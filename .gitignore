@@ -1,0 +1,49 @@
+# Arquivos do Python
+*.pyc
+__pycache__/
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+*.egg
+
+# Ambientes virtuais
+venv/
+env/
+.env
+*.env
+
+# Arquivos de configuração sensíveis
+*.sqlite3
+*.db
+local_settings.py
+settings.py  # Se contiver chaves secretas, ou crie um settings_local.py
+*.secret
+*.key
+
+# Arquivos de desenvolvimento
+.idea/  # PyCharm
+.vscode/  # Visual Studio Code
+*.sublime-project
+*.sublime-workspace
+
+# Arquivos de cache e temporários
+*.log
+*.pid
+*.seed
+*.bak
+*.swp
+*.swo
+.DS_Store  # macOS
+Thumbs.db  # Windows
+
+# Diretórios de mídia e estáticos (se gerados localmente)
+media/
+staticfiles/
+
+# Arquivos de testes e cobertura
+htmlcov/
+.coverage
+.pytest_cache/
+coverage.xml
+*.cover

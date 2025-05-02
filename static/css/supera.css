@@ -1,0 +1,89 @@
+/* Cores principais */
+:root {
+    --supera-vermelho: #B30000;
+    --supera-cinza: #f4f4f4;
+    --supera-preto: #111;
+    --supera-azul: #003366;
+}
+
+/* Geral */
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    color: var(--supera-preto);
+    background-color: white;
+}
+
+/* Cabeçalho */
+header {
+    background-color: var(--supera-vermelho);
+}
+
+header nav a {
+    color: white;
+    font-weight: 500;
+    transition: color 0.3s;
+}
+
+header nav a:hover {
+    color: #ddd;
+    text-decoration: none;
+}
+
+/* Banner principal */
+section.bg-light.text-center {
+    background-image: url('/static/images/banner_supera.jpg');
+    background-size: cover;
+    background-position: center;
+    color: white;
+    padding: 100px 20px;
+}
+
+section.bg-light.text-center h2,
+section.bg-light.text-center p {
+    text-shadow: 1px 1px 3px #000;
+}
+
+/* Seções */
+section {
+    padding: 60px 0;
+}
+
+section h3 {
+    color: var(--supera-vermelho);
+    font-weight: bold;
+    margin-bottom: 30px;
+    text-transform: uppercase;
+}
+
+/* Cards de Programas */
+.card {
+    border: none;
+    transition: transform 0.3s ease;
+}
+
+.card:hover {
+    transform: scale(1.03);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.card-title {
+    font-size: 1.2rem;
+    font-weight: bold;
+}
+
+/* Galeria */
+#galeria img {
+    border-radius: 8px;
+    transition: transform 0.3s ease;
+}
+
+#galeria img:hover {
+    transform: scale(1.05);
+}
+
+/* Rodapé */
+footer {
+    background-color: var(--supera-preto);
+    color: #ccc;
+    font-size: 0.9rem;
+}

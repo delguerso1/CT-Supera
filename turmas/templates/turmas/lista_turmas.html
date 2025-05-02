@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Turmas do Centro de Treinamento</h2>
+        <a href="{% url 'turmas:criar_turma' %}" class="btn btn-primary">Nova Turma</a>
+    </div>
+
+    {% if turmas %}
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Nome</th>
+                    <th>Dia da Semana</th>
+                    <th>Horário</th>
+                    <th>Capacidade Máxima</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for turma in turmas %}
+                    <tr>
+                        <td>{{ turma.nome }}</td>
+                        <td>{{ turma.get_dia_semana_display }}</td>
+                        <td>{{ turma.horario|time:"H:i" }}</td>
+                        <td>{{ turma.capacidade_maxima }}</td>
+                        <td>
+                            <a href="{% url 'turmas:editar_turma' turma.id %}" class="btn btn-sm btn-warning">Editar</a>
+                            <a href="{% url 'turmas:excluir_turma' turma.id %}" class="btn btn-sm btn-danger" onclick="return confirm('Tem certeza que deseja excluir esta turma?');">Excluir</a>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>Não há turmas cadastradas.</p>
+    {% endif %}
+</div>
+{% endblock %}

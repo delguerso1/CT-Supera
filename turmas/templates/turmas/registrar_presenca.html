@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2>Registrar Presença - {{ aula }}</h2>
+
+<form method="post">
+    {% csrf_token %}
+    <table>
+        <tr>
+            <th>Aluno</th>
+            <th>Presente?</th>
+        </tr>
+        {% for form in formset %}
+        <tr>
+            <td>{{ form.aluno.value }}</td>
+            <td>{{ form.presente }}</td>
+        </tr>
+        {{ form.id }}
+        {% endfor %}
+    </table>
+    <button type="submit">Salvar Presenças</button>
+</form>
+
+<a href="{% url 'listar_aulas' aula.turma.id %}">Voltar para Aulas</a>
+{% endblock %}

@@ -1,0 +1,43 @@
+<!-- alunos/templates/alunos/listar_precadastros.html -->
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Pré-cadastros - Painel Administrativo</title>
+</head>
+<body>
+    <h1>Lista de Agendamentos</h1>
+
+    <table border="1">
+        <tr>
+            <th>Nome</th>
+            <th>Telefone</th>
+            <th>CPF</th>
+            <th>Dia</th>
+            <th>Hora</th>
+            <th>Status</th>
+            <th>Ações</th>
+        </tr>
+        {% for precadastro in precadastros %}
+            <tr>
+                <td>{{ precadastro.nome }}</td>
+                <td>{{ precadastro.telefone }}</td>
+                <td>{{ precadastro.cpf }}</td>
+                <td>{{ precadastro.dia_aula_experimental }}</td>
+                <td>{{ precadastro.horario_aula_experimental }}</td>
+                <td>{{ precadastro.get_status_display }}</td>
+                <td>
+                    <a href="{% url 'atualizar_status_precadastro' precadastro.id %}">Atualizar Status</a>
+                </td>
+            </tr>
+        {% empty %}
+            <tr>
+                <td colspan="7">Nenhum agendamento encontrado.</td>
+            </tr>
+        {% endfor %}
+    </table>
+
+    <a href="{% url 'agendar_aula' %}">Agendar nova aula (teste)</a>
+</body>
+</html>

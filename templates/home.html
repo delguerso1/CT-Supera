@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2>Quem Somos</h2>
+<p>O CT Supera Vôlei é uma escola dedicada à formação de atletas e promoção do esporte com excelência e paixão pelo vôlei de praia.</p>
+
+<hr>
+
+<h2>Supera News</h2>
+<ul>
+    <li>Campeonato Interno - Maio 2025</li>
+    <li>Aulão especial com atletas convidados - Junho 2025</li>
+    <li>Novo CT em construção na Zona Oeste!</li>
+</ul>
+
+<hr>
+
+<h2>Galeria de Fotos</h2>
+<div class="row">
+    <div class="col-md-4">
+        <img src="{% static 'img/galeria1.jpg' %}" class="img-fluid" alt="Foto 1">
+    </div>
+    <div class="col-md-4">
+        <img src="{% static 'img/galeria2.jpg' %}" class="img-fluid" alt="Foto 2">
+    </div>
+    <div class="col-md-4">
+        <img src="{% static 'img/galeria3.jpg' %}" class="img-fluid" alt="Foto 3">
+    </div>
+</div>
+{% endblock %}

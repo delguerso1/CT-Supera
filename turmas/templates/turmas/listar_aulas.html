@@ -1,0 +1,8 @@
+<h2>Aulas da Turma: {{ turma.nome }}</h2>
+<ul>
+  {% for aula in aulas %}
+    <li>{{ aula.data }} às {{ aula.horario }}</li>
+  {% empty %}
+    <li>Nenhuma aula registrada.</li>
+  {% endfor %}
+</ul>
