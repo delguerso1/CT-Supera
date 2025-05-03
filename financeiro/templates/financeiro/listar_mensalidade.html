@@ -1,0 +1,75 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+  <h2>Mensalidades</h2>
+
+  <!-- Filtros -->
+  <form method="get" class="row g-3 mb-4">
+    <div class="col-md-4">
+      <label for="aluno" class="form-label">Aluno</label>
+      <select name="aluno" id="aluno" class="form-select">
+        <option value="">Todos</option>
+        {% for aluno in alunos %}
+          <option value="{{ aluno.id }}" {% if aluno_atual == aluno.id %}selected{% endif %}>
+            {{ aluno.nome }}
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="col-md-4">
+      <label for="status" class="form-label">Status</label>
+      <select name="status" id="status" class="form-select">
+        <option value="">Todos</option>
+        <option value="pendente" {% if status_atual == 'pendente' %}selected{% endif %}>Pendente</option>
+        <option value="pago" {% if status_atual == 'pago' %}selected{% endif %}>Pago</option>
+      </select>
+    </div>
+
+    <div class="col-md-4 d-flex align-items-end">
+      <button type="submit" class="btn btn-primary w-100">Filtrar</button>
+    </div>
+  </form>
+
+  <!-- Tabela -->
+  <table class="table table-bordered">
+    <thead>
+      <tr>
+        <th>Aluno</th>
+        <th>Valor</th>
+        <th>Vencimento</th>
+        <th>Status</th>
+        <th>Ações</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for mensalidade in mensalidades %}
+      <tr>
+        <td>{{ mensalidade.aluno.nome }}</td>
+        <td>R$ {{ mensalidade.valor }}</td>
+        <td>{{ mensalidade.vencimento|date:"d/m/Y" }}</td>
+        <td>
+          {% if mensalidade.status == 'pago' %}
+            <span class="badge bg-success">Pago</span>
+          {% else %}
+            <span class="badge bg-warning text-dark">Pendente</span>
+          {% endif %}
+        </td>
+        <td>
+        {% if mensalidade.status == 'pago' %}
+          <a href="{% url 'financeiro:visualizar_recibo' mensalidade.id %}" class="btn btn-sm btn-outline-success">Recibo</a>
+        {% endif %}
+          <a href="{% url 'financeiro:editar_mensalidade' mensalidade.id %}" class="btn btn-sm btn-outline-primary">Editar</a>
+          <a href="{% url 'financeiro:excluir_mensalidade' mensalidade.id %}" class="btn btn-sm btn-outline-danger">Excluir</a>
+        </td>
+      </tr>
+      {% empty %}
+      <tr>
+        <td colspan="5" class="text-center">Nenhuma mensalidade encontrada.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

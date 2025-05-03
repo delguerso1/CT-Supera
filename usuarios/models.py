@@ -1,16 +1,14 @@
-# usuarios/models.py
-
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 
 class Usuario(AbstractUser):
-    TIPOS = (
+    TIPO_USUARIO_CHOICES= (
         ('gerente', 'Gerente'),
         ('funcionario', 'Funcionário'),
         ('aluno', 'Aluno'),
     )
     
-    tipo = models.CharField(max_length=20, choices=TIPOS)
+    tipo = models.CharField(max_length=20, choices=TIPO_USUARIO_CHOICES)
     
     telefone = models.CharField(max_length=20, blank=True, null=True)
     cpf = models.CharField(max_length=14, unique=True, blank=True, null=True)

@@ -23,5 +23,6 @@ urlpatterns = [
     path('', pagina_inicial, name='home'), 
     path('alunos/', include('alunos.urls')),
     path('turmas/', include('turmas.urls')),
-    path('funcionarios/', include('funcionarios.urls')),    
+    path('funcionarios/', include('funcionarios.urls')),
+    path('financeiro/', include('financeiro.urls')),     
 ]

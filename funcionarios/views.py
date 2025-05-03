@@ -6,17 +6,6 @@ from .forms import CadastroFuncionarioForm
 from usuarios.models import Usuario
 from django.contrib import messages
 
-@login_required
-def cadastrar_funcionario(request):
-    if request.method == 'POST':
-        form = FuncionarioForm(request.POST)
-        if form.is_valid():
-            funcionario = form.save(commit=False)
-            funcionario.user = request.user
-            funcionario.save()
-            return redirect('dashboard')
-    else:
-        form = FuncionarioForm()
         
 @login_required
 def lista_funcionarios(request):
