@@ -12,6 +12,7 @@ venv/
 env/
 .env
 *.env
+.venv/
 
 # Arquivos de configuração sensíveis
 *.sqlite3

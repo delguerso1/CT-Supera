@@ -1,9 +1,8 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
-from .models import Turma, Aula, Presenca
+from .models import Turma
 from .forms import TurmaForm
-from ct.models import CentroTreinamento
-from alunos.models import PreCadastro
+
 
 @login_required
 def lista_turmas(request):
@@ -46,17 +45,4 @@ def excluir_turma(request, pk):
         return redirect('turmas:lista_turmas')
     return render(request, 'turmas/excluir_turma.html', {'turma': turma})
 
-def listar_aulas(request, turma_id):
-    turma = get_object_or_404(Turma, id=turma_id)
-    aulas = turma.aula_set.order_by('-data')
-    return render(request, 'turmas/listar_aulas.html', {'turma': turma, 'aulas': aulas})
 
-@login_required
-def registrar_presenca(request, aula_id):
-    aula = get_object_or_404(Aula, id=aula_id)
-
-    # Se o usuário for professor, ele só pode acessar suas turmas
-    if request.user.tipo_usuario == 'funcionario':
-        funcionario = get_object_or_404(Funcionario, user=request.user)
-        if aula.turma.professor != funcionario:
-            return render(request, '403.html')

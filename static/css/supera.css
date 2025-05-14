@@ -10,7 +10,7 @@
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     color: var(--supera-preto);
-    background-color: white;
+    background-color: black;
 }
 
 /* Cabeçalho */
@@ -86,4 +86,15 @@ footer {
     background-color: var(--supera-preto);
     color: #ccc;
     font-size: 0.9rem;
+}
+
+
+.quem-somos {
+    background-image: url('/static/img/fundo_quem_somos.jpg'); /* Ajuste o caminho conforme necessário */
+    background-size: cover; /* Faz a imagem cobrir toda a área */
+    background-position: center; /* Centraliza a imagem */
+    background-repeat: no-repeat; /* Evita repetição da imagem */
+    color: white; /* Garante que o texto fique visível */
+    padding: 100px 20px; /* Ajusta o espaçamento interno */
+    text-align: center; /* Centraliza o conteúdo */
 }

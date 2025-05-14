@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+  <h2>Painel do Gerente</h2>
+  <div class="row mt-4">
+    <div class="col-md-4">
+      <div class="card text-white bg-primary mb-3">
+        <div class="card-header">Alunos Ativos</div>
+        <div class="card-body">
+          <h4 class="card-title">{{ alunos_ativos }}</h4>
+        </div>
+      </div>
+    </div>
+    
+    <div class="col-md-4">
+      <div class="card text-white bg-success mb-3">
+        <div class="card-header">Professores Ativos</div>
+        <div class="card-body">
+          <h4 class="card-title">{{ professores }}</h4>
+        </div>
+      </div>
+    </div>
+    
+    <div class="col-md-4">
+      <div class="card text-white bg-info mb-3">
+        <div class="card-header">Pagamentos este mês</div>
+        <div class="card-body">
+          <h4 class="card-title">{{ pagamentos_mes }}</h4>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
