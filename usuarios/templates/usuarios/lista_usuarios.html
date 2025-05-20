@@ -1,0 +1,60 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Lista de Usuários</h2>
+
+    <a href="{% url 'usuarios:cadastrar_usuario' %}" class="btn btn-primary mb-3">Cadastrar Novo Usuário</a>
+
+    <h3 class="mt-4 text-primary">Gerentes</h3>
+    {% if gerentes %}
+        <ul class="list-group mb-4">
+            {% for usuario in gerentes %}
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    {{ usuario.nome }} ({{ usuario.cpf }})
+                    <span>
+                        <a href="{% url 'usuarios:editar_usuario' usuario.id %}" class="btn btn-sm btn-warning">Editar</a>
+                        <a href="{% url 'usuarios:excluir_usuario' usuario.id %}" class="btn btn-sm btn-danger">Excluir</a>
+                    </span>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p class="text-muted">Nenhum gerente cadastrado.</p>
+    {% endif %}
+
+    <h3 class="mt-4 text-success">Professores</h3>
+    {% if professores %}
+        <ul class="list-group mb-4">
+            {% for usuario in professores %}
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    {{ usuario.nome }} ({{ usuario.cpf }})
+                    <span>
+                        <a href="{% url 'usuarios:editar_usuario' usuario.id %}" class="btn btn-sm btn-warning">Editar</a>
+                        <a href="{% url 'usuarios:excluir_usuario' usuario.id %}" class="btn btn-sm btn-danger">Excluir</a>
+                    </span>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p class="text-muted">Nenhum professor cadastrado.</p>
+    {% endif %}
+
+    <h3 class="mt-4 text-info">Alunos</h3>
+    {% if alunos %}
+        <ul class="list-group mb-4">
+            {% for usuario in alunos %}
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    {{ usuario.nome }} ({{ usuario.cpf }})
+                    <span>
+                        <a href="{% url 'usuarios:editar_usuario' usuario.id %}" class="btn btn-sm btn-warning">Editar</a>
+                        <a href="{% url 'usuarios:excluir_usuario' usuario.id %}" class="btn btn-sm btn-danger">Excluir</a>
+                    </span>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p class="text-muted">Nenhum aluno cadastrado.</p>
+    {% endif %}
+</div>
+{% endblock %}

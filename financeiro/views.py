@@ -1,27 +1,25 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
-from .models import Mensalidade, Despesa
-from .forms import MensalidadeForm, DespesaForm
-from alunos.models import Aluno
-from funcionarios.models import Funcionario
 from django.db.models import Sum
 from django.utils import timezone
 from django.http import HttpResponseForbidden
-
+from .models import Mensalidade, Despesa
+from .forms import MensalidadeForm, DespesaForm
+from usuarios.models import Usuario
 
 @login_required
 def listar_mensalidades(request):
     """Lista mensalidades do CT do gerente logado."""
     try:
-        funcionario = Funcionario.objects.get(user=request.user)
-        ct = funcionario.ct
-    except Funcionario.DoesNotExist:
-        return render(request, "403.html")  # Bloqueia se não for funcionário
+        gerente = Usuario.objects.get(id=request.user.id, tipo="gerente")  # 🔹 Busca gerente diretamente
+    except Usuario.DoesNotExist:
+        return render(request, "404.html")  # 🔹 Bloqueia se não for gerente
 
-    alunos = Aluno.objects.filter(ct=ct)
-    mensalidades = Mensalidade.objects.filter(aluno__ct=ct)
+    # 🔹 Agora buscamos alunos diretamente do modelo `Usuario`
+    alunos = Usuario.objects.filter(tipo="aluno", ct=gerente.ct)
+    mensalidades = Mensalidade.objects.filter(aluno__in=alunos)  # 🔹 Busca mensalidades associadas aos alunos
 
-    # Filtros GET
+    # 🔹 Aplicação de filtros GET
     status = request.GET.get("status")
     aluno_id = request.GET.get("aluno")
 
@@ -41,8 +39,8 @@ def listar_mensalidades(request):
 @login_required
 def registrar_mensalidade(request):
     """Registro de nova mensalidade (apenas gerentes)."""
-    if request.user.tipo_usuario != "gerente":
-        return render(request, "403.html")
+    if request.user.tipo != "gerente":
+        return render(request, "404.html")
 
     if request.method == "POST":
         form = MensalidadeForm(request.POST, user=request.user)
@@ -85,7 +83,7 @@ def visualizar_recibo(request, mensalidade_id):
     """Exibe o recibo de uma mensalidade paga."""
     mensalidade = get_object_or_404(Mensalidade, id=mensalidade_id)
 
-    if request.user.tipo_usuario != "gerente" and mensalidade.aluno.user != request.user:
+    if request.user.tipo != "gerente" and mensalidade.aluno.user != request.user:
         return HttpResponseForbidden("Você não tem permissão para visualizar este recibo.")
 
     if mensalidade.status != "pago":
@@ -97,11 +95,9 @@ def visualizar_recibo(request, mensalidade_id):
 def listar_despesas(request):
     """Lista todas as despesas do sistema."""
     try:
-        funcionario = Funcionario.objects.get(user=request.user)
-        if funcionario.cargo != 'gerente':
-            return render(request, "403.html")
-    except Funcionario.DoesNotExist:
-        return render(request, "403.html")
+        gerente = Usuario.objects.get(id=request.user.id, tipo="gerente")  # 🔹 Substituí `Funcionario`
+    except Usuario.DoesNotExist:
+        return render(request, "403.html")  # Bloqueia se não for gerente
 
     despesas = Despesa.objects.all()
     return render(request, "financeiro/listar_despesas.html", {"despesas": despesas})
@@ -145,50 +141,51 @@ def excluir_despesa(request, despesa_id):
 
     return render(request, "financeiro/confirmar_exclusao.html", {"despesa": despesa})
 
-
-
 @login_required
 def dashboard_financeiro(request):
     """Painel financeiro com totais do mês."""
+    
+    # 🔹 Verifica se o usuário tem permissão
+    if request.user.tipo != "gerente":
+        return render(request, "404.html")
+    
+    # 🔹 Obtém o mês e ano dos parâmetros GET, com proteção contra erro de conversão
     try:
-        funcionario = Funcionario.objects.get(user=request.user)
-        if funcionario.cargo != 'gerente':
-            return render(request, "403.html")
-    except Funcionario.DoesNotExist:
-        return render(request, "403.html")
-
-    mes = request.GET.get("mes")
-    ano = request.GET.get("ano")
-
-    # Se não houver parâmetros, usa o mês e ano atual
-    if not mes:
+        mes = int(request.GET.get("mes", timezone.now().month))
+        ano = int(request.GET.get("ano", timezone.now().year))
+    except ValueError:
         mes = timezone.now().month
-    if not ano:
         ano = timezone.now().year
 
-    # Converte para inteiro
-    mes = int(mes)
-    ano = int(ano)
-
+    # 🔹 Filtra mensalidades e despesas do período
     mensalidades = Mensalidade.objects.filter(data_vencimento__month=mes, data_vencimento__year=ano)
     despesas = Despesa.objects.filter(data__month=mes, data__year=ano)
 
+    # 🔹 Calcula totais protegendo contra valores `None`
     total_pago = mensalidades.filter(status="pago").aggregate(Sum("valor"))["valor__sum"] or 0
     total_pendente = mensalidades.filter(status="pendente").aggregate(Sum("valor"))["valor__sum"] or 0
     total_atrasado = mensalidades.filter(status="atrasado").aggregate(Sum("valor"))["valor__sum"] or 0
-    total_geral = mensalidades.aggregate(Sum("valor"))["valor__sum"] or 0
     total_despesas = despesas.aggregate(Sum("valor"))["valor__sum"] or 0
+    saldo_final = total_pago - total_despesas  # 🔹 Protegido contra erro de soma com `None`
 
-    saldo_final = total_pago - total_despesas  # Calcula saldo do mês
-
-    context = {
+    # 🔹 Passa os dados para o template
+    return render(request, "financeiro/dashboard_financeiro.html", {
         "total_pago": total_pago,
         "total_pendente": total_pendente,
         "total_atrasado": total_atrasado,
-        "total_geral": total_geral,
         "total_despesas": total_despesas,
         "saldo_final": saldo_final,
-        "mes_atual": int(mes),
-        "ano_atual": int(ano),
-    }
-    return render(request, "financeiro/dashboard.html", context)
+        "mes_atual": mes,
+        "ano_atual": ano,
+        "meses": list(range(1, 13)),  # 🔹 Garante que o template tenha a lista correta de meses
+    })
+
+@login_required
+def relatorio_financeiro(request):
+    """Gera um relatório financeiro com mensalidades e despesas."""
+    try:
+        gerente = Usuario.objects.get(id=request.user.id, tipo="gerente")  # 🔹 Busca gerente diretamente
+    except Usuario.DoesNotExist:
+        return render(request, "404.html")
+
+

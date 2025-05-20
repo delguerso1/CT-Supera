@@ -2,24 +2,35 @@
 {% load static %}
 
 {% block content %}
-<h2>Registrar Presença - {{ turma.nome }}</h2>
-<form method="post">
-    {% csrf_token %}
-    <p><strong>Data:</strong> {{ hoje }}</p>
+<div class="container mt-4">
+    <h2 class="text-center">Registrar Presença - {{ turma.nome }}</h2>
 
-    <label><input type="checkbox" id="check_todos"> Marcar todos</label>
-    <ul>
-        {% for matricula in matriculas %}
-            <li>
-                <label>
-                    <input type="checkbox" name="presenca" value="{{ matricula.id }}" class="check_individual">
-                    {{ matricula.aluno.first_name }} ({{ matricula.aluno.username }})
-                </label>
-            </li>
-        {% endfor %}
-    </ul>
-    <button type="submit" class="btn btn-primary">Registrar Presença</button>
-</form>
+    <div class="card shadow-sm p-4">
+        <form method="post">
+            {% csrf_token %}
+            <p><strong>Data:</strong> {{ hoje }}</p>
+
+            <label class="mb-3">
+                <input type="checkbox" id="check_todos"> Marcar todos
+            </label>
+
+            <ul class="list-group mb-3">
+                {% for matricula in matriculas %}
+                <li class="list-group-item">
+                    <label class="form-check-label">
+                        <input type="checkbox" name="presenca" value="{{ matricula.id }}" class="form-check-input check_individual">
+                        {{ matricula.aluno.usuario.first_name }} ({{ matricula.aluno.usuario.username }})
+                    </label>
+                </li>
+                {% endfor %}
+            </ul>
+
+            <div class="text-center">
+                <button type="submit" class="btn btn-success">Registrar Presença</button>
+            </div>
+        </form>
+    </div>
+</div>
 
 <script>
     document.getElementById('check_todos').addEventListener('change', function() {

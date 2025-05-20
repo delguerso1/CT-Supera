@@ -1,40 +1,26 @@
 from django.db import models
-from django.contrib.auth import get_user_model
-from funcionarios.models import Funcionario
-from ct.models import CentroDeTreinamento 
+from ct.models import CentroDeTreinamento
+from usuarios.models import Usuario
 
-User = get_user_model()
+class DiaSemana(models.Model):
+    nome = models.CharField(max_length=20, unique=True)
 
-DIAS_SEMANA = [
-    ('segunda', 'Segunda-feira'),
-    ('terca', 'Terça-feira'),
-    ('quarta', 'Quarta-feira'),
-    ('quinta', 'Quinta-feira'),
-    ('sexta', 'Sexta-feira'),
-    ('sabado', 'Sábado'),
-    ('domingo', 'Domingo'),
-]
+    def __str__(self):
+        return self.nome
 
 class Turma(models.Model):
     ct = models.ForeignKey(CentroDeTreinamento, on_delete=models.CASCADE)  
     nome = models.CharField(max_length=100)
-    dia_semana = models.CharField(max_length=10, choices=DIAS_SEMANA)
+    dias_semana = models.ManyToManyField(DiaSemana)  # 🔹 Agora aceita vários dias!
     horario = models.TimeField()
     capacidade_maxima = models.PositiveIntegerField(default=0)
-    professor = models.ForeignKey(
-        Funcionario, 
-        on_delete=models.SET_NULL,  # Pode ser CASCADE se desejar
-        null=True, 
-        blank=True,
-        limit_choices_to={"cargo": "professor"}  # 🔹 Filtro para mostrar apenas professores!
-    )
-
-
+    professor = models.ForeignKey(Usuario, on_delete=models.SET_NULL, null=True, blank=True, related_name="turmas")  # 🔹 Relaciona com o usuário
 
     class Meta:
-        unique_together = ("ct", "dia_semana", "horario")
-        ordering = ["dia_semana", "horario"]
+        unique_together = ("ct", "horario")  # 🔹 Removemos `dia_semana` daqui
+        ordering = ["horario"]
         verbose_name_plural = "Turmas"
 
     def __str__(self):
-        return f"{self.ct.nome} - {self.nome} ({self.get_dia_semana_display()} às {self.horario})"
+        dias = ", ".join([dia.nome for dia in self.dias_semana.all()])
+        return f"{self.ct.nome} - {self.nome} ({dias} às {self.horario})"

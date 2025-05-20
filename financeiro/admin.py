@@ -17,12 +17,11 @@ class MensalidadeAdmin(admin.ModelAdmin):
         return f"R$ {obj.valor:.2f}"
     formatar_valor.short_description = "Valor"
 
-
 @admin.register(Despesa)
 class DespesaAdmin(admin.ModelAdmin):
-    list_display = ("categoria", "funcionario", "valor", "data", "descricao")
-    list_filter = ("categoria", "data")
-    search_fields = ("funcionario__user__username", "descricao")
+    list_display = ("categoria", "usuario", "valor", "data", "descricao")  # 🔹 Substituí `funcionario` por `usuario`
+    list_filter = ["categoria", "usuario", "data"]
+    search_fields = ("usuario__username", "descricao")  # 🔹 Corrigido erro aqui
     ordering = ["-data"]
     date_hierarchy = "data"
     list_per_page = 20

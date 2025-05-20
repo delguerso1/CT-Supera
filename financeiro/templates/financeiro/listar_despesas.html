@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2 class="text-center">Lista de Despesas</h2>
+
+    <div class="card p-4 shadow-sm">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Descrição</th>
+                    <th>Valor (R$)</th>
+                    <th>Data</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for despesa in despesas %}
+                <tr>
+                    <td>{{ despesa.descricao }}</td>
+                    <td>{{ despesa.valor }}</td>
+                    <td>{{ despesa.data }}</td>
+                    <td>
+                        <a href="{% url 'financeiro:editar_despesa' despesa.id %}" class="btn btn-warning">Editar</a>
+                        <a href="{% url 'financeiro:excluir_despesa' despesa.id %}" class="btn btn-danger">Excluir</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <a href="{% url 'financeiro:registrar_despesa' %}" class="btn btn-success">Adicionar Nova Despesa</a>
+    </div>
+</div>
+{% endblock %}

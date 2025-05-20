@@ -1,11 +1,13 @@
 from django.contrib import admin
 from .models import Turma
 
-@admin.register(Turma)
 class TurmaAdmin(admin.ModelAdmin):
-    list_display = ("nome", "dia_semana", "horario", "ct", "professor")
-    list_filter = ("dia_semana", "ct")
-    search_fields = ("nome", "professor__nome")
-    ordering = ["dia_semana", "horario"]
-    actions = ["delete_selected"]
-    
+    list_display = ["nome", "display_dias_semana", "horario", "capacidade_maxima", "professor"]  # 🔹 Alterado para `dias_semana`
+    list_filter = ["dias_semana", "horario", "professor"]
+    ordering = ["horario"]  # 🔹 Removi `dia_semana` do ordering
+
+    def display_dias_semana(self, obj):
+        return ", ".join([dia.nome for dia in obj.dias_semana.all()])  # 🔹 Mostra os dias selecionados
+    display_dias_semana.short_description = "Dias da Semana"
+
+admin.site.register(Turma, TurmaAdmin)

@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <h2>Alteração de Senha</h2>
+    <form method="POST">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit" class="btn btn-primary">Alterar Senha</button>
+    </form>
+
+    <!-- 🔹 Redireciona corretamente com base no tipo de usuário -->
+    <div class="mt-3 text-center">
+        {% if user.tipo == "gerente" %}
+            <a href="{% url 'funcionarios:painel_gerente' %}" class="btn btn-outline-primary">Voltar ao Painel Gerente</a>
+        {% elif user.tipo == "professor" %}
+            <a href="{% url 'funcionarios:painel_professor' %}" class="btn btn-outline-primary">Voltar ao Painel Professor</a>
+        {% elif user.tipo == "aluno" %}
+            <a href="{% url 'alunos:painel_aluno' %}" class="btn btn-outline-primary">Voltar ao Painel Aluno</a>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

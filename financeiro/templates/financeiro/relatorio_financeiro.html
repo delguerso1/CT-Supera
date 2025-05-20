@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+  <h2 class="text-center">Relatório Financeiro</h2>
+
+  <form method="get" class="row g-3 mb-4">
+    <div class="col-md-3">
+      <label for="mes" class="form-label">Mês</label>
+      <select name="mes" id="mes" class="form-select">
+        {% for m in meses %}
+          <option value="{{ m }}" {% if m == mes_atual %}selected{% endif %}>{{ m }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-3">
+      <label for="ano" class="form-label">Ano</label>
+      <input type="number" name="ano" id="ano" class="form-control" value="{{ ano_atual }}">
+    </div>
+    <div class="col-md-3 d-flex align-items-end">
+      <button type="submit" class="btn btn-primary">Filtrar</button>
+    </div>
+  </form>
+
+  <h4>Mensalidades</h4>
+  <table class="table table-striped">
+    <thead>
+      <tr>
+        <th>Aluno</th>
+        <th>Valor</th>
+        <th>Status</th>
+        <th>Vencimento</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for mensalidade in mensalidades %}
+      <tr>
+        <td>{{ mensalidade.aluno.nome }}</td>
+        <td>R$ {{ mensalidade.valor|floatformat:2 }}</td>
+        <td>{{ mensalidade.status }}</td>
+        <td>{{ mensalidade.data_vencimento|date:"d/m/Y" }}</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="4" class="text-center">Nenhuma mensalidade encontrada.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <h4>Despesas</h4>
+  <table class="table table-striped">
+    <thead>
+      <tr>
+        <th>Descrição</th>
+        <th>Valor</th>
+        <th>Data</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for despesa in despesas %}
+      <tr>
+        <td>{{ despesa.descricao }}</td>
+        <td>R$ {{ despesa.valor|floatformat:2 }}</td>
+        <td>{{ despesa.data|date:"d/m/Y" }}</td>
+      </tr>
+      {% empty %}
+      <tr><td colspan="3" class="text-center">Nenhuma despesa encontrada.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="text-center mt-4">
+    <a href="{% url 'financeiro:dashboard_financeiro' %}" class="btn btn-secondary">Voltar ao Dashboard</a>
+  </div>
+</div>
+{% endblock %}

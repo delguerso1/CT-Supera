@@ -1,0 +1,15 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2>💳 Pagamento de Mensalidade</h2>
+
+<p>💰 Valor: R$ {{ mensalidade.valor }}</p>
+<p>📅 Vencimento: {{ mensalidade.vencimento }}</p>
+
+<form method="post">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-success">Confirmar Pagamento</button>
+</form>
+
+<a href="{% url 'alunos:historico_pagamentos' %}" class="btn btn-secondary">Cancelar</a>
+{% endblock %}

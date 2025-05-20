@@ -1,16 +1,17 @@
 from django.db import models
+from django.contrib.auth import get_user_model
+from turmas.models import Turma
+from datetime import date
 
+User = get_user_model()
 
-class Funcionario(models.Model):
-    user = models.OneToOneField("usuarios.Usuario", on_delete=models.CASCADE)
-    nome = models.CharField(max_length=100, default="Funcionário Padrão")
-    telefone = models.CharField(max_length=20, blank=True, null=True)
-    cargo = models.CharField(max_length=50, choices=[("professor", "Professor"), ("gerente", "Gerente")])
-    despesa = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
-    turmas = models.ManyToManyField("turmas.Turma", blank=True)
-    
-    # 🔹 Adicionando campo `ativo`
-    ativo = models.BooleanField(default=True)
+class Presenca(models.Model):
+    usuario = models.ForeignKey(User, on_delete=models.CASCADE, related_name="presencas")
+    turma = models.ForeignKey(Turma, on_delete=models.CASCADE, related_name="presencas")
+    data = models.DateField(default=date.today)
+
+    class Meta:
+        unique_together = ("usuario", "data")  # 🔹 Impede duplicação no mesmo dia
 
     def __str__(self):
-        return self.nome
+        return f"{self.usuario.nome} - {self.data} ({self.turma.nome})"

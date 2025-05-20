@@ -1,11 +1,11 @@
 from django import forms
-from .models import Mensalidade
-from .models import Despesa
+from .models import Mensalidade, Despesa
+from usuarios.models import Usuario
 
 class DespesaForm(forms.ModelForm):
     class Meta:
         model = Despesa
-        fields = ["categoria", "funcionario", "descricao", "valor", "data"]
+        fields = ["categoria", "usuario", "descricao", "valor", "data"]  # 🔹 Substituí `funcionario` por `usuario`
         widgets = {
             "data": forms.DateInput(attrs={"type": "date", "class": "form-control"}),
             "valor": forms.NumberInput(attrs={"class": "form-control"}),
@@ -13,10 +13,14 @@ class DespesaForm(forms.ModelForm):
         }
         labels = {
             "categoria": "Categoria",
-            "funcionario": "Funcionário",
+            "usuario": "Usuário",  # 🔹 Alterei de "Funcionário" para "Usuário"
             "descricao": "Descrição",
             "valor": "Valor",
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["usuario"].queryset = Usuario.objects.filter(tipo="gerente")  # 🔹 Filtra apenas gerentes
 
 class MensalidadeForm(forms.ModelForm):
     class Meta:
@@ -27,6 +31,7 @@ class MensalidadeForm(forms.ModelForm):
         user = kwargs.pop("user", None)  # Obtém o usuário logado
         super().__init__(*args, **kwargs)
 
-        # Filtra apenas alunos do CT do gerente logado
-        if user and hasattr(user, "funcionario") and user.funcionario.cargo == "gerente":
-            self.fields["aluno"].queryset = user.funcionario.ct.alunos.all()
+        # 🔹 Filtra apenas alunos do CT do gerente logado
+        if user and user.tipo == "gerente":
+            self.fields["aluno"].queryset = Usuario.objects.filter(tipo="aluno", ct=user.ct)
+

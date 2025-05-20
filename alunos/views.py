@@ -1,167 +1,101 @@
 from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth.decorators import login_required, user_passes_test
+from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from .forms import PreCadastroForm
-from .models import PreCadastro, Matricula, Presenca, Aluno, Pagamento
 from usuarios.models import Usuario
-from usuarios.utils import is_gerente, is_gerente_ou_professor, is_aluno
+from financeiro.models import Mensalidade
+from .forms import AlunoPerfilForm
 from datetime import date
+from funcionarios.models import Presenca
 
-# === AGENDA AULA EXPERIMENTAL ===
+# === PAINEL DO ALUNO ===
+@login_required
+def painel_aluno(request):
+    """Página principal do aluno, com histórico e ações disponíveis."""
+    usuario = request.user
+    historico_aulas = Presenca.objects.filter(usuario=usuario).order_by('-data')
+    historico_pagamentos = Mensalidade.objects.filter(aluno=usuario).order_by('-vencimento')
 
-def agendar_aula_experimental(request):
+    return render(request, "alunos/painel_aluno.html", {
+        "usuario": usuario,
+        "historico_aulas": historico_aulas,
+        "historico_pagamentos": historico_pagamentos,
+        "pagamento_ok": pagamento_em_dia(Usuario),  # 🔹 Verifica pagamento
+    })
+
+# === EDIÇÃO DE PERFIL ===
+@login_required
+def editar_perfil_aluno(request):
+    """Permite que o aluno edite suas informações pessoais."""
+    aluno = request.user
+
     if request.method == 'POST':
-        form = PreCadastroForm(request.POST)
+        form = AlunoPerfilForm(request.POST, instance=aluno)
         if form.is_valid():
             form.save()
-            messages.success(request, "Aula experimental agendada com sucesso!")  # Feedback ao usuário
-            return redirect('listar_precadastros')  # Melhor que 'sucesso_agendamento', caso não exista
+            messages.success(request, "✅ Dados atualizados com sucesso!")
+            return redirect('painel_aluno')
     else:
-        form = PreCadastroForm()
+        form = AlunoPerfilForm(instance=aluno)
 
-    return render(request, 'alunos/agendar_aula_experimental.html', {'form': form})
-
-# === LISTAGEM E GERENCIAMENTO DE PRÉ-CADASTROS ===
-
-@login_required
-@user_passes_test(is_gerente_ou_professor)
-def listar_precadastros(request):
-    precadastros = PreCadastro.objects.all().order_by('-criado_em')
-    return render(request, 'alunos/listar_precadastros.html', {'precadastros': precadastros})
-
-@login_required
-@user_passes_test(is_gerente_ou_professor)
-def atualizar_status_precadastro(request, id_precadastro):
-    precadastro = get_object_or_404(PreCadastro, id=id_precadastro)
-
-    if request.method == 'POST':
-        novo_status = request.POST.get('status')
-
-        # Verificar se o status informado é válido antes de salvar
-        if novo_status in dict(PreCadastro.STATUS_CHOICES).keys():
-            precadastro.status = novo_status
-        else:
-            messages.error(request, "Status inválido.")
-            return redirect('listar_precadastros')
-
-        if novo_status == 'compareceu' and hasattr(precadastro, 'finalizar_agendamento'):
-            precadastro.finalizar_agendamento()
-
-        if novo_status == 'matriculado':
-            if not Usuario.objects.filter(cpf=precadastro.cpf).exists():
-                usuario = Usuario.objects.create_user(
-                    username=precadastro.cpf.replace(".", "").replace("-", ""),
-                    password='senha_inicial123',
-                    first_name=precadastro.nome,
-                    tipo_usuario='aluno',
-                    cpf=precadastro.cpf,
-                    telefone=precadastro.telefone,
-                    is_active=True,
-                )
-                
-                # 🔹 Criando um objeto `Aluno` vinculado ao `Usuario`
-                aluno = Aluno.objects.create(usuario=usuario)
-
-                # 🔹 Criando a matrícula vinculada ao aluno
-                Matricula.objects.create(
-                    aluno=aluno, 
-                    turma=precadastro.turma, 
-                    ativo=True
-                )
-
-                messages.success(request, 'Aluno matriculado e usuário criado.')
-            else:
-                messages.info(request, 'Este CPF já possui cadastro.')
-
-        precadastro.save()
-        return redirect('listar_precadastros')
-
-    return render(request, 'alunos/atualizar_status_precadastro.html', {'precadastro': precadastro})
-
-# === GESTÃO EXCLUSIVA DE GERENTES ===
-
-@login_required
-@user_passes_test(is_gerente)
-def gerenciar_precadastros(request):
-    precadastros = PreCadastro.objects.all().order_by('-criado_em')
-    return render(request, 'alunos/gerenciar_precadastros.html', {'precadastros': precadastros})
-
-@login_required
-@user_passes_test(is_gerente)
-def confirmar_matricula(request, precadastro_id):
-    precadastro = get_object_or_404(PreCadastro, id=precadastro_id)
-    precadastro.status = 'matriculado'
-    precadastro.save()
-    messages.success(request, 'Matrícula confirmada com sucesso.')
-    return redirect('gerenciar_precadastros')
-
-@login_required
-@user_passes_test(is_gerente)
-def recusar_matricula(request, precadastro_id):
-    precadastro = get_object_or_404(PreCadastro, id=precadastro_id)
-    precadastro.status = 'nao_quiser_matricular'
-    precadastro.save()
-    messages.info(request, 'Matrícula recusada.')
-    return redirect('gerenciar_precadastros')
+    return render(request, "alunos/editar_perfil.html", {"form": form})
 
 # === CHECK-IN DE ALUNO ===
-
 @login_required
 def realizar_checkin(request):
+    """Aluno realiza check-in apenas se pagamento estiver em dia."""
     usuario = request.user
-
-    try:
-        matricula = Matricula.objects.get(aluno=usuario, ativo=True)
-    except Matricula.DoesNotExist:
-        return render(request, 'alunos/sem_matricula.html')
 
     if not pagamento_em_dia(usuario):
         return render(request, 'alunos/pendencia_pagamento.html')
 
     hoje = date.today()
-    dia_semana = str(hoje.strftime('%w'))  # Obtém números de 0 a 6
 
-    if dia_semana != str(matricula.turma.dia_semana):  
-        return render(request, 'alunos/checkin.html', {'mensagem': "Hoje não é o dia da sua turma."})
-
-    if Presenca.objects.filter(matricula=matricula, data=hoje).exists():
-        return render(request, 'alunos/checkin.html', {'mensagem': "Você já realizou o check-in para hoje."})
+    if Presenca.objects.filter(usuario=usuario, data=hoje).exists():
+        return render(request, 'alunos/checkin.html', {'mensagem': "✅ Você já realizou o check-in para hoje."})
 
     if request.method == 'POST':
-        Presenca.objects.create(
-            matricula=matricula,
-            data=hoje,
-            hora=matricula.turma.horario
-        )
-        messages.success(request, "Check-in realizado com sucesso!")
+        Presenca.objects.create(usuario=usuario, data=hoje)
+        messages.success(request, "✅ Check-in realizado com sucesso!")
         return redirect('painel_aluno')
 
     return render(request, 'alunos/checkin.html')
 
-# === VALIDAÇÃO DE PAGAMENTO ===
+# === PAGAMENTO === #
 
-def pagamento_em_dia(usuario):
-    pagamentos_pendentes = Pagamento.objects.filter(aluno=usuario, status="pendente")
-    return not pagamentos_pendentes.exists()  # Retorna False se houver pagamentos pendentes
-
-# === PAINEL DO ALUNO ===
 @login_required
-@user_passes_test(lambda u: u.tipo == "aluno")
-def painel_aluno(request):
-    usuario = request.user
-    aluno = Aluno.objects.filter(usuario=usuario).first()  # 🔹 Busca aluno sem erro 404
+def historico_pagamentos(request):
+    """Exibe todas as mensalidades do aluno, separadas por status."""
+    aluno = request.user
+    mensalidades_vencidas = Mensalidade.objects.filter(aluno=aluno, status="pendente", vencimento__lt=date.today())
+    mensalidades_vincendas = Mensalidade.objects.filter(aluno=aluno, status="pendente", vencimento__gte=date.today())
+    mensalidades_pagas = Mensalidade.objects.filter(aluno=aluno, status="pago")
 
-    if not aluno:  # 🔹 Se nenhum aluno for encontrado, exibe uma página informativa
-        return render(request, "alunos/aluno_nao_encontrado.html", {"usuario": usuario})
-
-    matricula = Matricula.objects.filter(aluno=aluno, ativo=True).first()
-
-    return render(request, "alunos/painel_aluno.html", {
-        "aluno": aluno,
-        "matricula": matricula,
-        "idade": aluno.idade,
+    return render(request, "alunos/historico_pagamentos.html", {
+        "mensalidades_vencidas": mensalidades_vencidas,
+        "mensalidades_vincendas": mensalidades_vincendas,
+        "mensalidades_pagas": mensalidades_pagas
     })
 
 @login_required
-def atualizar_dados_aluno(request):
-    return render(request, "alunos/atualizar_dados_aluno.html")
+def pagamento_em_dia(usuario):
+
+
+    """Verifica se o aluno está com a mensalidade em dia."""
+    return not Mensalidade.objects.filter(aluno=usuario, status="pendente").exists()
+
+@login_required
+def realizar_pagamento(request, mensalidade_id):
+    """Permite que o aluno pague uma mensalidade pendente."""
+    mensalidade = get_object_or_404(Mensalidade, id=mensalidade_id, aluno=request.user)
+
+    if mensalidade.status == "pago":
+        messages.error(request, "✅ Esta mensalidade já foi paga!")
+        return redirect("historico_pagamentos")
+
+    if request.method == "POST":
+        mensalidade.status = "pago"
+        mensalidade.save()
+        messages.success(request, "✅ Pagamento realizado com sucesso!")
+        return redirect("historico_pagamentos")
+
+    return render(request, "alunos/pagamento_mensalidade.html", {"mensalidade": mensalidade})

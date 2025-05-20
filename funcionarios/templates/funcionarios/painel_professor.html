@@ -40,11 +40,12 @@
 
     <div class="text-center mt-4">
         {% for turma in professor.turmas.all %}
-    <a href="{% url 'registrar_presenca' turma.id %}" class="btn btn-primary">Registrar Presença - {{ turma.nome }}</a>
+    <a href="{% url 'funcionarios:registrar_presenca' turma.id %}" class="btn btn-primary">Registrar Presença - {{ turma.nome }}</a>
 {% endfor %}
 
-        <a href="{% url 'atualizar_dados_professor' %}" class="btn btn-warning">Atualizar Dados</a>
-        <a href="{% url 'logout' %}" class="btn btn-danger">Sair</a>
+        <a href="{% url 'funcionarios:atualizar_dados_professor' %}" class="btn btn-warning">Atualizar Dados</a>
+        <a href="{% url 'usuarios:password_change' %}" class="btn btn-warning">Alterar Senha</a>
+        <a href="{% url 'usuarios:logout' %}" class="btn btn-danger">Sair</a>
     </div>
 </div>
 {% endblock %}

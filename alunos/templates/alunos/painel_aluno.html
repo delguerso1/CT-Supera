@@ -41,8 +41,7 @@
     <div class="text-center mt-4">
         <a href="{% url 'realizar_checkin' %}" class="btn btn-success">Fazer Check-in</a>
         <a href="{% url 'atualizar_dados_aluno' %}" class="btn btn-warning">Atualizar Dados</a>
-        <a href="{% url 'password_change' %}" class="btn btn-secondary">Alterar Senha</a>
-        <a href="{% url 'password_reset' %}" class="btn btn-info">Redefinir Senha via E-mail</a>
+        <a href="{% url 'usuarios:password_change' %}" class="btn btn-warning">Alterar Senha</a>
         <a href="{% url 'logout' %}" class="btn btn-danger">Sair</a>
     </div>
 </div>

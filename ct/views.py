@@ -1,16 +1,12 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
-from funcionarios.models import Funcionario
+from usuarios.models import Usuario  # 🔹 Substituí `Funcionario` por `Usuario`
 from .models import CentroDeTreinamento
 from .forms import CentroDeTreinamentoForm
 
 def verifica_gerente(user):
     """Verifica se o usuário logado é um gerente"""
-    try:
-        funcionario = Funcionario.objects.get(user=user)
-        return funcionario.cargo == "gerente"
-    except Funcionario.DoesNotExist:
-        return False
+    return user.tipo == "gerente"  # 🔹 Agora validamos diretamente no modelo `Usuario`
 
 @login_required
 def lista_ct(request):

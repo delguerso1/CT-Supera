@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2 class="text-center text-danger">Excluir Mensalidade</h2>
+    
+    <div class="card p-4 shadow-sm">
+        <p>Tem certeza que deseja excluir a mensalidade de <strong>{{ mensalidade.aluno.nome }}</strong>?</p>
+        <p>Valor: <strong>R$ {{ mensalidade.valor }}</strong> | Status: <strong>{{ mensalidade.get_status_display }}</strong></p>
+
+        <form method="POST">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-danger">Confirmar Exclusão</button>
+            <a href="{% url 'financeiro:listar_mensalidades' %}" class="btn btn-secondary">Cancelar</a>
+        </form>
+    </div>
+</div>
+{% endblock %}

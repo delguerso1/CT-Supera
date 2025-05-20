@@ -3,10 +3,10 @@ from .models import Usuario
 
 @admin.register(Usuario)
 class UsuarioAdmin(admin.ModelAdmin):
-    list_display = ("cpf", "first_name", "tipo", "email", "is_active")  # 🔹 Agora usamos CPF!
+    list_display = ("first_name", "tipo", "email", "is_active")
     list_filter = ("tipo", "is_active")
-    search_fields = ("cpf", "email", "first_name")
-    ordering = ["cpf"]  # 🔹 Ordenação pelo CPF
+    search_fields = ("email", "first_name")
+    ordering = ["first_name"]
     exclude = ("username",)  # 🔹 Esconde `username` no formulário do admin
 
     def ativar_usuario(self, request, queryset):

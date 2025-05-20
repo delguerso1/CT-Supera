@@ -147,3 +147,10 @@ AUTHENTICATION_BACKENDS = [
 ]
 
 HANDLER404 = "usuarios.views.error_404"
+
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_HOST = "smtp.gmail.com"  # 🔹 Substitua pelo seu provedor de e-mail (Gmail, Outlook, etc.)
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = "seuemail@gmail.com"  # 🔹 E-mail de envio
+EMAIL_HOST_PASSWORD = "sua_senha"  # 🔹 Utilize variáveis de ambiente para segurança!

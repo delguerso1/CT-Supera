@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2>💳 Histórico de Pagamentos</h2>
+
+<h3>🔴 Vencidas</h3>
+{% if mensalidades_vencidas %}
+    <ul>
+        {% for mensalidade in mensalidades_vencidas %}
+            <li>{{ mensalidade.vencimento }} - R$ {{ mensalidade.valor }} <strong>(VENCIDA)</strong></li>
+            <a href="{% url 'realizar_pagamento' mensalidade.id %}" class="btn btn-danger">Pagar agora</a>
+        {% endfor %}
+    </ul>
+{% else %}
+    <p>✅ Nenhuma mensalidade vencida!</p>
+{% endif %}
+
+<h3>🟡 Vincendas</h3>
+{% if mensalidades_vincendas %}
+    <ul>
+        {% for mensalidade in mensalidades_vincendas %}
+            <li>{{ mensalidade.vencimento }} - R$ {{ mensalidade.valor }} <strong>(VAI VENCER EM BREVE)</strong></li>
+            <a href="{% url 'realizar_pagamento' mensalidade.id %}" class="btn btn-warning">Pagar antecipadamente</a>
+        {% endfor %}
+    </ul>
+{% else %}
+    <p>✅ Nenhuma mensalidade próxima do vencimento!</p>
+{% endif %}
+
+<h3>🟢 Pagas</h3>
+{% if mensalidades_pagas %}
+    <ul>
+        {% for mensalidade in mensalidades_pagas %}
+            <li>{{ mensalidade.vencimento }} - R$ {{ mensalidade.valor }} <strong>(PAGA ✅)</strong></li>
+        {% endfor %}
+    </ul>
+{% else %}
+    <p>⚠️ Nenhuma mensalidade paga registrada.</p>
+{% endif %}
+
+{% endblock %}
