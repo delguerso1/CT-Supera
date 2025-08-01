@@ -1,22 +1,39 @@
 from django.urls import path
-from . import views
+from .views import (
+    MensalidadeListCreateView, MensalidadeRetrieveUpdateDestroyView,
+    DespesaListCreateView, DespesaRetrieveUpdateDestroyView,
+    SalarioListCreateView, SalarioRetrieveUpdateDestroyView,
+    PagarSalarioAPIView, DashboardFinanceiroAPIView, RelatorioFinanceiroAPIView, GerarPixAPIView, ConsultarStatusPixAPIView,
+    GerarPagamentoPixAPIView, VerificarStatusPixAPIView, GerarPagamentoBancarioAPIView
+)
 
 app_name = "financeiro"
 
 urlpatterns = [
-    path("", views.listar_mensalidades, name="listar_mensalidades"),
-    path("registrar/", views.registrar_mensalidade, name="registrar_mensalidade"),
-    path("editar/<int:mensalidade_id>/", views.editar_mensalidade, name="editar_mensalidade"),
-    path("excluir/<int:mensalidade_id>/", views.excluir_mensalidade, name="excluir_mensalidade"),
-    path("recibo/<int:mensalidade_id>/", views.visualizar_recibo, name="visualizar_recibo"),
-    path("dashboard-financeiro/", views.dashboard_financeiro, name="dashboard_financeiro"),
+    # Mensalidades API
+    path('mensalidades/', MensalidadeListCreateView.as_view(), name='mensalidade_list_create'),
+    path('mensalidades/<int:pk>/', MensalidadeRetrieveUpdateDestroyView.as_view(), name='mensalidade_detail'),
+    path('mensalidades/<int:pk>/gerar-pix/', GerarPixAPIView.as_view(), name='gerar_pix'),
+    path('mensalidades/<int:pk>/status-pix/', ConsultarStatusPixAPIView.as_view(), name='status_pix'),
 
-    # URLs de despesas
-    path("despesas/", views.listar_despesas, name="listar_despesas"),
-    path("despesas/registrar/", views.registrar_despesa, name="registrar_despesa"),
-    path("despesas/editar/<int:despesa_id>/", views.editar_despesa, name="editar_despesa"),
-    path("despesas/excluir/<int:despesa_id>/", views.excluir_despesa, name="excluir_despesa"),
+    # Despesas API
+    path('despesas/', DespesaListCreateView.as_view(), name='despesa_list_create'),
+    path('despesas/<int:pk>/', DespesaRetrieveUpdateDestroyView.as_view(), name='despesa_detail'),
 
-    # URLs de relatório financeiro
-    path("relatorio-financeiro/", views.relatorio_financeiro, name="relatorio_financeiro"),
+    # Salários API
+    path('salarios/', SalarioListCreateView.as_view(), name='salario_list_create'),
+    path('salarios/<int:pk>/', SalarioRetrieveUpdateDestroyView.as_view(), name='salario_detail'),
+    path('pagar-salario/', PagarSalarioAPIView.as_view(), name='pagar_salario_api'),
+
+    path('dashboard/', DashboardFinanceiroAPIView.as_view(), name='dashboard_financeiro_api'),
+
+    # API para o relatório financeiro
+    path('relatorio/', RelatorioFinanceiroAPIView.as_view(), name='relatorio_financeiro_api'),
+
+    # Pagamentos PIX
+    path('pix/gerar/<int:mensalidade_id>/', GerarPagamentoPixAPIView.as_view(), name='gerar-pagamento-pix'),
+    path('pix/status/<int:transacao_id>/', VerificarStatusPixAPIView.as_view(), name='verificar-status-pix'),
+    
+    # Pagamentos Bancários
+    path('pagamento-bancario/gerar/<int:mensalidade_id>/', GerarPagamentoBancarioAPIView.as_view(), name='gerar-pagamento-bancario'),
 ]

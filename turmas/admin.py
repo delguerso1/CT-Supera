@@ -2,7 +2,7 @@ from django.contrib import admin
 from .models import Turma
 
 class TurmaAdmin(admin.ModelAdmin):
-    list_display = ["nome", "display_dias_semana", "horario", "capacidade_maxima", "professor"]  # 🔹 Alterado para `dias_semana`
+    list_display = ["display_dias_semana", "horario", "capacidade_maxima", "professor"]  # 🔹 Alterado para `dias_semana`
     list_filter = ["dias_semana", "horario", "professor"]
     ordering = ["horario"]  # 🔹 Removi `dia_semana` do ordering
 

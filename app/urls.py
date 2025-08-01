@@ -16,14 +16,21 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
-from app.views import pagina_inicial
+from django.conf import settings
+from django.conf.urls.static import static
+from app.views import StatusAPIView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('', pagina_inicial, name='home'), 
-    path('alunos/', include('alunos.urls')),
-    path('turmas/', include('turmas.urls')),
-    path('funcionarios/', include('funcionarios.urls')),
-    path('financeiro/', include('financeiro.urls')),
-    path('usuarios/', include('usuarios.urls')),     
+    path('status/', StatusAPIView.as_view(), name='status_api'),  # Endpoint de status
+    path('api/alunos/', include('alunos.urls')),
+    path('api/turmas/', include('turmas.urls')),
+    path('api/funcionarios/', include('funcionarios.urls')),
+    path('api/financeiro/', include('financeiro.urls')),
+    path('api/usuarios/', include('usuarios.urls')),
+    path('api/cts/', include('ct.urls')),
 ]
+
+# Configuração para servir arquivos de mídia em desenvolvimento
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

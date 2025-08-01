@@ -1,51 +1,107 @@
-from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth.decorators import login_required
-from .models import Turma
-from .forms import TurmaForm
+from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIView, ListAPIView
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework import status
+from django.shortcuts import get_object_or_404
+from usuarios.models import Usuario
+from .models import Turma, DiaSemana
+from .serializers import TurmaSerializer, UsuarioSerializer, DiaSemanaSerializer
+from django.db import models
 
 
-@login_required
-def lista_turmas(request):
-    turmas = Turma.objects.all()
-    return render(request, "turmas/lista_turmas.html", {"turmas": turmas})
+class ListaCriarTurmasAPIView(ListCreateAPIView):
+    """API para listar e criar turmas."""
+    queryset = Turma.objects.all()
+    serializer_class = TurmaSerializer
 
-@login_required
-def criar_turma(request):
-    if request.method == "POST":
-        form = TurmaForm(request.POST, user=request.user)
-        if form.is_valid():
-            turma = form.save(commit=False)
-            turma.ct = request.user.ct  # 🔹 Ajustado para refletir `Usuario`
-            turma.save()
-            form.save_m2m()  # 🔹 Salvar a relação ManyToMany com `dias_semana`
-            return redirect("turmas:lista_turmas")
-    else:
-        form = TurmaForm(user=request.user)
+    def get_permissions(self):
+        if self.request.method == 'GET':
+            return [AllowAny()]
+        return [IsAuthenticated()] 
 
-    return render(request, "turmas/criar_turma.html", {"form": form, "turma": None})
+    def get_queryset(self):
+        queryset = Turma.objects.filter(ativo=True)  # Filtra apenas turmas ativas
+        
+        # Filtra por CT se especificado
+        ct_id = self.request.query_params.get('ct')
+        if ct_id:
+            queryset = queryset.filter(ct_id=ct_id)
+            
+        # Filtra por professor se especificado
+        professor_id = self.request.query_params.get('professor')
+        if professor_id:
+            queryset = queryset.filter(professor_id=professor_id)
+            
+        # Ordena por horário e dias da semana
+        queryset = queryset.order_by('horario')
+        
+        # Annotate com contagem de alunos ativos
+        queryset = queryset.annotate(
+            alunos_ativos_count=models.Count(
+                'alunos',
+                filter=models.Q(alunos__ativo=True)
+            )
+        )
+        
+        return queryset
 
-@login_required
-def editar_turma(request, turma_id):
-    turma = get_object_or_404(Turma, id=turma_id, ct=request.user.ct)
-    
-    if request.method == "POST":
-        form = TurmaForm(request.POST, instance=turma, user=request.user)
-        if form.is_valid():
-            turma = form.save(commit=False)
-            turma.save()
-            form.save_m2m()  # 🔹 Salvar a relação ManyToMany novamente
-            return redirect("turmas:lista_turmas")
-    else:
-        form = TurmaForm(instance=turma, user=request.user)
-
-    return render(request, "turmas/editar_turma.html", {"form": form, "turma": turma})
-
-@login_required
-def excluir_turma(request, pk):
-    turma = get_object_or_404(Turma, pk=pk, ct__gerente=request.user)
-    if request.method == "POST":
-        turma.delete()
-        return redirect("turmas:lista_turmas")
-    return render(request, "turmas/excluir_turma.html", {"turma": turma})
+class EditarExcluirTurmaAPIView(RetrieveUpdateDestroyAPIView):
+    """API para editar, excluir ou visualizar uma turma."""
+    permission_classes = [IsAuthenticated]
+    queryset = Turma.objects.all()
+    serializer_class = TurmaSerializer
 
 
+class ListaAlunosTurmaAPIView(APIView):
+    """API para listar os alunos de uma turma."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, turma_id):
+        turma = get_object_or_404(Turma, id=turma_id)
+
+        # Verifica se a turma está ativa
+        if not turma.ativo:
+            return Response({"error": "Esta turma está inativa."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Filtra apenas alunos ativos e inclui todos os campos necessários
+        alunos = turma.alunos.filter(ativo=True)
+        
+        # Serializa os dados da turma e dos alunos
+        turma_data = TurmaSerializer(turma).data
+        alunos_data = UsuarioSerializer(alunos, many=True).data
+
+        return Response({
+            "turma": turma_data,
+            "alunos": alunos_data
+        }, status=status.HTTP_200_OK)
+
+
+class AdicionarAlunoAPIView(APIView):
+    """API para adicionar alunos a uma turma."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, turma_id):
+        turma = get_object_or_404(Turma, id=turma_id)
+
+        # Verifica se a turma está ativa
+        if not turma.ativo:
+            return Response({"error": "Não é possível adicionar alunos a uma turma inativa."}, status=status.HTTP_400_BAD_REQUEST)
+
+        alunos_ids = request.data.get("alunos", [])
+        if not alunos_ids:
+            return Response({"error": "Nenhum aluno foi fornecido."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Filtra apenas alunos ativos e do tipo "aluno"
+        alunos = Usuario.objects.filter(id__in=alunos_ids, tipo="aluno", ativo=True)
+        if not alunos.exists():
+            return Response({"error": "Nenhum aluno válido foi encontrado."}, status=status.HTTP_400_BAD_REQUEST)
+
+        turma.alunos.add(*alunos)
+        return Response({"message": "Alunos adicionados com sucesso!"}, status=status.HTTP_200_OK)
+
+
+class ListaDiasSemanaAPIView(ListAPIView):
+    """API para listar os dias da semana."""
+    queryset = DiaSemana.objects.all().order_by('id')  # ou .order_by('nome')
+    serializer_class = DiaSemanaSerializer

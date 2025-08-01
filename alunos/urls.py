@@ -1,14 +1,22 @@
 from django.urls import path
-from . import views
-
-app_name = "alunos"
+from .views import (
+    HistoricoPagamentosAPIView, RealizarPagamentoAPIView, PagamentoEmDiaAPIView,
+    PainelAlunoAPIView, RealizarCheckinAPIView
+)
 
 urlpatterns = [
-     # 🔹 Alunos e check-in
-    path("painel-aluno/", views.painel_aluno, name="painel_aluno"),
-    path("editar-perfil/", views.editar_perfil_aluno, name="editar_perfil_aluno"),
-    path("checkin/", views.realizar_checkin, name="realizar_checkin"),
-    path("historico-pagamentos/", views.historico_pagamentos, name="historico_pagamentos"),
-    path("pagamento/<int:mensalidade_id>/", views.realizar_pagamento, name="realizar_pagamento"),
- 
+    # Histórico de pagamentos
+    path('historico-pagamentos/', HistoricoPagamentosAPIView.as_view(), name='historico_pagamentos_api'),
+
+    # Realizar pagamento
+    path('realizar-pagamento/<int:mensalidade_id>/', RealizarPagamentoAPIView.as_view(), name='realizar_pagamento_api'),
+
+    # Verificar pagamento em dia
+    path('pagamento-em-dia/', PagamentoEmDiaAPIView.as_view(), name='pagamento_em_dia_api'),
+
+    # Painel do aluno
+    path('painel-aluno/', PainelAlunoAPIView.as_view(), name='painel_aluno_api'),
+
+    # Realizar check-in
+    path('realizar-checkin/', RealizarCheckinAPIView.as_view(), name='realizar_checkin_api'),
 ]

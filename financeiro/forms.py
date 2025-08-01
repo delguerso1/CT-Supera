@@ -1,6 +1,7 @@
 from django import forms
 from .models import Mensalidade, Despesa
 from usuarios.models import Usuario
+from .models import Salario  
 
 class DespesaForm(forms.ModelForm):
     class Meta:
@@ -25,13 +26,29 @@ class DespesaForm(forms.ModelForm):
 class MensalidadeForm(forms.ModelForm):
     class Meta:
         model = Mensalidade
-        fields = ["aluno", "valor", "data_inicio", "status", "observacoes"]
+        fields = ['valor', 'data_vencimento', 'status', 'observacoes']  # Inclua 'observacoes' se quiser editar
 
-    def __init__(self, *args, **kwargs):
-        user = kwargs.pop("user", None)  # Obtém o usuário logado
-        super().__init__(*args, **kwargs)
+from django.forms import modelformset_factory
 
-        # 🔹 Filtra apenas alunos do CT do gerente logado
-        if user and user.tipo == "gerente":
-            self.fields["aluno"].queryset = Usuario.objects.filter(tipo="aluno", ct=user.ct)
+MensalidadeFormSet = modelformset_factory(
+    Mensalidade,
+    form=MensalidadeForm,
+    extra=0,
+    can_delete=False
+)
+
+
+class SalarioForm(forms.ModelForm):
+    class Meta:
+        model = Salario
+        fields = ['professor', 'valor', 'data_pagamento', 'status']
+        widgets = {
+            'data_pagamento': forms.DateInput(attrs={'type': 'date'}),
+        }
+        labels = {
+            'professor': 'Professor',
+            'valor': 'Valor',
+            'data_pagamento': 'Data de Pagamento',
+        }
+
 

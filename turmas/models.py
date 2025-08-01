@@ -10,17 +10,18 @@ class DiaSemana(models.Model):
 
 class Turma(models.Model):
     ct = models.ForeignKey(CentroDeTreinamento, on_delete=models.CASCADE)  
-    nome = models.CharField(max_length=100)
     dias_semana = models.ManyToManyField(DiaSemana)  # 🔹 Agora aceita vários dias!
     horario = models.TimeField()
     capacidade_maxima = models.PositiveIntegerField(default=0)
     professor = models.ForeignKey(Usuario, on_delete=models.SET_NULL, null=True, blank=True, related_name="turmas")  # 🔹 Relaciona com o usuário
+    alunos = models.ManyToManyField(Usuario, blank=True, related_name="turmas_aluno")
+    ativo = models.BooleanField(default=True)  # <-- Adicione esta linha
 
     class Meta:
-        unique_together = ("ct", "horario")  # 🔹 Removemos `dia_semana` daqui
+        unique_together = ("ct", "horario")  
         ordering = ["horario"]
         verbose_name_plural = "Turmas"
 
     def __str__(self):
         dias = ", ".join([dia.nome for dia in self.dias_semana.all()])
-        return f"{self.ct.nome} - {self.nome} ({dias} às {self.horario})"
+        return f"{self.ct.nome} ({dias} às {self.horario})"

@@ -1,230 +1,393 @@
-from django.shortcuts import render, redirect, get_object_or_404
+from rest_framework.views import APIView
+from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIView
+from rest_framework.response import Response
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework import status
+from rest_framework.authtoken.models import Token
+from django.shortcuts import get_object_or_404
 from django.contrib.auth import authenticate, login, logout
-from django.contrib import messages
-from usuarios.models import Usuario
-from django.contrib.auth.forms import SetPasswordForm
 from django.contrib.auth.tokens import default_token_generator
 from django.utils.http import urlsafe_base64_decode
-from usuarios.forms import UsuarioForm, PreCadastroForm
-from django.contrib.auth.decorators import login_required
-from usuarios.models import PreCadastro
+from django.contrib.auth.forms import SetPasswordForm
+from usuarios.models import Usuario, PreCadastro
+from usuarios.forms import DefinirSenhaForm
+from usuarios.serializers import DefinirSenhaSerializer
+from financeiro.models import Mensalidade
+from django.utils import timezone
+from datetime import timedelta
+from .serializers import UsuarioSerializer, PreCadastroSerializer, MensalidadeSerializer, SalarioSerializer
+from datetime import date, timedelta
 from django.core.mail import send_mail
-from django.contrib.auth.hashers import make_password
+import logging
+from calendar import monthrange
+
+logger = logging.getLogger(__name__)
+
+class ListarPrecadastrosAPIView(ListCreateAPIView):
+    """API para listar e criar pré-cadastros."""
+    queryset = PreCadastro.objects.all().order_by('-criado_em')  # Ordena do mais novo para o mais antigo
+    serializer_class = PreCadastroSerializer
+
+    def get_permissions(self):
+        if self.request.method == 'POST':
+            return [AllowAny()]
+        return [IsAuthenticated()]
+    
+class EditarExcluirPrecadastroAPIView(RetrieveUpdateDestroyAPIView):
+    """API para editar, excluir ou visualizar um pré-cadastro."""
+    permission_classes = [IsAuthenticated]
+    queryset = PreCadastro.objects.all()
+    serializer_class = PreCadastroSerializer
 
 
+class FinalizarAgendamentoAPIView(APIView):
+    """API para finalizar o agendamento de um pré-cadastro."""
+    permission_classes = [IsAuthenticated]
 
-# === AGENDA AULA EXPERIMENTAL ===
-def agendar_aula_experimental(request):
-    """Permite que um usuário agende uma aula experimental. O formulário é exibido e, se válido, salva o agendamento."""
-    if request.method == 'POST':
-        form = PreCadastroForm(request.POST)
-        if form.is_valid():
-            form.save()
-            messages.success(request, "✅ Aula experimental agendada com sucesso!")
-            return redirect('home')
-    else:
-        form = PreCadastroForm()
+    def post(self, request, precadastro_id):
+        precadastro = get_object_or_404(PreCadastro, id=precadastro_id)
+        cpf = request.data.get("cpf")
+        dia_vencimento = request.data.get("dia_vencimento")
+        valor_mensalidade = request.data.get("valor_mensalidade")
+        
+        print(f"[DEBUG] Finalizando agendamento - PreCadastro ID: {precadastro_id}")
+        print(f"[DEBUG] CPF: {cpf}")
+        print(f"[DEBUG] Dia vencimento: {dia_vencimento}")
+        print(f"[DEBUG] Valor mensalidade: {valor_mensalidade}")
+        print(f"[DEBUG] Data nascimento do pré-cadastro: {precadastro.data_nascimento}")
+        
+        if not cpf or len(cpf) != 11 or not cpf.isdigit():
+            return Response({"error": "CPF inválido ou não fornecido."}, status=status.HTTP_400_BAD_REQUEST)
 
-    return render(request, 'usuarios/agendar_aula_experimental.html', {'form': form})
-
-def listar_precadastros(request):
-    """Lista todos os pré-cadastros. Apenas gerentes podem acessar essa página."""
-    if not request.user.is_gerente():
-        return render(request, '403.html')
-
-    precadastros = PreCadastro.objects.all()
-    return render(request, 'usuarios/listar_precadastros.html', {'precadastros': precadastros})
-
-def excluir_precadastro(request, pk):
-    """Exclui um pré-cadastro específico. Apenas gerentes podem acessar essa página."""
-    if not request.user.is_gerente():
-        return render(request, '403.html')
-
-    precadastro = get_object_or_404(PreCadastro, pk=pk)
-
-    if request.method == 'POST':
-        precadastro.delete()
-        messages.success(request, "✅ Pré-cadastro excluído com sucesso!")
-        return redirect('listar_precadastros')
-
-    return render(request, 'usuarios/excluir_precadastro.html', {'precadastro': precadastro})
-
-def editar_precadastro(request, pk):
-    """Atualiza os dados de um pré-cadastro específico. Apenas gerentes podem acessar essa página."""
-    if not request.user.is_gerente():
-        return render(request, '403.html')
-
-    precadastro = get_object_or_404(PreCadastro, pk=pk)
-
-    if request.method == 'POST':
-        form = PreCadastroForm(request.POST, instance=precadastro)
-        if form.is_valid():
-            form.save()
-            messages.success(request, "✅ Pré-cadastro atualizado com sucesso!")
-            return redirect('listar_precadastros')
-    else:
-        form = PreCadastroForm(instance=precadastro)
-
-    return render(request, 'usuarios/editar_precadastro.html', {'form': form, 'precadastro': precadastro})
-
-def cadastrar_precadastro(request):
-    """Permite que um usuário se cadastre como pré-cadastro. O formulário é exibido e, se válido, salva o pré-cadastro."""
-    if request.method == 'POST':
-        form = PreCadastroForm(request.POST)
-        if form.is_valid():
-            form.save()
-            messages.success(request, "✅ Pré-cadastro realizado com sucesso!")
-            return redirect('listar_precadastros')
-    else:
-        form = PreCadastroForm()
-
-    return render(request, 'usuarios/cadastrar_precadastro.html', {'form': form})
-
-
-# ---------------------- LOGIN PARA MÚLTIPLOS PERFIS ---------------------- #
-
-def login_view(request):
-    if request.method == "POST":
-        cpf = request.POST.get("cpf", "").replace(".", "").replace("-", "").strip()
-        password = request.POST.get("password", "")
-        user = authenticate(request, username=cpf, password=password)
-        if user is not None:
-            login(request, user)
-            if user.tipo == "gerente":
-                return redirect("funcionarios:painel_gerente")
-            elif user.tipo == "professor":
-                return redirect("funcionarios:painel_professor")
-            elif user.tipo == "aluno":
-                return redirect("alunos:painel_aluno")
-            else:
-                return redirect("usuarios:login")
-        else:
-            messages.error(request, "CPF ou senha inválidos.")
-    return render(request, "usuarios/login.html")
-
-
-# ---------------------- LOGOUT ---------------------- #
-
-def logout_view(request):
-    logout(request)
-    return redirect("home")
-
-# --------------------Ativação por Token -------------------#
-
-def ativar_conta(request, uidb64, token):
-    """Permite o aluno definir sua senha ao ativar a conta"""
-    try:
-        uid = urlsafe_base64_decode(uidb64).decode()
-        aluno = Usuario.objects.get(pk=uid, tipo="aluno")
-    except (Usuario.DoesNotExist, ValueError):
-        return render(request, "usuarios/ativacao_invalida.html")
-
-    if default_token_generator.check_token(aluno, token):
-        if request.method == "POST":
-            form = SetPasswordForm(aluno, request.POST)
-            if form.is_valid():
-                form.save()
-                return redirect("login")
-        else:
-            form = SetPasswordForm(aluno)
-        return render(request, "usuarios/definir_senha.html", {"form": form})
-    else:
-        return render(request, "usuarios/ativacao_invalida.html")
-
-
-#--------------------- CRUD DE USUÁRIOS ---------------------#
-
-@login_required
-def cadastrar_usuario(request):
-    if not request.user.is_gerente():
-        return render(request, "403.html")
-
-    usuario = Usuario()  # 🔹 Cria um objeto vazio para instância
-
-    if request.method == "POST":
-        form = UsuarioForm(request.POST, instance=usuario)  # 🔹 Passa `instance` para ajustar campos obrigatórios
-        if form.is_valid():
-            usuario = form.save(commit=False)
-            usuario.password = make_password(form.cleaned_data["password"])  # 🔹 Garante que a senha seja segura
-            usuario.save()
-
-            messages.success(request, "Usuário cadastrado com sucesso!")
-
-            # 🔹 Enviar e-mail de boas-vindas
-            if usuario.email:
-                mensagem = f"""
-                Olá {usuario.nome}, bem-vindo ao sistema! 🎉
-
-                ✅ Seus dados de acesso:
-                - Usuário: {usuario.username} (CPF)
-                - Senha: {form.cleaned_data['password']} (mude no primeiro acesso!)
-
-                🔗 Acesse: https://meusistema.com/login
-                """
-                send_mail(
-                    "Seus dados de acesso ao sistema",
-                    mensagem,
-                    "contato@meusistema.com",  # 🔹 Email do remetente
-                    [usuario.email],  # 🔹 Email do usuário cadastrado
-                    fail_silently=False,
+        precadastro.cpf = cpf
+        precadastro.save()
+        try:
+            usuario_aluno = precadastro.converter_para_aluno(
+                request.user,
+                dia_vencimento=dia_vencimento,
+                valor_mensalidade=valor_mensalidade
+            )
+            # Cria mensalidade para o novo aluno, se ainda não existir
+            if usuario_aluno and not Mensalidade.objects.filter(aluno=usuario_aluno).exists():
+                hoje = date.today()
+                dia = int(usuario_aluno.dia_vencimento) if usuario_aluno.dia_vencimento else hoje.day
+                # Garante que o dia não ultrapasse o último dia do mês
+                ultimo_dia = monthrange(hoje.year, hoje.month)[1]
+                dia = min(dia, ultimo_dia)
+                data_vencimento = hoje.replace(day=dia)
+                Mensalidade.objects.create(
+                    aluno=usuario_aluno,
+                    valor=usuario_aluno.valor_mensalidade or 150.00,
+                    data_vencimento=data_vencimento
                 )
+            return Response({"message": "Pré-cadastro convertido em aluno com sucesso!"}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"error": f"Erro ao finalizar agendamento: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
 
-            return redirect("usuarios:lista_usuarios")
-    else:
-        form = UsuarioForm(instance=usuario)  # 🔹 Ajusta os campos dinâmicos antes do envio
 
-    return render(request, "usuarios/cadastrar_usuario.html", {"form": form})
+class LoginAPIView(APIView):
+    """API para realizar login."""
+    permission_classes = []  # Remove a necessidade de autenticação
 
-@login_required
-def editar_usuario(request, usuario_id):
-    if not request.user.is_gerente():
-        return render(request, '403.html')
+    def post(self, request):
+        try:
+            cpf = request.data.get("cpf", "").replace(".", "").replace("-", "").strip()
+            password = request.data.get("password", "").strip()
+            
+            print(f"[DEBUG] Dados recebidos - CPF: {cpf}, Senha: {'*' * len(password)}")
+            print(f"[DEBUG] Headers da requisição: {request.headers}")
+            print(f"[DEBUG] Dados da requisição: {request.data}")
+            
+            if not cpf or not password:
+                print("[DEBUG] CPF ou senha não fornecidos")
+                return Response(
+                    {"error": "CPF e senha são obrigatórios."}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Verifica se o usuário existe
+            try:
+                user = Usuario.objects.get(username=cpf)
+                print(f"[DEBUG] Usuário encontrado: {user.username}, Tipo: {user.tipo}, Ativo: {user.is_active}")
+            except Usuario.DoesNotExist:
+                print(f"[DEBUG] Usuário não encontrado para CPF: {cpf}")
+                return Response(
+                    {"error": "Usuário não encontrado."}, 
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
+            
+            # Tenta autenticar
+            print(f"[DEBUG] Tentando autenticar com username: {cpf}, password: {password}")
+            user = authenticate(request, username=cpf, password=password)
+            print(f"[DEBUG] Resultado da autenticação: {user is not None}")
+            if user is None:
+                print(f"[DEBUG] Falha na autenticação - verificando se usuário existe...")
+                try:
+                    user_check = Usuario.objects.get(username=cpf)
+                    print(f"[DEBUG] Usuário existe no banco: {user_check.username}")
+                    print(f"[DEBUG] Verificando senha manualmente...")
+                    if user_check.check_password(password):
+                        print(f"[DEBUG] Senha está correta!")
+                        user = user_check
+                    else:
+                        print(f"[DEBUG] Senha está incorreta!")
+                except Usuario.DoesNotExist:
+                    print(f"[DEBUG] Usuário não encontrado no banco")
+            
+            if user is not None:
+                if user.is_active:
+                    # Gera ou obtém o token
+                    token, created = Token.objects.get_or_create(user=user)
+                    print(f"[DEBUG] Login bem-sucedido para usuário: {user.username}")
+                    print(f"[DEBUG] Token gerado: {token.key}")
+                    print(f"[DEBUG] Dados do usuário: {user.id}, {user.username}, {user.tipo}")
+                    return Response({
+                        "message": "Login realizado com sucesso!",
+                        "token": token.key,
+                        "user": UsuarioSerializer(user).data
+                    }, status=status.HTTP_200_OK)
+                else:
+                    print(f"[DEBUG] Tentativa de login para usuário inativo: {cpf}")
+                    return Response(
+                        {"error": "Conta desativada. Entre em contato com o administrador."}, 
+                        status=status.HTTP_401_UNAUTHORIZED
+                    )
+            else:
+                print(f"[DEBUG] Falha na autenticação para CPF: {cpf}")
+                return Response(
+                    {"error": "CPF ou senha inválidos."}, 
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
+        except Exception as e:
+            print(f"[DEBUG] Erro durante o login: {str(e)}")
+            import traceback
+            print(f"[DEBUG] Stack trace: {traceback.format_exc()}")
+            return Response(
+                {"error": "Erro interno do servidor. Tente novamente mais tarde."}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
-    usuario = get_object_or_404(Usuario, id=usuario_id)
 
-    if request.method == 'POST':
-        form = UsuarioForm(request.POST, instance=usuario)
-        if form.is_valid():
-            form.save()
-            messages.success(request, 'Usuário atualizado com sucesso.')
-            return redirect('usuarios:lista_usuarios')
-    else:
-        form = UsuarioForm(instance=usuario)
+class LogoutAPIView(APIView):
+    """API para realizar logout."""
+    permission_classes = [IsAuthenticated]
 
-    return render(request, 'usuarios/editar_usuario.html', {'form': form, 'usuario': usuario})
+    def post(self, request):
+        logout(request)
+        return Response({"message": "Logout realizado com sucesso!"}, status=status.HTTP_200_OK)
 
-@login_required
-def excluir_usuario(request, usuario_id):
-    if not request.user.is_gerente():
-        return render(request, '403.html')
 
-    usuario = get_object_or_404(Usuario, id=usuario_id)
+class AtivarContaAPIView(APIView):
+    """API para ativar a conta de um aluno."""
+    def post(self, request, uidb64, token):
+        try:
+            uid = urlsafe_base64_decode(uidb64).decode()
+            aluno = Usuario.objects.get(pk=uid, tipo="aluno")
+        except (Usuario.DoesNotExist, ValueError):
+            return Response({
+                "error": "Token de ativação inválido ou usuário não encontrado.",
+                "code": "INVALID_TOKEN"
+            }, status=status.HTTP_400_BAD_REQUEST)
 
-    if request.method == 'POST':
-        usuario.delete()
-        messages.success(request, 'Usuário excluído com sucesso.')
-        return redirect('usuarios:lista_usuarios')
+        if default_token_generator.check_token(aluno, token):
+            serializer = DefinirSenhaSerializer(data=request.data)
+            if serializer.is_valid():
+                # Define a nova senha e ativa a conta
+                nova_senha = serializer.validated_data['new_password1']
+                aluno.set_password(nova_senha)
+                aluno.is_active = True  # Ativa a conta
+                aluno.save()
+                
+                logger.info(f"Conta ativada com sucesso para o usuário {aluno.username}")
+                return Response({
+                    "message": "Conta ativada com sucesso!",
+                    "user": {
+                        "id": aluno.id,
+                        "username": aluno.username,
+                        "email": aluno.email,
+                        "first_name": aluno.first_name,
+                        "last_name": aluno.last_name
+                    }
+                }, status=status.HTTP_200_OK)
+            else:
+                return Response({
+                    "error": "Dados inválidos",
+                    "details": serializer.errors,
+                    "code": "VALIDATION_ERROR"
+                }, status=status.HTTP_400_BAD_REQUEST)
+        return Response({
+            "error": "Token de ativação inválido ou expirado.",
+            "code": "EXPIRED_TOKEN"
+        }, status=status.HTTP_400_BAD_REQUEST)
 
-    return render(request, 'usuarios/excluir_usuario.html', {'usuario': usuario})
 
-@login_required
-def lista_usuarios(request):
-    if not request.user.is_gerente():
-        return render(request, '403.html')
+class ListarCriarUsuariosAPIView(ListCreateAPIView):
+    """API para listar e criar usuários."""
+    permission_classes = [IsAuthenticated]
+    queryset = Usuario.objects.all()
+    serializer_class = UsuarioSerializer
 
-    gerentes = Usuario.objects.filter(tipo='gerente')
-    professores = Usuario.objects.filter(tipo='professor')
-    alunos = Usuario.objects.filter(tipo='aluno')
+    def get_queryset(self):
+        queryset = Usuario.objects.all()
+        tipo = self.request.query_params.get('tipo', None)
+        if tipo:
+            queryset = queryset.filter(tipo=tipo)
+        return queryset
 
-    return render(
-        request,
-        "usuarios/lista_usuarios.html",
-        {
-            "gerentes": gerentes,
-            "professores": professores,
-            "alunos": alunos,
-        }
-    )
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+    def create(self, request, *args, **kwargs):
+        try:
+            serializer = self.get_serializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            self.perform_create(serializer)
+            headers = self.get_success_headers(serializer.data)
+            # Retorna o objeto criado (com id)
+            return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+        except Exception as e:
+            # Captura erro específico de CPF duplicado
+            if 'UNIQUE constraint failed: usuarios_usuario.cpf' in str(e):
+                return Response(
+                    {"error": "CPF já cadastrado no sistema. Use um CPF diferente."}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            # Para outros erros, retorna erro genérico
+            return Response(
+                {"error": f"Erro ao cadastrar usuário: {str(e)}"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+
+class EditarExcluirUsuarioAPIView(RetrieveUpdateDestroyAPIView):
+    """API para editar, excluir ou visualizar um usuário."""
+    permission_classes = [IsAuthenticated]
+    queryset = Usuario.objects.all()
+    serializer_class = UsuarioSerializer
+
+    def get(self, request, *args, **kwargs):
+        try:
+            print(f"[DEBUG] Headers da requisição: {request.headers}")
+            print(f"[DEBUG] Usuário autenticado: {request.user}")
+            print(f"[DEBUG] Buscando usuário com ID: {kwargs.get('pk')}")
+            instance = self.get_object()
+            print(f"[DEBUG] Usuário encontrado: {instance.id}, {instance.username}, {instance.tipo}")
+            serializer = self.get_serializer(instance)
+            return Response(serializer.data)
+        except Exception as e:
+            print(f"[DEBUG] Erro ao buscar usuário: {str(e)}")
+            return Response(
+                {"error": "Erro ao buscar dados do usuário."}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+    def put(self, request, *args, **kwargs):
+        """Método personalizado para lidar com upload de fotos e atualização de dados."""
+        try:
+            instance = self.get_object()
+            print(f"[DEBUG] Atualizando usuário ID: {instance.id}")
+            print(f"[DEBUG] Dados recebidos: {request.data}")
+            print(f"[DEBUG] Arquivos recebidos: {request.FILES}")
+            
+            # Se há arquivos (foto), usa FormData
+            if request.FILES:
+                print(f"[DEBUG] Processando upload de arquivo")
+                # Para upload de arquivo, precisamos incluir todos os dados existentes
+                data = request.data.copy()
+                
+                # Adiciona campos obrigatórios se não estiverem presentes
+                if 'username' not in data:
+                    data['username'] = instance.username
+                if 'tipo' not in data:
+                    data['tipo'] = instance.tipo
+                if 'cpf' not in data:
+                    data['cpf'] = instance.cpf
+                if 'ativo' not in data:
+                    data['ativo'] = instance.ativo
+                if 'email' not in data:
+                    data['email'] = instance.email
+                if 'first_name' not in data:
+                    data['first_name'] = instance.first_name
+                if 'last_name' not in data:
+                    data['last_name'] = instance.last_name
+                
+                # Adiciona outros campos se existirem no usuário
+                if hasattr(instance, 'telefone') and 'telefone' not in data:
+                    data['telefone'] = instance.telefone
+                if hasattr(instance, 'endereco') and 'endereco' not in data:
+                    data['endereco'] = instance.endereco
+                if hasattr(instance, 'data_nascimento') and 'data_nascimento' not in data:
+                    data['data_nascimento'] = instance.data_nascimento
+                if hasattr(instance, 'nome_responsavel') and 'nome_responsavel' not in data:
+                    data['nome_responsavel'] = instance.nome_responsavel
+                if hasattr(instance, 'telefone_responsavel') and 'telefone_responsavel' not in data:
+                    data['telefone_responsavel'] = instance.telefone_responsavel
+                if hasattr(instance, 'telefone_emergencia') and 'telefone_emergencia' not in data:
+                    data['telefone_emergencia'] = instance.telefone_emergencia
+                if hasattr(instance, 'ficha_medica') and 'ficha_medica' not in data:
+                    data['ficha_medica'] = instance.ficha_medica
+                if hasattr(instance, 'dia_vencimento') and 'dia_vencimento' not in data:
+                    data['dia_vencimento'] = instance.dia_vencimento
+                if hasattr(instance, 'valor_mensalidade') and 'valor_mensalidade' not in data:
+                    data['valor_mensalidade'] = instance.valor_mensalidade
+                
+                serializer = self.get_serializer(instance, data=data, partial=True)
+            else:
+                # Para dados normais (sem arquivo)
+                serializer = self.get_serializer(instance, data=request.data, partial=True)
+            
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data)
+            else:
+                print(f"[DEBUG] Erros de validação: {serializer.errors}")
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+                
+        except Exception as e:
+            print(f"[DEBUG] Erro ao atualizar usuário: {str(e)}")
+            return Response(
+                {"error": f"Erro ao atualizar usuário: {str(e)}"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+
+class ReenviarConviteAPIView(APIView):
+    """API para reenviar convite de ativação."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, usuario_id):
+        try:
+            usuario = Usuario.objects.get(id=usuario_id, tipo="aluno")
+            
+            # Verifica se o usuário tem e-mail
+            if not usuario.email:
+                return Response(
+                    {"error": "Usuário não possui e-mail cadastrado."}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Reenvia o convite
+            from usuarios.utils import enviar_convite_aluno
+            enviar_convite_aluno(usuario)
+            
+            return Response(
+                {"message": "Convite de ativação reenviado com sucesso!"}, 
+                status=status.HTTP_200_OK
+            )
+            
+        except Usuario.DoesNotExist:
+            return Response(
+                {"error": "Usuário não encontrado."}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            logger.error(f"Erro ao reenviar convite: {str(e)}")
+            return Response(
+                {"error": "Erro ao reenviar convite. Tente novamente."}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 
 

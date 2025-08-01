@@ -1,15 +1,27 @@
-
 from django.contrib.auth import authenticate, login
 from django.contrib import messages
 from django.core.mail import send_mail
 from django.utils.http import urlsafe_base64_encode
 from django.utils.encoding import force_bytes
 from django.contrib.auth.tokens import default_token_generator
-import random
-import string
+import logging
+from django.conf import settings
+from typing import Optional, List
+
+logger = logging.getLogger(__name__)
 
 
-def autenticar_usuario(request, tipo_esperado):
+def autenticar_usuario(request, tipo_esperado: str) -> Optional[object]:
+    """
+    Autentica um usuário e verifica se tem o tipo esperado.
+    
+    Args:
+        request: Objeto request do Django
+        tipo_esperado: Tipo de usuário esperado ('aluno', 'professor', 'gerente')
+    
+    Returns:
+        Usuario autenticado se válido, None caso contrário
+    """
     username = request.POST.get('username')
     password = request.POST.get('password')
     user = authenticate(request, username=username, password=password)
@@ -18,49 +30,307 @@ def autenticar_usuario(request, tipo_esperado):
         login(request, user)
         return user
     else:
-        messages.error(request, 'Usuário ou senha inválidos.')
         return None
 
-def is_gerente(user):
-    return user.is_authenticated and user.tipo == 'gerente'
-
-def is_professor(user):
-    return user.is_authenticated and user.tipo == 'funcionario'
-
-def is_aluno(user):
-    return user.is_authenticated and user.tipo == 'aluno'
-
-def is_gerente_ou_professor(user):
-    return user.is_authenticated and user.tipo in ['gerente', 'funcionario']
-
-
-
-#=== criação de senha por convite de ativação ===#
-def enviar_convite_aluno(aluno):
-    """Gera um link de ativação e envia por e-mail para o aluno"""
-    uidb64 = urlsafe_base64_encode(force_bytes(aluno.pk))
-    token = default_token_generator.make_token(aluno)
-
-    link_ativacao = f"https://meusistema.com/ativar-conta/{uidb64}/{token}/"
-
-    mensagem = f"""
-    Olá {aluno.first_name}, seja bem-vindo ao sistema! 🚀
-
-    🔗 Clique no link abaixo para ativar sua conta e definir sua senha:
-    {link_ativacao}
-
-    Qualquer dúvida, estamos à disposição. 🤝
+def has_role(user, roles: List[str]) -> bool:
     """
+    Verifica se o usuário tem um dos papéis especificados.
+    
+    Args:
+        user: Usuario a ser verificado
+        roles: Lista de papéis permitidos
+    
+    Returns:
+        True se o usuário tem um dos papéis, False caso contrário
+    """
+    return user.is_authenticated and user.tipo in roles
 
-    send_mail(
-        "Ativação da sua conta",
-        mensagem,
-        "sistema@meusistema.com",
-        [aluno.email],
-        fail_silently=False
+def is_gerente(user) -> bool:
+    """Verifica se o usuário é gerente."""
+    return has_role(user, ['gerente'])
+
+def is_professor(user) -> bool:
+    """Verifica se o usuário é professor."""
+    return has_role(user, ['professor'])
+
+def is_aluno(user) -> bool:
+    """Verifica se o usuário é aluno."""
+    return has_role(user, ['aluno'])
+
+def is_gerente_ou_professor(user) -> bool:
+    """Verifica se o usuário é gerente ou professor."""
+    return has_role(user, ['gerente', 'professor'])
+
+
+
+def enviar_convite_aluno(aluno) -> None:
+    """
+    Envia e-mail de ativação para um aluno com link seguro.
+    
+    Args:
+        aluno: Instância do modelo Usuario (aluno)
+    
+    Raises:
+        Exception: Se houver erro no envio do e-mail
+        ValueError: Se o aluno não tem e-mail válido
+    """
+    # Validações
+    if not aluno.email or aluno.email == 'pendente':
+        raise ValueError(f"Aluno {aluno.username} não possui e-mail válido")
+    
+    if not aluno.first_name:
+        raise ValueError(f"Aluno {aluno.username} não possui nome válido")
+    
+    try:
+        uidb64 = urlsafe_base64_encode(force_bytes(aluno.pk))
+        token = default_token_generator.make_token(aluno)
+
+        # URL base do frontend - ajuste conforme sua configuração
+        frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')
+        link_ativacao = f"{frontend_url}/ativar-conta/{uidb64}/{token}/"
+
+        # Versão em texto simples (fallback para clientes que não suportam HTML)
+        mensagem_texto = f"""
+        Olá {aluno.first_name}, seja bem-vindo ao sistema! 🚀
+
+        Sua conta foi criada com sucesso e está aguardando ativação.
+
+        🔗 Clique no link abaixo para ativar sua conta e definir sua senha:
+        {link_ativacao}
+
+        ⚠️ IMPORTANTE:
+        - Este link é válido por 24 horas
+        - Use seu CPF como usuário para fazer login
+        - Defina uma senha segura (mínimo 8 caracteres)
+        - Se o link expirar, solicite um novo ao administrador
+
+        Qualquer dúvida, estamos à disposição. 🤝
+        """
+
+        # Versão HTML profissional
+        mensagem_html = f"""
+        <!DOCTYPE html>
+        <html lang="pt-BR">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Ativação de Conta - CT Supera</title>
+            <style>
+                body {{
+                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                    line-height: 1.6;
+                    color: #333;
+                    margin: 0;
+                    padding: 0;
+                    background-color: #f4f4f4;
+                }}
+                .container {{
+                    max-width: 600px;
+                    margin: 0 auto;
+                    background-color: #ffffff;
+                    border-radius: 8px;
+                    overflow: hidden;
+                    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                }}
+                .header {{
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    color: white;
+                    padding: 30px;
+                    text-align: center;
+                }}
+                .header h1 {{
+                    margin: 0;
+                    font-size: 28px;
+                    font-weight: 300;
+                }}
+                .header .subtitle {{
+                    margin-top: 10px;
+                    opacity: 0.9;
+                    font-size: 16px;
+                }}
+                .content {{
+                    padding: 40px 30px;
+                }}
+                .welcome {{
+                    font-size: 18px;
+                    color: #2c3e50;
+                    margin-bottom: 25px;
+                }}
+                .description {{
+                    color: #555;
+                    margin-bottom: 30px;
+                    font-size: 16px;
+                }}
+                .cta-button {{
+                    display: inline-block;
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    color: white;
+                    text-decoration: none;
+                    padding: 15px 30px;
+                    border-radius: 25px;
+                    font-weight: bold;
+                    font-size: 16px;
+                    margin: 20px 0;
+                    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+                    transition: all 0.3s ease;
+                }}
+                .cta-button:hover {{
+                    transform: translateY(-2px);
+                    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+                }}
+                .info-box {{
+                    background-color: #f8f9fa;
+                    border-left: 4px solid #667eea;
+                    padding: 20px;
+                    margin: 25px 0;
+                    border-radius: 0 8px 8px 0;
+                }}
+                .info-box h3 {{
+                    margin: 0 0 15px 0;
+                    color: #2c3e50;
+                    font-size: 18px;
+                }}
+                .info-list {{
+                    margin: 0;
+                    padding-left: 20px;
+                }}
+                .info-list li {{
+                    margin-bottom: 8px;
+                    color: #555;
+                }}
+                .footer {{
+                    background-color: #f8f9fa;
+                    padding: 25px 30px;
+                    text-align: center;
+                    color: #666;
+                    font-size: 14px;
+                }}
+                .logo {{
+                    font-size: 24px;
+                    font-weight: bold;
+                    margin-bottom: 10px;
+                }}
+                .link-fallback {{
+                    word-break: break-all;
+                    color: #667eea;
+                    text-decoration: none;
+                }}
+                @media only screen and (max-width: 600px) {{
+                    .container {{
+                        margin: 10px;
+                        border-radius: 4px;
+                    }}
+                    .header, .content, .footer {{
+                        padding: 20px;
+                    }}
+                    .header h1 {{
+                        font-size: 24px;
+                    }}
+                }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <div class="logo">🏋️ CT Supera</div>
+                    <h1>Bem-vindo ao Sistema!</h1>
+                    <div class="subtitle">Sua conta foi criada com sucesso</div>
+                </div>
+                
+                <div class="content">
+                    <div class="welcome">
+                        Olá <strong>{aluno.first_name}</strong>, seja bem-vindo ao CT Supera! 🚀
+                    </div>
+                    
+                    <div class="description">
+                        Sua conta foi criada com sucesso e está aguardando ativação. 
+                        Para começar a usar o sistema, você precisa ativar sua conta e definir sua senha.
+                    </div>
+                    
+                    <div style="text-align: center;">
+                        <a href="{link_ativacao}" class="cta-button">
+                            🎯 ATIVAR MINHA CONTA
+                        </a>
+                    </div>
+                    
+                    <div class="info-box">
+                        <h3>⚠️ Informações Importantes</h3>
+                        <ul class="info-list">
+                            <li><strong>Validade:</strong> Este link é válido por 24 horas</li>
+                            <li><strong>Usuário:</strong> Use seu CPF como nome de usuário para fazer login</li>
+                            <li><strong>Senha:</strong> Defina uma senha segura (mínimo 8 caracteres)</li>
+                            <li><strong>Segurança:</strong> Inclua letras maiúsculas, minúsculas, números e caracteres especiais</li>
+                        </ul>
+                    </div>
+                    
+                    <div style="margin-top: 30px; padding: 15px; background-color: #e8f4fd; border-radius: 8px; border-left: 4px solid #3498db;">
+                        <strong>🔗 Link de Ativação:</strong><br>
+                        <a href="{link_ativacao}" class="link-fallback">{link_ativacao}</a>
+                    </div>
+                </div>
+                
+                <div class="footer">
+                    <div style="margin-bottom: 15px;">
+                        <strong>CT Supera - Centro de Treinamento</strong><br>
+                        Sistema de Gestão Completo
+                    </div>
+                    <div style="color: #999; font-size: 12px;">
+                        Se o link não funcionar, copie e cole o endereço acima no seu navegador.<br>
+                        Em caso de dúvidas, entre em contato conosco.
+                    </div>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+
+        # Envia e-mail com versão HTML e texto simples
+        send_mail(
+            "Ativação da sua conta - Sistema CT Supera",
+            mensagem_texto,
+            settings.DEFAULT_FROM_EMAIL,
+            [aluno.email],
+            fail_silently=False,
+            html_message=mensagem_html
+        )
+        logger.info(f"Convite de ativação enviado para {aluno.email}")
+        return True
+    except Exception as e:
+        logger.error(f"Erro ao enviar convite para {aluno.email}: {str(e)}")
+        raise
+
+
+def reenviar_convite_aluno(aluno) -> bool:
+    """
+    Reenvia e-mail de ativação para um aluno.
+    
+    Args:
+        aluno: Instância do modelo Usuario (aluno)
+    
+    Returns:
+        True se enviado com sucesso, False caso contrário
+    """
+    try:
+        return enviar_convite_aluno(aluno)
+    except Exception as e:
+        logger.error(f"Erro ao reenviar convite para {aluno.email}: {str(e)}")
+        return False
+
+
+def pode_receber_convite(aluno) -> bool:
+    """
+    Verifica se um aluno pode receber convite de ativação.
+    
+    Args:
+        aluno: Instância do modelo Usuario (aluno)
+    
+    Returns:
+        True se pode receber convite, False caso contrário
+    """
+    return (
+        aluno.email and 
+        aluno.email != 'pendente' and 
+        aluno.first_name and
+        not aluno.is_active
     )
 
-
-def gerar_senha_temporaria():
-    """Gera uma senha aleatória segura"""
-    return ''.join(random.choices(string.ascii_letters + string.digits, k=12))

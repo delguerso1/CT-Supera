@@ -5,7 +5,8 @@ from turmas.models import Turma
 from django.core.exceptions import ValidationError
 import re
 from django.contrib.auth.hashers import make_password
-import datetime 
+import datetime
+from ct.models import CentroDeTreinamento
 
 def validar_telefone(telefone):
     if telefone:
@@ -37,23 +38,44 @@ def validar_cpf(cpf):
     
     return cpf
 
+def validar_senha(senha):
+    """Valida a força da senha"""
+    if len(senha) < 8:
+        raise ValidationError("A senha deve ter pelo menos 8 caracteres.")
+    
+    if not re.search(r'[A-Z]', senha):
+        raise ValidationError("A senha deve conter pelo menos uma letra maiúscula.")
+    
+    if not re.search(r'[a-z]', senha):
+        raise ValidationError("A senha deve conter pelo menos uma letra minúscula.")
+    
+    if not re.search(r'\d', senha):
+        raise ValidationError("A senha deve conter pelo menos um número.")
+    
+    if not re.search(r'[!@#$%^&*(),.?":{}|<>]', senha):
+        raise ValidationError("A senha deve conter pelo menos um caractere especial (!@#$%^&*(),.?\":{}|<>).")
+    
+    return senha
+
 
 class UsuarioForm(forms.ModelForm):
-    password = forms.CharField(widget=forms.PasswordInput, required=True, label="Senha")
+    first_name = forms.CharField(label="Nome", max_length=150)
+    last_name = forms.CharField(label="Sobrenome", max_length=150)
     telefone = forms.CharField(max_length=20, widget=forms.TextInput(attrs={"placeholder": "(21)00000-0000"}))
     data_nascimento = forms.DateField(widget=forms.DateInput(attrs={"type": "date"}), label="Data de Nascimento")
     endereco = forms.CharField(max_length=255, required=False, label="Endereço")
-    nome = forms.CharField(max_length=100, required=True, label="Nome")
     cpf = forms.CharField(max_length=14, required=True, label="CPF")
     tipo = forms.ChoiceField(choices=Usuario.TIPO_USUARIO_CHOICES, label="Tipo de Usuário")
     telefone_responsavel = forms.CharField(required=False, label="Telefone do Responsável")
     telefone_emergencia = forms.CharField(required=False, label="Telefone de Emergência")
-
+    email = forms.EmailField(required=True, label="E-mail")
+    
+   
     class Meta:
         model = Usuario
         fields = [
-            "cpf", "nome", "tipo", "telefone", "endereco", "data_nascimento", "password",
-            "telefone_responsavel", "telefone_emergencia"
+            "cpf", "first_name", "last_name", "tipo", "telefone", "endereco", "data_nascimento",
+            "telefone_responsavel", "telefone_emergencia", "email"
         ]
 
     def clean_cpf(self):
@@ -96,23 +118,37 @@ class UsuarioForm(forms.ModelForm):
 
     def save(self, commit=True):
         usuario = super().save(commit=False)
-        if self.cleaned_data["password"]:
-            usuario.password = make_password(self.cleaned_data["password"])
+        usuario.username = re.sub(r"\D", "", self.cleaned_data["cpf"])
+        
+        # Cria usuário inativo (será ativado via link)
+        usuario.is_active = False  # Usuário inativo até ativar via link
+        usuario.set_unusable_password()  # Não define senha - usuário definirá via link
+        
         if commit:
             usuario.save()
+            
+            # Envia convite de ativação para todos os usuários
+            if usuario.email:
+                try:
+                    from usuarios.utils import enviar_convite_aluno
+                    enviar_convite_aluno(usuario)
+                except Exception as e:
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.error(f"Erro ao enviar convite de ativação para {usuario.email}: {e}")
+        
         return usuario
-
-
     
+
 
 class PreCadastroForm(forms.ModelForm):
     telefone = forms.CharField(max_length=20, widget=forms.TextInput(attrs={"placeholder": "(21)00000-0000"}))
-    data_de_nascimento = forms.DateField(widget=forms.DateInput(attrs={"type": "date"}))
+    data_nascimento = forms.DateField(widget=forms.DateInput(attrs={"type": "date"}), label="Data de Nascimento")
     turma = forms.ModelChoiceField(queryset=Turma.objects.all(), empty_label="Selecione uma turma", required=True)
 
     class Meta:
         model = PreCadastro
-        fields = ["nome", "telefone", "data_de_nascimento", "email", "turma"]  
+        fields = ["first_name", "last_name", "telefone", "data_nascimento", "email", "turma"]  
 
 
     def clean_email(self):
@@ -136,10 +172,54 @@ class PreCadastroForm(forms.ModelForm):
 class AgendarAulaForm(forms.ModelForm):
     class Meta:
         model = PreCadastro
-        fields = ['nome', 'telefone', 'data_de_nascimento', 'email', 'turma']  # 🔹 Adicionado `email` ao formulário
+        fields = ['first_name', 'last_name', 'telefone', 'data_nascimento', 'email', 'turma']
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['turma'].queryset = Turma.objects.filter(dia_semana__in=['segunda', 'terca', 'quarta', 'quinta', 'sexta'])
 
 
+
+class PreCadastroEditForm(forms.ModelForm):
+    cpf = forms.CharField(
+        max_length=11,
+        required=True,
+        widget=forms.TextInput(attrs={"placeholder": "Informe o CPF"})
+    )
+
+    class Meta:
+        model = PreCadastro
+        fields = ["first_name", "last_name", "telefone", "data_nascimento", "email", "turma", "cpf"]
+
+
+class DefinirSenhaForm(forms.Form):
+    """Formulário para definição de senha com validação de força"""
+    new_password1 = forms.CharField(
+        label="Nova senha",
+        widget=forms.PasswordInput,
+        help_text="Mínimo 8 caracteres, incluindo maiúscula, minúscula, número e caractere especial"
+    )
+    new_password2 = forms.CharField(
+        label="Confirmar nova senha",
+        widget=forms.PasswordInput
+    )
+
+    def clean_new_password1(self):
+        password = self.cleaned_data.get('new_password1')
+        if password:
+            try:
+                validar_senha(password)
+            except ValidationError as e:
+                raise forms.ValidationError(e)
+        return password
+
+    def clean(self):
+        cleaned_data = super().clean()
+        password1 = cleaned_data.get("new_password1")
+        password2 = cleaned_data.get("new_password2")
+        
+        if password1 and password2:
+            if password1 != password2:
+                raise forms.ValidationError("As senhas não coincidem.")
+        
+        return cleaned_data

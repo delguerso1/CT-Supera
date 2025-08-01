@@ -1,11 +1,19 @@
 from django.urls import path
-from . import views
-
-app_name = 'turmas'
+from .views import ListaCriarTurmasAPIView, EditarExcluirTurmaAPIView, ListaAlunosTurmaAPIView, AdicionarAlunoAPIView, ListaDiasSemanaAPIView
 
 urlpatterns = [
-    path('nova/', views.criar_turma, name='criar_turma'),
-    path('<int:pk>/editar/', views.editar_turma, name='editar_turma'),
-    path('<int:pk>/excluir/', views.excluir_turma, name='excluir_turma'),
-    path('', views.lista_turmas, name='lista_turmas'),
+    # Listar e criar turmas
+    path('', ListaCriarTurmasAPIView.as_view(), name='lista_criar_turmas_api'),
+
+    # Editar, excluir ou visualizar uma turma
+    path('<int:pk>/', EditarExcluirTurmaAPIView.as_view(), name='editar_excluir_turma_api'),
+
+    # Listar alunos de uma turma
+    path('<int:turma_id>/alunos/', ListaAlunosTurmaAPIView.as_view(), name='lista_alunos_turma_api'),
+
+    # Adicionar alunos a uma turma
+    path('<int:turma_id>/adicionar-alunos/', AdicionarAlunoAPIView.as_view(), name='adicionar_aluno_api'),
+
+    # Listar dias da semana
+    path('diassemana/', ListaDiasSemanaAPIView.as_view(), name='lista_dias_semana_api'),
 ]

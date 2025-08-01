@@ -3,29 +3,39 @@ from financeiro.models import Mensalidade
 from alunos.models import PreCadastro
 from django.utils import timezone
 from datetime import timedelta
+from usuarios.models import Usuario
+from calendar import monthrange
 
 class Command(BaseCommand):
-    help = 'Gera mensalidades automaticamente para alunos com vencimento em 5 dias'
+    help = 'Gera mensalidades automaticamente para alunos ativos, usando vencimento e valor personalizados.'
 
     def handle(self, *args, **kwargs):
         hoje = timezone.now().date()
-        data_vencimento = hoje + timedelta(days=5)
-
-        alunos = PreCadastro.objects.all()
+        ano = hoje.year
+        mes = hoje.month
         total_geradas = 0
 
+        alunos = Usuario.objects.filter(tipo='aluno', ativo=True)
+
         for aluno in alunos:
+            if not aluno.dia_vencimento or not aluno.valor_mensalidade:
+                continue  # Pula alunos sem configuração
+            # Calcula o vencimento para o mês atual
+            ultimo_dia = monthrange(ano, mes)[1]
+            dia = min(int(aluno.dia_vencimento), ultimo_dia)
+            data_vencimento = hoje.replace(day=dia)
+            # Evita duplicidade
             existe = Mensalidade.objects.filter(
                 aluno=aluno,
-                data_vencimento=data_vencimento
+                data_vencimento__year=ano,
+                data_vencimento__month=mes
             ).exists()
-
             if not existe:
                 Mensalidade.objects.create(
                     aluno=aluno,
                     valor=aluno.valor_mensalidade,
-                    data_inicio=data_vencimento,
-                    data_vencimento=data_vencimento + timedelta(days=30)
+                    data_inicio=hoje,
+                    data_vencimento=data_vencimento
                 )
                 total_geradas += 1
 

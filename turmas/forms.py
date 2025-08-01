@@ -13,11 +13,12 @@ class TurmaForm(forms.ModelForm):
 
     class Meta:
         model = Turma
-        fields = ["ct", "nome", "dias_semana", "horario", "capacidade_maxima", "professor"]
+        fields = ["ct", "dias_semana", "horario", "capacidade_maxima", "professor", "alunos"]
 
     def __init__(self, *args, **kwargs):
         user = kwargs.pop("user", None)
         super().__init__(*args, **kwargs)
+        self.fields["alunos"].queryset = Usuario.objects.filter(tipo="aluno")
 
         if user:
             self.fields["professor"].queryset = Usuario.objects.filter(tipo="professor")  # 🔹 Filtra apenas professores

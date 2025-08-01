@@ -1,11 +1,19 @@
 from django.urls import path
-from . import views
-
-app_name = "ct"
+from .views import ListaCTAPIView, CriarCTAPIView, EditarCTAPIView, ExcluirCTAPIView, DetalheCTAPIView
 
 urlpatterns = [
-    path("", views.lista_ct, name="lista_ct"),
-    path("criar/", views.criar_ct, name="criar_ct"),
-    path("editar/<int:ct_id>/", views.editar_ct, name="editar_ct"),
-    path("excluir/<int:ct_id>/", views.excluir_ct, name="excluir_ct"),
+    # Listar Centros de Treinamento
+    path('', ListaCTAPIView.as_view(), name='lista_ct_api'),
+
+    # Detalhar Centro de Treinamento
+    path('<int:pk>/', DetalheCTAPIView.as_view(), name='detalhe_ct_api'),
+
+    # Criar Centro de Treinamento
+    path('criar/', CriarCTAPIView.as_view(), name='criar_ct_api'),
+
+    # Editar Centro de Treinamento
+    path('editar/<int:ct_id>/', EditarCTAPIView.as_view(), name='editar_ct_api'),
+
+    # Excluir Centro de Treinamento
+    path('excluir/<int:ct_id>/', ExcluirCTAPIView.as_view(), name='excluir_ct_api'),
 ]

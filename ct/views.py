@@ -1,66 +1,69 @@
-from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth.decorators import login_required
-from usuarios.models import Usuario  # 🔹 Substituí `Funcionario` por `Usuario`
+from django.shortcuts import get_object_or_404
 from .models import CentroDeTreinamento
-from .forms import CentroDeTreinamentoForm
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from rest_framework import status
+from .serializers import CentroDeTreinamentoSerializer
+from rest_framework.generics import RetrieveAPIView
 
-def verifica_gerente(user):
-    """Verifica se o usuário logado é um gerente"""
-    return user.tipo == "gerente"  # 🔹 Agora validamos diretamente no modelo `Usuario`
 
-@login_required
-def lista_ct(request):
-    """Lista os Centros de Treinamento (apenas para gerentes)"""
-    if not verifica_gerente(request.user):
-        return render(request, "403.html")  # Página de acesso negado
 
-    centros = CentroDeTreinamento.objects.all()
-    return render(request, "ct/lista_ct.html", {"centros": centros})
+class ListaCTAPIView(APIView):
+    """API para listar os Centros de Treinamento (apenas gerentes)."""
+    permission_classes = []
 
-@login_required
-def criar_ct(request):
-    """Criação de um novo Centro de Treinamento (apenas gerentes)"""
-    if not verifica_gerente(request.user):
-        return render(request, "403.html")
+    def get(self, request):
+        centros = CentroDeTreinamento.objects.all()
+        serializer = CentroDeTreinamentoSerializer(centros, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
-    if request.method == "POST":
-        form = CentroDeTreinamentoForm(request.POST)
-        if form.is_valid():
-            form.save()
-            return redirect("ct:lista_ct")
-    else:
-        form = CentroDeTreinamentoForm()
 
-    return render(request, "ct/form_ct.html", {"form": form})
+class CriarCTAPIView(APIView):
+    """API para criar um novo Centro de Treinamento (apenas gerentes)."""
+    permission_classes = [IsAuthenticated]
 
-@login_required
-def editar_ct(request, ct_id):
-    """Edição de um CT existente (apenas gerentes)"""
-    if not verifica_gerente(request.user):
-        return render(request, "403.html")
+    def post(self, request):
+        if request.user.tipo != "gerente":
+            return Response({"error": "Permissão negada."}, status=status.HTTP_403_FORBIDDEN)
 
-    ct = get_object_or_404(CentroDeTreinamento, id=ct_id)
+        serializer = CentroDeTreinamentoSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    if request.method == "POST":
-        form = CentroDeTreinamentoForm(request.POST, instance=ct)
-        if form.is_valid():
-            form.save()
-            return redirect("ct:lista_ct")
-    else:
-        form = CentroDeTreinamentoForm(instance=ct)
 
-    return render(request, "ct/form_ct.html", {"form": form, "ct": ct})
+class EditarCTAPIView(APIView):
+    """API para editar um Centro de Treinamento existente (apenas gerentes)."""
+    permission_classes = [IsAuthenticated]
 
-@login_required
-def excluir_ct(request, ct_id):
-    """Exclusão de um CT (apenas gerentes)"""
-    if not verifica_gerente(request.user):
-        return render(request, "403.html")
+    def put(self, request, ct_id):
+        if request.user.tipo != "gerente":
+            return Response({"error": "Permissão negada."}, status=status.HTTP_403_FORBIDDEN)
 
-    ct = get_object_or_404(CentroDeTreinamento, id=ct_id)
+        ct = get_object_or_404(CentroDeTreinamento, id=ct_id)
+        serializer = CentroDeTreinamentoSerializer(ct, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    if request.method == "POST":
+
+class ExcluirCTAPIView(APIView):
+    """API para excluir um Centro de Treinamento (apenas gerentes)."""
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, ct_id):
+        if request.user.tipo != "gerente":
+            return Response({"error": "Permissão negada."}, status=status.HTTP_403_FORBIDDEN)
+
+        ct = get_object_or_404(CentroDeTreinamento, id=ct_id)
         ct.delete()
-        return redirect("ct:lista_ct")
+        return Response({"message": "Centro de Treinamento excluído com sucesso!"}, status=status.HTTP_200_OK)
 
-    return render(request, "ct/excluir_ct.html", {"ct": ct})
+
+class DetalheCTAPIView(RetrieveAPIView):
+    """API para detalhar um Centro de Treinamento."""
+    queryset = CentroDeTreinamento.objects.all()
+    serializer_class = CentroDeTreinamentoSerializer

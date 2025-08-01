@@ -1,9 +1,0 @@
-{% extends 'base.html' %}
-
-{% block content %}
-<h2>⚠️ Link inválido ou expirado</h2>
-<p>O link de ativação que você tentou acessar não é válido ou já foi utilizado.</p>
-<p>Se você não ativou sua conta, solicite um novo convite ao administrador.</p>
-
-<a href="{% url 'usuarios:login' %}" class="btn btn-primary">Voltar para o login</a>
-{% endblock %}
