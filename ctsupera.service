@@ -1,0 +1,21 @@
+[Unit]
+Description=CT Supera Django Application
+After=network.target
+
+[Service]
+Type=notify
+User=oracle
+Group=oracle
+WorkingDirectory=/home/oracle/ct-supera
+Environment="PATH=/home/oracle/ct-supera/venv/bin"
+Environment="DJANGO_SETTINGS_MODULE=app.settings_production"
+ExecStart=/home/oracle/ct-supera/venv/bin/gunicorn app.wsgi:application --config gunicorn.conf.py
+ExecReload=/bin/kill -s HUP $MAINPID
+KillMode=mixed
+TimeoutStopSec=5
+PrivateTmp=true
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target 

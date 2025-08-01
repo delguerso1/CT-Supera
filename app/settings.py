@@ -28,9 +28,16 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'chave-secreta-padrao')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.getenv('DJANGO_DEBUG', 'False') == 'True'
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', 'seu-dominio.com']
+ALLOWED_HOSTS = [
+    'localhost', 
+    '127.0.0.1', 
+    'seu-dominio.com', 
+    '163.176.178.246',
+    os.getenv('DOMAIN_NAME', ''),
+    os.getenv('SERVER_IP', '163.176.178.246'),
+]
 
 
 # Application definition
