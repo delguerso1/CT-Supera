@@ -311,6 +311,24 @@ function DashboardGerente({ user }) {
   const [uploadingFoto, setUploadingFoto] = useState(false);
   const navigate = useNavigate();
 
+  const fetchGerenteData = useCallback(async () => {
+    try {
+      const response = await api.get('funcionarios/painel-gerente/');
+      setGerente(response.data);
+      setForm({
+        first_name: response.data.first_name || '',
+        last_name: response.data.last_name || '',
+        email: response.data.email || '',
+        telefone: response.data.telefone || '',
+        endereco: response.data.endereco || '',
+        data_nascimento: response.data.data_nascimento || '',
+        ficha_medica: response.data.ficha_medica || ''
+      });
+    } catch (err) {
+      setErro('Erro ao carregar dados do gerente.');
+    }
+  }, []);
+
   const fetchDashboardData = useCallback(async () => {
     try {
       setLoading(true);
@@ -377,24 +395,6 @@ function DashboardGerente({ user }) {
     fetchDashboardData();
     fetchGerenteData();
   }, [user, navigate, fetchDashboardData, fetchGerenteData]);
-
-  const fetchGerenteData = useCallback(async () => {
-    try {
-      const response = await api.get('funcionarios/painel-gerente/');
-      setGerente(response.data);
-      setForm({
-        first_name: response.data.first_name || '',
-        last_name: response.data.last_name || '',
-        email: response.data.email || '',
-        telefone: response.data.telefone || '',
-        endereco: response.data.endereco || '',
-        data_nascimento: response.data.data_nascimento || '',
-        ficha_medica: response.data.ficha_medica || ''
-      });
-    } catch (err) {
-      setErro('Erro ao carregar dados do gerente.');
-    }
-  }, []);
 
   const handleFotoChange = (e) => {
     const file = e.target.files[0];

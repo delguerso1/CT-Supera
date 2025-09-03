@@ -4,7 +4,7 @@ from .views import (
     DespesaListCreateView, DespesaRetrieveUpdateDestroyView,
     SalarioListCreateView, SalarioRetrieveUpdateDestroyView,
     PagarSalarioAPIView, DashboardFinanceiroAPIView, RelatorioFinanceiroAPIView, GerarPixAPIView, ConsultarStatusPixAPIView,
-    GerarPagamentoPixAPIView, VerificarStatusPixAPIView, GerarPagamentoBancarioAPIView
+    # GerarPagamentoPixAPIView, VerificarStatusPixAPIView, GerarPagamentoBancarioAPIView  # Comentado - usa Mercado Pago
 )
 
 app_name = "financeiro"
@@ -30,10 +30,10 @@ urlpatterns = [
     # API para o relatório financeiro
     path('relatorio/', RelatorioFinanceiroAPIView.as_view(), name='relatorio_financeiro_api'),
 
-    # Pagamentos PIX
-    path('pix/gerar/<int:mensalidade_id>/', GerarPagamentoPixAPIView.as_view(), name='gerar-pagamento-pix'),
-    path('pix/status/<int:transacao_id>/', VerificarStatusPixAPIView.as_view(), name='verificar-status-pix'),
+    # Pagamentos PIX (comentado - usa Mercado Pago)
+    # path('pix/gerar/<int:mensalidade_id>/', GerarPagamentoPixAPIView.as_view(), name='gerar-pagamento-pix'),
+    # path('pix/status/<int:transacao_id>/', VerificarStatusPixAPIView.as_view(), name='verificar-status-pix'),
     
-    # Pagamentos Bancários
-    path('pagamento-bancario/gerar/<int:mensalidade_id>/', GerarPagamentoBancarioAPIView.as_view(), name='gerar-pagamento-bancario'),
+    # Pagamentos Bancários (comentado - usa Mercado Pago)
+    # path('pagamento-bancario/gerar/<int:mensalidade_id>/', GerarPagamentoBancarioAPIView.as_view(), name='gerar-pagamento-bancario'),
 ]

@@ -1,5 +1,5 @@
 """
-Configurações de produção para o Oracle Cloud
+Configurações de produção para Hostinger
 """
 
 import os
@@ -21,7 +21,7 @@ DEBUG = False
 # Configuração de hosts permitidos para produção
 ALLOWED_HOSTS = [
     os.getenv('DOMAIN_NAME', 'seu-dominio.com'),
-    os.getenv('SERVER_IP', ''),
+    os.getenv('SERVER_IP', '72.60.145.13'),
     'localhost',
     '127.0.0.1',
 ]
@@ -89,7 +89,7 @@ CORS_ALLOW_HEADERS = [
 # Configurações de segurança para produção
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
-SECURE_SSL_REDIRECT = True
+SECURE_SSL_REDIRECT = os.getenv('SECURE_SSL_REDIRECT', 'False').lower() == 'true'
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
 SECURE_HSTS_SECONDS = 31536000
@@ -131,32 +131,17 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'app.wsgi.application'
 
-# Configuração do banco de dados Oracle
+# Configuração do banco de dados PostgreSQL (Hostinger)
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.oracle',
-        'NAME': os.getenv('ORACLE_DB_NAME', 'XE'),  # Nome do serviço Oracle
-        'USER': os.getenv('ORACLE_DB_USER', 'ctsupera'),
-        'PASSWORD': os.getenv('ORACLE_DB_PASSWORD', ''),
-        'HOST': os.getenv('ORACLE_DB_HOST', 'localhost'),
-        'PORT': os.getenv('ORACLE_DB_PORT', '1521'),
-        'OPTIONS': {
-            'threaded': True,
-        },
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.getenv('POSTGRES_DB_NAME', 'ctsupera'),
+        'USER': os.getenv('POSTGRES_DB_USER', 'ctsupera'),
+        'PASSWORD': os.getenv('POSTGRES_DB_PASSWORD', ''),
+        'HOST': os.getenv('POSTGRES_DB_HOST', 'localhost'),
+        'PORT': os.getenv('POSTGRES_DB_PORT', '5432'),
     }
 }
-
-# Configuração alternativa para PostgreSQL (se preferir)
-# DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.postgresql',
-#         'NAME': os.getenv('POSTGRES_DB_NAME', 'ctsupera'),
-#         'USER': os.getenv('POSTGRES_DB_USER', 'ctsupera'),
-#         'PASSWORD': os.getenv('POSTGRES_DB_PASSWORD', ''),
-#         'HOST': os.getenv('POSTGRES_DB_HOST', 'localhost'),
-#         'PORT': os.getenv('POSTGRES_DB_PORT', '5432'),
-#     }
-# }
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
@@ -262,4 +247,4 @@ LOGGING = {
             'propagate': False,
         },
     },
-} 
+}

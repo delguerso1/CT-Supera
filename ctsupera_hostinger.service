@@ -1,0 +1,36 @@
+[Unit]
+Description=CT Supera Django Application
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=exec
+User=root
+Group=root
+WorkingDirectory=/root/ct-supera
+Environment=PATH=/root/ct-supera/venv/bin
+EnvironmentFile=/root/ct-supera/.env
+ExecStart=/root/ct-supera/venv/bin/gunicorn --workers 3 --bind 127.0.0.1:8000 --timeout 120 --keep-alive 2 --max-requests 1000 --max-requests-jitter 100 --settings=app.settings_hostinger app.wsgi:application
+ExecReload=/bin/kill -s HUP $MAINPID
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ctsupera
+
+# Configurações de segurança
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/root/ct-supera
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+
+# Limites de recursos
+LimitNOFILE=65536
+LimitNPROC=4096
+
+[Install]
+WantedBy=multi-user.target

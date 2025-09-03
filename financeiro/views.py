@@ -10,7 +10,7 @@ from .serializers import MensalidadeSerializer, DespesaSerializer, SalarioSerial
 from django.shortcuts import get_object_or_404
 from django.conf import settings
 from datetime import timedelta
-import mercadopago
+# import mercadopago  # Comentado - não será usado
 # 
 
 # Mensalidades API
@@ -162,218 +162,218 @@ class ConsultarStatusPixAPIView(APIView):
         status_pix = mensalidade.status  # Supondo que você atualiza o status via webhook
         return Response({"status": status_pix})
 
-class GerarPagamentoPixAPIView(APIView):
-    """API para gerar um pagamento PIX."""
-    permission_classes = [IsAuthenticated]
+# class GerarPagamentoPixAPIView(APIView):
+#     """API para gerar um pagamento PIX."""
+#     permission_classes = [IsAuthenticated]
 
-    def post(self, request, mensalidade_id):
-        try:
-            mensalidade = Mensalidade.objects.get(id=mensalidade_id, aluno=request.user)
-            
-            # Verifica se já existe uma transação PIX pendente
-            if TransacaoPix.objects.filter(
-                mensalidade=mensalidade,
-                status='pendente',
-                data_expiracao__gt=timezone.now()
-            ).exists():
-                return Response({
-                    "error": "Já existe um pagamento PIX pendente para esta mensalidade."
-                }, status=status.HTTP_400_BAD_REQUEST)
+#     def post(self, request, mensalidade_id):
+#         try:
+#             mensalidade = Mensalidade.objects.get(id=mensalidade_id, aluno=request.user)
+#             
+#             # Verifica se já existe uma transação PIX pendente
+#             if TransacaoPix.objects.filter(
+#                 mensalidade=mensalidade,
+#                 status='pendente',
+#                 data_expiracao__gt=timezone.now()
+#             ).exists():
+#                 return Response({
+#                     "error": "Já existe um pagamento PIX pendente para esta mensalidade."
+#                 }, status=status.HTTP_400_BAD_REQUEST)
 
-            # Inicializa o SDK do Mercado Pago
-            sdk = mercadopago.SDK(settings.MERCADO_PAGO_ACCESS_TOKEN)
+#             # Inicializa o SDK do Mercado Pago
+#             sdk = mercadopago.SDK(settings.MERCADO_PAGO_ACCESS_TOKEN)
 
-            # Cria o pagamento PIX
-            payment_data = {
-                "transaction_amount": float(mensalidade.valor),
-                "description": f"Mensalidade {mensalidade.data_vencimento.strftime('%m/%Y')}",
-                "payment_method_id": "pix",
-                "payer": {
-                    "email": request.user.email,
-                    "first_name": request.user.first_name,
-                    "last_name": request.user.last_name
-                }
-            }
+#             # Cria o pagamento PIX
+#             payment_data = {
+#                 "transaction_amount": float(mensalidade.valor),
+#                 "description": f"Mensalidade {mensalidade.data_vencimento.strftime('%m/%Y')}",
+#                 "payment_method_id": "pix",
+#                 "payer": {
+#                     "email": request.user.email,
+#                     "first_name": request.user.first_name,
+#                     "last_name": request.user.last_name
+#                 }
+#             }
 
-            payment_response = sdk.payment().create(payment_data)
-            payment = payment_response["response"]
+#             payment_response = sdk.payment().create(payment_data)
+#             payment = payment_response["response"]
 
-            if payment["status"] == "approved":
-                # Se o pagamento for aprovado imediatamente
-                mensalidade.status = "pago"
-                mensalidade.save()
-                return Response({
-                    "message": "Pagamento aprovado com sucesso!",
-                    "mensalidade": MensalidadeSerializer(mensalidade).data
-                })
+#             if payment["status"] == "approved":
+#                 # Se o pagamento for aprovado imediatamente
+#                 mensalidade.status = "pago"
+#                 mensalidade.save()
+#                 return Response({
+#                     "message": "Pagamento aprovado com sucesso!",
+#                     "mensalidade": MensalidadeSerializer(mensalidade).data
+#                 })
 
-            # Cria a transação PIX
-            transacao = TransacaoPix.objects.create(
-                mensalidade=mensalidade,
-                codigo_pix=payment["point_of_interaction"]["transaction_data"]["qr_code"],
-                qr_code=payment["point_of_interaction"]["transaction_data"]["qr_code_base64"],
-                valor=mensalidade.valor,
-                data_expiracao=timezone.now() + timedelta(minutes=30),
-                identificador_externo=payment["id"]
-            )
+#             # Cria a transação PIX
+#             transacao = TransacaoPix.objects.create(
+#                 mensalidade=mensalidade,
+#                 codigo_pix=payment["point_of_interaction"]["transaction_data"]["qr_code"],
+#                 qr_code=payment["point_of_interaction"]["transaction_data"]["qr_code_base64"],
+#                 valor=mensalidade.valor,
+#                 data_expiracao=timezone.now() + timedelta(minutes=30),
+#                 identificador_externo=payment["id"]
+#             )
 
-            return Response({
-                "message": "Pagamento PIX gerado com sucesso!",
-                "transacao": TransacaoPixSerializer(transacao).data
-            })
+#             return Response({
+#                 "message": "Pagamento PIX gerado com sucesso!",
+#                 "transacao": TransacaoPixSerializer(transacao).data
+#             })
 
-        except Mensalidade.DoesNotExist:
-            return Response({
-                "error": "Mensalidade não encontrada."
-            }, status=status.HTTP_404_NOT_FOUND)
-        except Exception as e:
-            return Response({
-                "error": f"Erro ao gerar pagamento: {str(e)}"
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
-class VerificarStatusPixAPIView(APIView):
-    """API para verificar o status de um pagamento PIX."""
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request, transacao_id):
-        try:
-            transacao = TransacaoPix.objects.get(
-                id=transacao_id,
-                mensalidade__aluno=request.user
-            )
-
-            # Verifica se a transação expirou
-            if transacao.status == 'pendente' and timezone.now() > transacao.data_expiracao:
-                transacao.status = 'expirado'
-                transacao.save()
-                return Response({
-                    "message": "Pagamento PIX expirado.",
-                    "transacao": TransacaoPixSerializer(transacao).data
-                })
-
-            # Consulta o status no Mercado Pago
-            sdk = mercadopago.SDK(settings.MERCADO_PAGO_ACCESS_TOKEN)
-            payment_response = sdk.payment().get(transacao.identificador_externo)
-            payment = payment_response["response"]
-
-            if payment["status"] == "approved" and transacao.status != "aprovado":
-                transacao.status = "aprovado"
-                transacao.data_aprovacao = timezone.now()
-                transacao.save()
-
-                # Atualiza o status da mensalidade
-                mensalidade = transacao.mensalidade
-                mensalidade.status = "pago"
-                mensalidade.save()
-
-            return Response({
-                "transacao": TransacaoPixSerializer(transacao).data
-            })
-
-        except TransacaoPix.DoesNotExist:
-            return Response({
-                "error": "Transação não encontrada."
-            }, status=status.HTTP_404_NOT_FOUND)
-        except Exception as e:
-            return Response({
-                "error": f"Erro ao verificar status: {str(e)}"
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+#         except Mensalidade.DoesNotExist:
+#             return Response({
+#                 "error": "Mensalidade não encontrada."
+#             }, status=status.HTTP_404_NOT_FOUND)
+#         except Exception as e:
+#             return Response({
+#                 "error": f"Erro ao gerar pagamento: {str(e)}"
+#             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-class GerarPagamentoBancarioAPIView(APIView):
-    """API para gerar um pagamento bancário (cartão de crédito/débito)."""
-    permission_classes = [IsAuthenticated]
+# class VerificarStatusPixAPIView(APIView):
+#     """API para verificar o status de um pagamento PIX."""
+#     permission_classes = [IsAuthenticated]
 
-    def post(self, request, mensalidade_id):
-        try:
-            mensalidade = Mensalidade.objects.get(id=mensalidade_id, aluno=request.user)
-            
-            # Verifica se a mensalidade já foi paga
-            if mensalidade.status == "pago":
-                return Response({
-                    "error": "Esta mensalidade já foi paga."
-                }, status=status.HTTP_400_BAD_REQUEST)
+#     def get(self, request, transacao_id):
+#         try:
+#             transacao = TransacaoPix.objects.get(
+#                 id=transacao_id,
+#                 mensalidade__aluno=request.user
+#             )
 
-            # Inicializa o SDK do Mercado Pago
-            sdk = mercadopago.SDK(settings.MERCADO_PAGO_ACCESS_TOKEN)
+#             # Verifica se a transação expirou
+#             if transacao.status == 'pendente' and timezone.now() > transacao.data_expiracao:
+#                 transacao.status = 'expirado'
+#                 transacao.save()
+#                 return Response({
+#                     "message": "Pagamento PIX expirado.",
+#                     "transacao": TransacaoPixSerializer(transacao).data
+#                 })
 
-            # Cria o pagamento com cartão de crédito/débito
-            payment_data = {
-                "transaction_amount": float(mensalidade.valor),
-                "description": f"Mensalidade {mensalidade.data_vencimento.strftime('%m/%Y')} - {mensalidade.aluno.get_full_name()}",
-                "payment_method_id": "master",  # Pode ser alterado para outros métodos
-                "payer": {
-                    "email": request.user.email,
-                    "first_name": request.user.first_name,
-                    "last_name": request.user.last_name,
-                    "identification": {
-                        "type": "CPF",
-                        "number": request.user.cpf
-                    }
-                },
-                "external_reference": f"mensalidade_{mensalidade.id}",
-                "notification_url": f"{settings.FRONTEND_URL}/api/financeiro/webhook/",
-                "back_urls": {
-                    "success": f"{settings.FRONTEND_URL}/dashboard/aluno?payment=success",
-                    "failure": f"{settings.FRONTEND_URL}/dashboard/aluno?payment=failure",
-                    "pending": f"{settings.FRONTEND_URL}/dashboard/aluno?payment=pending"
-                }
-            }
+#             # Consulta o status no Mercado Pago
+#             sdk = mercadopago.SDK(settings.MERCADO_PAGO_ACCESS_TOKEN)
+#             payment_response = sdk.payment().get(transacao.identificador_externo)
+#             payment = payment_response["response"]
 
-            # Cria a preferência de pagamento
-            preference_data = {
-                "items": [
-                    {
-                        "title": f"Mensalidade {mensalidade.data_vencimento.strftime('%m/%Y')}",
-                        "quantity": 1,
-                        "unit_price": float(mensalidade.valor),
-                        "currency_id": "BRL"
-                    }
-                ],
-                "payer": {
-                    "email": request.user.email,
-                    "name": request.user.first_name,
-                    "surname": request.user.last_name
-                },
-                "external_reference": f"mensalidade_{mensalidade.id}",
-                "notification_url": f"{settings.FRONTEND_URL}/api/financeiro/webhook/",
-                "back_urls": {
-                    "success": f"{settings.FRONTEND_URL}/dashboard/aluno?payment=success",
-                    "failure": f"{settings.FRONTEND_URL}/dashboard/aluno?payment=failure",
-                    "pending": f"{settings.FRONTEND_URL}/dashboard/aluno?payment=pending"
-                },
-                "auto_return": "approved",
-                "expires": True,
-                "expiration_date_to": (timezone.now() + timedelta(hours=24)).isoformat()
-            }
+#             if payment["status"] == "approved" and transacao.status != "aprovado":
+#                 transacao.status = "aprovado"
+#                 transacao.data_aprovacao = timezone.now()
+#                 transacao.save()
 
-            preference_response = sdk.preference().create(preference_data)
-            preference = preference_response["response"]
+#                 # Atualiza o status da mensalidade
+#                 mensalidade = transacao.mensalidade
+#                 mensalidade.status = "pago"
+#                 mensalidade.save()
 
-            # Cria a transação bancária
-            transacao = TransacaoBancaria.objects.create(
-                mensalidade=mensalidade,
-                valor=mensalidade.valor,
-                data_expiracao=timezone.now() + timedelta(hours=24),
-                identificador_externo=preference["id"],
-                preference_id=preference["id"],
-                payment_url=preference["init_point"]
-            )
+#             return Response({
+#                 "transacao": TransacaoPixSerializer(transacao).data
+#             })
 
-            return Response({
-                "message": "Link de pagamento bancário gerado com sucesso!",
-                "payment_url": preference["init_point"],
-                "preference_id": preference["id"],
-                "mensalidade_id": mensalidade.id,
-                "transacao": TransacaoBancariaSerializer(transacao).data
-            })
+#         except TransacaoPix.DoesNotExist:
+#             return Response({
+#                 "error": "Transação não encontrada."
+#             }, status=status.HTTP_404_NOT_FOUND)
+#         except Exception as e:
+#             return Response({
+#                 "error": f"Erro ao verificar status: {str(e)}"
+#             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        except Mensalidade.DoesNotExist:
-            return Response({
-                "error": "Mensalidade não encontrada."
-            }, status=status.HTTP_404_NOT_FOUND)
-        except Exception as e:
-            return Response({
-                "error": f"Erro ao gerar pagamento bancário: {str(e)}"
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+# class GerarPagamentoBancarioAPIView(APIView):
+#     """API para gerar um pagamento bancário (cartão de crédito/débito)."""
+#     permission_classes = [IsAuthenticated]
+
+#     def post(self, request, mensalidade_id):
+#         try:
+#             mensalidade = Mensalidade.objects.get(id=mensalidade_id, aluno=request.user)
+#             
+#             # Verifica se a mensalidade já foi paga
+#             if mensalidade.status == "pago":
+#                 return Response({
+#                     "error": "Esta mensalidade já foi paga."
+#                 }, status=status.HTTP_400_BAD_REQUEST)
+
+#             # Inicializa o SDK do Mercado Pago
+#             sdk = mercadopago.SDK(settings.MERCADO_PAGO_ACCESS_TOKEN)
+
+#             # Cria o pagamento com cartão de crédito/débito
+#             payment_data = {
+#                 "transaction_amount": float(mensalidade.valor),
+#                 "description": f"Mensalidade {mensalidade.data_vencimento.strftime('%m/%Y')} - {mensalidade.aluno.get_full_name()}",
+#                 "payment_method_id": "master",  # Pode ser alterado para outros métodos
+#                 "payer": {
+#                     "email": request.user.email,
+#                     "first_name": request.user.first_name,
+#                     "last_name": request.user.last_name,
+#                     "identification": {
+#                         "type": "CPF",
+#                         "number": request.user.cpf
+#                     }
+#                 },
+#                 "external_reference": f"mensalidade_{mensalidade.id}",
+#                 "notification_url": f"{settings.FRONTEND_URL}/api/financeiro/webhook/",
+#                 "back_urls": {
+#                     "success": f"{settings.FRONTEND_URL}/dashboard/aluno?payment=success",
+#                     "failure": f"{settings.FRONTEND_URL}/dashboard/aluno?payment=failure",
+#                     "pending": f"{settings.FRONTEND_URL}/dashboard/aluno?payment=pending"
+#                 }
+#             }
+
+#             # Cria a preferência de pagamento
+#             preference_data = {
+#                 "items": [
+#                     {
+#                         "title": f"Mensalidade {mensalidade.data_vencimento.strftime('%m/%Y')}",
+#                         "quantity": 1,
+#                         "unit_price": float(mensalidade.valor),
+#                         "currency_id": "BRL"
+#                     }
+#                 ],
+#                 "payer": {
+#                     "email": request.user.email,
+#                     "name": request.user.first_name,
+#                     "surname": request.user.last_name
+#                 },
+#                 "external_reference": f"mensalidade_{mensalidade.id}",
+#                 "notification_url": f"{settings.FRONTEND_URL}/api/financeiro/webhook/",
+#                 "back_urls": {
+#                     "success": f"{settings.FRONTEND_URL}/dashboard/aluno?payment=success",
+#                     "failure": f"{settings.FRONTEND_URL}/dashboard/aluno?payment=failure",
+#                     "pending": f"{settings.FRONTEND_URL}/dashboard/aluno?payment=pending"
+#                 },
+#                 "auto_return": "approved",
+#                 "expires": True,
+#                 "expiration_date_to": (timezone.now() + timedelta(hours=24)).isoformat()
+#             }
+
+#             preference_response = sdk.preference().create(preference_data)
+#             preference = preference_response["response"]
+
+#             # Cria a transação bancária
+#             transacao = TransacaoBancaria.objects.create(
+#                 mensalidade=mensalidade,
+#                 valor=mensalidade.valor,
+#                 data_expiracao=timezone.now() + timedelta(hours=24),
+#                 identificador_externo=preference["id"],
+#                 preference_id=preference["id"],
+#                 payment_url=preference["init_point"]
+#             )
+
+#             return Response({
+#                 "message": "Link de pagamento bancário gerado com sucesso!",
+#                 "payment_url": preference["init_point"],
+#                 "preference_id": preference["id"],
+#                 "mensalidade_id": mensalidade.id,
+#                 "transacao": TransacaoBancariaSerializer(transacao).data
+#             })
+
+#         except Mensalidade.DoesNotExist:
+#             return Response({
+#                 "error": "Mensalidade não encontrada."
+#             }, status=status.HTTP_404_NOT_FOUND)
+#         except Exception as e:
+#             return Response({
+#                 "error": f"Erro ao gerar pagamento bancário: {str(e)}"
+#             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

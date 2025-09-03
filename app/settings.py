@@ -35,8 +35,9 @@ ALLOWED_HOSTS = [
     '127.0.0.1', 
     'seu-dominio.com', 
     '163.176.178.246',
+    '13.59.11.161',
     os.getenv('DOMAIN_NAME', ''),
-    os.getenv('SERVER_IP', '163.176.178.246'),
+    os.getenv('SERVER_IP', '13.59.11.161'),
 ]
 
 

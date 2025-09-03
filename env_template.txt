@@ -1,0 +1,78 @@
+# ========================================
+# CONFIGURAÇÕES DO DJANGO
+# ========================================
+
+# Chave secreta do Django (GERE UMA NOVA PARA PRODUÇÃO!)
+DJANGO_SECRET_KEY=django-insecure-sua-chave-secreta-muito-segura-aqui-para-desenvolvimento
+
+# Modo debug (True para desenvolvimento, False para produção)
+DJANGO_DEBUG=True
+
+# ========================================
+# CONFIGURAÇÕES DO SERVIDOR
+# ========================================
+
+# Nome do domínio (para produção)
+DOMAIN_NAME=localhost
+
+# IP do servidor (para produção)
+SERVER_IP=127.0.0.1
+
+# ========================================
+# CONFIGURAÇÕES DO BANCO DE DADOS
+# ========================================
+
+# Banco de dados PostgreSQL (Hostinger)
+POSTGRES_DB_NAME=ctsupera
+POSTGRES_DB_USER=ctsupera
+POSTGRES_DB_PASSWORD=sua-senha-postgres
+POSTGRES_DB_HOST=localhost
+POSTGRES_DB_PORT=5432
+
+# ========================================
+# CONFIGURAÇÕES DE E-MAIL
+# ========================================
+
+# Servidor SMTP
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_USE_TLS=True
+
+# Credenciais do e-mail
+EMAIL_HOST_USER=seu-email@gmail.com
+EMAIL_HOST_PASSWORD=sua-senha-de-app-gmail
+DEFAULT_FROM_EMAIL=sistema@ctsupera.com
+
+# ========================================
+# CONFIGURAÇÕES DO FRONTEND
+# ========================================
+
+# URL do frontend React
+FRONTEND_URL=http://localhost:3000
+
+# ========================================
+# CONFIGURAÇÕES DO MERCADO PAGO
+# ========================================
+
+# Credenciais do Mercado Pago
+MERCADO_PAGO_ACCESS_TOKEN=seu-token-mercado-pago
+MERCADO_PAGO_PUBLIC_KEY=sua-chave-publica-mercado-pago
+
+# ========================================
+# CONFIGURAÇÕES DE SEGURANÇA
+# ========================================
+
+# Configurações SSL (True para produção)
+SECURE_SSL_REDIRECT=False
+SESSION_COOKIE_SECURE=False
+CSRF_COOKIE_SECURE=False
+
+# ========================================
+# CONFIGURAÇÕES ADICIONAIS
+# ========================================
+
+# Timezone
+TIME_ZONE=America/Sao_Paulo
+
+# Idioma
+LANGUAGE_CODE=pt-br 

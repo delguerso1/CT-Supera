@@ -1,11 +1,11 @@
 # Configuração do cron para backup automático
-# Adicione estas linhas ao crontab do usuário ubuntu
+# Adicione estas linhas ao crontab do usuário root
 
 # Backup diário às 2:00 da manhã
-0 2 * * * /home/oracle/ct-supera/backup.sh >> /home/oracle/backups/backup.log 2>&1
+0 2 * * * /root/ct-supera/backup_hostinger.sh >> /root/backups/backup.log 2>&1
 
 # Limpeza de logs antigos (semanal)
-0 3 * * 0 find /home/oracle/ct-supera/logs -name "*.log" -mtime +30 -delete
+0 3 * * 0 find /root/ct-supera/logs -name "*.log" -mtime +30 -delete
 
 # Verificação de espaço em disco (diário às 6:00)
 0 6 * * * df -h | grep -E '^/dev/' | awk '{if($5 > 80) print "ALERTA: Disco com mais de 80% de uso - " $0}' | mail -s "Alerta de Disco" admin@ctsupera.com
