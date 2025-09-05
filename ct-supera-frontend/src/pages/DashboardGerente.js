@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import api from '../services/api';
+import api, { MEDIA_URL } from '../services/api';
 import CadastroUsuario from '../pages/CadastroUsuario';
 import ControleFinanceiro from '../pages/ControleFinanceiro';
 import CadastroCentroTreinamento from '../pages/CadastroCentroTreinamento';
@@ -630,7 +630,7 @@ function DashboardGerente({ user }) {
               color: '#1a237e',
               border: '3px solid #e0e0e0',
               overflow: 'hidden',
-              backgroundImage: gerente?.foto_perfil ? `url(http://localhost:8000${gerente.foto_perfil})` : 'none',
+              backgroundImage: gerente?.foto_perfil ? `url(${MEDIA_URL}${gerente.foto_perfil})` : 'none',
               backgroundSize: 'cover',
               backgroundPosition: 'center'
             }}>

@@ -33,10 +33,11 @@ DEBUG = os.getenv('DJANGO_DEBUG', 'False') == 'True'
 ALLOWED_HOSTS = [
     'localhost', 
     '127.0.0.1', 
-    'seu-dominio.com', 
+    'ctsupera.com.br',
+    'www.ctsupera.com.br',
     '163.176.178.246',
     '13.59.11.161',
-    os.getenv('DOMAIN_NAME', ''),
+    os.getenv('DOMAIN_NAME', 'ctsupera.com.br'),
     os.getenv('SERVER_IP', '13.59.11.161'),
 ]
 
@@ -223,7 +224,7 @@ EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', 'seuemail@gmail.com')
 EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', 'sua_senha')
-DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'sistema@ctsupera.com')
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'administracao@ctsupera.com.br')
 
 # URL do frontend para links de ativação
 FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000')

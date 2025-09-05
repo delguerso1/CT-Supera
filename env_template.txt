@@ -3,20 +3,20 @@
 # ========================================
 
 # Chave secreta do Django (GERE UMA NOVA PARA PRODUÇÃO!)
-DJANGO_SECRET_KEY=django-insecure-sua-chave-secreta-muito-segura-aqui-para-desenvolvimento
+DJANGO_SECRET_KEY=[,ME;@,<hEjz_#!L8%e`NFXQci:A7rA7bX(eqQA^V>n:@Yq<wo
 
 # Modo debug (True para desenvolvimento, False para produção)
-DJANGO_DEBUG=True
+DJANGO_DEBUG=False
 
 # ========================================
 # CONFIGURAÇÕES DO SERVIDOR
 # ========================================
 
-# Nome do domínio (para produção)
-DOMAIN_NAME=localhost
+# Nome do domínio (para produção) - CONFIGURE SEU DOMÍNIO AQUI
+DOMAIN_NAME=ctsupera.com.br
 
 # IP do servidor (para produção)
-SERVER_IP=127.0.0.1
+SERVER_IP=72.60.145.13
 
 # ========================================
 # CONFIGURAÇÕES DO BANCO DE DADOS
@@ -25,7 +25,7 @@ SERVER_IP=127.0.0.1
 # Banco de dados PostgreSQL (Hostinger)
 POSTGRES_DB_NAME=ctsupera
 POSTGRES_DB_USER=ctsupera
-POSTGRES_DB_PASSWORD=sua-senha-postgres
+POSTGRES_DB_PASSWORD=ctsupera123
 POSTGRES_DB_HOST=localhost
 POSTGRES_DB_PORT=5432
 
@@ -33,39 +33,39 @@ POSTGRES_DB_PORT=5432
 # CONFIGURAÇÕES DE E-MAIL
 # ========================================
 
-# Servidor SMTP
-EMAIL_HOST=smtp.gmail.com
+# Servidor SMTP (Hostinger)
+EMAIL_HOST=smtp.hostinger.com
 EMAIL_PORT=587
 EMAIL_USE_TLS=True
 
-# Credenciais do e-mail
-EMAIL_HOST_USER=seu-email@gmail.com
-EMAIL_HOST_PASSWORD=sua-senha-de-app-gmail
-DEFAULT_FROM_EMAIL=sistema@ctsupera.com
+# Credenciais do e-mail - CONFIGURE SEU EMAIL AQUI
+EMAIL_HOST_USER=administracao@ctsupera.com.br
+EMAIL_HOST_PASSWORD=Supera2025@
+DEFAULT_FROM_EMAIL=administracao@ctsupera.com.br
 
 # ========================================
 # CONFIGURAÇÕES DO FRONTEND
 # ========================================
 
 # URL do frontend React
-FRONTEND_URL=http://localhost:3000
+FRONTEND_URL=https://ctsupera.com.br
 
 # ========================================
-# CONFIGURAÇÕES DO MERCADO PAGO
+# CONFIGURAÇÕES DO MERCADO PAGO (REMOVIDO)
 # ========================================
 
-# Credenciais do Mercado Pago
-MERCADO_PAGO_ACCESS_TOKEN=seu-token-mercado-pago
-MERCADO_PAGO_PUBLIC_KEY=sua-chave-publica-mercado-pago
+# Credenciais do Mercado Pago - REMOVIDO DO SISTEMA
+# MERCADO_PAGO_ACCESS_TOKEN=seu-token-mercado-pago
+# MERCADO_PAGO_PUBLIC_KEY=sua-chave-publica-mercado-pago
 
 # ========================================
 # CONFIGURAÇÕES DE SEGURANÇA
 # ========================================
 
 # Configurações SSL (True para produção)
-SECURE_SSL_REDIRECT=False
-SESSION_COOKIE_SECURE=False
-CSRF_COOKIE_SECURE=False
+SECURE_SSL_REDIRECT=True
+SESSION_COOKIE_SECURE=True
+CSRF_COOKIE_SECURE=True
 
 # ========================================
 # CONFIGURAÇÕES ADICIONAIS

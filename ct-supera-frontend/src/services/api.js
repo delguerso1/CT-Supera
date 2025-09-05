@@ -3,6 +3,9 @@ import axios from 'axios';
 // Define a URL base dinamicamente com base no ambiente
 const baseURL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api/';
 
+// Define a URL base para imagens/media
+export const MEDIA_URL = process.env.REACT_APP_MEDIA_URL || 'http://localhost:8000';
+
 const api = axios.create({
   baseURL: baseURL,
   timeout: 10000, // Tempo limite de 10 segundos

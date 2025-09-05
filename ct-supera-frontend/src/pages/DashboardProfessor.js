@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import api from '../services/api';
+import api, { MEDIA_URL } from '../services/api';
 import { useNavigate } from 'react-router-dom';
 
 const styles = {
@@ -663,7 +663,7 @@ function DashboardProfessor({ user }) {
               color: '#1a237e',
               border: '3px solid #e0e0e0',
               overflow: 'hidden',
-              backgroundImage: professor?.foto_perfil ? `url(http://localhost:8000${professor.foto_perfil})` : 'none',
+              backgroundImage: professor?.foto_perfil ? `url(${MEDIA_URL}${professor.foto_perfil})` : 'none',
               backgroundSize: 'cover',
               backgroundPosition: 'center'
             }}>

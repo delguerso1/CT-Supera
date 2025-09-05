@@ -20,7 +20,8 @@ DEBUG = False
 
 # Configuração de hosts permitidos para produção
 ALLOWED_HOSTS = [
-    os.getenv('DOMAIN_NAME', 'seu-dominio.com'),
+    os.getenv('DOMAIN_NAME', 'ctsupera.com.br'),
+    'www.ctsupera.com.br',
     os.getenv('SERVER_IP', '72.60.145.13'),
     'localhost',
     '127.0.0.1',
@@ -59,8 +60,10 @@ MIDDLEWARE = [
 
 # Configurações de CORS para produção
 CORS_ALLOWED_ORIGINS = [
-    f"https://{os.getenv('DOMAIN_NAME', 'seu-dominio.com')}",
-    f"http://{os.getenv('DOMAIN_NAME', 'seu-dominio.com')}",
+    f"https://{os.getenv('DOMAIN_NAME', 'ctsupera.com.br')}",
+    f"http://{os.getenv('DOMAIN_NAME', 'ctsupera.com.br')}",
+    "https://www.ctsupera.com.br",
+    "http://www.ctsupera.com.br",
 ]
 
 CORS_ALLOW_CREDENTIALS = True
@@ -200,10 +203,10 @@ EMAIL_PORT = int(os.getenv('EMAIL_PORT', '587'))
 EMAIL_USE_TLS = True
 EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
-DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'sistema@ctsupera.com')
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'administracao@ctsupera.com.br')
 
 # URL do frontend para links de ativação
-FRONTEND_URL = os.getenv('FRONTEND_URL', 'https://seu-dominio.com')
+FRONTEND_URL = os.getenv('FRONTEND_URL', 'https://ctsupera.com.br')
 
 # Configurações do Mercado Pago
 MERCADO_PAGO_ACCESS_TOKEN = os.getenv('MERCADO_PAGO_ACCESS_TOKEN', '')

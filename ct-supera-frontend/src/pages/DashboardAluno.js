@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import api from '../services/api';
+import api, { MEDIA_URL } from '../services/api';
 
 const styles = {
   container: {
@@ -792,7 +792,7 @@ function DashboardAluno({ user }) {
               color: '#1a237e',
               border: '3px solid #e0e0e0',
               overflow: 'hidden',
-              backgroundImage: aluno?.foto_perfil ? `url(http://localhost:8000${aluno.foto_perfil})` : 'none',
+              backgroundImage: aluno?.foto_perfil ? `url(${MEDIA_URL}${aluno.foto_perfil})` : 'none',
               backgroundSize: 'cover',
               backgroundPosition: 'center'
             }}>
