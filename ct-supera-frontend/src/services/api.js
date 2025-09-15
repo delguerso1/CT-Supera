@@ -71,4 +71,22 @@ api.interceptors.response.use(
   }
 );
 
+// Funções específicas para recuperação de senha
+export const passwordRecoveryAPI = {
+  // Solicitar recuperação de senha
+  solicitarRecuperacao: async (cpf) => {
+    const response = await api.post('/usuarios/esqueci-senha/', { cpf });
+    return response.data;
+  },
+
+  // Redefinir senha
+  redefinirSenha: async (uidb64, token, novaSenha) => {
+    const response = await api.post(`/usuarios/redefinir-senha/${uidb64}/${token}/`, {
+      new_password1: novaSenha,
+      new_password2: novaSenha
+    });
+    return response.data;
+  }
+};
+
 export default api;

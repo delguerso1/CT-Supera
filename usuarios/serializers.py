@@ -145,3 +145,48 @@ class DefinirSenhaSerializer(serializers.Serializer):
             })
         
         return attrs
+
+
+class SolicitarRecuperacaoSenhaSerializer(serializers.Serializer):
+    """Serializer para solicitação de recuperação de senha"""
+    cpf = serializers.CharField(
+        max_length=14,
+        help_text="CPF do usuário (com ou sem formatação)"
+    )
+    
+    def validate_cpf(self, value):
+        """Valida e limpa o CPF"""
+        # Remove formatação
+        cpf_limpo = re.sub(r'\D', '', value)
+        
+        if len(cpf_limpo) != 11:
+            raise serializers.ValidationError("CPF deve ter 11 dígitos.")
+        
+        return cpf_limpo
+
+
+class RedefinirSenhaSerializer(serializers.Serializer):
+    """Serializer para redefinição de senha via token"""
+    new_password1 = serializers.CharField(
+        min_length=8,
+        write_only=True,
+        help_text="Mínimo 8 caracteres, incluindo maiúscula, minúscula, número e caractere especial"
+    )
+    new_password2 = serializers.CharField(write_only=True)
+
+    def validate_new_password1(self, value):
+        """Valida a força da senha"""
+        validar_senha_serializer(value)
+        return value
+
+    def validate(self, attrs):
+        """Valida se as senhas coincidem"""
+        password1 = attrs.get('new_password1')
+        password2 = attrs.get('new_password2')
+        
+        if password1 and password2 and password1 != password2:
+            raise serializers.ValidationError({
+                "new_password2": "As senhas não coincidem."
+            })
+        
+        return attrs

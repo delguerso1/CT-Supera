@@ -10,6 +10,8 @@ import DashboardProfessor from './pages/DashboardProfessor';
 import DashboardAluno from './pages/DashboardAluno';
 import AgendamentoPage from './pages/AgendamentoPage';
 import CadastroTurmas from './pages/CadastroTurmas';
+import EsqueciMinhaSenha from './pages/EsqueciMinhaSenha';
+import RedefinirSenha from './pages/RedefinirSenha';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import './App.css';
@@ -68,6 +70,8 @@ function App() {
           <Route path="/formacao-atletas" element={<FormacaoAtletas />} />
           <Route path="/galeria" element={<GaleriaFotos />} />
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/esqueci-senha" element={<EsqueciMinhaSenha />} />
+          <Route path="/redefinir-senha/:uidb64/:token" element={<RedefinirSenha />} />
           <Route path="/agendamento" element={<AgendamentoPage />} />
           {/* Rotas protegidas */}
           <Route 

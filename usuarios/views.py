@@ -11,7 +11,7 @@ from django.utils.http import urlsafe_base64_decode
 from django.contrib.auth.forms import SetPasswordForm
 from usuarios.models import Usuario, PreCadastro
 from usuarios.forms import DefinirSenhaForm
-from usuarios.serializers import DefinirSenhaSerializer
+from usuarios.serializers import DefinirSenhaSerializer, SolicitarRecuperacaoSenhaSerializer, RedefinirSenhaSerializer
 from financeiro.models import Mensalidade
 from django.utils import timezone
 from datetime import timedelta
@@ -388,6 +388,107 @@ class ReenviarConviteAPIView(APIView):
                 {"error": "Erro ao reenviar convite. Tente novamente."}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+
+class SolicitarRecuperacaoSenhaAPIView(APIView):
+    """API para solicitar recuperação de senha."""
+    permission_classes = []  # Não requer autenticação
+
+    def post(self, request):
+        serializer = SolicitarRecuperacaoSenhaSerializer(data=request.data)
+        
+        if not serializer.is_valid():
+            return Response({
+                "error": "Dados inválidos",
+                "details": serializer.errors
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        cpf = serializer.validated_data['cpf']
+        
+        try:
+            # Busca usuário pelo CPF
+            usuario = Usuario.objects.get(username=cpf, is_active=True)
+            
+            # Verifica se o usuário tem e-mail válido
+            if not usuario.email or usuario.email == 'pendente':
+                return Response({
+                    "error": "Usuário não possui e-mail válido cadastrado.",
+                    "code": "NO_EMAIL"
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Envia e-mail de recuperação
+            from usuarios.utils import enviar_recuperacao_senha
+            enviar_recuperacao_senha(usuario)
+            
+            logger.info(f"Solicitação de recuperação de senha para {usuario.email}")
+            
+            return Response({
+                "message": "E-mail de recuperação enviado com sucesso!",
+                "email": usuario.email  # Retorna o e-mail para confirmação
+            }, status=status.HTTP_200_OK)
+            
+        except Usuario.DoesNotExist:
+            # Por segurança, não revela se o usuário existe ou não
+            return Response({
+                "message": "Se o CPF estiver cadastrado e ativo, você receberá um e-mail com instruções para recuperar sua senha.",
+                "code": "EMAIL_SENT"
+            }, status=status.HTTP_200_OK)
+        except Exception as e:
+            logger.error(f"Erro ao processar solicitação de recuperação: {str(e)}")
+            return Response({
+                "error": "Erro interno. Tente novamente mais tarde.",
+                "code": "INTERNAL_ERROR"
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class RedefinirSenhaAPIView(APIView):
+    """API para redefinir senha via token."""
+    permission_classes = []  # Não requer autenticação
+
+    def post(self, request, uidb64, token):
+        try:
+            # Decodifica o UID
+            uid = urlsafe_base64_decode(uidb64).decode()
+            usuario = Usuario.objects.get(pk=uid, is_active=True)
+        except (Usuario.DoesNotExist, ValueError):
+            return Response({
+                "error": "Token de recuperação inválido ou usuário não encontrado.",
+                "code": "INVALID_TOKEN"
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Verifica se o token é válido
+        if not default_token_generator.check_token(usuario, token):
+            return Response({
+                "error": "Token de recuperação inválido ou expirado.",
+                "code": "EXPIRED_TOKEN"
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Valida os dados da nova senha
+        serializer = RedefinirSenhaSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response({
+                "error": "Dados inválidos",
+                "details": serializer.errors,
+                "code": "VALIDATION_ERROR"
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Define a nova senha
+        nova_senha = serializer.validated_data['new_password1']
+        usuario.set_password(nova_senha)
+        usuario.save()
+        
+        logger.info(f"Senha redefinida com sucesso para o usuário {usuario.username}")
+        
+        return Response({
+            "message": "Senha redefinida com sucesso!",
+            "user": {
+                "id": usuario.id,
+                "username": usuario.username,
+                "email": usuario.email,
+                "first_name": usuario.first_name,
+                "last_name": usuario.last_name
+            }
+        }, status=status.HTTP_200_OK)
 
 
 

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import api from '../services/api';
 
 const styles = {
@@ -44,6 +44,18 @@ const styles = {
     color: '#d32f2f',
     textAlign: 'center',
     marginTop: '10px',
+  },
+  forgotPassword: {
+    textAlign: 'center',
+    marginTop: '15px',
+  },
+  forgotPasswordLink: {
+    color: '#1a237e',
+    textDecoration: 'none',
+    fontSize: '14px',
+    '&:hover': {
+      textDecoration: 'underline',
+    },
   },
 };
 
@@ -135,6 +147,12 @@ function LoginPage() {
         </button>
         {error && <div style={styles.error}>{error}</div>}
       </form>
+      
+      <div style={styles.forgotPassword}>
+        <Link to="/esqueci-senha" style={styles.forgotPasswordLink}>
+          Esqueci minha senha
+        </Link>
+      </div>
     </div>
   );
 }
