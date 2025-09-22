@@ -179,6 +179,8 @@ class LogoutAPIView(APIView):
 
 class AtivarContaAPIView(APIView):
     """API para ativar a conta de um aluno."""
+    permission_classes = []  # Público para permitir ativação sem autenticação
+    
     def post(self, request, uidb64, token):
         try:
             uid = urlsafe_base64_decode(uidb64).decode()
