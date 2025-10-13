@@ -118,6 +118,17 @@ class Usuario(AbstractUser):
     telefone_emergencia = models.CharField(max_length=20, blank=True, null=True)
     ficha_medica = models.TextField(blank=True, null=True)
     foto_perfil = models.ImageField(upload_to='fotos_perfil/', blank=True, null=True, help_text="Foto de perfil do usuário")
+    
+    # CAMPOS DO QUESTIONÁRIO PAR-Q (apenas para alunos)
+    parq_question_1 = models.BooleanField(default=False, help_text="PAR-Q: Alguma vez um médico disse que você tem um problema de coração e que só deveria fazer atividade física recomendada por um médico?")
+    parq_question_2 = models.BooleanField(default=False, help_text="PAR-Q: Você sente dor no peito quando faz atividade física?")
+    parq_question_3 = models.BooleanField(default=False, help_text="PAR-Q: No último mês, você teve dor no peito quando não estava fazendo atividade física?")
+    parq_question_4 = models.BooleanField(default=False, help_text="PAR-Q: Você perde o equilíbrio por causa de tontura ou alguma vez perdeu a consciência?")
+    parq_question_5 = models.BooleanField(default=False, help_text="PAR-Q: Você tem algum problema ósseo ou articular que poderia piorar com a mudança de sua atividade física?")
+    parq_question_6 = models.BooleanField(default=False, help_text="PAR-Q: Atualmente um médico está prescrevendo medicamentos para sua pressão arterial ou condição cardíaca?")
+    parq_question_7 = models.BooleanField(default=False, help_text="PAR-Q: Você sabe de alguma outra razão pela qual não deveria fazer atividade física?")
+    parq_completed = models.BooleanField(default=False, help_text="Indica se o questionário PAR-Q foi preenchido")
+    parq_completion_date = models.DateTimeField(null=True, blank=True, help_text="Data de preenchimento do questionário PAR-Q")
      # NOVOS CAMPOS PARA MENSALIDADE
     dia_vencimento = models.PositiveSmallIntegerField(null=True, blank=True, help_text="Dia do vencimento da mensalidade (1-31)")
     valor_mensalidade = models.DecimalField(max_digits=7, decimal_places=2, null=True, blank=True, help_text="Valor personalizado da mensalidade do aluno")
@@ -132,6 +143,68 @@ class Usuario(AbstractUser):
         return self.tipo == "professor"
     def is_aluno(self):
         return self.tipo == "aluno"
+
+    def get_parq_questions(self):
+        """Retorna as perguntas do PAR-Q para o usuário."""
+        if not self.is_aluno():
+            return []
+        
+        questions = [
+            {
+                'field': 'parq_question_1',
+                'question': 'Alguma vez um médico disse que você tem um problema de coração e que só deveria fazer atividade física recomendada por um médico?',
+                'value': self.parq_question_1
+            },
+            {
+                'field': 'parq_question_2', 
+                'question': 'Você sente dor no peito quando faz atividade física?',
+                'value': self.parq_question_2
+            },
+            {
+                'field': 'parq_question_3',
+                'question': 'No último mês, você teve dor no peito quando não estava fazendo atividade física?',
+                'value': self.parq_question_3
+            },
+            {
+                'field': 'parq_question_4',
+                'question': 'Você perde o equilíbrio por causa de tontura ou alguma vez perdeu a consciência?',
+                'value': self.parq_question_4
+            },
+            {
+                'field': 'parq_question_5',
+                'question': 'Você tem algum problema ósseo ou articular que poderia piorar com a mudança de sua atividade física?',
+                'value': self.parq_question_5
+            },
+            {
+                'field': 'parq_question_6',
+                'question': 'Atualmente um médico está prescrevendo medicamentos para sua pressão arterial ou condição cardíaca?',
+                'value': self.parq_question_6
+            },
+            {
+                'field': 'parq_question_7',
+                'question': 'Você sabe de alguma outra razão pela qual não deveria fazer atividade física?',
+                'value': self.parq_question_7
+            }
+        ]
+        return questions
+
+    def has_parq_restrictions(self):
+        """Verifica se o usuário tem alguma restrição no PAR-Q."""
+        if not self.is_aluno():
+            return False
+        
+        return any([
+            self.parq_question_1, self.parq_question_2, self.parq_question_3,
+            self.parq_question_4, self.parq_question_5, self.parq_question_6,
+            self.parq_question_7
+        ])
+
+    def can_participate_in_activities(self):
+        """Verifica se o aluno pode participar das atividades baseado no PAR-Q."""
+        if not self.is_aluno():
+            return True
+        
+        return not self.has_parq_restrictions()
 
     @property
     def idade(self):

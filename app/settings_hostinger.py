@@ -64,7 +64,13 @@ CORS_ALLOWED_ORIGINS = [
     f"http://{os.getenv('DOMAIN_NAME', 'ctsupera.com.br')}",
     "https://www.ctsupera.com.br",
     "http://www.ctsupera.com.br",
+    "http://localhost:3000",  # Para desenvolvimento local
+    "http://127.0.0.1:3000",  # Para desenvolvimento local
+    f"http://{os.getenv('SERVER_IP', '72.60.145.13')}",  # IP do servidor
 ]
+
+# Para desenvolvimento, permitir todas as origens
+CORS_ALLOW_ALL_ORIGINS = True
 
 CORS_ALLOW_CREDENTIALS = True
 

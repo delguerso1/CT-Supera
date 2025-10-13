@@ -101,7 +101,11 @@ class AdicionarAlunoAPIView(APIView):
         return Response({"message": "Alunos adicionados com sucesso!"}, status=status.HTTP_200_OK)
 
 
-class ListaDiasSemanaAPIView(ListAPIView):
+class ListaDiasSemanaAPIView(APIView):
     """API para listar os dias da semana."""
-    queryset = DiaSemana.objects.all().order_by('id')  # ou .order_by('nome')
-    serializer_class = DiaSemanaSerializer
+    permission_classes = []  # Remove todas as permissões para permitir acesso livre
+    
+    def get(self, request):
+        dias = DiaSemana.objects.all().order_by('id')
+        serializer = DiaSemanaSerializer(dias, many=True)
+        return Response(serializer.data)

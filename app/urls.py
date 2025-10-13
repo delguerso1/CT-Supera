@@ -15,10 +15,10 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
-from django.urls import path, include
+from django.urls import path, include, re_path
 from django.conf import settings
 from django.conf.urls.static import static
-from app.views import StatusAPIView
+from app.views import StatusAPIView, serve_frontend
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -29,6 +29,8 @@ urlpatterns = [
     path('api/financeiro/', include('financeiro.urls')),
     path('api/usuarios/', include('usuarios.urls')),
     path('api/cts/', include('ct.urls')),
+    # Rota catch-all para servir o frontend React
+    re_path(r'^.*$', serve_frontend, name='frontend'),
 ]
 
 # Configuração para servir arquivos de mídia em desenvolvimento

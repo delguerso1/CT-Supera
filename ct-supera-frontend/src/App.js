@@ -12,9 +12,11 @@ import AgendamentoPage from './pages/AgendamentoPage';
 import CadastroTurmas from './pages/CadastroTurmas';
 import EsqueciMinhaSenha from './pages/EsqueciMinhaSenha';
 import RedefinirSenha from './pages/RedefinirSenha';
+import AtivarConta from './pages/AtivarConta';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import './App.css';
+import './styles/responsive.css';
 
 // Importe o objeto styles do DashboardGerente
 import { styles } from './pages/DashboardGerente';
@@ -72,6 +74,7 @@ function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/esqueci-senha" element={<EsqueciMinhaSenha />} />
           <Route path="/redefinir-senha/:uidb64/:token" element={<RedefinirSenha />} />
+          <Route path="/ativar-conta/:uidb64/:token" element={<AtivarConta />} />
           <Route path="/agendamento" element={<AgendamentoPage />} />
           {/* Rotas protegidas */}
           <Route 

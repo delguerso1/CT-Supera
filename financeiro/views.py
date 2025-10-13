@@ -10,6 +10,13 @@ from .serializers import MensalidadeSerializer, DespesaSerializer, SalarioSerial
 from django.shortcuts import get_object_or_404
 from django.conf import settings
 from datetime import timedelta
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
+from django.http import JsonResponse
+import json
+import logging
+
+logger = logging.getLogger(__name__)
 # import mercadopago  # Comentado - não será usado
 # 
 
@@ -377,3 +384,169 @@ class ConsultarStatusPixAPIView(APIView):
 #             return Response({
 #                 "error": f"Erro ao gerar pagamento bancário: {str(e)}"
 #             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+# ========================================
+# INTEGRAÇÃO BANCO CORA
+# ========================================
+
+@method_decorator(csrf_exempt, name='dispatch')
+class CoraCallbackView(APIView):
+    """
+    Endpoint para callback do Banco Cora após pagamento
+    URL: /api/financeiro/cora/callback/
+    """
+    permission_classes = []  # Público para receber callbacks
+    
+    def post(self, request):
+        try:
+            # Log do callback recebido
+            logger.info(f"Callback Cora recebido: {request.data}")
+            
+            # Processar dados do callback
+            payment_data = request.data
+            
+            # Aqui você processará os dados conforme documentação do Cora
+            # Exemplo de estrutura esperada:
+            transaction_id = payment_data.get('transaction_id')
+            status_payment = payment_data.get('status')
+            amount = payment_data.get('amount')
+            
+            # Atualizar mensalidade correspondente
+            # mensalidade = Mensalidade.objects.get(external_id=transaction_id)
+            # mensalidade.status = 'aprovado' if status_payment == 'approved' else 'rejeitado'
+            # mensalidade.save()
+            
+            return JsonResponse({
+                'status': 'success',
+                'message': 'Callback processado com sucesso'
+            })
+            
+        except Exception as e:
+            logger.error(f"Erro no callback Cora: {str(e)}")
+            return JsonResponse({
+                'status': 'error',
+                'message': 'Erro ao processar callback'
+            }, status=400)
+
+
+@method_decorator(csrf_exempt, name='dispatch')
+class CoraWebhookView(APIView):
+    """
+    Endpoint para webhook do Banco Cora
+    URL: /api/financeiro/cora/webhook/
+    """
+    permission_classes = []  # Público para receber webhooks
+    
+    def post(self, request):
+        try:
+            # Log do webhook recebido
+            logger.info(f"Webhook Cora recebido: {request.data}")
+            
+            # Processar notificação do webhook
+            webhook_data = request.data
+            
+            # Verificar assinatura/autenticidade se necessário
+            # signature = request.headers.get('X-Cora-Signature')
+            
+            # Processar evento
+            event_type = webhook_data.get('event_type')
+            transaction_data = webhook_data.get('data')
+            
+            if event_type == 'payment.approved':
+                # Processar pagamento aprovado
+                pass
+            elif event_type == 'payment.rejected':
+                # Processar pagamento rejeitado
+                pass
+            
+            return JsonResponse({
+                'status': 'received',
+                'message': 'Webhook processado'
+            })
+            
+        except Exception as e:
+            logger.error(f"Erro no webhook Cora: {str(e)}")
+            return JsonResponse({
+                'status': 'error',
+                'message': 'Erro ao processar webhook'
+            }, status=400)
+
+
+class CoraSuccessView(APIView):
+    """
+    Página de sucesso após pagamento via Cora
+    URL: /api/financeiro/cora/success/
+    """
+    permission_classes = []
+    
+    def get(self, request):
+        # Parâmetros que o Cora pode enviar
+        transaction_id = request.GET.get('transaction_id')
+        payment_id = request.GET.get('payment_id')
+        
+        return JsonResponse({
+            'status': 'success',
+            'message': 'Pagamento realizado com sucesso!',
+            'transaction_id': transaction_id,
+            'redirect_url': f'{settings.FRONTEND_URL}/dashboard/aluno'
+        })
+
+
+class CoraErrorView(APIView):
+    """
+    Página de erro após falha no pagamento via Cora
+    URL: /api/financeiro/cora/error/
+    """
+    permission_classes = []
+    
+    def get(self, request):
+        # Parâmetros de erro que o Cora pode enviar
+        error_code = request.GET.get('error_code')
+        error_message = request.GET.get('error_message')
+        
+        return JsonResponse({
+            'status': 'error',
+            'message': 'Erro no pagamento',
+            'error_code': error_code,
+            'error_message': error_message,
+            'redirect_url': f'{settings.FRONTEND_URL}/dashboard/aluno'
+        })
+
+
+class CoraInitPaymentView(APIView):
+    """
+    Iniciar pagamento via Banco Cora
+    URL: /api/financeiro/cora/init-payment/
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request):
+        try:
+            mensalidade_id = request.data.get('mensalidade_id')
+            mensalidade = get_object_or_404(Mensalidade, id=mensalidade_id)
+            
+            # Dados para enviar ao Cora
+            payment_data = {
+                'amount': float(mensalidade.valor),
+                'description': f'Mensalidade {mensalidade.mes}/{mensalidade.ano}',
+                'external_reference': str(mensalidade.id),
+                'success_url': f'{request.build_absolute_uri("/api/financeiro/cora/success/")}',
+                'error_url': f'{request.build_absolute_uri("/api/financeiro/cora/error/")}',
+                'webhook_url': f'{request.build_absolute_uri("/api/financeiro/cora/webhook/")}',
+            }
+            
+            # Aqui você fará a chamada para API do Cora
+            # cora_response = requests.post('https://api.cora.com.br/payments', data=payment_data)
+            
+            return Response({
+                'message': 'Pagamento Cora iniciado',
+                'payment_data': payment_data,
+                'mensalidade_id': mensalidade.id
+            })
+            
+        except Exception as e:
+            logger.error(f"Erro ao iniciar pagamento Cora: {str(e)}")
+            return Response({
+                'error': 'Erro ao processar pagamento'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

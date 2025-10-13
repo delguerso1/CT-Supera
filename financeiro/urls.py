@@ -5,6 +5,8 @@ from .views import (
     SalarioListCreateView, SalarioRetrieveUpdateDestroyView,
     PagarSalarioAPIView, DashboardFinanceiroAPIView, RelatorioFinanceiroAPIView, GerarPixAPIView, ConsultarStatusPixAPIView,
     # GerarPagamentoPixAPIView, VerificarStatusPixAPIView, GerarPagamentoBancarioAPIView  # Comentado - usa Mercado Pago
+    # Integração Banco Cora
+    CoraCallbackView, CoraWebhookView, CoraSuccessView, CoraErrorView, CoraInitPaymentView,
 )
 
 app_name = "financeiro"
@@ -36,4 +38,13 @@ urlpatterns = [
     
     # Pagamentos Bancários (comentado - usa Mercado Pago)
     # path('pagamento-bancario/gerar/<int:mensalidade_id>/', GerarPagamentoBancarioAPIView.as_view(), name='gerar-pagamento-bancario'),
+    
+    # ========================================
+    # INTEGRAÇÃO BANCO CORA
+    # ========================================
+    path('cora/callback/', CoraCallbackView.as_view(), name='cora_callback'),
+    path('cora/webhook/', CoraWebhookView.as_view(), name='cora_webhook'),
+    path('cora/success/', CoraSuccessView.as_view(), name='cora_success'),
+    path('cora/error/', CoraErrorView.as_view(), name='cora_error'),
+    path('cora/init-payment/', CoraInitPaymentView.as_view(), name='cora_init_payment'),
 ]

@@ -1,10 +1,10 @@
 import axios from 'axios';
 
 // Define a URL base dinamicamente com base no ambiente
-const baseURL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api/';
+const baseURL = process.env.REACT_APP_API_URL || 'https://ctsupera.com.br/api/';
 
 // Define a URL base para imagens/media
-export const MEDIA_URL = process.env.REACT_APP_MEDIA_URL || 'http://localhost:8000';
+export const MEDIA_URL = process.env.REACT_APP_MEDIA_URL || 'https://ctsupera.com.br';
 
 const api = axios.create({
   baseURL: baseURL,
@@ -82,6 +82,18 @@ export const passwordRecoveryAPI = {
   // Redefinir senha
   redefinirSenha: async (uidb64, token, novaSenha) => {
     const response = await api.post(`/usuarios/redefinir-senha/${uidb64}/${token}/`, {
+      new_password1: novaSenha,
+      new_password2: novaSenha
+    });
+    return response.data;
+  }
+};
+
+// Funções específicas para ativação de conta
+export const accountActivationAPI = {
+  // Ativar conta de aluno
+  ativarConta: async (uidb64, token, novaSenha) => {
+    const response = await api.post(`/usuarios/ativar-conta/${uidb64}/${token}/`, {
       new_password1: novaSenha,
       new_password2: novaSenha
     });

@@ -178,45 +178,50 @@ class LogoutAPIView(APIView):
 
 
 class AtivarContaAPIView(APIView):
-    """API para ativar a conta de um aluno."""
+    """API para ativar a conta de um usuário (aluno, professor ou gerente)."""
     permission_classes = []  # Público para permitir ativação sem autenticação
     
     def post(self, request, uidb64, token):
         try:
             uid = urlsafe_base64_decode(uidb64).decode()
-            aluno = Usuario.objects.get(pk=uid, tipo="aluno")
+            usuario = Usuario.objects.get(pk=uid)
         except (Usuario.DoesNotExist, ValueError):
+            logger.error(f"Erro ao decodificar UID ou usuário não encontrado: uidb64={uidb64}")
             return Response({
                 "error": "Token de ativação inválido ou usuário não encontrado.",
                 "code": "INVALID_TOKEN"
             }, status=status.HTTP_400_BAD_REQUEST)
 
-        if default_token_generator.check_token(aluno, token):
+        if default_token_generator.check_token(usuario, token):
             serializer = DefinirSenhaSerializer(data=request.data)
             if serializer.is_valid():
                 # Define a nova senha e ativa a conta
                 nova_senha = serializer.validated_data['new_password1']
-                aluno.set_password(nova_senha)
-                aluno.is_active = True  # Ativa a conta
-                aluno.save()
+                usuario.set_password(nova_senha)
+                usuario.is_active = True  # Ativa a conta
+                usuario.save()
                 
-                logger.info(f"Conta ativada com sucesso para o usuário {aluno.username}")
+                logger.info(f"Conta ativada com sucesso para o usuário {usuario.username} (tipo: {usuario.tipo})")
                 return Response({
                     "message": "Conta ativada com sucesso!",
                     "user": {
-                        "id": aluno.id,
-                        "username": aluno.username,
-                        "email": aluno.email,
-                        "first_name": aluno.first_name,
-                        "last_name": aluno.last_name
+                        "id": usuario.id,
+                        "username": usuario.username,
+                        "email": usuario.email,
+                        "first_name": usuario.first_name,
+                        "last_name": usuario.last_name,
+                        "tipo": usuario.tipo
                     }
                 }, status=status.HTTP_200_OK)
             else:
+                logger.warning(f"Dados inválidos ao ativar conta: {serializer.errors}")
                 return Response({
                     "error": "Dados inválidos",
                     "details": serializer.errors,
                     "code": "VALIDATION_ERROR"
                 }, status=status.HTTP_400_BAD_REQUEST)
+        
+        logger.warning(f"Token inválido ou expirado para usuário: uidb64={uidb64}")
         return Response({
             "error": "Token de ativação inválido ou expirado.",
             "code": "EXPIRED_TOKEN"

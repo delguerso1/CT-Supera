@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import api from '../services/api';
 
 const styles = {
   navbar: {
     backgroundColor: '#1a237e',
     padding: '1rem',
     color: 'white',
+    position: 'relative',
   },
   container: {
     display: 'flex',
@@ -20,6 +20,7 @@ const styles = {
     fontWeight: 'bold',
     color: 'white',
     textDecoration: 'none',
+    zIndex: 11,
   },
   navLinks: {
     display: 'flex',
@@ -29,6 +30,7 @@ const styles = {
     color: 'white',
     textDecoration: 'none',
     fontSize: '1rem',
+    transition: 'color 0.3s ease',
     '&:hover': {
       color: '#90caf9',
     },
@@ -41,6 +43,7 @@ const styles = {
     border: 'none',
     cursor: 'pointer',
     position: 'relative',
+    transition: 'background-color 0.3s ease',
     '&:hover': {
       backgroundColor: '#45a049',
     },
@@ -66,25 +69,115 @@ const styles = {
     textAlign: 'left',
     color: '#1a237e',
     fontSize: '1rem',
+    transition: 'background-color 0.3s ease',
+    '&:hover': {
+      backgroundColor: '#f5f5f5',
+    },
+  },
+  // Estilos para mobile
+  mobileMenuButton: {
+    display: 'none',
+    background: 'none',
+    border: 'none',
+    color: 'white',
+    fontSize: '1.5rem',
+    cursor: 'pointer',
+    padding: '0.5rem',
+    zIndex: 11,
+  },
+  mobileNavLinks: {
+    display: 'none',
+    position: 'absolute',
+    top: '100%',
+    left: 0,
+    right: 0,
+    backgroundColor: '#1a237e',
+    flexDirection: 'column',
+    padding: '1rem',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+    zIndex: 10,
+  },
+  mobileNavLink: {
+    color: 'white',
+    textDecoration: 'none',
+    fontSize: '1.1rem',
+    padding: '0.75rem 0',
+    borderBottom: '1px solid rgba(255,255,255,0.1)',
+    transition: 'color 0.3s ease',
+    '&:hover': {
+      color: '#90caf9',
+    },
+    '&:last-child': {
+      borderBottom: 'none',
+    },
+  },
+  // Media queries para responsividade
+  '@media (max-width: 768px)': {
+    navLinks: {
+      display: 'none',
+    },
+    mobileMenuButton: {
+      display: 'block',
+    },
+    mobileNavLinks: {
+      display: 'flex',
+    },
+    container: {
+      padding: '0 1rem',
+    },
   },
 };
 
 function Navbar() {
-  const [showLoginModal, setShowLoginModal] = useState(false);
-  const [cpf, setCpf] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [user, setUser] = useState(() => JSON.parse(localStorage.getItem('user')));
+  const [user, setUser] = useState(() => {
+    const storedUser = localStorage.getItem('user');
+    const token = localStorage.getItem('token');
+    // Só considera o usuário logado se tiver tanto user quanto token
+    return (storedUser && token) ? JSON.parse(storedUser) : null;
+  });
   const [showDropdown, setShowDropdown] = useState(false);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
   const navigate = useNavigate();
   const dropdownRef = useRef();
 
+  // Verificar autenticação sempre que o componente monta
   useEffect(() => {
-    const onStorage = () => {
-      setUser(JSON.parse(localStorage.getItem('user')));
+    const checkAuth = () => {
+      const storedUser = localStorage.getItem('user');
+      const token = localStorage.getItem('token');
+      
+      if (storedUser && token) {
+        try {
+          const userData = JSON.parse(storedUser);
+          setUser(userData);
+        } catch (error) {
+          console.error('Erro ao parsear dados do usuário:', error);
+          localStorage.removeItem('user');
+          localStorage.removeItem('token');
+          setUser(null);
+        }
+      } else {
+        setUser(null);
+      }
     };
+
+    // Verificar imediatamente
+    checkAuth();
+
+    // Verificar quando o storage muda
+    const onStorage = () => {
+      checkAuth();
+    };
+    
     window.addEventListener('storage', onStorage);
-    return () => window.removeEventListener('storage', onStorage);
+    
+    // Verificar periodicamente (a cada 5 segundos) para garantir consistência
+    const interval = setInterval(checkAuth, 5000);
+    
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      clearInterval(interval);
+    };
   }, []);
 
   useEffect(() => {
@@ -99,34 +192,14 @@ function Navbar() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showDropdown]);
 
-  const handleLoginSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
-    try {
-      const response = await api.post('usuarios/login/', { cpf, password });
-      if (response.data.message === "Login realizado com sucesso!") {
-        localStorage.setItem('token', response.data.token);
-        localStorage.setItem('user', JSON.stringify(response.data.user));
-        setUser(response.data.user);
-        setShowLoginModal(false);
-        if (response.data.user.tipo === 'gerente') {
-          navigate('/dashboard/gerente');
-        } else if (response.data.user.tipo === 'professor') {
-          navigate('/dashboard/professor');
-        } else {
-          navigate('/dashboard/aluno');
-        }
-      }
-    } catch (error) {
-      setError(error.response?.data?.error || 'Erro ao realizar login. Tente novamente.');
-    }
-  };
 
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     setUser(null);
     setShowDropdown(false);
+    // Forçar atualização do estado
+    window.dispatchEvent(new Event('storage'));
     navigate('/');
   };
 
@@ -136,7 +209,9 @@ function Navbar() {
         <Link to="/" style={styles.logo}>
           CT Supera
         </Link>
-        <div style={styles.navLinks}>
+        
+        {/* Menu desktop */}
+        <div className="nav-links" style={styles.navLinks}>
           <Link to="/quem-somos" style={styles.navLink}>
             Quem Somos
           </Link>
@@ -150,6 +225,8 @@ function Navbar() {
             Galeria de Fotos
           </Link>
         </div>
+
+        {/* Botão de login desktop */}
         {user ? (
           <div style={{ position: 'relative' }} ref={dropdownRef}>
             <button
@@ -185,168 +262,88 @@ function Navbar() {
             )}
           </div>
         ) : (
-          <button 
-            style={styles.loginButton}
-            onClick={() => setShowLoginModal(true)}
-          >
+          <Link to="/login" style={styles.loginButton}>
             Login
-          </button>
+          </Link>
         )}
+
+        {/* Botão menu mobile */}
+        <button
+          className="mobile-menu-button"
+          style={styles.mobileMenuButton}
+          onClick={() => setShowMobileMenu(!showMobileMenu)}
+        >
+          ☰
+        </button>
       </div>
-      {showLoginModal && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0,0,0,0.5)',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          zIndex: 1000
-        }}>
-          <div style={{
-            backgroundColor: 'white',
-            padding: '2rem',
-            borderRadius: '8px',
-            width: '400px',
-            boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
-          }}>
-            <div style={{
-              marginBottom: '1.5rem',
-              textAlign: 'center'
-            }}>
-              <h2 style={{
-                color: '#1a237e',
-                marginBottom: '0.5rem',
-                fontSize: '1.5rem'
-              }}>
-                Bem-vindo ao CT Supera
-              </h2>
-              <p style={{
-                color: '#666',
-                fontSize: '0.9rem'
-              }}>
-                Faça login para acessar sua conta
-              </p>
-            </div>
-            {error && (
-              <div style={{
-                color: 'white',
-                backgroundColor: '#f44336',
-                padding: '0.75rem',
-                borderRadius: '4px',
-                marginBottom: '1rem',
-                fontSize: '0.9rem'
-              }}>
-                {error}
-              </div>
-            )}
-            <form onSubmit={handleLoginSubmit}>
-              <div style={{ marginBottom: '1.5rem' }}>
-                <label style={{
-                  display: 'block',
-                  marginBottom: '0.5rem',
-                  color: '#333',
-                  fontWeight: '500'
-                }}>
-                  CPF:
-                </label>
-                <input
-                  type="text"
-                  value={cpf}
-                  onChange={(e) => setCpf(e.target.value)}
-                  placeholder="Digite seu CPF (apenas números)"
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    borderRadius: '4px',
-                    border: '1px solid #ddd',
-                    fontSize: '1rem',
-                    '&:focus': {
-                      borderColor: '#1a237e',
-                      outline: 'none'
-                    }
-                  }}
-                  required
-                />
-              </div>
-              <div style={{ marginBottom: '1.5rem' }}>
-                <label style={{
-                  display: 'block',
-                  marginBottom: '0.5rem',
-                  color: '#333',
-                  fontWeight: '500'
-                }}>
-                  Senha:
-                </label>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Digite sua senha"
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    borderRadius: '4px',
-                    border: '1px solid #ddd',
-                    fontSize: '1rem',
-                    '&:focus': {
-                      borderColor: '#1a237e',
-                      outline: 'none'
-                    }
-                  }}
-                  autoComplete="current-password"
-                  required
-                />
-              </div>
-              <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                gap: '1rem'
-              }}>
-                <button
-                  type="button"
-                  onClick={() => setShowLoginModal(false)}
-                  style={{
-                    padding: '0.75rem 1.5rem',
-                    borderRadius: '4px',
-                    border: '1px solid #ddd',
-                    backgroundColor: '#f5f5f5',
-                    color: '#333',
-                    cursor: 'pointer',
-                    fontSize: '1rem',
-                    flex: 1,
-                    '&:hover': {
-                      backgroundColor: '#e0e0e0'
-                    }
-                  }}
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  style={{
-                    padding: '0.75rem 1.5rem',
-                    borderRadius: '4px',
-                    border: 'none',
-                    backgroundColor: '#1a237e',
-                    color: 'white',
-                    cursor: 'pointer',
-                    fontSize: '1rem',
-                    flex: 1,
-                    '&:hover': {
-                      backgroundColor: '#151b60'
-                    }
-                  }}
-                >
-                  Entrar
-                </button>
-              </div>
-            </form>
-          </div>
+
+      {/* Menu mobile */}
+      {showMobileMenu && (
+        <div className="mobile-nav-links" style={styles.mobileNavLinks}>
+          <Link 
+            to="/quem-somos" 
+            style={styles.mobileNavLink}
+            onClick={() => setShowMobileMenu(false)}
+          >
+            Quem Somos
+          </Link>
+          <Link 
+            to="/supera-news" 
+            style={styles.mobileNavLink}
+            onClick={() => setShowMobileMenu(false)}
+          >
+            Supera News
+          </Link>
+          <Link 
+            to="/formacao-atletas" 
+            style={styles.mobileNavLink}
+            onClick={() => setShowMobileMenu(false)}
+          >
+            Formação de Atletas
+          </Link>
+          <Link 
+            to="/galeria" 
+            style={styles.mobileNavLink}
+            onClick={() => setShowMobileMenu(false)}
+          >
+            Galeria de Fotos
+          </Link>
+          {user ? (
+            <>
+              <button
+                style={{...styles.mobileNavLink, background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer'}}
+                onClick={() => {
+                  setShowMobileMenu(false);
+                  navigate(
+                    user.tipo === 'gerente'
+                      ? '/dashboard/gerente'
+                      : user.tipo === 'professor'
+                      ? '/dashboard/professor'
+                      : '/dashboard/aluno'
+                  );
+                }}
+              >
+                Meu Painel
+              </button>
+              <button
+                style={{...styles.mobileNavLink, background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer'}}
+                onClick={() => {
+                  setShowMobileMenu(false);
+                  handleLogout();
+                }}
+              >
+                Sair
+              </button>
+            </>
+          ) : (
+            <Link 
+              to="/login" 
+              style={styles.mobileNavLink}
+              onClick={() => setShowMobileMenu(false)}
+            >
+              Login
+            </Link>
+          )}
         </div>
       )}
     </nav>
