@@ -1,6 +1,5 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import Navbar from '../components/Navbar';
 
 const styles = {
   container: {
@@ -56,22 +55,20 @@ const styles = {
 function HomePage() {
   return (
     <div>
-      <div style={styles.hero}>
-        <h1 style={styles.title}>Bem-vindo ao CT Supera</h1>
-        <p style={styles.subtitle}>
+      <div className="hero" style={styles.hero}>
+        <h1 className="hero-title" style={styles.title}>Bem-vindo ao CT Supera</h1>
+        <p className="hero-subtitle" style={styles.subtitle}>
           Formando campeões dentro e fora das quadras
         </p>
+        <Link to="/agendamento" className="agendamento-button" style={styles.agendamentoButton}>
+          Agendar Aula Experimental
+        </Link>
       </div>
-
-      <Link to="/agendamento" style={styles.agendamentoButton}>
-            Agendar Aula Experimental
-          </Link>
-      
 
       <div style={styles.container}>
         <section style={styles.quemSomos}>
-          <h2 style={styles.sectionTitle}>Quem Somos</h2>
-          <div style={styles.content}>
+          <h2 className="section-title" style={styles.sectionTitle}>Quem Somos</h2>
+          <div className="content" style={styles.content}>
             <p>
               O CT Supera é um centro de treinamento dedicado ao desenvolvimento de atletas de todas as idades, com foco especial no Vôlei de Praia.
 
@@ -114,7 +111,7 @@ No CT Supera, você não entra apenas para jogar, entra para fazer parte de um e
               em formação de atletas.
             </p>
           </div>
-          <Link to="/agendamento" style={styles.agendamentoButton}>
+          <Link to="/agendamento" className="agendamento-button" style={styles.agendamentoButton}>
             Agendar Aula Experimental
           </Link>
         </section>

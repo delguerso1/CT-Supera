@@ -1,11 +1,30 @@
 import React, { useEffect, useState } from 'react';
 import api, { MEDIA_URL } from '../services/api';
 
+// Hook para detectar tamanho da tela
+const useResponsive = () => {
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  const [isTablet, setIsTablet] = useState(window.innerWidth > 768 && window.innerWidth <= 1024);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 768);
+      setIsTablet(window.innerWidth > 768 && window.innerWidth <= 1024);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  return { isMobile, isTablet };
+};
+
 const styles = {
   container: {
     display: 'flex',
     minHeight: '100vh',
-    backgroundColor: '#f5f7fa'
+    backgroundColor: '#f5f7fa',
+    flexDirection: window.innerWidth <= 768 ? 'column' : 'row'
   },
   sidebar: {
     width: '280px',
@@ -14,8 +33,11 @@ const styles = {
     padding: '20px',
     boxShadow: '2px 0 10px rgba(0,0,0,0.1)',
     position: 'fixed',
+    top: 0,
+    left: 0,
     height: '100vh',
-    overflowY: 'auto'
+    overflowY: 'auto',
+    zIndex: 1000
   },
   mainContent: {
     flex: 1,
@@ -353,6 +375,7 @@ function getInitials(name) {
 }
 
 function DashboardAluno({ user }) {
+  const { isMobile, isTablet } = useResponsive();
   const [activeSection, setActiveSection] = useState('dashboard');
   const [loading, setLoading] = useState(true);
   const [aluno, setAluno] = useState(null);
@@ -703,13 +726,14 @@ function DashboardAluno({ user }) {
       </div>
 
       {!statusHoje.checkin_realizado && statusHoje.pode_fazer_checkin && (
-        <div style={styles.checkinCard}>
+        <div className="checkin-card" style={styles.checkinCard}>
           <div style={styles.checkinTitle}>
             <span>✅</span>
             Check-in Disponível
           </div>
           <p>Você pode realizar o check-in para a aula de hoje.</p>
           <button
+            className="checkin-button"
             onClick={handleCheckin}
             disabled={checkinLoading}
             style={{
@@ -723,7 +747,7 @@ function DashboardAluno({ user }) {
       )}
 
       {statusHoje.checkin_realizado && (
-        <div style={styles.checkinCard}>
+        <div className="checkin-card" style={styles.checkinCard}>
           <div style={styles.checkinTitle}>
             <span>✅</span>
             Check-in Realizado
@@ -771,7 +795,7 @@ function DashboardAluno({ user }) {
           Foto de Perfil
         </h3>
         
-        <div style={{
+        <div className="photo-upload-container" style={{
           display: 'flex',
           alignItems: 'center',
           gap: '30px',
@@ -823,7 +847,7 @@ function DashboardAluno({ user }) {
           )}
           
           {/* Controles de Upload */}
-          <div style={{ flex: 1, minWidth: '250px' }}>
+          <div className="photo-upload-controls" style={{ flex: 1, minWidth: '250px' }}>
             <div style={{ marginBottom: '15px' }}>
               <input
                 type="file"
@@ -1016,15 +1040,69 @@ function DashboardAluno({ user }) {
               style={styles.input}
             />
           </div>
+          {/* Questionário PAR-Q */}
           <div style={styles.formGroup}>
-            <label style={styles.label}>Ficha Médica</label>
-            <textarea
-              name="ficha_medica"
-              value={form.ficha_medica}
-              onChange={handleChange}
-              style={styles.textarea}
-              rows={4}
-            />
+            <label style={styles.label}>
+              Questionário de Prontidão para Atividade Física (PAR-Q)
+            </label>
+            <div style={{ fontSize: '12px', color: '#666', marginBottom: '10px' }}>
+              Marque "Sim" se alguma das perguntas se aplica a você
+            </div>
+            
+            {[
+              {
+                field: 'parq_question_1',
+                question: 'Alguma vez um médico disse que você tem um problema de coração e que só deveria fazer atividade física recomendada por um médico?'
+              },
+              {
+                field: 'parq_question_2',
+                question: 'Você sente dor no peito quando faz atividade física?'
+              },
+              {
+                field: 'parq_question_3',
+                question: 'No último mês, você teve dor no peito quando não estava fazendo atividade física?'
+              },
+              {
+                field: 'parq_question_4',
+                question: 'Você perde o equilíbrio por causa de tontura ou alguma vez perdeu a consciência?'
+              },
+              {
+                field: 'parq_question_5',
+                question: 'Você tem algum problema ósseo ou articular que poderia piorar com a mudança de sua atividade física?'
+              },
+              {
+                field: 'parq_question_6',
+                question: 'Atualmente um médico está prescrevendo medicamentos para sua pressão arterial ou condição cardíaca?'
+              },
+              {
+                field: 'parq_question_7',
+                question: 'Você sabe de alguma outra razão pela qual não deveria fazer atividade física?'
+              }
+            ].map((item, index) => (
+              <div key={item.field} style={{ marginBottom: '10px', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}>
+                <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    name={item.field}
+                    checked={form[item.field] || false}
+                    onChange={(e) => handleChange({
+                      target: {
+                        name: item.field,
+                        value: e.target.checked
+                      }
+                    })}
+                    style={{ margin: 0, marginTop: '2px' }}
+                  />
+                  <div style={{ flex: 1, fontSize: '13px', lineHeight: '1.3' }}>
+                    <strong>{index + 1}.</strong> {item.question}
+                  </div>
+                </label>
+              </div>
+            ))}
+            
+            <div style={{ marginTop: '10px', padding: '8px', backgroundColor: '#f8f9fa', borderRadius: '4px', fontSize: '12px', color: '#666' }}>
+              <strong>Importante:</strong> Se você respondeu "Sim" a alguma pergunta, consulte seu médico antes de começar um programa de atividade física.
+            </div>
           </div>
           <div style={styles.buttonGroup}>
             <button type="submit" style={styles.primaryButton}>
@@ -1105,7 +1183,7 @@ function DashboardAluno({ user }) {
         Check-in e Presença
       </h2>
       
-      <div style={styles.checkinCard}>
+      <div className="checkin-card" style={styles.checkinCard}>
         <div style={styles.checkinTitle}>
           <span>📅</span>
           Status de Hoje
@@ -1156,6 +1234,7 @@ function DashboardAluno({ user }) {
         </div>
         
         <button
+          className="checkin-button"
           onClick={handleCheckin}
           disabled={checkinLoading || statusHoje.checkin_realizado || !statusHoje.pode_fazer_checkin}
           style={{
@@ -1176,8 +1255,8 @@ function DashboardAluno({ user }) {
       </h3>
       
       {historicoAulas.length > 0 ? (
-        <div style={{ overflowX: 'auto' }}>
-          <table style={styles.table}>
+        <div className="table-responsive" style={{ overflowX: 'auto' }}>
+          <table className="table" style={styles.table}>
             <thead>
               <tr>
                 <th style={styles.th}>Data</th>
@@ -1226,8 +1305,8 @@ function DashboardAluno({ user }) {
             <span>⚠️</span>
             Mensalidades Pendentes
           </div>
-          <div style={{ overflowX: 'auto' }}>
-            <table style={styles.table}>
+          <div className="table-responsive" style={{ overflowX: 'auto' }}>
+            <table className="table" style={styles.table}>
               <thead>
                 <tr>
                   <th style={styles.th}>Mês/Ano</th>
@@ -1261,8 +1340,9 @@ function DashboardAluno({ user }) {
                       </span>
                     </td>
                     <td style={styles.td}>
-                      <div style={styles.paymentButtons}>
+                      <div className="payment-buttons" style={styles.paymentButtons}>
                         <button
+                          className="pix-button"
                           onClick={() => handleGerarPix(mensalidade.id)}
                           disabled={pagamentoLoading || pagamentoBancarioLoading}
                           style={{
@@ -1273,6 +1353,7 @@ function DashboardAluno({ user }) {
                           {pagamentoLoading ? 'Gerando PIX...' : 'Pagar com PIX'}
                         </button>
                         <button
+                          className="bank-button"
                           onClick={() => handleGerarPagamentoBancario(mensalidade.id)}
                           disabled={pagamentoLoading || pagamentoBancarioLoading}
                           style={{
@@ -1298,8 +1379,8 @@ function DashboardAluno({ user }) {
       </h3>
       
       {historicoMensalidades.length > 0 ? (
-        <div style={{ overflowX: 'auto' }}>
-          <table style={styles.table}>
+        <div className="table-responsive" style={{ overflowX: 'auto' }}>
+          <table className="table" style={styles.table}>
             <thead>
               <tr>
                 <th style={styles.th}>Mês/Ano</th>
@@ -1340,8 +1421,9 @@ function DashboardAluno({ user }) {
                   </td>
                   <td style={styles.td}>
                     {mensalidade.status !== 'pago' && (
-                      <div style={styles.paymentButtons}>
+                      <div className="payment-buttons" style={styles.paymentButtons}>
                         <button
+                          className="pix-button"
                           onClick={() => handleGerarPix(mensalidade.id)}
                           disabled={pagamentoLoading || pagamentoBancarioLoading}
                           style={{
@@ -1352,6 +1434,7 @@ function DashboardAluno({ user }) {
                           {pagamentoLoading ? 'Gerando PIX...' : 'Pagar com PIX'}
                         </button>
                         <button
+                          className="bank-button"
                           onClick={() => handleGerarPagamentoBancario(mensalidade.id)}
                           disabled={pagamentoLoading || pagamentoBancarioLoading}
                           style={{
@@ -1375,14 +1458,36 @@ function DashboardAluno({ user }) {
     </div>
   );
 
+  // Estilos responsivos dinâmicos
+  const responsiveStyles = {
+    container: {
+      ...styles.container,
+      flexDirection: isMobile ? 'column' : 'row'
+    },
+    sidebar: {
+      ...styles.sidebar,
+      width: isMobile ? '100%' : (isTablet ? '240px' : '280px'),
+      height: isMobile ? 'auto' : '100vh',
+      position: isMobile ? 'relative' : 'fixed',
+      marginBottom: isMobile ? '0' : '0',
+      boxShadow: isMobile ? 'none' : styles.sidebar.boxShadow,
+      borderBottom: isMobile ? '1px solid rgba(255,255,255,0.1)' : 'none'
+    },
+    mainContent: {
+      ...styles.mainContent,
+      marginLeft: isMobile ? '0' : (isTablet ? '240px' : '280px'),
+      padding: isMobile ? '0.5rem' : '20px'
+    }
+  };
+
   return (
-    <div style={styles.container}>
+    <div className="dashboard-container" style={responsiveStyles.container}>
       {/* Sidebar */}
-      <div style={styles.sidebar}>
+      <div className="dashboard-sidebar" style={responsiveStyles.sidebar}>
         <div style={styles.profileSection}>
           <div style={{
             ...styles.profilePhoto,
-            backgroundImage: aluno?.foto_perfil ? `url(http://localhost:8000${aluno.foto_perfil})` : 'none',
+            backgroundImage: aluno?.foto_perfil ? `url(http://72.60.145.13${aluno.foto_perfil})` : 'none',
             backgroundSize: 'cover',
             backgroundPosition: 'center'
           }}>
@@ -1446,15 +1551,15 @@ function DashboardAluno({ user }) {
       </div>
 
       {/* Main Content */}
-      <div style={styles.mainContent}>
+      <div className="dashboard-main-content" style={responsiveStyles.mainContent}>
         {erro && (
-          <div style={styles.error}>
+          <div className="alert alert-danger" style={styles.error}>
             {erro}
           </div>
         )}
 
         {transacaoPix && (
-          <div style={styles.pixContainer}>
+          <div className="pix-container" style={styles.pixContainer}>
             <h3 style={styles.pixTitle}>Pagamento PIX</h3>
             <p style={{ color: '#666', marginBottom: '20px' }}>
               Escaneie o QR Code abaixo ou copie o código PIX para realizar o pagamento.
@@ -1462,6 +1567,7 @@ function DashboardAluno({ user }) {
             </p>
             <div style={{ marginBottom: '20px' }}>
               <img
+                className="qr-code"
                 src={`data:image/png;base64,${transacaoPix.qr_code}`}
                 alt="QR Code PIX"
                 style={styles.qrCode}
@@ -1469,9 +1575,10 @@ function DashboardAluno({ user }) {
             </div>
             <div>
               <p style={{ color: '#666', marginBottom: '10px' }}>Código PIX Copia e Cola:</p>
-              <div style={styles.pixCodeWrapper}>
-                <code style={styles.pixCode}>{transacaoPix.codigo_pix}</code>
+              <div className="pix-code-wrapper" style={styles.pixCodeWrapper}>
+                <code className="pix-code" style={styles.pixCode}>{transacaoPix.codigo_pix}</code>
                 <button
+                  className="copy-button"
                   onClick={() => {
                     navigator.clipboard.writeText(transacaoPix.codigo_pix);
                     setSuccess('Código PIX copiado!');
@@ -1485,9 +1592,9 @@ function DashboardAluno({ user }) {
           </div>
         )}
 
-        {success && <div style={styles.success}>{success}</div>}
+        {success && <div className="alert alert-success" style={styles.success}>{success}</div>}
 
-        <div style={styles.contentArea}>
+        <div className="dashboard-content-area" style={styles.contentArea}>
           {activeSection === 'dashboard' && renderDashboard()}
           {activeSection === 'perfil' && renderMeuPerfil()}
           {activeSection === 'checkin' && renderCheckin()}

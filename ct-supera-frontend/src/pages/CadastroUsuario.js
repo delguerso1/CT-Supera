@@ -166,6 +166,14 @@ function CadastroUsuario({ onUserChange }) {
     telefone_emergencia: '',
     nome_responsavel: '',
     ficha_medica: '',
+    // Campos do PAR-Q
+    parq_question_1: false,
+    parq_question_2: false,
+    parq_question_3: false,
+    parq_question_4: false,
+    parq_question_5: false,
+    parq_question_6: false,
+    parq_question_7: false,
   });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -766,19 +774,75 @@ function CadastroUsuario({ onUserChange }) {
                 </>
               )}
 
-              <div style={styles.formGroup}>
-                <label style={styles.label} htmlFor="ficha_medica">
-                  Ficha Médica
-                </label>
-                <textarea
-                  id="ficha_medica"
-                  name="ficha_medica"
-                  value={formData.ficha_medica}
-                  onChange={handleChange}
-                  style={{ ...styles.input, minHeight: '100px' }}
-                  placeholder="Informações médicas relevantes"
-                />
-              </div>
+              {/* Ficha Médica - apenas para alunos */}
+              {activeTab === 'alunos' && (
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>
+                    Questionário de Prontidão para Atividade Física (PAR-Q)
+                  </label>
+                  <div style={{ fontSize: '12px', color: '#666', marginBottom: '10px' }}>
+                    Marque "Sim" se alguma das perguntas se aplica a você
+                  </div>
+                  
+                  {[
+                    {
+                      field: 'parq_question_1',
+                      question: 'Alguma vez um médico disse que você tem um problema de coração e que só deveria fazer atividade física recomendada por um médico?'
+                    },
+                    {
+                      field: 'parq_question_2',
+                      question: 'Você sente dor no peito quando faz atividade física?'
+                    },
+                    {
+                      field: 'parq_question_3',
+                      question: 'No último mês, você teve dor no peito quando não estava fazendo atividade física?'
+                    },
+                    {
+                      field: 'parq_question_4',
+                      question: 'Você perde o equilíbrio por causa de tontura ou alguma vez perdeu a consciência?'
+                    },
+                    {
+                      field: 'parq_question_5',
+                      question: 'Você tem algum problema ósseo ou articular que poderia piorar com a mudança de sua atividade física?'
+                    },
+                    {
+                      field: 'parq_question_6',
+                      question: 'Atualmente um médico está prescrevendo medicamentos para sua pressão arterial ou condição cardíaca?'
+                    },
+                    {
+                      field: 'parq_question_7',
+                      question: 'Você sabe de alguma outra razão pela qual não deveria fazer atividade física?'
+                    }
+                  ].map((item, index) => (
+                    <div key={item.field} style={{ marginBottom: '15px', padding: '10px', border: '1px solid #ddd', borderRadius: '5px' }}>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer', minWidth: '60px' }}>
+                          <input
+                            type="checkbox"
+                            name={item.field}
+                            checked={formData[item.field] || false}
+                            onChange={(e) => handleChange({
+                              target: {
+                                name: item.field,
+                                value: e.target.checked
+                              }
+                            })}
+                            style={{ margin: 0 }}
+                          />
+                          <span style={{ fontSize: '14px', fontWeight: 'bold' }}>Sim</span>
+                        </label>
+                        <div style={{ flex: 1, fontSize: '14px', lineHeight: '1.4' }}>
+                          <strong>{index + 1}.</strong> {item.question}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  
+                  <div style={{ marginTop: '15px', padding: '10px', backgroundColor: '#f8f9fa', borderRadius: '5px', fontSize: '13px', color: '#666' }}>
+                    <strong>Importante:</strong> Se você respondeu "Sim" a alguma pergunta, consulte seu médico antes de começar um programa de atividade física.
+                  </div>
+                </div>
+              )}
 
               {/* Campo tipo de usuário - só mostra se for cadastro de gerente */}
               {activeTab === 'gerentes' && (

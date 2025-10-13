@@ -41,7 +41,7 @@ const EsqueciMinhaSenha = () => {
 
     try {
       const cpfNumbers = cpf.replace(/\D/g, '');
-      const response = await api.post('/api/usuarios/esqueci-senha/', {
+      const response = await api.post('/usuarios/esqueci-senha/', {
         cpf: cpfNumbers
       });
 

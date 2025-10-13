@@ -23,7 +23,6 @@ function CadastroTurmas({ centroId, styles }) {
   const [alunosDisponiveis, setAlunosDisponiveis] = useState([]);
   const [showAlunosModal, setShowAlunosModal] = useState(false);
   const [alunosTurma, setAlunosTurma] = useState([]);
-  const [turmaModalNome, setTurmaModalNome] = useState('');
 
   useEffect(() => {
     fetchCentro();
@@ -50,13 +49,16 @@ function CadastroTurmas({ centroId, styles }) {
       const response = await api.get('turmas/diassemana/');
       console.log("📥 Dias da semana recebidos:", response.data); // 👈 ADICIONE ISTO
       
+      // Verifica se é um array direto ou dados paginados
+      let diasData = [];
       if (Array.isArray(response.data)) {
-        setDiasSemana(response.data);
-      } else if (Array.isArray(response.data.results)) {
-        setDiasSemana(response.data.results);
-      } else {
-        setDiasSemana([]);
+        diasData = response.data;
+      } else if (response.data && Array.isArray(response.data.results)) {
+        diasData = response.data.results;
       }
+      
+      console.log("📥 Dias processados:", diasData);
+      setDiasSemana(diasData);
     } catch (error) {
       console.error("❌ Erro ao buscar dias da semana:", error); // 👈 E ISTO
       setDiasSemana([]);

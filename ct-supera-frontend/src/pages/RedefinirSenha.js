@@ -75,7 +75,7 @@ const RedefinirSenha = () => {
     setLoading(true);
 
     try {
-      const response = await api.post(`/api/usuarios/redefinir-senha/${uidb64}/${token}/`, formData);
+      await api.post(`/usuarios/redefinir-senha/${uidb64}/${token}/`, formData);
       
       setMessage('Senha redefinida com sucesso! Redirecionando para o login...');
       
