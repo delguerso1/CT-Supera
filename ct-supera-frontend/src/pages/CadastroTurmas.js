@@ -23,6 +23,7 @@ function CadastroTurmas({ centroId, styles }) {
   const [alunosDisponiveis, setAlunosDisponiveis] = useState([]);
   const [showAlunosModal, setShowAlunosModal] = useState(false);
   const [alunosTurma, setAlunosTurma] = useState([]);
+  const [turmaModalNome, setTurmaModalNome] = useState('');
 
   useEffect(() => {
     fetchCentro();
@@ -518,7 +519,7 @@ function CadastroTurmas({ centroId, styles }) {
           <div style={{
             background: '#fff', padding: 24, borderRadius: 8, minWidth: 320, maxWidth: 400, boxShadow: '0 2px 8px #0002'
           }}>
-            <h3 style={{ marginTop: 0, marginBottom: 16 }}>Alunos da turma</h3>
+            <h3 style={{ marginTop: 0, marginBottom: 16 }}>Alunos da turma {turmaModalNome && `- ${turmaModalNome}`}</h3>
             {alunosTurma.length === 0 ? (
               <div style={{ color: '#888' }}>Nenhum aluno atribuído a esta turma.</div>
             ) : (
