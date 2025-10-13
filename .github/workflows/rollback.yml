@@ -1,0 +1,87 @@
+name: Rollback para Backup Anterior
+
+on:
+  workflow_dispatch:
+    inputs:
+      backup_name:
+        description: 'Nome do backup (deixe vazio para usar o mais recente)'
+        required: false
+        type: string
+
+jobs:
+  rollback:
+    name: Executar Rollback
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://ctsupera.com.br
+    
+    steps:
+      - name: Configurar SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.HOST }} >> ~/.ssh/known_hosts
+
+      - name: Listar backups disponíveis
+        run: |
+          ssh ${{ secrets.USERNAME }}@${{ secrets.HOST }} << 'EOF'
+            echo "📦 Backups disponíveis:"
+            cd /root/backups
+            ls -lht ct-supera-backup-*.tar.gz | head -10
+          EOF
+
+      - name: Executar rollback
+        run: |
+          ssh ${{ secrets.USERNAME }}@${{ secrets.HOST }} << 'EOF'
+            set -e
+            cd /root/backups
+            
+            backup_name="${{ github.event.inputs.backup_name }}"
+            
+            if [ -z "$backup_name" ]; then
+              # Usar backup mais recente
+              backup_file=$(ls -t ct-supera-backup-*.tar.gz | head -1)
+              echo "📦 Usando backup mais recente: $backup_file"
+            else
+              backup_file="$backup_name"
+              echo "📦 Usando backup especificado: $backup_file"
+            fi
+            
+            if [ ! -f "$backup_file" ]; then
+              echo "❌ Backup não encontrado: $backup_file"
+              exit 1
+            fi
+            
+            echo "⚠️ Criando backup de segurança do estado atual..."
+            cd /root
+            tar -czf backups/ct-supera-pre-rollback-$(date +%Y%m%d-%H%M%S).tar.gz ct-supera/
+            
+            echo "🔄 Restaurando backup..."
+            rm -rf ct-supera.rollback
+            mv ct-supera ct-supera.rollback
+            tar -xzf backups/$backup_file
+            
+            echo "🔄 Reiniciando serviço..."
+            systemctl restart ctsupera
+            sleep 3
+            
+            echo "✅ Rollback concluído!"
+            systemctl status ctsupera --no-pager -l | head -15
+          EOF
+
+      - name: Verificar aplicação
+        run: |
+          echo "🌐 Verificando se a aplicação está respondendo..."
+          curl -I https://ctsupera.com.br || echo "⚠️ Aplicação pode estar offline"
+
+      - name: Notificar resultado
+        if: always()
+        run: |
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "✅ Rollback realizado com sucesso!"
+          else
+            echo "❌ Rollback falhou!"
+          fi
+

@@ -35,7 +35,11 @@ class UsuarioSerializer(serializers.ModelSerializer):
             'endereco', 'data_nascimento', 'ativo',
             'dia_vencimento', 'valor_mensalidade', 'cpf',
             'nome_responsavel', 'telefone_responsavel', 'telefone_emergencia',
-            'ficha_medica', 'salario_professor', 'pix_professor', 'foto_perfil'
+            'ficha_medica', 'salario_professor', 'pix_professor', 'foto_perfil',
+            # Campos do PAR-Q
+            'parq_question_1', 'parq_question_2', 'parq_question_3', 'parq_question_4',
+            'parq_question_5', 'parq_question_6', 'parq_question_7',
+            'parq_completed', 'parq_completion_date'
         ]
         extra_kwargs = {
             'password': {'write_only': True}
@@ -57,6 +61,21 @@ class UsuarioSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
         representation = super().to_representation(instance)
         representation['tipo'] = instance.tipo
+        
+        # Remove ficha_medica para Professor e Gerente
+        if instance.tipo in ['professor', 'gerente']:
+            representation.pop('ficha_medica', None)
+            representation.pop('nome_responsavel', None)
+            representation.pop('telefone_responsavel', None)
+            representation.pop('telefone_emergencia', None)
+            representation.pop('dia_vencimento', None)
+            representation.pop('valor_mensalidade', None)
+            # Remove campos PAR-Q para professor e gerente
+            for field in ['parq_question_1', 'parq_question_2', 'parq_question_3', 
+                         'parq_question_4', 'parq_question_5', 'parq_question_6', 
+                         'parq_question_7', 'parq_completed', 'parq_completion_date']:
+                representation.pop(field, None)
+        
         return representation
 
     def create(self, validated_data):
@@ -89,11 +108,26 @@ class UsuarioSerializer(serializers.ModelSerializer):
         dia_vencimento_antigo = instance.dia_vencimento
         valor_mensalidade_antigo = instance.valor_mensalidade
         password = validated_data.pop('password', None)
+        
+        # Verificar se algum campo PAR-Q foi atualizado
+        parq_fields_updated = any(field in validated_data for field in [
+            'parq_question_1', 'parq_question_2', 'parq_question_3', 'parq_question_4',
+            'parq_question_5', 'parq_question_6', 'parq_question_7'
+        ])
+        
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
+            
+        # Se campos PAR-Q foram atualizados, marcar como completo
+        if parq_fields_updated and instance.is_aluno():
+            from django.utils import timezone
+            instance.parq_completed = True
+            instance.parq_completion_date = timezone.now()
+            
         if password is not None:
             instance.set_password(password)
         instance.save()
+        
         # Atualiza mensalidades pendentes se necessário
         if (
             ('dia_vencimento' in validated_data and validated_data['dia_vencimento'] != dia_vencimento_antigo)

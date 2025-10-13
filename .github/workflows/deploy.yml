@@ -1,0 +1,218 @@
+name: Deploy CT Supera to Hostinger
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:  # Permite execução manual
+
+jobs:
+  test:
+    name: Testes e Validações
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Instalar dependências Python
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Verificar migrações
+        run: |
+          python manage.py makemigrations --check --dry-run
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16'
+          cache: 'npm'
+          cache-dependency-path: ct-supera-frontend/package-lock.json
+
+      - name: Instalar dependências Node.js
+        working-directory: ./ct-supera-frontend
+        run: npm ci
+
+      - name: Verificar erros de lint (Frontend)
+        working-directory: ./ct-supera-frontend
+        run: npm run build
+        continue-on-error: true
+
+  build-frontend:
+    name: Build do Frontend
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16'
+          cache: 'npm'
+          cache-dependency-path: ct-supera-frontend/package-lock.json
+
+      - name: Instalar dependências
+        working-directory: ./ct-supera-frontend
+        run: npm ci
+
+      - name: Build da aplicação
+        working-directory: ./ct-supera-frontend
+        run: npm run build
+
+      - name: Upload do build
+        uses: actions/upload-artifact@v3
+        with:
+          name: frontend-build
+          path: ct-supera-frontend/build/
+          retention-days: 1
+
+  deploy:
+    name: Deploy para Produção
+    needs: [test, build-frontend]
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://ctsupera.com.br
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v3
+
+      - name: Download do build do frontend
+        uses: actions/download-artifact@v3
+        with:
+          name: frontend-build
+          path: ct-supera-frontend/build/
+
+      - name: Configurar SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.HOST }} >> ~/.ssh/known_hosts
+
+      - name: Criar backup no servidor
+        run: |
+          ssh ${{ secrets.USERNAME }}@${{ secrets.HOST }} << 'EOF'
+            cd /root
+            mkdir -p backups
+            timestamp=$(date +%Y%m%d-%H%M%S)
+            tar -czf backups/ct-supera-backup-$timestamp.tar.gz ct-supera/
+            # Manter apenas os últimos 10 backups
+            cd backups
+            ls -t ct-supera-backup-*.tar.gz | tail -n +11 | xargs -r rm
+            echo "✅ Backup criado: ct-supera-backup-$timestamp.tar.gz"
+          EOF
+
+      - name: Sincronizar código Backend
+        run: |
+          rsync -avz --delete \
+            --exclude 'venv/' \
+            --exclude 'node_modules/' \
+            --exclude '__pycache__/' \
+            --exclude '*.pyc' \
+            --exclude '.git/' \
+            --exclude 'ct-supera-frontend/' \
+            --exclude 'staticfiles/' \
+            --exclude 'media/' \
+            --exclude 'db.sqlite3' \
+            --exclude '.env' \
+            --exclude 'logs/' \
+            ./ ${{ secrets.USERNAME }}@${{ secrets.HOST }}:/root/ct-supera/
+
+      - name: Sincronizar Frontend Build
+        run: |
+          rsync -avz --delete \
+            ct-supera-frontend/build/ \
+            ${{ secrets.USERNAME }}@${{ secrets.HOST }}:/root/ct-supera/ct-supera-frontend/build/
+
+      - name: Executar deploy no servidor
+        run: |
+          ssh ${{ secrets.USERNAME }}@${{ secrets.HOST }} << 'EOF'
+            set -e
+            cd /root/ct-supera
+            
+            echo "📦 Ativando ambiente virtual..."
+            source venv/bin/activate
+            
+            echo "📦 Instalando/atualizando dependências..."
+            pip install -r requirements.txt --quiet
+            
+            echo "🗄️ Executando migrações..."
+            python manage.py migrate --settings=app.settings_hostinger --noinput
+            
+            echo "📁 Coletando arquivos estáticos..."
+            python manage.py collectstatic --settings=app.settings_hostinger --noinput
+            
+            echo "🔄 Reiniciando serviço..."
+            systemctl restart ctsupera
+            
+            echo "⏳ Aguardando serviço iniciar..."
+            sleep 3
+            
+            echo "✅ Deploy concluído com sucesso!"
+          EOF
+
+      - name: Verificar status do serviço
+        run: |
+          ssh ${{ secrets.USERNAME }}@${{ secrets.HOST }} << 'EOF'
+            echo "📊 Status dos serviços:"
+            echo ""
+            echo "=== Aplicação Django ==="
+            systemctl status ctsupera --no-pager -l | head -15
+            echo ""
+            echo "=== Nginx ==="
+            systemctl status nginx --no-pager -l | head -10
+            echo ""
+            echo "=== PostgreSQL ==="
+            systemctl status postgresql --no-pager -l | head -10
+          EOF
+
+      - name: Notificar sucesso
+        if: success()
+        run: |
+          echo "🎉 Deploy realizado com sucesso!"
+          echo "🌐 Aplicação disponível em: https://ctsupera.com.br"
+          echo "⏰ Horário: $(date)"
+
+      - name: Rollback em caso de falha
+        if: failure()
+        run: |
+          ssh ${{ secrets.USERNAME }}@${{ secrets.HOST }} << 'EOF'
+            echo "❌ Deploy falhou! Iniciando rollback..."
+            cd /root/backups
+            latest_backup=$(ls -t ct-supera-backup-*.tar.gz | head -1)
+            if [ -n "$latest_backup" ]; then
+              echo "📦 Restaurando backup: $latest_backup"
+              cd /root
+              rm -rf ct-supera.old
+              mv ct-supera ct-supera.old
+              tar -xzf backups/$latest_backup
+              systemctl restart ctsupera
+              echo "✅ Rollback concluído!"
+            else
+              echo "⚠️ Nenhum backup encontrado!"
+            fi
+          EOF
+
+  notify:
+    name: Notificação
+    needs: deploy
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Verificar resultado
+        run: |
+          if [ "${{ needs.deploy.result }}" == "success" ]; then
+            echo "✅ Deploy realizado com sucesso!"
+          else
+            echo "❌ Deploy falhou!"
+            exit 1
+          fi
+

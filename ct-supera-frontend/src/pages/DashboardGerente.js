@@ -5,6 +5,24 @@ import CadastroUsuario from '../pages/CadastroUsuario';
 import ControleFinanceiro from '../pages/ControleFinanceiro';
 import CadastroCentroTreinamento from '../pages/CadastroCentroTreinamento';
 
+// Hook para detectar tamanho da tela
+const useResponsive = () => {
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  const [isTablet, setIsTablet] = useState(window.innerWidth > 768 && window.innerWidth <= 1024);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 768);
+      setIsTablet(window.innerWidth > 768 && window.innerWidth <= 1024);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  return { isMobile, isTablet };
+};
+
 const styles = {
   container: {
     display: 'flex',
@@ -18,8 +36,11 @@ const styles = {
     padding: '20px',
     boxShadow: '2px 0 10px rgba(0,0,0,0.1)',
     position: 'fixed',
+    top: 0,
+    left: 0,
     height: '100vh',
-    overflowY: 'auto'
+    overflowY: 'auto',
+    zIndex: 1000
   },
   mainContent: {
     flex: 1,
@@ -280,6 +301,7 @@ function getInitials(name) {
 }
 
 function DashboardGerente({ user }) {
+  const { isMobile, isTablet } = useResponsive();
   const [activeSection, setActiveSection] = useState('dashboard');
   const [stats, setStats] = useState({
     alunosAtivos: 0,
@@ -301,8 +323,7 @@ function DashboardGerente({ user }) {
     email: '',
     telefone: '',
     endereco: '',
-    data_nascimento: '',
-    ficha_medica: ''
+    data_nascimento: ''
   });
   const [success, setSuccess] = useState('');
   const [erro, setErro] = useState('');
@@ -321,8 +342,7 @@ function DashboardGerente({ user }) {
         email: response.data.email || '',
         telefone: response.data.telefone || '',
         endereco: response.data.endereco || '',
-        data_nascimento: response.data.data_nascimento || '',
-        ficha_medica: response.data.ficha_medica || ''
+        data_nascimento: response.data.data_nascimento || ''
       });
     } catch (err) {
       setErro('Erro ao carregar dados do gerente.');
@@ -477,8 +497,7 @@ function DashboardGerente({ user }) {
       email: gerente?.email || '',
       telefone: gerente?.telefone || '',
       endereco: gerente?.endereco || '',
-      data_nascimento: gerente?.data_nascimento || '',
-      ficha_medica: gerente?.ficha_medica || ''
+      data_nascimento: gerente?.data_nascimento || ''
     });
     setErro('');
     setSuccess('');
@@ -609,7 +628,7 @@ function DashboardGerente({ user }) {
           Foto de Perfil
         </h3>
         
-        <div style={{
+        <div className="photo-upload-container" style={{
           display: 'flex',
           alignItems: 'center',
           gap: '30px',
@@ -661,7 +680,7 @@ function DashboardGerente({ user }) {
           )}
           
           {/* Controles de Upload */}
-          <div style={{ flex: 1, minWidth: '250px' }}>
+          <div className="photo-upload-controls" style={{ flex: 1, minWidth: '250px' }}>
             <div style={{ marginBottom: '15px' }}>
               <input
                 type="file"
@@ -821,16 +840,6 @@ function DashboardGerente({ user }) {
               style={styles.input}
             />
           </div>
-          <div style={styles.formGroup}>
-            <label style={styles.label}>Ficha Médica</label>
-            <textarea
-              name="ficha_medica"
-              value={form.ficha_medica}
-              onChange={handleChange}
-              style={styles.textarea}
-              rows={4}
-            />
-          </div>
           <div style={styles.buttonGroup}>
             <button type="submit" style={styles.primaryButton}>
               Salvar Alterações
@@ -870,12 +879,6 @@ function DashboardGerente({ user }) {
               {gerente?.data_nascimento
                 ? new Date(gerente.data_nascimento).toLocaleDateString()
                 : '-'}
-            </div>
-          </div>
-          <div style={styles.formGroup}>
-            <label style={styles.label}>Ficha Médica</label>
-            <div style={styles.textarea}>
-              {gerente?.ficha_medica || '-'}
             </div>
           </div>
           <div style={styles.buttonGroup}>
@@ -939,14 +942,36 @@ function DashboardGerente({ user }) {
     );
   }
 
+  // Estilos responsivos dinâmicos
+  const responsiveStyles = {
+    container: {
+      ...styles.container,
+      flexDirection: isMobile ? 'column' : 'row'
+    },
+    sidebar: {
+      ...styles.sidebar,
+      width: isMobile ? '100%' : (isTablet ? '240px' : '280px'),
+      height: isMobile ? 'auto' : '100vh',
+      position: isMobile ? 'relative' : 'fixed',
+      marginBottom: isMobile ? '0' : '0',
+      boxShadow: isMobile ? 'none' : styles.sidebar.boxShadow,
+      borderBottom: isMobile ? '1px solid rgba(255,255,255,0.1)' : 'none'
+    },
+    mainContent: {
+      ...styles.mainContent,
+      marginLeft: isMobile ? '0' : (isTablet ? '240px' : '280px'),
+      padding: isMobile ? '0.5rem' : '20px'
+    }
+  };
+
   return (
-    <div style={styles.container}>
+    <div style={responsiveStyles.container}>
       {/* Sidebar */}
-      <div style={styles.sidebar}>
+      <div style={responsiveStyles.sidebar}>
         <div style={styles.profileSection}>
           <div style={{
             ...styles.profilePhoto,
-            backgroundImage: gerente?.foto_perfil ? `url(http://localhost:8000${gerente.foto_perfil})` : 'none',
+            backgroundImage: gerente?.foto_perfil ? `url(http://72.60.145.13${gerente.foto_perfil})` : 'none',
             backgroundSize: 'cover',
             backgroundPosition: 'center'
           }}>
@@ -1020,7 +1045,7 @@ function DashboardGerente({ user }) {
       </div>
 
       {/* Main Content */}
-      <div style={styles.mainContent}>
+      <div style={responsiveStyles.mainContent}>
         {erro && (
           <div style={styles.error}>
             {erro}

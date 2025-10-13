@@ -213,7 +213,6 @@ class PainelGerenteAPIView(APIView):
                 'telefone': gerente_data.get('telefone'),
                 'endereco': gerente_data.get('endereco'),
                 'data_nascimento': gerente_data.get('data_nascimento'),
-                'ficha_medica': gerente_data.get('ficha_medica'),
                 'foto_perfil': gerente_data.get('foto_perfil'),
                 'ativo': gerente_data.get('ativo'),
                 'id': gerente_data.get('id')

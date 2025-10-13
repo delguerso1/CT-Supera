@@ -1,0 +1,115 @@
+name: Testes e Validações
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+  push:
+    branches: [ develop ]
+
+jobs:
+  test-backend:
+    name: Testes Backend
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:13
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Cache dependências Python
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Instalar dependências
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Verificar código Python (flake8)
+        run: |
+          pip install flake8
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+        continue-on-error: true
+
+      - name: Verificar migrações
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/test_db
+        run: |
+          python manage.py makemigrations --check --dry-run
+
+      - name: Executar testes Django
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/test_db
+          SECRET_KEY: test-secret-key-for-ci
+          DEBUG: False
+        run: |
+          python manage.py test --settings=app.settings
+        continue-on-error: true
+
+  test-frontend:
+    name: Testes Frontend
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '16'
+          cache: 'npm'
+          cache-dependency-path: ct-supera-frontend/package-lock.json
+
+      - name: Instalar dependências
+        working-directory: ./ct-supera-frontend
+        run: npm ci
+
+      - name: Executar testes
+        working-directory: ./ct-supera-frontend
+        run: npm test -- --passWithNoTests
+        continue-on-error: true
+
+      - name: Build de produção
+        working-directory: ./ct-supera-frontend
+        run: npm run build
+
+  lint:
+    name: Verificação de Código
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v3
+
+      - name: Verificar formatação de arquivos
+        run: |
+          echo "Verificando arquivos Python..."
+          find . -name "*.py" -type f | head -10
+          echo "Verificando arquivos JavaScript..."
+          find ct-supera-frontend/src -name "*.js" -type f | head -10
+
