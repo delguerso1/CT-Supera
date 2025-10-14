@@ -404,7 +404,13 @@ function DashboardAluno({ user }) {
     nome_responsavel: '',
     telefone_responsavel: '',
     telefone_emergencia: '',
-    ficha_medica: ''
+    parq_question_1: false,
+    parq_question_2: false,
+    parq_question_3: false,
+    parq_question_4: false,
+    parq_question_5: false,
+    parq_question_6: false,
+    parq_question_7: false
   });
   const [fotoPerfil, setFotoPerfil] = useState(null);
   const [fotoPreview, setFotoPreview] = useState(null);
@@ -435,7 +441,13 @@ function DashboardAluno({ user }) {
           nome_responsavel: resp.data.usuario.nome_responsavel || '',
           telefone_responsavel: resp.data.usuario.telefone_responsavel || '',
           telefone_emergencia: resp.data.usuario.telefone_emergencia || '',
-          ficha_medica: resp.data.usuario.ficha_medica || ''
+          parq_question_1: resp.data.usuario.parq_question_1 || false,
+          parq_question_2: resp.data.usuario.parq_question_2 || false,
+          parq_question_3: resp.data.usuario.parq_question_3 || false,
+          parq_question_4: resp.data.usuario.parq_question_4 || false,
+          parq_question_5: resp.data.usuario.parq_question_5 || false,
+          parq_question_6: resp.data.usuario.parq_question_6 || false,
+          parq_question_7: resp.data.usuario.parq_question_7 || false
         });
       } catch (err) {
         console.error('Erro ao carregar dados:', err);
@@ -465,7 +477,13 @@ function DashboardAluno({ user }) {
       nome_responsavel: aluno?.nome_responsavel || '',
       telefone_responsavel: aluno?.telefone_responsavel || '',
       telefone_emergencia: aluno?.telefone_emergencia || '',
-      ficha_medica: aluno?.ficha_medica || ''
+      parq_question_1: aluno?.parq_question_1 || false,
+      parq_question_2: aluno?.parq_question_2 || false,
+      parq_question_3: aluno?.parq_question_3 || false,
+      parq_question_4: aluno?.parq_question_4 || false,
+      parq_question_5: aluno?.parq_question_5 || false,
+      parq_question_6: aluno?.parq_question_6 || false,
+      parq_question_7: aluno?.parq_question_7 || false
     });
     setSuccess('');
     setErro('');
@@ -489,7 +507,13 @@ function DashboardAluno({ user }) {
       nome_responsavel: form.nome_responsavel,
       telefone_responsavel: form.telefone_responsavel,
       telefone_emergencia: form.telefone_emergencia,
-      ficha_medica: form.ficha_medica,
+      parq_question_1: form.parq_question_1,
+      parq_question_2: form.parq_question_2,
+      parq_question_3: form.parq_question_3,
+      parq_question_4: form.parq_question_4,
+      parq_question_5: form.parq_question_5,
+      parq_question_6: form.parq_question_6,
+      parq_question_7: form.parq_question_7,
       username: aluno.username,
       tipo: aluno.tipo,
       cpf: aluno.cpf,
@@ -1157,12 +1181,166 @@ function DashboardAluno({ user }) {
             <label style={styles.label}>Telefone de Emergência</label>
             <div style={styles.input}>{aluno?.telefone_emergencia || '-'}</div>
           </div>
-          <div style={styles.formGroup}>
-            <label style={styles.label}>Ficha Médica</label>
-            <div style={styles.textarea}>
-              {aluno?.ficha_medica || '-'}
+        </div>
+        
+        {/* Seção PAR-Q - Questionário de Aptidão para Atividade Física */}
+        <div style={{
+          gridColumn: '1 / -1',
+          marginTop: '20px',
+          padding: '20px',
+          backgroundColor: '#f8f9fa',
+          borderRadius: '12px',
+          border: '1px solid #e0e0e0'
+        }}>
+          <h3 style={{
+            fontSize: '18px',
+            color: '#1a237e',
+            marginBottom: '15px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+            <span>📋</span>
+            Questionário PAR-Q (Prontidão para Atividade Física)
+          </h3>
+          
+          {aluno?.parq_completed ? (
+            <div>
+              <div style={{
+                backgroundColor: '#e8f5e9',
+                padding: '12px',
+                borderRadius: '8px',
+                marginBottom: '15px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}>
+                <span style={{ fontSize: '20px' }}>✅</span>
+                <div>
+                  <div style={{ fontWeight: 'bold', color: '#2e7d32' }}>
+                    Questionário Completo
+                  </div>
+                  {aluno?.parq_completion_date && (
+                    <div style={{ fontSize: '12px', color: '#666' }}>
+                      Preenchido em: {new Date(aluno.parq_completion_date).toLocaleDateString('pt-BR')}
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              {[
+                {
+                  field: 'parq_question_1',
+                  question: '1. Alguma vez um médico disse que você tem um problema de coração e que só deveria fazer atividade física recomendada por um médico?'
+                },
+                {
+                  field: 'parq_question_2',
+                  question: '2. Você sente dor no peito quando faz atividade física?'
+                },
+                {
+                  field: 'parq_question_3',
+                  question: '3. No último mês, você teve dor no peito quando não estava fazendo atividade física?'
+                },
+                {
+                  field: 'parq_question_4',
+                  question: '4. Você perde o equilíbrio por causa de tontura ou alguma vez perdeu a consciência?'
+                },
+                {
+                  field: 'parq_question_5',
+                  question: '5. Você tem algum problema ósseo ou articular que poderia piorar com a mudança de sua atividade física?'
+                },
+                {
+                  field: 'parq_question_6',
+                  question: '6. Atualmente um médico está prescrevendo medicamentos para sua pressão arterial ou condição cardíaca?'
+                },
+                {
+                  field: 'parq_question_7',
+                  question: '7. Você sabe de alguma outra razão pela qual não deveria fazer atividade física?'
+                }
+              ].map((item) => (
+                <div key={item.field} style={{
+                  padding: '10px',
+                  marginBottom: '8px',
+                  backgroundColor: 'white',
+                  borderRadius: '8px',
+                  border: '1px solid #e0e0e0',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '10px'
+                }}>
+                  <span style={{
+                    fontSize: '18px',
+                    color: aluno?.[item.field] ? '#d32f2f' : '#4caf50'
+                  }}>
+                    {aluno?.[item.field] ? '⚠️' : '✅'}
+                  </span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '14px', color: '#333', marginBottom: '4px' }}>
+                      {item.question}
+                    </div>
+                    <div style={{
+                      fontSize: '13px',
+                      fontWeight: 'bold',
+                      color: aluno?.[item.field] ? '#d32f2f' : '#4caf50'
+                    }}>
+                      Resposta: {aluno?.[item.field] ? 'Sim' : 'Não'}
+                    </div>
+                  </div>
+                </div>
+              ))}
+              
+              {/* Alerta se alguma resposta for Sim */}
+              {[1, 2, 3, 4, 5, 6, 7].some(i => aluno?.[`parq_question_${i}`]) && (
+                <div style={{
+                  marginTop: '15px',
+                  padding: '15px',
+                  backgroundColor: '#fff3cd',
+                  borderRadius: '8px',
+                  border: '2px solid #ffc107'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '24px' }}>⚠️</span>
+                    <div style={{ fontWeight: 'bold', color: '#856404', fontSize: '16px' }}>
+                      Atenção - Consulta Médica Necessária
+                    </div>
+                  </div>
+                  <div style={{ fontSize: '14px', color: '#856404' }}>
+                    Você respondeu "Sim" a pelo menos uma pergunta do PAR-Q. 
+                    É recomendado consultar um médico antes de iniciar ou intensificar 
+                    atividades físicas.
+                  </div>
+                </div>
+              )}
             </div>
-          </div>
+          ) : (
+            <div style={{
+              padding: '20px',
+              backgroundColor: '#fff3cd',
+              borderRadius: '8px',
+              border: '1px solid #ffc107',
+              textAlign: 'center'
+            }}>
+              <span style={{ fontSize: '48px', marginBottom: '10px', display: 'block' }}>📋</span>
+              <div style={{ fontSize: '16px', color: '#856404', marginBottom: '10px' }}>
+                <strong>Questionário PAR-Q Pendente</strong>
+              </div>
+              <div style={{ fontSize: '14px', color: '#666', marginBottom: '15px' }}>
+                Preencha o questionário PAR-Q para avaliar sua aptidão para atividade física.
+              </div>
+              <button
+                onClick={handleEdit}
+                style={{
+                  ...styles.primaryButton,
+                  backgroundColor: '#ff9800'
+                }}
+              >
+                Preencher Questionário
+              </button>
+            </div>
+          )}
+        </div>
+        
+        <div style={{ gridColumn: '1 / -1' }}>
           <div style={styles.buttonGroup}>
             <button
               onClick={handleEdit}
