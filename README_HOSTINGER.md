@@ -22,7 +22,7 @@ Este projeto foi configurado especificamente para deploy na **Hostinger** com as
 - `ctsupera_hostinger.service` - Serviço systemd
 
 #### Documentação
-- `HOSTINGER_DEPLOY.md` - Guia completo de deploy
+- `CORRECOES_WORKFLOW_DEPLOY.md` - Correções e melhorias no workflow de deploy
 - `crontab.example` - Configuração de tarefas automáticas
 
 ### 🚀 Passos para Deploy
@@ -58,7 +58,7 @@ Este projeto foi configurado especificamente para deploy na **Hostinger** com as
 ## 📞 Suporte
 
 Para problemas específicos, consulte:
-1. `HOSTINGER_DEPLOY.md` - Guia completo
+1. `CORRECOES_WORKFLOW_DEPLOY.md` - Guia de correções e configuração
 2. Logs da aplicação
 3. Status dos serviços systemd
 4. Configurações do Nginx

@@ -334,7 +334,7 @@ Após configurar `CREDENTIALS.md`:
 
 **Dúvidas?** Veja também:
 - [SECURITY.md](SECURITY.md) - Guia completo de segurança
-- [QUICK_START_CI_CD.md](QUICK_START_CI_CD.md) - Setup do CI/CD
+- [CORRECOES_WORKFLOW_DEPLOY.md](CORRECOES_WORKFLOW_DEPLOY.md) - Correções no workflow de deploy
 
 ---
 

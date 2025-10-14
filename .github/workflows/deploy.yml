@@ -24,6 +24,9 @@ jobs:
           pip install -r requirements.txt
 
       - name: Verificar migrações
+        env:
+          DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
+          DJANGO_SETTINGS_MODULE: app.settings
         run: |
           python manage.py makemigrations --check --dry-run
 
@@ -118,12 +121,16 @@ jobs:
             --exclude '__pycache__/' \
             --exclude '*.pyc' \
             --exclude '.git/' \
-            --exclude 'ct-supera-frontend/' \
+            --exclude 'ct-supera-frontend/build/' \
+            --exclude 'ct-supera-frontend/node_modules/' \
             --exclude 'staticfiles/' \
             --exclude 'media/' \
             --exclude 'db.sqlite3' \
             --exclude '.env' \
             --exclude 'logs/' \
+            --exclude 'backups/' \
+            --exclude '*.tar.gz' \
+            --exclude '*.zip' \
             ./ ${{ secrets.USERNAME }}@${{ secrets.HOST }}:/root/ct-supera/
 
       - name: Sincronizar Frontend Build
@@ -151,10 +158,35 @@ jobs:
             python manage.py collectstatic --settings=app.settings_hostinger --noinput
             
             echo "🔄 Reiniciando serviço..."
-            systemctl restart ctsupera
+            sudo systemctl restart ctsupera
             
             echo "⏳ Aguardando serviço iniciar..."
-            sleep 3
+            sleep 5
+            
+            echo "🏥 Verificando saúde da aplicação..."
+            # Verificar se o serviço está ativo
+            if ! sudo systemctl is-active --quiet ctsupera; then
+              echo "❌ Erro: Serviço ctsupera não está rodando!"
+              sudo systemctl status ctsupera --no-pager -l
+              exit 1
+            fi
+            
+            # Verificar se a aplicação responde (timeout de 30s)
+            max_attempts=10
+            attempt=0
+            while [ $attempt -lt $max_attempts ]; do
+              if curl -f -s -o /dev/null http://localhost:8000 || curl -f -s -o /dev/null https://ctsupera.com.br; then
+                echo "✅ Aplicação respondendo corretamente!"
+                break
+              fi
+              attempt=$((attempt + 1))
+              if [ $attempt -eq $max_attempts ]; then
+                echo "❌ Erro: Aplicação não responde após $max_attempts tentativas!"
+                exit 1
+              fi
+              echo "⏳ Tentativa $attempt/$max_attempts... aguardando..."
+              sleep 3
+            done
             
             echo "✅ Deploy concluído com sucesso!"
           EOF
@@ -165,13 +197,13 @@ jobs:
             echo "📊 Status dos serviços:"
             echo ""
             echo "=== Aplicação Django ==="
-            systemctl status ctsupera --no-pager -l | head -15
+            sudo systemctl status ctsupera --no-pager -l | head -15
             echo ""
             echo "=== Nginx ==="
-            systemctl status nginx --no-pager -l | head -10
+            sudo systemctl status nginx --no-pager -l | head -10
             echo ""
             echo "=== PostgreSQL ==="
-            systemctl status postgresql --no-pager -l | head -10
+            sudo systemctl status postgresql --no-pager -l | head -10
           EOF
 
       - name: Notificar sucesso
@@ -194,7 +226,7 @@ jobs:
               rm -rf ct-supera.old
               mv ct-supera ct-supera.old
               tar -xzf backups/$latest_backup
-              systemctl restart ctsupera
+              sudo systemctl restart ctsupera
               echo "✅ Rollback concluído!"
             else
               echo "⚠️ Nenhum backup encontrado!"

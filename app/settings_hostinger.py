@@ -64,13 +64,11 @@ CORS_ALLOWED_ORIGINS = [
     f"http://{os.getenv('DOMAIN_NAME', 'ctsupera.com.br')}",
     "https://www.ctsupera.com.br",
     "http://www.ctsupera.com.br",
-    "http://localhost:3000",  # Para desenvolvimento local
-    "http://127.0.0.1:3000",  # Para desenvolvimento local
-    f"http://{os.getenv('SERVER_IP', '72.60.145.13')}",  # IP do servidor
 ]
 
-# Para desenvolvimento, permitir todas as origens
-CORS_ALLOW_ALL_ORIGINS = True
+# ⚠️ IMPORTANTE: Em produção, NUNCA use CORS_ALLOW_ALL_ORIGINS = True
+# Isso é uma vulnerabilidade de segurança crítica!
+# CORS_ALLOW_ALL_ORIGINS = False  # Padrão seguro
 
 CORS_ALLOW_CREDENTIALS = True
 
@@ -99,12 +97,20 @@ CORS_ALLOW_HEADERS = [
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_SSL_REDIRECT = os.getenv('SECURE_SSL_REDIRECT', 'False').lower() == 'true'
-SESSION_COOKIE_SECURE = True
-CSRF_COOKIE_SECURE = True
+SESSION_COOKIE_SECURE = os.getenv('SESSION_COOKIE_SECURE', 'True').lower() == 'true'
+CSRF_COOKIE_SECURE = os.getenv('CSRF_COOKIE_SECURE', 'True').lower() == 'true'
 SECURE_HSTS_SECONDS = 31536000
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 SECURE_HSTS_PRELOAD = True
 X_FRAME_OPTIONS = 'DENY'
+
+# Configurações de CSRF para produção
+CSRF_TRUSTED_ORIGINS = [
+    f"https://{os.getenv('DOMAIN_NAME', 'ctsupera.com.br')}",
+    "https://www.ctsupera.com.br",
+    f"http://{os.getenv('DOMAIN_NAME', 'ctsupera.com.br')}",  # Apenas se não estiver usando SSL
+    "http://www.ctsupera.com.br",  # Apenas se não estiver usando SSL
+]
 
 # Configurações do REST Framework
 REST_FRAMEWORK = {
