@@ -1142,48 +1142,49 @@ function DashboardAluno({ user }) {
           </div>
         </form>
       ) : (
-        <div style={styles.form}>
-          <div style={styles.formGroup}>
-            <label style={styles.label}>Nome Completo</label>
-            <div style={styles.input}>
-              {aluno?.first_name} {aluno?.last_name}
+        <>
+          <div style={styles.form}>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Nome Completo</label>
+              <div style={styles.input}>
+                {aluno?.first_name} {aluno?.last_name}
+              </div>
+            </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Email</label>
+              <div style={styles.input}>{aluno?.email}</div>
+            </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Telefone</label>
+              <div style={styles.input}>{aluno?.telefone}</div>
+            </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Endereço</label>
+              <div style={styles.input}>{aluno?.endereco || '-'}</div>
+            </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Data de Nascimento</label>
+              <div style={styles.input}>
+                {aluno?.data_nascimento
+                  ? new Date(aluno.data_nascimento).toLocaleDateString()
+                  : '-'}
+              </div>
+            </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Nome do Responsável</label>
+              <div style={styles.input}>{aluno?.nome_responsavel || '-'}</div>
+            </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Telefone do Responsável</label>
+              <div style={styles.input}>{aluno?.telefone_responsavel || '-'}</div>
+            </div>
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Telefone de Emergência</label>
+              <div style={styles.input}>{aluno?.telefone_emergencia || '-'}</div>
             </div>
           </div>
-          <div style={styles.formGroup}>
-            <label style={styles.label}>Email</label>
-            <div style={styles.input}>{aluno?.email}</div>
-          </div>
-          <div style={styles.formGroup}>
-            <label style={styles.label}>Telefone</label>
-            <div style={styles.input}>{aluno?.telefone}</div>
-          </div>
-          <div style={styles.formGroup}>
-            <label style={styles.label}>Endereço</label>
-            <div style={styles.input}>{aluno?.endereco || '-'}</div>
-          </div>
-          <div style={styles.formGroup}>
-            <label style={styles.label}>Data de Nascimento</label>
-            <div style={styles.input}>
-              {aluno?.data_nascimento
-                ? new Date(aluno.data_nascimento).toLocaleDateString()
-                : '-'}
-            </div>
-          </div>
-          <div style={styles.formGroup}>
-            <label style={styles.label}>Nome do Responsável</label>
-            <div style={styles.input}>{aluno?.nome_responsavel || '-'}</div>
-          </div>
-          <div style={styles.formGroup}>
-            <label style={styles.label}>Telefone do Responsável</label>
-            <div style={styles.input}>{aluno?.telefone_responsavel || '-'}</div>
-          </div>
-          <div style={styles.formGroup}>
-            <label style={styles.label}>Telefone de Emergência</label>
-            <div style={styles.input}>{aluno?.telefone_emergencia || '-'}</div>
-          </div>
-        </div>
-        
-        {/* Seção PAR-Q - Questionário de Aptidão para Atividade Física */}
+          
+          {/* Seção PAR-Q - Questionário de Aptidão para Atividade Física */}
         <div style={{
           gridColumn: '1 / -1',
           marginTop: '20px',
@@ -1340,16 +1341,17 @@ function DashboardAluno({ user }) {
           )}
         </div>
         
-        <div style={{ gridColumn: '1 / -1' }}>
-          <div style={styles.buttonGroup}>
-            <button
-              onClick={handleEdit}
-              style={styles.primaryButton}
-            >
-              Editar Perfil
-            </button>
+          <div style={{ gridColumn: '1 / -1' }}>
+            <div style={styles.buttonGroup}>
+              <button
+                onClick={handleEdit}
+                style={styles.primaryButton}
+              >
+                Editar Perfil
+              </button>
+            </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   );
