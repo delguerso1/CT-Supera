@@ -9,6 +9,7 @@ class CentroDeTreinamentoSerializer(serializers.ModelSerializer):
 
 class SuperaNewsSerializer(serializers.ModelSerializer):
     autor_nome = serializers.CharField(source='autor.get_full_name', read_only=True)
+    ativo = serializers.BooleanField(default=True, required=False)
     
     class Meta:
         model = SuperaNews
@@ -19,6 +20,7 @@ class SuperaNewsSerializer(serializers.ModelSerializer):
 
 class GaleriaFotoSerializer(serializers.ModelSerializer):
     autor_nome = serializers.CharField(source='autor.get_full_name', read_only=True)
+    ativo = serializers.BooleanField(default=True, required=False)
     
     class Meta:
         model = GaleriaFoto
