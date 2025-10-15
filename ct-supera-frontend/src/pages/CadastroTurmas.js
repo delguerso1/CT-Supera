@@ -227,14 +227,22 @@ function CadastroTurmas({ centroId, styles }) {
         <button
           onClick={handleNovaTurma}
           style={{
-            ...styles.tab,
             backgroundColor: '#1a237e',
             color: 'white',
+            border: 'none',
+            borderRadius: '8px',
+            padding: '12px 24px',
+            fontSize: '1rem',
+            fontWeight: '600',
+            cursor: 'pointer',
             marginBottom: 16,
-            fontWeight: 600,
+            width: '100%',
+            transition: 'all 0.2s'
           }}
+          onMouseEnter={(e) => e.target.style.backgroundColor = '#0d47a1'}
+          onMouseLeave={(e) => e.target.style.backgroundColor = '#1a237e'}
         >
-          Cadastrar Nova Turma
+          ➕ Cadastrar Nova Turma
         </button>
       )}
 
@@ -292,21 +300,62 @@ function CadastroTurmas({ centroId, styles }) {
                 <td style={{ padding: 10, textAlign: 'center' }}>
                   <button
                     onClick={() => handleEdit(turma)}
-                    style={{ ...styles.tab, marginRight: 8 }}
+                    style={{
+                      backgroundColor: '#1a237e',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      padding: '8px 12px',
+                      fontSize: '0.85rem',
+                      fontWeight: '500',
+                      cursor: 'pointer',
+                      marginRight: 4,
+                      marginBottom: 4,
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => e.target.style.backgroundColor = '#0d47a1'}
+                    onMouseLeave={(e) => e.target.style.backgroundColor = '#1a237e'}
                   >
-                    Editar
+                    ✏️ Editar
                   </button>
                   <button
                     onClick={() => handleDelete(turma.id)}
-                    style={{ ...styles.tab, backgroundColor: '#f44336', color: 'white', marginRight: 8 }}
+                    style={{
+                      backgroundColor: '#d32f2f',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      padding: '8px 12px',
+                      fontSize: '0.85rem',
+                      fontWeight: '500',
+                      cursor: 'pointer',
+                      marginRight: 4,
+                      marginBottom: 4,
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => e.target.style.backgroundColor = '#b71c1c'}
+                    onMouseLeave={(e) => e.target.style.backgroundColor = '#d32f2f'}
                   >
-                    Excluir
+                    🗑️ Excluir
                   </button>
                   <button
                     onClick={() => handleShowAddAluno(turma.id)}
-                    style={{ ...styles.tab, backgroundColor: '#388e3c', color: 'white' }}
+                    style={{
+                      backgroundColor: '#2e7d32',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      padding: '8px 12px',
+                      fontSize: '0.85rem',
+                      fontWeight: '500',
+                      cursor: 'pointer',
+                      marginBottom: 4,
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => e.target.style.backgroundColor = '#1b5e20'}
+                    onMouseLeave={(e) => e.target.style.backgroundColor = '#2e7d32'}
                   >
-                    Adicionar Aluno
+                    👤 Adicionar Aluno
                   </button>
                 </td>
               </tr>
@@ -433,15 +482,18 @@ function CadastroTurmas({ centroId, styles }) {
                 backgroundColor: '#1a237e',
                 color: 'white',
                 border: 'none',
-                borderRadius: 4,
-                padding: '10px 0',
-                fontWeight: 600,
+                borderRadius: '8px',
+                padding: '12px 24px',
                 fontSize: '1rem',
+                fontWeight: '600',
                 cursor: 'pointer',
-                flex: 1
+                flex: 1,
+                transition: 'all 0.2s'
               }}
+              onMouseEnter={(e) => e.target.style.backgroundColor = '#0d47a1'}
+              onMouseLeave={(e) => e.target.style.backgroundColor = '#1a237e'}
             >
-              {editId ? 'Salvar Alterações' : 'Cadastrar Turma'}
+              {editId ? '💾 Salvar Alterações' : '➕ Cadastrar Turma'}
             </button>
             <button
               type="button"
@@ -459,13 +511,21 @@ function CadastroTurmas({ centroId, styles }) {
                 setSuccess('');
               }}
               style={{
-                ...styles.tab,
-                backgroundColor: '#888',
+                backgroundColor: '#757575',
                 color: 'white',
-                flex: 1
+                border: 'none',
+                borderRadius: '8px',
+                padding: '12px 24px',
+                fontSize: '1rem',
+                fontWeight: '600',
+                cursor: 'pointer',
+                flex: 1,
+                transition: 'all 0.2s'
               }}
+              onMouseEnter={(e) => e.target.style.backgroundColor = '#616161'}
+              onMouseLeave={(e) => e.target.style.backgroundColor = '#757575'}
             >
-              Cancelar
+              ❌ Cancelar
             </button>
           </div>
         </form>
@@ -502,11 +562,43 @@ function CadastroTurmas({ centroId, styles }) {
               </option>
             ))}
           </select>
-          <button type="submit" style={{ background: '#388e3c', color: 'white', padding: '8px 16px', border: 'none', borderRadius: 4 }}>
-            Adicionar
+          <button 
+            type="submit" 
+            style={{ 
+              backgroundColor: '#2e7d32', 
+              color: 'white', 
+              padding: '10px 20px', 
+              border: 'none', 
+              borderRadius: '6px',
+              fontWeight: '600',
+              fontSize: '0.95rem',
+              cursor: 'pointer',
+              marginRight: 8,
+              transition: 'all 0.2s'
+            }}
+            onMouseEnter={(e) => e.target.style.backgroundColor = '#1b5e20'}
+            onMouseLeave={(e) => e.target.style.backgroundColor = '#2e7d32'}
+          >
+            ✅ Adicionar
           </button>
-          <button type="button" onClick={() => setShowAddAluno(false)} style={{ marginLeft: 8 }}>
-            Cancelar
+          <button 
+            type="button" 
+            onClick={() => setShowAddAluno(false)} 
+            style={{ 
+              backgroundColor: '#757575',
+              color: 'white',
+              padding: '10px 20px',
+              border: 'none',
+              borderRadius: '6px',
+              fontWeight: '600',
+              fontSize: '0.95rem',
+              cursor: 'pointer',
+              transition: 'all 0.2s'
+            }}
+            onMouseEnter={(e) => e.target.style.backgroundColor = '#616161'}
+            onMouseLeave={(e) => e.target.style.backgroundColor = '#757575'}
+          >
+            ❌ Cancelar
           </button>
         </form>
       )}
@@ -534,11 +626,21 @@ function CadastroTurmas({ centroId, styles }) {
             <button
               onClick={() => setShowAlunosModal(false)}
               style={{
-                marginTop: 16, background: '#1a237e', color: 'white', border: 'none',
-                borderRadius: 4, padding: '8px 16px', cursor: 'pointer'
+                marginTop: 16,
+                backgroundColor: '#1a237e',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                padding: '10px 20px',
+                fontWeight: '600',
+                fontSize: '0.95rem',
+                cursor: 'pointer',
+                transition: 'all 0.2s'
               }}
+              onMouseEnter={(e) => e.target.style.backgroundColor = '#0d47a1'}
+              onMouseLeave={(e) => e.target.style.backgroundColor = '#1a237e'}
             >
-              Fechar
+              ✅ Fechar
             </button>
           </div>
         </div>

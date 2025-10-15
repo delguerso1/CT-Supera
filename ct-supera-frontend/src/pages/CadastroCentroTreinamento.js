@@ -97,14 +97,22 @@ function CadastroCentroTreinamento({ styles }) {
         <button
           onClick={handleNovoCentro}
           style={{
-            ...styles.tab,
             backgroundColor: '#1a237e',
             color: 'white',
+            border: 'none',
+            borderRadius: '8px',
+            padding: '12px 24px',
+            fontSize: '1rem',
+            fontWeight: '600',
+            cursor: 'pointer',
             marginBottom: 16,
-            fontWeight: 600,
+            width: '100%',
+            transition: 'all 0.2s'
           }}
+          onMouseEnter={(e) => e.target.style.backgroundColor = '#0d47a1'}
+          onMouseLeave={(e) => e.target.style.backgroundColor = '#1a237e'}
         >
-          Cadastrar Novo Centro de Treinamento
+          ➕ Cadastrar Novo Centro de Treinamento
         </button>
       )}
 
@@ -146,15 +154,40 @@ function CadastroCentroTreinamento({ styles }) {
                 <td style={{ padding: 10, textAlign: 'center' }}>
                   <button
                     onClick={() => handleEdit(centro)}
-                    style={{ ...styles.tab, marginRight: 8 }}
+                    style={{
+                      backgroundColor: '#1a237e',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      padding: '8px 16px',
+                      fontSize: '0.9rem',
+                      fontWeight: '500',
+                      cursor: 'pointer',
+                      marginRight: 8,
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => e.target.style.backgroundColor = '#0d47a1'}
+                    onMouseLeave={(e) => e.target.style.backgroundColor = '#1a237e'}
                   >
-                    Editar
+                    ✏️ Editar
                   </button>
                   <button
                     onClick={() => handleDelete(centro.id)}
-                    style={{ ...styles.tab, backgroundColor: '#f44336', color: 'white' }}
+                    style={{
+                      backgroundColor: '#d32f2f',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      padding: '8px 16px',
+                      fontSize: '0.9rem',
+                      fontWeight: '500',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => e.target.style.backgroundColor = '#b71c1c'}
+                    onMouseLeave={(e) => e.target.style.backgroundColor = '#d32f2f'}
                   >
-                    Excluir
+                    🗑️ Excluir
                   </button>
                 </td>
               </tr>
@@ -247,15 +280,18 @@ function CadastroCentroTreinamento({ styles }) {
                 backgroundColor: '#1a237e',
                 color: 'white',
                 border: 'none',
-                borderRadius: 4,
-                padding: '10px 0',
-                fontWeight: 600,
+                borderRadius: '8px',
+                padding: '12px 24px',
                 fontSize: '1rem',
+                fontWeight: '600',
                 cursor: 'pointer',
-                flex: 1
+                flex: 1,
+                transition: 'all 0.2s'
               }}
+              onMouseEnter={(e) => e.target.style.backgroundColor = '#0d47a1'}
+              onMouseLeave={(e) => e.target.style.backgroundColor = '#1a237e'}
             >
-              {editId ? 'Salvar Alterações' : 'Cadastrar Centro de Treinamento'}
+              {editId ? '💾 Salvar Alterações' : '➕ Cadastrar Centro de Treinamento'}
             </button>
             <button
               type="button"
@@ -267,13 +303,21 @@ function CadastroCentroTreinamento({ styles }) {
                 setSuccess('');
               }}
               style={{
-                ...styles.tab,
-                backgroundColor: '#888',
+                backgroundColor: '#757575',
                 color: 'white',
-                flex: 1
+                border: 'none',
+                borderRadius: '8px',
+                padding: '12px 24px',
+                fontSize: '1rem',
+                fontWeight: '600',
+                cursor: 'pointer',
+                flex: 1,
+                transition: 'all 0.2s'
               }}
+              onMouseEnter={(e) => e.target.style.backgroundColor = '#616161'}
+              onMouseLeave={(e) => e.target.style.backgroundColor = '#757575'}
             >
-              Cancelar
+              ❌ Cancelar
             </button>
           </div>
         </form>
