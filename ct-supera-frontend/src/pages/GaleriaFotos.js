@@ -49,8 +49,9 @@ const styles = {
   photoImage: {
     width: '100%',
     height: '250px',
-    objectFit: 'cover',
+    objectFit: 'contain',
     cursor: 'pointer',
+    backgroundColor: '#f5f5f5',
   },
   photoContent: {
     padding: '1rem',

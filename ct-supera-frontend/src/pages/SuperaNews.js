@@ -50,7 +50,8 @@ const styles = {
   newsImage: {
     width: '100%',
     height: '200px',
-    objectFit: 'cover',
+    objectFit: 'contain',
+    backgroundColor: '#f5f5f5',
   },
   newsContent: {
     padding: '1.5rem',
