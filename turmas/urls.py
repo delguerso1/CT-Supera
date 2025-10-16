@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import ListaCriarTurmasAPIView, EditarExcluirTurmaAPIView, ListaAlunosTurmaAPIView, AdicionarAlunoAPIView, ListaDiasSemanaAPIView
+from .views import ListaCriarTurmasAPIView, EditarExcluirTurmaAPIView, ListaAlunosTurmaAPIView, AdicionarAlunoAPIView, RemoverAlunoAPIView, ListaDiasSemanaAPIView
 
 urlpatterns = [
     # Listar e criar turmas
@@ -13,6 +13,9 @@ urlpatterns = [
 
     # Adicionar alunos a uma turma
     path('<int:turma_id>/adicionar-alunos/', AdicionarAlunoAPIView.as_view(), name='adicionar_aluno_api'),
+
+    # Remover alunos de uma turma
+    path('<int:turma_id>/remover-alunos/', RemoverAlunoAPIView.as_view(), name='remover_aluno_api'),
 
     # Listar dias da semana
     path('diassemana/', ListaDiasSemanaAPIView.as_view(), name='lista_dias_semana_api'),

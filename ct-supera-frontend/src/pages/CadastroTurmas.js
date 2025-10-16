@@ -18,9 +18,11 @@ function CadastroTurmas({ centroId, styles }) {
   const [success, setSuccess] = useState('');
   const [centroNome, setCentroNome] = useState('');
   const [showAddAluno, setShowAddAluno] = useState(false);
+  const [showRemoveAluno, setShowRemoveAluno] = useState(false);
   const [turmaIdSelecionada, setTurmaIdSelecionada] = useState(null);
   const [selectedAlunos, setSelectedAlunos] = useState([]);
   const [alunosDisponiveis, setAlunosDisponiveis] = useState([]);
+  const [alunosTurmaParaRemover, setAlunosTurmaParaRemover] = useState([]);
   const [showAlunosModal, setShowAlunosModal] = useState(false);
   const [alunosTurma, setAlunosTurma] = useState([]);
   const [turmaModalNome, setTurmaModalNome] = useState('');
@@ -201,7 +203,21 @@ function CadastroTurmas({ centroId, styles }) {
 
   const handleShowAddAluno = (turmaId) => {
     setTurmaIdSelecionada(turmaId);
+    setSelectedAlunos([]);
     setShowAddAluno(true);
+  };
+
+  const handleShowRemoveAluno = async (turmaId) => {
+    try {
+      const response = await api.get(`turmas/${turmaId}/alunos/`);
+      setAlunosTurmaParaRemover(response.data.alunos);
+      setTurmaIdSelecionada(turmaId);
+      setSelectedAlunos([]);
+      setShowRemoveAluno(true);
+    } catch (error) {
+      setError('Erro ao buscar alunos da turma.');
+      setShowRemoveAluno(false);
+    }
   };
 
   const handleShowAlunosTurma = async (turmaId) => {
@@ -338,13 +354,29 @@ function CadastroTurmas({ centroId, styles }) {
                       cursor: 'pointer',
                       marginRight: '0.5rem',
                       fontSize: '0.9rem',
-                      backgroundColor: '#2196f3',
+                      backgroundColor: '#4caf50',
                       color: 'white',
                     }}
-                    onMouseEnter={(e) => e.target.style.backgroundColor = '#1976d2'}
-                    onMouseLeave={(e) => e.target.style.backgroundColor = '#2196f3'}
+                    onMouseEnter={(e) => e.target.style.backgroundColor = '#45a049'}
+                    onMouseLeave={(e) => e.target.style.backgroundColor = '#4caf50'}
                   >
-                    Adicionar Aluno
+                    + Aluno
+                  </button>
+                  <button
+                    onClick={() => handleShowRemoveAluno(turma.id)}
+                    style={{
+                      padding: '0.5rem 1rem',
+                      borderRadius: '4px',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontSize: '0.9rem',
+                      backgroundColor: '#ff9800',
+                      color: 'white',
+                    }}
+                    onMouseEnter={(e) => e.target.style.backgroundColor = '#f57c00'}
+                    onMouseLeave={(e) => e.target.style.backgroundColor = '#ff9800'}
+                  >
+                    - Aluno
                   </button>
                 </td>
               </tr>
@@ -526,20 +558,22 @@ function CadastroTurmas({ centroId, styles }) {
               });
               setShowAddAluno(false);
               setTurmaIdSelecionada(null);
+              setSelectedAlunos([]);
               setSuccess('Alunos adicionados com sucesso!');
               fetchTurmas();
             } catch (error) {
               setError(error.response?.data?.error || 'Erro ao adicionar alunos.');
             }
           }}
-          style={{ marginTop: 16, background: '#f5f5f5', padding: 16, borderRadius: 8 }}
+          style={{ marginTop: 16, background: '#e8f5e9', padding: 16, borderRadius: 8, border: '2px solid #4caf50' }}
         >
-          <label>Selecione os alunos:</label>
+          <h3 style={{ marginTop: 0, color: '#2e7d32' }}>➕ Adicionar Alunos à Turma</h3>
+          <label>Selecione os alunos: (segure Ctrl para selecionar múltiplos)</label>
           <select
             multiple
             value={selectedAlunos}
             onChange={e => setSelectedAlunos([...e.target.selectedOptions].map(opt => opt.value))}
-            style={{ width: '100%', marginBottom: 8 }}
+            style={{ width: '100%', marginBottom: 8, minHeight: '150px', padding: '8px' }}
           >
             {alunosDisponiveis.map(aluno => (
               <option key={aluno.id} value={aluno.id}>
@@ -566,21 +600,113 @@ function CadastroTurmas({ centroId, styles }) {
             Cancelar
           </button>
           <button 
-            type="submit" 
-            style={{ 
-              backgroundColor: '#1a237e', 
-              color: 'white', 
-              padding: '0.75rem 1.5rem', 
-              border: 'none', 
+            type="submit"
+            style={{
+              backgroundColor: '#4caf50',
+              color: 'white',
+              padding: '0.75rem 1.5rem',
+              border: 'none',
               borderRadius: '4px',
               fontSize: '1rem',
               cursor: 'pointer',
             }}
-            onMouseEnter={(e) => e.target.style.backgroundColor = '#151b60'}
-            onMouseLeave={(e) => e.target.style.backgroundColor = '#1a237e'}
+            onMouseEnter={(e) => e.target.style.backgroundColor = '#45a049'}
+            onMouseLeave={(e) => e.target.style.backgroundColor = '#4caf50'}
           >
             Adicionar
           </button>
+        </form>
+      )}
+
+      {showRemoveAluno && (
+        <form
+          onSubmit={async (e) => {
+            e.preventDefault();
+            if (selectedAlunos.length === 0) {
+              setError('Selecione pelo menos um aluno para remover.');
+              return;
+            }
+            
+            if (!window.confirm(`Tem certeza que deseja remover ${selectedAlunos.length} aluno(s) desta turma?`)) {
+              return;
+            }
+            
+            try {
+              await api.post(`turmas/${turmaIdSelecionada}/remover-alunos/`, {
+                alunos: selectedAlunos.map(Number)
+              });
+              setShowRemoveAluno(false);
+              setTurmaIdSelecionada(null);
+              setSelectedAlunos([]);
+              setAlunosTurmaParaRemover([]);
+              setSuccess('Alunos removidos com sucesso!');
+              fetchTurmas();
+            } catch (error) {
+              setError(error.response?.data?.error || 'Erro ao remover alunos.');
+            }
+          }}
+          style={{ marginTop: 16, background: '#fff3e0', padding: 16, borderRadius: 8, border: '2px solid #ff9800' }}
+        >
+          <h3 style={{ marginTop: 0, color: '#f57c00' }}>➖ Remover Alunos da Turma</h3>
+          {alunosTurmaParaRemover.length === 0 ? (
+            <div style={{ color: '#888', marginBottom: 16 }}>Esta turma não possui alunos.</div>
+          ) : (
+            <>
+              <label>Selecione os alunos para remover: (segure Ctrl para selecionar múltiplos)</label>
+              <select
+                multiple
+                value={selectedAlunos}
+                onChange={e => setSelectedAlunos([...e.target.selectedOptions].map(opt => opt.value))}
+                style={{ width: '100%', marginBottom: 8, minHeight: '150px', padding: '8px' }}
+              >
+                {alunosTurmaParaRemover.map(aluno => (
+                  <option key={aluno.id} value={aluno.id}>
+                    {aluno.first_name} {aluno.last_name} ({aluno.username})
+                  </option>
+                ))}
+              </select>
+            </>
+          )}
+          <button 
+            type="button" 
+            onClick={() => {
+              setShowRemoveAluno(false);
+              setSelectedAlunos([]);
+              setAlunosTurmaParaRemover([]);
+            }} 
+            style={{ 
+              backgroundColor: '#f5f5f5',
+              color: '#333',
+              padding: '0.75rem 1.5rem',
+              border: 'none',
+              borderRadius: '4px',
+              fontSize: '1rem',
+              cursor: 'pointer',
+              marginRight: 8,
+            }}
+            onMouseEnter={(e) => e.target.style.backgroundColor = '#e0e0e0'}
+            onMouseLeave={(e) => e.target.style.backgroundColor = '#f5f5f5'}
+          >
+            Cancelar
+          </button>
+          {alunosTurmaParaRemover.length > 0 && (
+            <button 
+              type="submit"
+              style={{
+                backgroundColor: '#ff9800',
+                color: 'white',
+                padding: '0.75rem 1.5rem',
+                border: 'none',
+                borderRadius: '4px',
+                fontSize: '1rem',
+                cursor: 'pointer',
+              }}
+              onMouseEnter={(e) => e.target.style.backgroundColor = '#f57c00'}
+              onMouseLeave={(e) => e.target.style.backgroundColor = '#ff9800'}
+            >
+              Remover
+            </button>
+          )}
         </form>
       )}
 

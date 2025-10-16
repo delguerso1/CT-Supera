@@ -101,6 +101,27 @@ class AdicionarAlunoAPIView(APIView):
         return Response({"message": "Alunos adicionados com sucesso!"}, status=status.HTTP_200_OK)
 
 
+class RemoverAlunoAPIView(APIView):
+    """API para remover alunos de uma turma."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, turma_id):
+        turma = get_object_or_404(Turma, id=turma_id)
+
+        alunos_ids = request.data.get("alunos", [])
+        if not alunos_ids:
+            return Response({"error": "Nenhum aluno foi fornecido."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Filtra apenas alunos do tipo "aluno"
+        alunos = Usuario.objects.filter(id__in=alunos_ids, tipo="aluno")
+        if not alunos.exists():
+            return Response({"error": "Nenhum aluno válido foi encontrado."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Remove os alunos da turma
+        turma.alunos.remove(*alunos)
+        return Response({"message": "Alunos removidos com sucesso!"}, status=status.HTTP_200_OK)
+
+
 class ListaDiasSemanaAPIView(APIView):
     """API para listar os dias da semana."""
     permission_classes = []  # Remove todas as permissões para permitir acesso livre
