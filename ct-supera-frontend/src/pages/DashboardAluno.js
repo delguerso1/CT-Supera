@@ -681,9 +681,13 @@ function DashboardAluno({ user }) {
       setFotoPerfil(null);
       setFotoPreview(null);
       
-      // Atualizar dados do aluno
+      // Atualizar dados do aluno com timestamp para forçar reload da imagem
       const resp = await api.get('alunos/painel-aluno/');
-      setAluno(resp.data.usuario);
+      const alunoAtualizado = {
+        ...resp.data.usuario,
+        _photoTimestamp: Date.now() // Cache-bust para forçar reload da foto
+      };
+      setAluno(alunoAtualizado);
       
     } catch (err) {
       console.error('Erro ao fazer upload da foto:', err);
@@ -840,7 +844,7 @@ function DashboardAluno({ user }) {
               color: '#1a237e',
               border: '3px solid #e0e0e0',
               overflow: 'hidden',
-              backgroundImage: aluno?.foto_perfil ? `url(${MEDIA_URL}${aluno.foto_perfil})` : 'none',
+              backgroundImage: aluno?.foto_perfil ? `url(${MEDIA_URL}${aluno.foto_perfil}?t=${aluno._photoTimestamp || Date.now()})` : 'none',
               backgroundSize: 'cover',
               backgroundPosition: 'center'
             }}>
@@ -1667,7 +1671,7 @@ function DashboardAluno({ user }) {
         <div style={styles.profileSection}>
           <div style={{
             ...styles.profilePhoto,
-            backgroundImage: aluno?.foto_perfil ? `url(http://72.60.145.13${aluno.foto_perfil})` : 'none',
+            backgroundImage: aluno?.foto_perfil ? `url(http://72.60.145.13${aluno.foto_perfil}?t=${aluno._photoTimestamp || Date.now()})` : 'none',
             backgroundSize: 'cover',
             backgroundPosition: 'center'
           }}>

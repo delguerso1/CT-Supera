@@ -466,8 +466,13 @@ function DashboardGerente({ user }) {
       setFotoPerfil(null);
       setFotoPreview(null);
       
-      // Atualizar dados do gerente
-      await fetchGerenteData();
+      // Atualizar dados do gerente com timestamp para forçar reload da imagem
+      const resp = await api.get(`usuarios/${gerente.id}/`);
+      const gerenteAtualizado = {
+        ...resp.data,
+        _photoTimestamp: Date.now() // Cache-bust para forçar reload da foto
+      };
+      setGerente(gerenteAtualizado);
       
     } catch (err) {
       console.error('Erro ao fazer upload da foto:', err);
@@ -649,7 +654,7 @@ function DashboardGerente({ user }) {
               color: '#1a237e',
               border: '3px solid #e0e0e0',
               overflow: 'hidden',
-              backgroundImage: gerente?.foto_perfil ? `url(${MEDIA_URL}${gerente.foto_perfil})` : 'none',
+              backgroundImage: gerente?.foto_perfil ? `url(${MEDIA_URL}${gerente.foto_perfil}?t=${gerente._photoTimestamp || Date.now()})` : 'none',
               backgroundSize: 'cover',
               backgroundPosition: 'center'
             }}>
@@ -971,7 +976,7 @@ function DashboardGerente({ user }) {
         <div style={styles.profileSection}>
           <div style={{
             ...styles.profilePhoto,
-            backgroundImage: gerente?.foto_perfil ? `url(http://72.60.145.13${gerente.foto_perfil})` : 'none',
+            backgroundImage: gerente?.foto_perfil ? `url(http://72.60.145.13${gerente.foto_perfil}?t=${gerente._photoTimestamp || Date.now()})` : 'none',
             backgroundSize: 'cover',
             backgroundPosition: 'center'
           }}>

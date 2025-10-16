@@ -471,9 +471,13 @@ function DashboardProfessor({ user }) {
       setFotoPerfil(null);
       setFotoPreview(null);
       
-      // Atualizar dados do professor
+      // Atualizar dados do professor com timestamp para forçar reload da imagem
       const resp = await api.get('funcionarios/painel-professor/');
-      setProfessor(resp.data);
+      const professorAtualizado = {
+        ...resp.data,
+        _photoTimestamp: Date.now() // Cache-bust para forçar reload da foto
+      };
+      setProfessor(professorAtualizado);
       
     } catch (err) {
       console.error('Erro ao fazer upload da foto:', err);
@@ -682,7 +686,7 @@ function DashboardProfessor({ user }) {
               color: '#1a237e',
               border: '3px solid #e0e0e0',
               overflow: 'hidden',
-              backgroundImage: professor?.foto_perfil ? `url(${MEDIA_URL}${professor.foto_perfil})` : 'none',
+              backgroundImage: professor?.foto_perfil ? `url(${MEDIA_URL}${professor.foto_perfil}?t=${professor._photoTimestamp || Date.now()})` : 'none',
               backgroundSize: 'cover',
               backgroundPosition: 'center'
             }}>
@@ -1086,7 +1090,7 @@ function DashboardProfessor({ user }) {
         <div style={styles.profileSection}>
           <div style={{
             ...styles.profilePhoto,
-            backgroundImage: professor?.foto_perfil ? `url(http://72.60.145.13${professor.foto_perfil})` : 'none',
+            backgroundImage: professor?.foto_perfil ? `url(http://72.60.145.13${professor.foto_perfil}?t=${professor._photoTimestamp || Date.now()})` : 'none',
             backgroundSize: 'cover',
             backgroundPosition: 'center'
           }}>
