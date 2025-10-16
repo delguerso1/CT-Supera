@@ -976,7 +976,7 @@ function DashboardGerente({ user }) {
         <div style={styles.profileSection}>
           <div style={{
             ...styles.profilePhoto,
-            backgroundImage: gerente?.foto_perfil ? `url(http://72.60.145.13${gerente.foto_perfil}?t=${gerente._photoTimestamp || Date.now()})` : 'none',
+            backgroundImage: gerente?.foto_perfil ? `url(${MEDIA_URL}${gerente.foto_perfil}?t=${gerente._photoTimestamp || Date.now()})` : 'none',
             backgroundSize: 'cover',
             backgroundPosition: 'center'
           }}>

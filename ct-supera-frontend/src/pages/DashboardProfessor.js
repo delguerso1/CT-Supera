@@ -1090,7 +1090,7 @@ function DashboardProfessor({ user }) {
         <div style={styles.profileSection}>
           <div style={{
             ...styles.profilePhoto,
-            backgroundImage: professor?.foto_perfil ? `url(http://72.60.145.13${professor.foto_perfil}?t=${professor._photoTimestamp || Date.now()})` : 'none',
+            backgroundImage: professor?.foto_perfil ? `url(${MEDIA_URL}${professor.foto_perfil}?t=${professor._photoTimestamp || Date.now()})` : 'none',
             backgroundSize: 'cover',
             backgroundPosition: 'center'
           }}>

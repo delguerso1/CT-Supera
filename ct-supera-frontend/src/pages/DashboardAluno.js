@@ -1671,7 +1671,7 @@ function DashboardAluno({ user }) {
         <div style={styles.profileSection}>
           <div style={{
             ...styles.profilePhoto,
-            backgroundImage: aluno?.foto_perfil ? `url(http://72.60.145.13${aluno.foto_perfil}?t=${aluno._photoTimestamp || Date.now()})` : 'none',
+            backgroundImage: aluno?.foto_perfil ? `url(${MEDIA_URL}${aluno.foto_perfil}?t=${aluno._photoTimestamp || Date.now()})` : 'none',
             backgroundSize: 'cover',
             backgroundPosition: 'center'
           }}>
