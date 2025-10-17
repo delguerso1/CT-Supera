@@ -43,12 +43,9 @@ const styles = {
     color: 'white',
     padding: '1rem 2rem',
     borderRadius: '4px',
-    textDecoration: 'none',
+    textDecoration: 'none !important',
     fontSize: '1.1rem',
     transition: 'background-color 0.3s',
-    '&:hover': {
-      backgroundColor: '#45a049',
-    },
   },
 };
 

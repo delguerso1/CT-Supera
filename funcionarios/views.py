@@ -156,7 +156,8 @@ class PainelGerenteAPIView(APIView):
             mensalidades_pendentes = Mensalidade.objects.filter(status="pendente").count()
             mensalidades_atrasadas = Mensalidade.objects.filter(status="atrasado").count()
             mensalidades_pagas = Mensalidade.objects.filter(status="pago").count()
-            precadastros = PreCadastro.objects.count()
+            # Conta apenas pré-cadastros pendentes (não matriculados)
+            precadastros = PreCadastro.objects.filter(status='pendente').count()
             turmas = Turma.objects.all()
 
             # Atividades recentes
@@ -227,11 +228,12 @@ class PainelGerenteAPIView(APIView):
 
 
 class ListarPrecadastrosAPIView(APIView):
-    """API para listar os pré-cadastros."""
+    """API para listar os pré-cadastros pendentes (não matriculados)."""
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        precadastros = PreCadastro.objects.all().order_by('-criado_em')
+        # Lista apenas pré-cadastros pendentes (não matriculados ou cancelados)
+        precadastros = PreCadastro.objects.filter(status='pendente').order_by('-criado_em')
         serializer = PreCadastroSerializer(precadastros, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 

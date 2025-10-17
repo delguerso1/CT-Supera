@@ -24,9 +24,12 @@ from calendar import monthrange
 logger = logging.getLogger(__name__)
 
 class ListarPrecadastrosAPIView(ListCreateAPIView):
-    """API para listar e criar pré-cadastros."""
-    queryset = PreCadastro.objects.all().order_by('-criado_em')  # Ordena do mais novo para o mais antigo
+    """API para listar e criar pré-cadastros. Lista apenas pré-cadastros pendentes."""
     serializer_class = PreCadastroSerializer
+
+    def get_queryset(self):
+        # Lista apenas pré-cadastros pendentes (não matriculados)
+        return PreCadastro.objects.filter(status='pendente').order_by('-criado_em')
 
     def get_permissions(self):
         if self.request.method == 'POST':

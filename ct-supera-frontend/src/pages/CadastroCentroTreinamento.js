@@ -140,7 +140,8 @@ function CadastroCentroTreinamento({ styles }) {
                     style={{
                       color: '#1a237e',
                       fontWeight: 600,
-                      cursor: 'pointer'
+                      cursor: 'pointer',
+                      textDecoration: 'none'
                     }}
                   >
                     {centro.nome}

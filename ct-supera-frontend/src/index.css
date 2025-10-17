@@ -11,3 +11,12 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
 }
+
+/* Remove sublinhado de todos os links */
+a {
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: none;
+}
