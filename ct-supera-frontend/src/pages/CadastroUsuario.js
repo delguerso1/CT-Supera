@@ -576,37 +576,52 @@ function CadastroUsuario({ onUserChange }) {
       </div>
 
       {/* Filtro por CT - apenas para alunos */}
-      {activeTab === 'alunos' && Array.isArray(centrosTreinamento) && centrosTreinamento.length > 0 && (
-        <div style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+      {activeTab === 'alunos' && (
+        <div style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
           <label style={{ fontWeight: '500', color: '#333' }}>
             Filtrar por Centro de Treinamento:
           </label>
-          <select
-            value={filtroCtSelecionado}
-            onChange={(e) => setFiltroCtSelecionado(e.target.value)}
-            style={{
-              ...styles.select,
-              minWidth: '250px',
-            }}
-          >
-            <option value="">Todos os CTs</option>
-            {Array.isArray(centrosTreinamento) && centrosTreinamento.map(ct => (
-              <option key={ct.id} value={ct.id}>
-                {ct.nome}
-              </option>
-            ))}
-          </select>
-          {filtroCtSelecionado && (
-            <button
-              onClick={() => setFiltroCtSelecionado('')}
-              style={{
-                ...styles.actionButton,
-                backgroundColor: '#757575',
-                padding: '0.5rem 1rem',
-              }}
-            >
-              Limpar Filtro
-            </button>
+          {Array.isArray(centrosTreinamento) && centrosTreinamento.length > 0 ? (
+            <>
+              <select
+                value={filtroCtSelecionado}
+                onChange={(e) => setFiltroCtSelecionado(e.target.value)}
+                style={{
+                  ...styles.select,
+                  minWidth: '250px',
+                }}
+              >
+                <option value="">Todos os CTs</option>
+                {centrosTreinamento.map(ct => (
+                  <option key={ct.id} value={ct.id}>
+                    {ct.nome}
+                  </option>
+                ))}
+              </select>
+              {filtroCtSelecionado && (
+                <button
+                  onClick={() => setFiltroCtSelecionado('')}
+                  style={{
+                    ...styles.actionButton,
+                    backgroundColor: '#757575',
+                    padding: '0.5rem 1rem',
+                  }}
+                >
+                  Limpar Filtro
+                </button>
+              )}
+            </>
+          ) : (
+            <span style={{ 
+              color: '#999', 
+              fontSize: '14px',
+              fontStyle: 'italic',
+              padding: '0.5rem',
+              backgroundColor: '#f5f5f5',
+              borderRadius: '4px'
+            }}>
+              Nenhum Centro de Treinamento cadastrado ainda
+            </span>
           )}
         </div>
       )}
