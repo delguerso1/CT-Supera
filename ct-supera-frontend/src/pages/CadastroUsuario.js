@@ -248,9 +248,13 @@ function CadastroUsuario({ onUserChange }) {
     const fetchCentros = async () => {
       try {
         const response = await api.get('ct/');
-        setCentrosTreinamento(response.data);
+        console.log('[DEBUG] Resposta centros de treinamento:', response.data);
+        // Garante que sempre será um array
+        const centros = Array.isArray(response.data) ? response.data : [];
+        setCentrosTreinamento(centros);
       } catch (error) {
         console.error('[DEBUG] Erro ao carregar centros de treinamento:', error);
+        setCentrosTreinamento([]);
       }
     };
     fetchCentros();
@@ -511,7 +515,7 @@ function CadastroUsuario({ onUserChange }) {
     }
     
     return users.filter(user => {
-      if (!user.centros_treinamento || user.centros_treinamento.length === 0) {
+      if (!Array.isArray(user.centros_treinamento) || user.centros_treinamento.length === 0) {
         return false;
       }
       return user.centros_treinamento.some(ct => ct.id === parseInt(filtroCtSelecionado));
@@ -572,7 +576,7 @@ function CadastroUsuario({ onUserChange }) {
       </div>
 
       {/* Filtro por CT - apenas para alunos */}
-      {activeTab === 'alunos' && centrosTreinamento.length > 0 && (
+      {activeTab === 'alunos' && Array.isArray(centrosTreinamento) && centrosTreinamento.length > 0 && (
         <div style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
           <label style={{ fontWeight: '500', color: '#333' }}>
             Filtrar por Centro de Treinamento:
@@ -586,7 +590,7 @@ function CadastroUsuario({ onUserChange }) {
             }}
           >
             <option value="">Todos os CTs</option>
-            {centrosTreinamento.map(ct => (
+            {Array.isArray(centrosTreinamento) && centrosTreinamento.map(ct => (
               <option key={ct.id} value={ct.id}>
                 {ct.nome}
               </option>
@@ -639,7 +643,7 @@ function CadastroUsuario({ onUserChange }) {
                 <td style={styles.td}>{user.telefone}</td>
                 {activeTab === 'alunos' && (
                   <td style={styles.td}>
-                    {user.centros_treinamento && user.centros_treinamento.length > 0
+                    {Array.isArray(user.centros_treinamento) && user.centros_treinamento.length > 0
                       ? user.centros_treinamento.map(ct => ct.nome).join(', ')
                       : 'Nenhum CT vinculado'}
                   </td>
