@@ -184,6 +184,8 @@ function CadastroUsuario({ onUserChange }) {
   const [valorMensalidadeNovo, setValorMensalidadeNovo] = useState('');
   const [salarioProfessor, setSalarioProfessor] = useState('');
   const [pixProfessor, setPixProfessor] = useState('');
+  const [centrosTreinamento, setCentrosTreinamento] = useState([]);
+  const [filtroCtSelecionado, setFiltroCtSelecionado] = useState('');
 
   // Defina fetchUsers usando useCallback
   const fetchUsers = useCallback(async () => {
@@ -240,6 +242,19 @@ function CadastroUsuario({ onUserChange }) {
     console.log('[DEBUG] useEffect disparado, tab:', activeTab);
     fetchUsers();
   }, [fetchUsers, activeTab]);
+
+  // Buscar centros de treinamento para o filtro
+  useEffect(() => {
+    const fetchCentros = async () => {
+      try {
+        const response = await api.get('ct/');
+        setCentrosTreinamento(response.data);
+      } catch (error) {
+        console.error('[DEBUG] Erro ao carregar centros de treinamento:', error);
+      }
+    };
+    fetchCentros();
+  }, []);
 
   const calcularIdade = (dataNascimento) => {
     if (!dataNascimento) return null;
@@ -475,6 +490,34 @@ function CadastroUsuario({ onUserChange }) {
     }
   };
 
+  const handleReenviarAtivacao = async (userId) => {
+    try {
+      setError('');
+      setSuccess('');
+      const response = await api.post(`usuarios/reenviar-convite/${userId}/`);
+      if (response.data.message) {
+        setSuccess(response.data.message);
+      }
+    } catch (error) {
+      console.error('[DEBUG] Erro ao reenviar convite:', error);
+      setError(error.response?.data?.error || 'Erro ao reenviar convite de ativação. Tente novamente.');
+    }
+  };
+
+  // Função para filtrar usuários por CT
+  const getFilteredUsers = () => {
+    if (!filtroCtSelecionado || activeTab !== 'alunos') {
+      return users;
+    }
+    
+    return users.filter(user => {
+      if (!user.centros_treinamento || user.centros_treinamento.length === 0) {
+        return false;
+      }
+      return user.centros_treinamento.some(ct => ct.id === parseInt(filtroCtSelecionado));
+    });
+  };
+
   return (
     <div style={styles.container}>
       <div style={styles.header}>
@@ -528,6 +571,42 @@ function CadastroUsuario({ onUserChange }) {
         </button>
       </div>
 
+      {/* Filtro por CT - apenas para alunos */}
+      {activeTab === 'alunos' && centrosTreinamento.length > 0 && (
+        <div style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <label style={{ fontWeight: '500', color: '#333' }}>
+            Filtrar por Centro de Treinamento:
+          </label>
+          <select
+            value={filtroCtSelecionado}
+            onChange={(e) => setFiltroCtSelecionado(e.target.value)}
+            style={{
+              ...styles.select,
+              minWidth: '250px',
+            }}
+          >
+            <option value="">Todos os CTs</option>
+            {centrosTreinamento.map(ct => (
+              <option key={ct.id} value={ct.id}>
+                {ct.nome}
+              </option>
+            ))}
+          </select>
+          {filtroCtSelecionado && (
+            <button
+              onClick={() => setFiltroCtSelecionado('')}
+              style={{
+                ...styles.actionButton,
+                backgroundColor: '#757575',
+                padding: '0.5rem 1rem',
+              }}
+            >
+              Limpar Filtro
+            </button>
+          )}
+        </div>
+      )}
+
       {error && <div style={styles.error}>{error}</div>}
       {success && <div style={styles.success}>{success}</div>}
 
@@ -543,12 +622,14 @@ function CadastroUsuario({ onUserChange }) {
               <th style={styles.th}>CPF</th>
               <th style={styles.th}>E-mail</th>
               <th style={styles.th}>Telefone</th>
+              {activeTab === 'alunos' && <th style={styles.th}>Centro(s) de Treinamento</th>}
+              {activeTab === 'alunos' && <th style={styles.th}>Status</th>}
               {activeTab === 'precadastros' && <th style={styles.th}>Status</th>}
               <th style={styles.th}>Ações</th>
             </tr>
           </thead>
           <tbody>
-            {users.map(user => (
+            {getFilteredUsers().map(user => (
               <tr key={user.id}>
                 <td style={styles.td}>
                   {`${user.first_name} ${user.last_name || ''}`.trim()}
@@ -556,6 +637,27 @@ function CadastroUsuario({ onUserChange }) {
                 <td style={styles.td}>{user.cpf || user.username}</td>
                 <td style={styles.td}>{user.email}</td>
                 <td style={styles.td}>{user.telefone}</td>
+                {activeTab === 'alunos' && (
+                  <td style={styles.td}>
+                    {user.centros_treinamento && user.centros_treinamento.length > 0
+                      ? user.centros_treinamento.map(ct => ct.nome).join(', ')
+                      : 'Nenhum CT vinculado'}
+                  </td>
+                )}
+                {activeTab === 'alunos' && (
+                  <td style={styles.td}>
+                    <span style={{
+                      padding: '4px 12px',
+                      borderRadius: '12px',
+                      fontSize: '12px',
+                      fontWeight: 'bold',
+                      backgroundColor: user.is_active ? '#e8f5e9' : '#ffebee',
+                      color: user.is_active ? '#2e7d32' : '#c62828',
+                    }}>
+                      {user.is_active ? 'Ativo' : 'Inativo'}
+                    </span>
+                  </td>
+                )}
                 {activeTab === 'precadastros' && (
                   <td style={styles.td}>{user.status || '-'}</td>
                 )}
@@ -578,6 +680,19 @@ function CadastroUsuario({ onUserChange }) {
                       onClick={() => handleConvertPreCadastro(user.id)}
                     >
                       Matricular
+                    </button>
+                  )}
+                  {activeTab === 'alunos' && !user.is_active && user.email && user.email !== 'pendente' && (
+                    <button
+                      style={{ 
+                        ...styles.actionButton,
+                        backgroundColor: '#ff9800',
+                        color: 'white',
+                      }}
+                      onClick={() => handleReenviarAtivacao(user.id)}
+                      title="Reenviar e-mail de ativação da conta"
+                    >
+                      ✉️ Reenviar Ativação
                     </button>
                   )}
                 </td>

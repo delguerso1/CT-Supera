@@ -26,16 +26,18 @@ def validar_senha_serializer(senha):
 class UsuarioSerializer(serializers.ModelSerializer):
     nome_completo = serializers.SerializerMethodField()
     tipo_display = serializers.SerializerMethodField()
+    centros_treinamento = serializers.SerializerMethodField()
 
     class Meta:
         model = Usuario
         fields = [
             'id', 'username', 'email', 'first_name', 'last_name',
             'tipo', 'tipo_display', 'nome_completo', 'telefone',
-            'endereco', 'data_nascimento', 'ativo',
+            'endereco', 'data_nascimento', 'ativo', 'is_active',
             'dia_vencimento', 'valor_mensalidade', 'cpf',
             'nome_responsavel', 'telefone_responsavel', 'telefone_emergencia',
             'ficha_medica', 'salario_professor', 'pix_professor', 'foto_perfil',
+            'centros_treinamento',
             # Campos do PAR-Q
             'parq_question_1', 'parq_question_2', 'parq_question_3', 'parq_question_4',
             'parq_question_5', 'parq_question_6', 'parq_question_7',
@@ -57,6 +59,18 @@ class UsuarioSerializer(serializers.ModelSerializer):
             'gerente': 'Gerente'
         }
         return tipos.get(obj.tipo, obj.tipo)
+    
+    def get_centros_treinamento(self, obj):
+        """Retorna os Centros de Treinamento vinculados ao usuário (alunos através de turmas, professores através de turmas que lecionam)"""
+        if obj.tipo == 'aluno':
+            # Busca CTs através das turmas do aluno
+            cts = obj.turmas_aluno.select_related('ct').values('ct__id', 'ct__nome').distinct()
+            return [{'id': ct['ct__id'], 'nome': ct['ct__nome']} for ct in cts]
+        elif obj.tipo == 'professor':
+            # Busca CTs através das turmas que o professor leciona
+            cts = obj.turmas.select_related('ct').values('ct__id', 'ct__nome').distinct()
+            return [{'id': ct['ct__id'], 'nome': ct['ct__nome']} for ct in cts]
+        return []
 
     def to_representation(self, instance):
         representation = super().to_representation(instance)
