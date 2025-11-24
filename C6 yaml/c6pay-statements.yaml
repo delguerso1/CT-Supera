@@ -1,0 +1,535 @@
+openapi: 3.0.3
+info:
+  title: Transações e Recebíveis C6 Pay
+  description: >-
+    ## O que é?
+
+    A API de Transações e Recebíveis C6 Pay é um serviço que entrega informações detalhadas sobre todo o financeiro C6 Pay.
+
+    ## O que esta API permite?
+
+    Esta API permite a consulta do extrato eletrônico de transações realizadas por um cliente C6 Pay, utilizando datas como elementos de filtragem.
+    Com ela é possível acessar detalhes completos sobre ajustes (a débito e crédito), chargebacks (e reversões de chargeback), efeitos de contrato, recebíveis, transações (e cancelamentos) em um período ou data específica, proporcionando uma visão detalhada dos movimentos financeiros em produtos C6 Pay.
+
+    Os métodos disponíveis na API são:
+
+    > [Consultar recebíveis](c6pay-statements#tag/statements/GET/receivables)
+
+
+    > [Consultar transações](c6pay-statements#tag/statements/GET/transactions)
+
+
+    Você também pode navegar facilmente pelo menu lateral.  No menu, é possível explorar os diferentes métodos
+    da API e, na seção de Models, você pode aprender mais sobre os schemas utilizados em cada método.
+
+    ## Endereços dos ambientes:
+
+
+    | Ambiente | Host                                 | Path                   |
+
+    |:--------:|------------------------------------- |------------------------|
+
+    | Sandbox  | https://baas-api-sandbox.c6bank.info | /v1/c6pay/statement/ |
+
+    | Produção | https://baas-api.c6bank.info         | /v1/c6pay/statement/ |
+
+
+    ## Informações úteis:
+
+    - [Termos de uso (ao usar essa API você concorda com estes termos)](https://www.c6bank.com.br/termos-de-uso/)
+
+    - [Saiba mais sobre o C6 Bank](https://www.c6bank.com)
+
+    - [Saiba mais sobre esse produto C6 Bank](https://www.c6bank.com.br/maquininha-de-cartao-c6-pay/)
+
+  version: 1.0.6
+paths:
+
+  /receivables:
+    get:
+      tags:
+        - statements
+      summary: >-
+        Consultar recebíveis.
+      description: Obtém o extrato dos recebívies agendados ou liquidados para uma data ou dentro do período solicitado, no momento a API permite consultar períodos de até 60 dias por requisição.
+      parameters:
+        - $ref: '#/components/parameters/PartnerSoftwareName'
+        - $ref: '#/components/parameters/PartnerSoftwareVersion'
+        - $ref: '#/components/parameters/Authorization'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/StartDate'
+        - $ref: '#/components/parameters/EndDate'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  page:
+                    $ref: '#/components/schemas/page'
+                  last_page:
+                    $ref: '#/components/schemas/last_page'
+                  items:
+                    $ref: '#/components/schemas/items'
+                  receivables:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/receivable'
+
+        4XX:
+          description: Para descrição de erros visite a <a href="https://developers.c6bank.com.br/apis/errors">documentação correspondente</a>.
+        5XX:
+          description: Para descrição de erros visite a <a href="https://developers.c6bank.com.br/apis/errors">documentação correspondente</a>.
+
+  /transactions:
+    get:
+      tags:
+        - statements
+      summary: >-
+        Consultar transações.
+      description: Obtém o extrato das transações e cancelamentos realizados numa data ou dentro do período solicitado.
+      parameters:
+        - $ref: '#/components/parameters/PartnerSoftwareName'
+        - $ref: '#/components/parameters/PartnerSoftwareVersion'
+        - $ref: '#/components/parameters/Authorization'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/StartDate'
+        - $ref: '#/components/parameters/EndDate'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  page:
+                    $ref: '#/components/schemas/page'
+                  last-page:
+                    $ref: '#/components/schemas/last_page'
+                  items:
+                    $ref: '#/components/schemas/items'
+                  transactions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/transaction'
+
+        4XX:
+          description: Para descrição de erros visite a <a href="https://developers.c6bank.com.br/apis/errors">documentação correspondente</a>.
+        5XX:
+          description: Para descrição de erros visite a <a href="https://developers.c6bank.com.br/apis/errors">documentação correspondente</a>.
+
+servers:
+  - url: 'https://baas-api-sandbox.c6bank.info/v1/c6pay/statement'
+    description: Ambiente sandbox
+  - url: 'https://baas-api.c6bank.info/v1/c6pay/statement'
+    description: Ambiente produtivo
+
+components:
+  parameters:
+    Authorization:
+      in: header
+      name: Authorization
+      required: true
+      schema:
+        title: Authorization
+        type: string
+        format: string
+        example: "Bearer {your_acess_token}"
+        description: Token de autorização.
+    PartnerSoftwareName:
+      in: header
+      name: partner-software-name
+      description: Nome do software do parceiro
+      schema:
+        type: string
+      required: false
+      example: "Super PDV"
+    PartnerSoftwareVersion:
+      in: header
+      name: partner-software-version
+      description: Versão do software do parceiro
+      schema:
+        type: string
+      required: false
+      example: "1.0.0"
+    Page:
+      in: query
+      name: page
+      description: >-
+        Parâmetro para a escolha da quantidade de páginas a serem retornadas no Body Response.
+      schema:
+        type: integer
+      required: true
+      example: 1
+    StartDate:
+      in: query
+      name: start_date
+      description: Data de início do período na consulta.
+      schema:
+        type: string
+      required: true
+      example: 'YYYY-MM-DD'
+    EndDate:
+      in: query
+      name: end_date
+      description: Data de término do período na consulta. Se não informado, é automaticamente replicada a data inicial (start_date).
+      schema:
+        type: string
+      required: false
+      example: 'YYYY-MM-DD'
+    Size:
+      in: query
+      name: size
+      description: Tamanho da página no body response.
+      schema:
+        type: integer
+      required: false
+      example: 200
+    Date:
+      in: path
+      name: date
+      description: Data em que a transação foi feita.
+      schema:
+        type: string
+      required: true
+      example: 'YYYY-MM-DD'
+  schemas:
+    account_agency:
+      type: string
+      example: 1234
+      description: Número da agência bancária (Campo apresentado apenas quando o recebível já foi enviado para pagamento/pago).
+    account_bank:
+      type: integer
+      example: 336
+      description: Código que identifica o banco (Campo apresentado apenas quando o recebível já foi enviado para pagamento/pago).
+    account_number:
+      type: integer
+      example: 1
+      description: Número da conta bancária (Campo apresentado apenas quando o recebível já foi enviado para pagamento/pago).
+    amount:
+      type: number
+      example: 123.45
+      description: Define o valor original da transação.
+    authorization_code:
+      type: string
+      example: '00001'
+      description: Código de autorização da transação.
+    authorizer_reference:
+      type: string
+      example: '00001'
+      description: Código de referência da transação para o autorizador. Também conhecido como NSU ou TID.
+    brand_name:
+      type: string
+      example: MASTERCARD
+      description: Nome da bandeira do cartão que foi feito a transação.
+    card_bin:
+      type: string
+      example: 462345
+      description: BIN (Bank Identification Number - 6 primeiros dígitos) do número do cartão.
+    card_entry_mode:
+      type: string
+      example: Contacless
+      description: Indica o modo pelo qual o pagamento com cartão foi realizado.
+    card_holder_name:
+      type: string
+      example: Jose da Silva
+      description: Nome do titular do cartão.
+    card_number:
+      type: string
+      example: 000000******0000
+      description: Número do cartão que foi feito a transação.
+    currency_code:
+      type: string
+      example: BRL
+      description: Código da moeda da transação.
+    date_time:
+      description: "Data e hora da transação"
+      type: string
+      example: '2024-08-16T13:18:05.802Z'
+    discount:
+      type: number
+      example: -2.35
+      description: Desconto total aplicado ao recebível (fee + mdr).
+    expected_date:
+      type: string
+      example: '2021-12-17'
+      description: Data esperada para o pagamento da transação.
+    fee:
+      type: number
+      example: -0.22
+      description: >-
+        Tarifa de processamento da transação.
+    fraud_analysis_recommendation:
+      type: string
+      example: APPROVE
+      enum:
+        - APPROVE
+        - DENY
+      description: É a recomendação do antifraude após análise da transação.
+    gross_amount:
+      type: number
+      example: 202.45
+      description: Valor bruto do recebível.
+    id:
+      type: string
+      example: 31f50f80-a0b8-4167-811f-9a1974b2932e
+      description: Identificador da transação ou do recebível.
+    installment_number:
+      type: number
+      example: 1
+      description: Parcela da transação a qual o recebível se refere.
+    installments:
+      type: number
+      example: 1
+      description: Quantidade de parcelas da transação.
+    interest_type:
+      type: string
+      example: SINGLE
+      readOnly: true
+      description: Tipo do parcelamento.
+      enum:
+        - "SINGLE"
+        - "MERCHANT"
+        - "ISSUER"
+    last_page:
+      type: integer
+      example: 2
+      readOnly: true
+      description: >-
+        Quantidade de páginas retornadas pela API no body response
+    items:
+      type: integer
+      example: 1
+      readOnly: true
+      description: >-
+        Quantidade de itens retornados no objeto.
+    local_reference:
+      description: "Identificador local da transação."
+      type: string
+      example: "123456"
+    mdr:
+      type: number
+      example: 2
+      description: >-
+        Taxa de desconto do negociante. Valor cobrado dos negociantes pelas
+        adquirentes durante   o processamento de pagamentos via cartão de
+        crédito e débito.
+    net_amount:
+      type: number
+      example: 200
+      description: Valor liquido do recebível.
+    origin:
+      type: string
+      example: PAYMENT_TERMINAL
+      description: Informa o dispositivo de captura de origem da transação.
+      enum:
+        - PAYGO
+        - PAYMENT_TERMINAL
+        - CHECKOUT
+        - TAP_ON_PHONE
+    page:
+      type: integer
+      example: 1
+      readOnly: true
+      description: Página atual em que a consulta do extrato está.
+    payment_date:
+      type: string
+      format: date
+      example: '2025-11-25'
+      description: Data de pagamento do recebível.
+    payment_type:
+      type: string
+      example: CREDIT
+      readOnly: true
+      description: Tipo do pagamento.
+      enum:
+        - "CREDIT"
+        - "DEBIT"
+        - "VOUCHER"
+        - "PIX"
+    block_type:
+      type: string
+      example: 'LEGAL'
+      description: Motivo do bloqueio do recebível
+      enum:
+        - 'INVALID_PAYMENT_DATA'
+        - 'RISK'
+        - 'NONE'
+    receivable:
+      type: object
+      readOnly: true
+      properties:
+        local_reference:
+          $ref: '#/components/schemas/local_reference'
+        account_agency:
+          $ref: '#/components/schemas/account_agency'
+        account_bank:
+          $ref: '#/components/schemas/account_bank'
+        account_number:
+          $ref: '#/components/schemas/account_number'
+        authorization_code:
+          $ref: '#/components/schemas/authorization_code'
+        authorizer_reference:
+          $ref: '#/components/schemas/authorizer_reference'
+        block_type:
+          $ref: '#/components/schemas/block_type'
+        brand_name:
+          $ref: '#/components/schemas/brand_name'
+        card_number:
+          $ref: '#/components/schemas/card_number'
+        expected_date:
+          $ref: '#/components/schemas/expected_date'
+        receivable_id:
+          $ref: '#/components/schemas/id'
+        installment_number:
+          $ref: '#/components/schemas/installment_number'
+        installments:
+          $ref: '#/components/schemas/installments'
+        interest_type:
+          $ref: '#/components/schemas/interest_type'
+        gross_amount:
+          $ref: '#/components/schemas/gross_amount'
+        fee:
+          $ref: '#/components/schemas/fee'
+        mdr:
+          $ref: '#/components/schemas/mdr'
+        discount:
+          $ref: '#/components/schemas/discount'
+        net_amount:
+          $ref: '#/components/schemas/net_amount'
+        payment_date:
+          $ref: '#/components/schemas/payment_date'
+        payment_type:
+          $ref: '#/components/schemas/payment_type'
+        transaction_date_time:
+          $ref: '#/components/schemas/date_time'
+        transaction_id:
+          $ref: '#/components/schemas/id'
+        type:
+          $ref: '#/components/schemas/type'
+        status:
+          $ref: '#/components/schemas/status_receivable'
+        origin:
+          $ref: '#/components/schemas/origin'
+
+    status:
+      type: string
+      example: AUTHORIZED
+      readOnly: true
+      description: Status da transação.
+      enum:
+        - "IN PROGRESS"
+        - "AUTHORIZED, CONFIRMATION PENDING"
+        - "CONFIRMATION REQUESTED"
+        - "PAID"
+        - "CANCELLATION REQUESTED"
+        - "CANCELLED"
+        - "DECLINED"
+        - "EXPIRED"
+    status_receivable:
+      type: string
+      example: PAYMENT_APPROVED
+      readOnly: true
+      description: Status do recebível.
+      enum:
+        - "PAYMENT_APPROVED"
+        - "PAYMENT_REPROVED"
+        - "SCHEDULED"
+        - "BLOCKED"
+        - "CANCELED"
+        - "PAYMENT_PENDING"
+    contract_effect_owner:
+      type: string
+      example: '31.872.495/0001-72'
+      description: CNPJ da instituição financeira detentora do efeito de contrato.
+
+    transaction:
+      type: object
+      readOnly: true
+      properties:
+        amount:
+          $ref: '#/components/schemas/amount'
+        authorization_code:
+          $ref: '#/components/schemas/authorization_code'
+        authorizer_reference:
+          $ref: '#/components/schemas/authorizer_reference'
+        brand_name:
+          $ref: '#/components/schemas/brand_name'
+        card_bin:
+          $ref: '#/components/schemas/card_bin'
+        card_entry_mode:
+          $ref: '#/components/schemas/card_entry_mode'
+        card_holder_name:
+          $ref: '#/components/schemas/card_holder_name'
+        card_number:
+          $ref: '#/components/schemas/card_number'
+        currency_code:
+          $ref: '#/components/schemas/currency_code'
+        date_time:
+          $ref: '#/components/schemas/date_time'
+        fraud_analysis_recommendation:
+          $ref: '#/components/schemas/fraud_analysis_recommendation'
+        id:
+          $ref: '#/components/schemas/id'
+        installments:
+          $ref: '#/components/schemas/installments'
+        interest_type:
+          $ref: '#/components/schemas/interest_type'
+        local_reference:
+          $ref: '#/components/schemas/local_reference'
+        origin:
+          $ref: '#/components/schemas/origin'
+        payment_type:
+          $ref: '#/components/schemas/payment_type'
+        status:
+          $ref: '#/components/schemas/status'
+        terminal_id:
+          $ref: '#/components/schemas/terminal_id'
+    terminal_id:
+      type: string
+      example: 3243599
+      description: Id do terminal (Id do ponto de captura).
+    type:
+      type: string
+      example: SALE
+      description: Tipo do recebível.
+      enum:
+        - "SALE"
+        - "REFUND"
+        - "ADJUST_CREDIT"
+        - "ADJUST_DEBIT"
+        - "POINT_OF_SALE_RENT"
+        - "MEMBERSHIP_TAX"
+        - "REVERSAL_PAYMENT"
+        - "CASHBACK_CREDIT_CAMPAIGN"
+        - "TAX_CORRECTION"
+        - "SALE_CANCELLATION"
+        - "REVERSAL_SALE_CANCELLATION"
+        - "PARTIAL_SALE_CANCELLATION"
+        - "CHARGEBACK"
+        - "WITHDRAWAL_COMMISSION"
+        - "DUPLICATED_PAYMENT"
+        - "DEBIT_BALANCE_COMPENSATION"
+        - "REVERSAL_POINT_OF_SALE_RENT"
+        - "CHANCE_RECEIVING_PLAN"
+        - "TRANSACTION_OVER_12_INSTALLMENTS"
+        - "TRANSACTION_FOR"
+        - "PIX_BILLING"
+        - "RECEIVABLES ANTICIPATION"
+        - "CREDIT GRANTING"
+        - "ONUS_OTHERS"
+        - "COURT_BLOCK"
+        - "ASSIGNMENT_PROMISE"
+  securitySchemes:
+    OAuth2:
+      type: oauth2
+      flows:
+        clientCredentials:
+          tokenUrl: 'https://baas-api-sandbox.c6bank.info/v1/auth'
+          scopes:
+            'receivable.read': consultar recebíveis e transações

@@ -13,7 +13,7 @@ const styles = {
   },
   title: {
     fontSize: '2.5rem',
-    color: '#1a237e',
+    color: '#1F6C86',
     marginBottom: '1rem',
   },
   subtitle: {
@@ -21,7 +21,7 @@ const styles = {
     color: '#555',
   },
   addButton: {
-    backgroundColor: '#1a237e',
+    backgroundColor: '#1F6C86',
     color: 'white',
     border: 'none',
     padding: '0.75rem 1.5rem',
@@ -58,7 +58,7 @@ const styles = {
   },
   photoTitle: {
     fontSize: '1.1rem',
-    color: '#1a237e',
+    color: '#1F6C86',
     marginBottom: '0.5rem',
     fontWeight: '600',
   },
@@ -119,7 +119,7 @@ const styles = {
   },
   modalTitle: {
     fontSize: '1.8rem',
-    color: '#1a237e',
+    color: '#1F6C86',
     marginBottom: '1.5rem',
   },
   formGroup: {
@@ -155,7 +155,7 @@ const styles = {
     justifyContent: 'flex-end',
   },
   submitButton: {
-    backgroundColor: '#1a237e',
+    backgroundColor: '#1F6C86',
     color: 'white',
     border: 'none',
     padding: '0.75rem 1.5rem',

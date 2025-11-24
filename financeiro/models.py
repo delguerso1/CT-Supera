@@ -77,7 +77,7 @@ class TransacaoPix(models.Model):
     data_criacao = models.DateTimeField(auto_now_add=True)
     data_expiracao = models.DateTimeField()
     data_aprovacao = models.DateTimeField(null=True, blank=True)
-    identificador_externo = models.CharField(max_length=100, unique=True)  # ID da transação no Mercado Pago
+    identificador_externo = models.CharField(max_length=100, unique=True)  # ID da transação externa
 
     def __str__(self):
         return f"PIX {self.identificador_externo} - {self.mensalidade.aluno.get_full_name()}"
@@ -102,8 +102,8 @@ class TransacaoBancaria(models.Model):
     data_criacao = models.DateTimeField(auto_now_add=True)
     data_expiracao = models.DateTimeField()
     data_aprovacao = models.DateTimeField(null=True, blank=True)
-    identificador_externo = models.CharField(max_length=100, unique=True)  # ID da transação no Mercado Pago
-    preference_id = models.CharField(max_length=100, blank=True, null=True)  # ID da preferência no Mercado Pago
+    identificador_externo = models.CharField(max_length=100, unique=True)  # ID da transação externa
+    preference_id = models.CharField(max_length=100, blank=True, null=True)  # ID da preferência externa
     payment_url = models.URLField(blank=True, null=True)  # URL de pagamento
     metodo_pagamento = models.CharField(max_length=50, blank=True, null=True)  # Cartão de crédito, débito, etc.
 
@@ -113,3 +113,62 @@ class TransacaoBancaria(models.Model):
     class Meta:
         verbose_name = "Transação Bancária"
         verbose_name_plural = "Transações Bancárias"
+
+
+class TransacaoC6Bank(models.Model):
+    """
+    Modelo para transações específicas do C6 Bank
+    """
+    STATUS_CHOICES = [
+        ('pendente', 'Pendente'),
+        ('aprovado', 'Aprovado'),
+        ('rejeitado', 'Rejeitado'),
+        ('expirado', 'Expirado'),
+        ('processando', 'Processando'),
+        ('cancelado', 'Cancelado')
+    ]
+    
+    TIPO_CHOICES = [
+        ('pix', 'PIX'),
+        ('boleto', 'Boleto'),
+        ('cartao', 'Cartão de Crédito/Débito'),
+        ('transferencia', 'Transferência Bancária')
+    ]
+
+    mensalidade = models.ForeignKey(Mensalidade, on_delete=models.CASCADE, related_name='transacoes_c6')
+    tipo = models.CharField(max_length=20, choices=TIPO_CHOICES, default='pix')
+    valor = models.DecimalField(max_digits=10, decimal_places=2)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pendente')
+    
+    # Dados específicos do C6 Bank
+    txid = models.CharField(max_length=100, unique=True, blank=True, null=True)  # ID da transação no C6 Bank
+    chave_pix = models.CharField(max_length=100, blank=True, null=True)  # Chave PIX do recebedor
+    qr_code = models.TextField(blank=True, null=True)  # QR Code em base64
+    codigo_pix = models.TextField(blank=True, null=True)  # Código PIX copia e cola
+    
+    # URLs e dados de pagamento
+    payment_url = models.URLField(blank=True, null=True)  # URL de pagamento
+    boleto_url = models.URLField(blank=True, null=True)  # URL do boleto
+    boleto_codigo = models.CharField(max_length=100, blank=True, null=True)  # Código do boleto
+    
+    # Timestamps
+    data_criacao = models.DateTimeField(auto_now_add=True)
+    data_expiracao = models.DateTimeField()
+    data_aprovacao = models.DateTimeField(null=True, blank=True)
+    data_cancelamento = models.DateTimeField(null=True, blank=True)
+    
+    # Dados adicionais
+    descricao = models.TextField(blank=True, null=True)
+    observacoes = models.TextField(blank=True, null=True)
+    
+    # Dados de resposta da API
+    resposta_api = models.JSONField(blank=True, null=True)  # Resposta completa da API
+    erro_api = models.TextField(blank=True, null=True)  # Mensagem de erro da API
+
+    def __str__(self):
+        return f"C6 Bank {self.tipo.upper()} - {self.mensalidade.aluno.get_full_name()} - R$ {self.valor}"
+
+    class Meta:
+        verbose_name = "Transação C6 Bank"
+        verbose_name_plural = "Transações C6 Bank"
+        ordering = ['-data_criacao']

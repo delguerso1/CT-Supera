@@ -86,6 +86,14 @@ const LoginScreen: React.FC<NavigationProps> = ({ navigation }) => {
                 <Text style={styles.buttonText}>Entrar</Text>
               )}
             </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.forgotPasswordButton}
+              onPress={() => navigation.navigate('EsqueciSenha')}
+              disabled={loading}
+            >
+              <Text style={styles.forgotPasswordText}>Esqueci minha senha</Text>
+            </TouchableOpacity>
           </View>
 
           <View style={styles.footer}>
@@ -180,6 +188,15 @@ const styles = StyleSheet.create({
   footerText: {
     color: '#666',
     fontSize: 14,
+  },
+  forgotPasswordButton: {
+    marginTop: 16,
+    alignItems: 'center',
+  },
+  forgotPasswordText: {
+    color: '#1a237e',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 

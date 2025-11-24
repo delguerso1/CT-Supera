@@ -1,6 +1,24 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { User, LoginResponse, ApiResponse, Turma } from '../types';
+import { 
+  User, 
+  LoginResponse, 
+  ApiResponse, 
+  Turma, 
+  Mensalidade, 
+  HistoricoPagamentos, 
+  PainelAluno,
+  PixPayment,
+  BoletoPayment,
+  CheckoutPayment,
+  VerificarCheckinResponse,
+  RegistrarPresencaResponse,
+  PreCadastro,
+  PainelGerente,
+  CentroTreinamento,
+  SuperaNews,
+  GaleriaFoto
+} from '../types';
 import CONFIG from '../config';
 
 const api = axios.create({
@@ -40,7 +58,7 @@ api.interceptors.response.use(
 
 export const authService = {
   login: async (username: string, password: string): Promise<LoginResponse> => {
-    const response = await api.post('usuarios/login/', { username, password });
+    const response = await api.post('usuarios/login/', { cpf: username, password });
     return response.data;
   },
 
@@ -57,18 +75,56 @@ export const authService = {
 
   getCurrentUser: async (): Promise<User | null> => {
     try {
-      const response = await api.get('usuarios/profile/');
-      return response.data;
+      // Tenta usar o endpoint de profile, se não existir, usa o endpoint de alunos
+      const response = await api.get('alunos/painel-aluno/');
+      return response.data.usuario;
     } catch (error) {
       return null;
     }
+  },
+
+  solicitarRecuperacaoSenha: async (cpf: string): Promise<{ message: string }> => {
+    const response = await api.post('usuarios/esqueci-senha/', { cpf });
+    return response.data;
+  },
+
+  redefinirSenha: async (
+    uidb64: string,
+    token: string,
+    newPassword1: string,
+    newPassword2: string
+  ): Promise<{ message: string }> => {
+    const response = await api.post(`usuarios/redefinir-senha/${uidb64}/${token}/`, {
+      new_password1: newPassword1,
+      new_password2: newPassword2,
+    });
+    return response.data;
+  },
+
+  ativarConta: async (
+    uidb64: string,
+    token: string,
+    newPassword1: string,
+    newPassword2: string
+  ): Promise<{ message: string; user: User }> => {
+    const response = await api.post(`usuarios/ativar-conta/${uidb64}/${token}/`, {
+      new_password1: newPassword1,
+      new_password2: newPassword2,
+    });
+    return response.data;
+  },
+
+  reenviarConvite: async (usuarioId: number): Promise<{ message: string }> => {
+    const response = await api.post(`usuarios/reenviar-convite/${usuarioId}/`);
+    return response.data;
   },
 };
 
 export const userService = {
   getProfile: async (): Promise<User> => {
-    const response = await api.get('usuarios/profile/');
-    return response.data;
+    // Usa o painel do aluno para obter os dados do usuário
+    const response = await api.get('alunos/painel-aluno/');
+    return response.data.usuario;
   },
 
   updateProfile: async (data: Partial<User>): Promise<User> => {
@@ -99,20 +155,147 @@ export const turmaService = {
     const response = await api.get(`turmas/${id}/`);
     return response.data;
   },
-};
 
-export const presencaService = {
-  registrarPresenca: async (data: {
-    turma: number;
-    alunos: { id: number }[];
-    presencas: { [key: number]: boolean };
-  }): Promise<any> => {
-    const response = await api.post('presencas/registrar/', data);
+  criarTurma: async (data: Partial<Turma>): Promise<Turma> => {
+    const response = await api.post('turmas/', data);
     return response.data;
   },
 
-  verificarCheckin: async (turmaId: number): Promise<any> => {
+  atualizarTurma: async (id: number, data: Partial<Turma>): Promise<Turma> => {
+    const response = await api.put(`turmas/${id}/`, data);
+    return response.data;
+  },
+
+  excluirTurma: async (id: number): Promise<void> => {
+    await api.delete(`turmas/${id}/`);
+  },
+
+  getAlunosTurma: async (turmaId: number): Promise<User[]> => {
+    const response = await api.get(`turmas/${turmaId}/alunos/`);
+    return response.data;
+  },
+
+  adicionarAlunos: async (turmaId: number, alunosIds: number[]): Promise<{ message: string }> => {
+    const response = await api.post(`turmas/${turmaId}/adicionar-alunos/`, {
+      alunos: alunosIds,
+    });
+    return response.data;
+  },
+
+  removerAlunos: async (turmaId: number, alunosIds: number[]): Promise<{ message: string }> => {
+    const response = await api.post(`turmas/${turmaId}/remover-alunos/`, {
+      alunos: alunosIds,
+    });
+    return response.data;
+  },
+
+  getDiasSemana: async (): Promise<Array<{ id: number; nome: string }>> => {
+    const response = await api.get('turmas/diassemana/');
+    return response.data;
+  },
+};
+
+export const ctService = {
+  listarCTs: async (): Promise<CentroTreinamento[]> => {
+    const response = await api.get('cts/');
+    return response.data;
+  },
+
+  obterCT: async (id: number): Promise<CentroTreinamento> => {
+    const response = await api.get(`cts/${id}/`);
+    return response.data;
+  },
+
+  criarCT: async (data: Partial<CentroTreinamento>): Promise<CentroTreinamento> => {
+    const response = await api.post('cts/criar/', data);
+    return response.data;
+  },
+
+  atualizarCT: async (id: number, data: Partial<CentroTreinamento>): Promise<CentroTreinamento> => {
+    const response = await api.put(`cts/editar/${id}/`, data);
+    return response.data;
+  },
+
+  excluirCT: async (id: number): Promise<void> => {
+    await api.delete(`cts/excluir/${id}/`);
+  },
+};
+
+export const superaNewsService = {
+  listarNoticias: async (): Promise<SuperaNews[]> => {
+    const response = await api.get('cts/supera-news/');
+    return response.data;
+  },
+
+  criarNoticia: async (data: FormData): Promise<SuperaNews> => {
+    const response = await api.post('cts/supera-news/criar/', data, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+
+  atualizarNoticia: async (id: number, data: FormData): Promise<SuperaNews> => {
+    const response = await api.put(`cts/supera-news/editar/${id}/`, data, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+
+  excluirNoticia: async (id: number): Promise<void> => {
+    await api.delete(`cts/supera-news/excluir/${id}/`);
+  },
+};
+
+export const galeriaService = {
+  listarFotos: async (): Promise<GaleriaFoto[]> => {
+    const response = await api.get('cts/galeria/');
+    return response.data;
+  },
+
+  criarFoto: async (data: FormData): Promise<GaleriaFoto> => {
+    const response = await api.post('cts/galeria/criar/', data, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+
+  atualizarFoto: async (id: number, data: FormData): Promise<GaleriaFoto> => {
+    const response = await api.put(`cts/galeria/editar/${id}/`, data, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+
+  excluirFoto: async (id: number): Promise<void> => {
+    await api.delete(`cts/galeria/excluir/${id}/`);
+  },
+};
+
+export const professorService = {
+  listarProfessores: async (): Promise<User[]> => {
+    const response = await api.get('usuarios/', { params: { tipo: 'professor' } });
+    return response.data.results || response.data;
+  },
+};
+
+export const presencaService = {
+  verificarCheckin: async (turmaId: number): Promise<VerificarCheckinResponse> => {
     const response = await api.get(`funcionarios/verificar-checkin/${turmaId}/`);
+    return response.data;
+  },
+
+  registrarPresenca: async (turmaId: number, alunosIds: string[]): Promise<RegistrarPresencaResponse> => {
+    const response = await api.post(`funcionarios/registrar-presenca/${turmaId}/`, {
+      presenca: alunosIds,
+    });
     return response.data;
   },
 };
@@ -123,8 +306,32 @@ export const financeiroService = {
     return response.data;
   },
 
+  getMensalidadeById: async (id: number): Promise<Mensalidade> => {
+    const response = await api.get(`financeiro/mensalidades/${id}/`);
+    return response.data;
+  },
+
+  criarMensalidade: async (data: Partial<Mensalidade>): Promise<Mensalidade> => {
+    const response = await api.post('financeiro/mensalidades/', data);
+    return response.data;
+  },
+
+  atualizarMensalidade: async (id: number, data: Partial<Mensalidade>): Promise<Mensalidade> => {
+    const response = await api.put(`financeiro/mensalidades/${id}/`, data);
+    return response.data;
+  },
+
+  excluirMensalidade: async (id: number): Promise<void> => {
+    await api.delete(`financeiro/mensalidades/${id}/`);
+  },
+
   getDashboardStats: async (): Promise<any> => {
     const response = await api.get('financeiro/dashboard/');
+    return response.data;
+  },
+
+  getRelatorioFinanceiro: async (params?: any): Promise<any> => {
+    const response = await api.get('financeiro/relatorio/', { params });
     return response.data;
   },
 };
@@ -135,7 +342,7 @@ export const funcionarioService = {
     return response.data;
   },
 
-  getPainelGerente: async (): Promise<any> => {
+  getPainelGerente: async (): Promise<PainelGerente> => {
     const response = await api.get('funcionarios/painel-gerente/');
     return response.data;
   },
@@ -147,6 +354,111 @@ export const funcionarioService = {
 
   atualizarDadosGerente: async (data: Partial<User>): Promise<User> => {
     const response = await api.put('funcionarios/atualizar-dados-gerente/', data);
+    return response.data;
+  },
+
+  listarPrecadastros: async (): Promise<PreCadastro[]> => {
+    const response = await api.get('funcionarios/listar-precadastros/');
+    return response.data;
+  },
+
+  converterPrecadastro: async (precadastroId: number): Promise<{ message: string }> => {
+    const response = await api.post(`funcionarios/converter-precadastro/${precadastroId}/`);
+    return response.data;
+  },
+};
+
+export const usuarioService = {
+  listarUsuarios: async (params?: any): Promise<ApiResponse<User[]>> => {
+    const response = await api.get('usuarios/', { params });
+    return response.data;
+  },
+
+  listarAlunos: async (params?: any): Promise<User[]> => {
+    const response = await api.get('usuarios/', { params: { ...params, tipo: 'aluno' } });
+    return response.data.results || response.data;
+  },
+
+  obterUsuario: async (id: number): Promise<User> => {
+    const response = await api.get(`usuarios/${id}/`);
+    return response.data;
+  },
+
+  criarUsuario: async (data: Partial<User>): Promise<User> => {
+    const response = await api.post('usuarios/', data);
+    return response.data;
+  },
+
+  atualizarUsuario: async (id: number, data: Partial<User>): Promise<User> => {
+    const response = await api.put(`usuarios/${id}/`, data);
+    return response.data;
+  },
+
+  excluirUsuario: async (id: number): Promise<void> => {
+    await api.delete(`usuarios/${id}/`);
+  },
+};
+
+export const alunoService = {
+  getPainelAluno: async (): Promise<PainelAluno> => {
+    const response = await api.get('alunos/painel-aluno/');
+    return response.data;
+  },
+
+  getHistoricoPagamentos: async (): Promise<HistoricoPagamentos> => {
+    const response = await api.get('alunos/historico-pagamentos/');
+    return response.data;
+  },
+
+  verificarPagamentoEmDia: async (): Promise<{ pagamento_em_dia: boolean }> => {
+    const response = await api.get('alunos/pagamento-em-dia/');
+    return response.data;
+  },
+
+  realizarCheckin: async (): Promise<{ message: string }> => {
+    const response = await api.post('alunos/realizar-checkin/');
+    return response.data;
+  },
+
+  realizarPagamento: async (mensalidadeId: number): Promise<{ message: string; mensalidade: Mensalidade }> => {
+    const response = await api.post(`alunos/realizar-pagamento/${mensalidadeId}/`);
+    return response.data;
+  },
+};
+
+export const pagamentoService = {
+  gerarPix: async (mensalidadeId: number, expiracaoMinutos?: number): Promise<PixPayment> => {
+    const response = await api.post(`financeiro/pix/gerar/${mensalidadeId}/`, {
+      expiracao_minutos: expiracaoMinutos || 30,
+    });
+    return response.data;
+  },
+
+  consultarStatusPix: async (transacaoId: number): Promise<any> => {
+    const response = await api.get(`financeiro/pix/status/${transacaoId}/`);
+    return response.data;
+  },
+
+  gerarBoleto: async (mensalidadeId: number): Promise<BoletoPayment> => {
+    const response = await api.post(`financeiro/mensalidades/${mensalidadeId}/gerar-boleto/`);
+    return response.data;
+  },
+
+  consultarBoleto: async (transacaoId: number): Promise<any> => {
+    const response = await api.get(`financeiro/boletos/${transacaoId}/consultar/`);
+    return response.data;
+  },
+
+  downloadBoletoPDF: async (transacaoId: number): Promise<string> => {
+    const response = await api.get(`financeiro/boletos/${transacaoId}/pdf/`, {
+      responseType: 'blob',
+    });
+    // Retorna a URL do PDF ou o blob
+    return response.data;
+  },
+
+  criarCheckout: async (mensalidadeId: number): Promise<CheckoutPayment> => {
+    const response = await api.post(`financeiro/pagamento-bancario/gerar/${mensalidadeId}/`);
     return response.data;
   },
 };

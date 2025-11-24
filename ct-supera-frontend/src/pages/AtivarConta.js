@@ -101,7 +101,7 @@ const AtivarConta = () => {
   const styles = {
     container: {
       minHeight: '100vh',
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      background: 'linear-gradient(135deg, #1F6C86 0%, #155a6e 100%)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -153,7 +153,7 @@ const AtivarConta = () => {
       transition: 'border-color 0.3s ease',
     },
     inputFocus: {
-      borderColor: '#667eea',
+      borderColor: '#1F6C86',
       outline: 'none',
     },
     passwordStrength: {
@@ -182,7 +182,7 @@ const AtivarConta = () => {
       gap: '8px',
     },
     button: {
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      background: 'linear-gradient(135deg, #1F6C86 0%, #155a6e 100%)',
       color: 'white',
       border: 'none',
       padding: '15px 30px',
@@ -220,7 +220,7 @@ const AtivarConta = () => {
       marginTop: '20px',
     },
     link: {
-      color: '#667eea',
+      color: '#1F6C86',
       textDecoration: 'none',
       fontWeight: '500',
     },

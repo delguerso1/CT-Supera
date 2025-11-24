@@ -123,11 +123,42 @@ class UsuarioSerializer(serializers.ModelSerializer):
         valor_mensalidade_antigo = instance.valor_mensalidade
         password = validated_data.pop('password', None)
         
-        # Verificar se algum campo PAR-Q foi atualizado
-        parq_fields_updated = any(field in validated_data for field in [
-            'parq_question_1', 'parq_question_2', 'parq_question_3', 'parq_question_4',
-            'parq_question_5', 'parq_question_6', 'parq_question_7'
-        ])
+        # Verificar se algum campo PAR-Q foi realmente alterado (valor mudou)
+        parq_fields = ['parq_question_1', 'parq_question_2', 'parq_question_3', 'parq_question_4',
+                       'parq_question_5', 'parq_question_6', 'parq_question_7']
+        
+        parq_fields_updated = False
+        for field in parq_fields:
+            if field in validated_data:
+                # Compara o valor atual com o novo valor
+                valor_atual = getattr(instance, field, False)
+                valor_novo = validated_data[field]
+                if valor_atual != valor_novo:
+                    parq_fields_updated = True
+                    break
+        
+        # Validar se pode preencher o PAR-Q novamente (1 ano após último preenchimento)
+        # Só valida se os valores realmente mudaram E o questionário já foi preenchido antes
+        if parq_fields_updated and instance.is_aluno() and instance.parq_completed:
+            if not instance.can_fill_parq_again():
+                from django.utils import timezone
+                from datetime import timedelta
+                
+                data_preenchimento = instance.parq_completion_date
+                if data_preenchimento:
+                    if hasattr(data_preenchimento, 'date'):
+                        data_preenchimento = data_preenchimento.date()
+                    
+                    um_ano_depois = data_preenchimento + timedelta(days=365)
+                    hoje = timezone.now().date()
+                    
+                    dias_restantes = (um_ano_depois - hoje).days
+                    
+                    raise serializers.ValidationError({
+                        'parq_question_1': f'O questionário PAR-Q só pode ser preenchido uma vez por ano. '
+                                         f'Último preenchimento: {instance.parq_completion_date.strftime("%d/%m/%Y") if instance.parq_completion_date else "N/A"}. '
+                                         f'Você poderá preencher novamente em {dias_restantes} dia(s).'
+                    })
         
         for attr, value in validated_data.items():
             setattr(instance, attr, value)

@@ -19,6 +19,12 @@
     padding: 0 1rem !important;
   }
 
+  /* Logo mobile - reduzir tamanho */
+  .logo img {
+    height: 45px !important;
+    max-width: 150px !important;
+  }
+
   /* HomePage mobile */
   .hero {
     padding: 2rem 1rem !important;

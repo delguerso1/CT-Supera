@@ -200,7 +200,7 @@ function ControleFinanceiro({ user, onDataChange }) {
 
   return (
     <div style={styles?.card || { background: '#fff', padding: 24, borderRadius: 8 }}>
-      <h2 style={styles?.cardTitle || { color: '#1a237e' }}>Painel Financeiro</h2>
+      <h2 style={styles?.cardTitle || { color: '#1F6C86' }}>Painel Financeiro</h2>
       <div style={{ marginBottom: 16 }}>
         <label>
           Mês:
@@ -241,7 +241,7 @@ function ControleFinanceiro({ user, onDataChange }) {
         </div>
       </div>
 
-      <h3 style={{ color: '#1a237e', marginTop: 32 }}>Mensalidades</h3>
+      <h3 style={{ color: '#1F6C86', marginTop: 32 }}>Mensalidades</h3>
       <div style={{ marginBottom: 12, display: 'flex', gap: 16, alignItems: 'center' }}>
         <input
           type="text"
@@ -309,9 +309,9 @@ function ControleFinanceiro({ user, onDataChange }) {
         </div>
       )}
 
-      <h3 style={{ color: '#1a237e', marginTop: 32 }}>Despesas</h3>
+      <h3 style={{ color: '#1F6C86', marginTop: 32 }}>Despesas</h3>
       <button
-        style={{ marginBottom: 12, background: '#1a237e', color: '#fff', border: 'none', borderRadius: 4, padding: '8px 16px', cursor: 'pointer' }}
+        style={{ marginBottom: 12, background: '#1F6C86', color: '#fff', border: 'none', borderRadius: 4, padding: '8px 16px', cursor: 'pointer' }}
         onClick={handleNovaDespesa}
       >
         Nova Despesa
@@ -347,7 +347,7 @@ function ControleFinanceiro({ user, onDataChange }) {
         </table>
       </div>
 
-      <h3 style={{ color: '#1a237e', marginTop: 32 }}>Salários</h3>
+      <h3 style={{ color: '#1F6C86', marginTop: 32 }}>Salários</h3>
       <div style={{ overflowX: 'auto', marginBottom: 24 }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 500 }}>
           <thead>
@@ -435,7 +435,7 @@ function ControleFinanceiro({ user, onDataChange }) {
               />
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button type="submit" style={{ background: '#1a237e', color: '#fff', border: 'none', borderRadius: 4, padding: '8px 16px' }}>
+              <button type="submit" style={{ background: '#1F6C86', color: '#fff', border: 'none', borderRadius: 4, padding: '8px 16px' }}>
                 Salvar
               </button>
               <button type="button" onClick={() => setShowDespesaModal(false)} style={{ border: 'none', background: '#eee', borderRadius: 4, padding: '8px 16px' }}>

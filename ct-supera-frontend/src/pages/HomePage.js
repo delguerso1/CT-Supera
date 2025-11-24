@@ -15,7 +15,7 @@ const styles = {
   },
   title: {
     fontSize: '2.5rem',
-    color: '#1a237e',
+    color: '#1F6C86',
     marginBottom: '1rem',
   },
   subtitle: {
@@ -28,7 +28,7 @@ const styles = {
   },
   sectionTitle: {
     fontSize: '2rem',
-    color: '#1a237e',
+    color: '#1F6C86',
     marginBottom: '1.5rem',
   },
   content: {
@@ -75,7 +75,7 @@ No CT Supera, acreditamos que o esporte vai muito além da competição. Ele é 
 <div
   style={{
     background: '#e3f2fd', // azul claro
-    color: '#1a237e',
+    color: '#1F6C86',
     fontWeight: 'bold',
     maxWidth: 600,
     margin: '40px auto',

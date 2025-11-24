@@ -15,11 +15,11 @@ const styles = {
     marginBottom: '2rem',
   },
   title: {
-    color: '#1a237e',
+    color: '#1F6C86',
     margin: 0,
   },
   button: {
-    backgroundColor: '#1a237e',
+    backgroundColor: '#1F6C86',
     color: 'white',
     padding: '0.75rem 1.5rem',
     borderRadius: '4px',
@@ -47,10 +47,10 @@ const styles = {
     },
   },
   activeTab: {
-    backgroundColor: '#1a237e',
+    backgroundColor: '#1F6C86',
     color: 'white',
     '&:hover': {
-      backgroundColor: '#1a237e',
+      backgroundColor: '#1F6C86',
     },
   },
   table: {
@@ -283,11 +283,59 @@ function CadastroUsuario({ onUserChange }) {
     return telefone;
   };
 
+  // Função para verificar se pode preencher o Par-Q novamente
+  const canFillParqAgain = (user) => {
+    if (!user || !user.parq_completed || !user.parq_completion_date) {
+      return true; // Pode preencher se nunca preencheu ou não há usuário
+    }
+    
+    const dataPreenchimento = new Date(user.parq_completion_date);
+    const umAnoDepois = new Date(dataPreenchimento);
+    umAnoDepois.setFullYear(umAnoDepois.getFullYear() + 1);
+    const hoje = new Date();
+    
+    return hoje >= umAnoDepois;
+  };
+
+  // Função para calcular dias restantes até poder preencher novamente
+  const getDaysUntilCanFillParq = (user) => {
+    if (!user || !user.parq_completed || !user.parq_completion_date) {
+      return 0;
+    }
+    
+    const dataPreenchimento = new Date(user.parq_completion_date);
+    const umAnoDepois = new Date(dataPreenchimento);
+    umAnoDepois.setFullYear(umAnoDepois.getFullYear() + 1);
+    const hoje = new Date();
+    
+    const diffTime = umAnoDepois - hoje;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    return diffDays > 0 ? diffDays : 0;
+  };
+
+  // Função para formatar data e hora do preenchimento do Par-Q
+  const formatParqDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString);
+    return date.toLocaleString('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
   const handleChange = (e) => {
-    const { name, value } = e.target;
+    const { name, value, type, checked } = e.target;
     let valorFormatado = value;
 
-    if (name === 'telefone' || name === 'telefone_responsavel' || name === 'telefone_emergencia') {
+    if (type === 'radio') {
+      valorFormatado = value === 'true';
+    } else if (type === 'checkbox') {
+      valorFormatado = checked;
+    } else if (name === 'telefone' || name === 'telefone_responsavel' || name === 'telefone_emergencia') {
       valorFormatado = formatarTelefone(value);
     }
 
@@ -323,6 +371,14 @@ function CadastroUsuario({ onUserChange }) {
       if (formData.ficha_medica) dados.ficha_medica = formData.ficha_medica;
       if (diaVencimento) dados.dia_vencimento = parseInt(diaVencimento);
       if (valorMensalidadeNovo) dados.valor_mensalidade = parseFloat(valorMensalidadeNovo);
+      // Campos do Par-Q
+      dados.parq_question_1 = formData.parq_question_1 || false;
+      dados.parq_question_2 = formData.parq_question_2 || false;
+      dados.parq_question_3 = formData.parq_question_3 || false;
+      dados.parq_question_4 = formData.parq_question_4 || false;
+      dados.parq_question_5 = formData.parq_question_5 || false;
+      dados.parq_question_6 = formData.parq_question_6 || false;
+      dados.parq_question_7 = formData.parq_question_7 || false;
     }
 
     // Campos específicos para professores
@@ -357,7 +413,8 @@ function CadastroUsuario({ onUserChange }) {
       }
     } catch (err) {
       console.error('[DEBUG] Erro detalhado:', err.response?.data);
-      setError(err.response?.data?.error || 'Erro ao cadastrar usuário.');
+      const errorMessage = err.response?.data?.parq_question_1 || err.response?.data?.error || err.response?.data?.detail || 'Erro ao cadastrar usuário.';
+      setError(Array.isArray(errorMessage) ? errorMessage[0] : errorMessage);
     }
   };
 
@@ -376,6 +433,13 @@ function CadastroUsuario({ onUserChange }) {
         telefone_emergencia: user.telefone_emergencia || '',
         nome_responsavel: user.nome_responsavel || '',
         ficha_medica: user.ficha_medica || '',
+        parq_question_1: user.parq_question_1 || false,
+        parq_question_2: user.parq_question_2 || false,
+        parq_question_3: user.parq_question_3 || false,
+        parq_question_4: user.parq_question_4 || false,
+        parq_question_5: user.parq_question_5 || false,
+        parq_question_6: user.parq_question_6 || false,
+        parq_question_7: user.parq_question_7 || false,
       });
     
     // Carregar campos específicos de professor
@@ -642,6 +706,7 @@ function CadastroUsuario({ onUserChange }) {
               <th style={styles.th}>E-mail</th>
               <th style={styles.th}>Telefone</th>
               {activeTab === 'alunos' && <th style={styles.th}>Centro(s) de Treinamento</th>}
+              {activeTab === 'alunos' && <th style={styles.th}>Par-Q</th>}
               {activeTab === 'alunos' && <th style={styles.th}>Status</th>}
               {activeTab === 'precadastros' && <th style={styles.th}>Status</th>}
               <th style={styles.th}>Ações</th>
@@ -661,6 +726,44 @@ function CadastroUsuario({ onUserChange }) {
                     {Array.isArray(user.centros_treinamento) && user.centros_treinamento.length > 0
                       ? user.centros_treinamento.map(ct => ct.nome).join(', ')
                       : 'Nenhum CT vinculado'}
+                  </td>
+                )}
+                {activeTab === 'alunos' && (
+                  <td style={styles.td}>
+                    {user.parq_completed ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                        <span style={{
+                          padding: '4px 12px',
+                          borderRadius: '12px',
+                          fontSize: '11px',
+                          fontWeight: 'bold',
+                          backgroundColor: '#e8f5e9',
+                          color: '#2e7d32',
+                          display: 'inline-block',
+                          width: 'fit-content'
+                        }}>
+                          ✅ Completo
+                        </span>
+                        {user.parq_completion_date && (
+                          <span style={{ fontSize: '10px', color: '#666' }}>
+                            {formatParqDate(user.parq_completion_date)}
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <span style={{
+                        padding: '4px 12px',
+                        borderRadius: '12px',
+                        fontSize: '11px',
+                        fontWeight: 'bold',
+                        backgroundColor: '#fff3cd',
+                        color: '#856404',
+                        display: 'inline-block',
+                        width: 'fit-content'
+                      }}>
+                        ⏳ Pendente
+                      </span>
+                    )}
                   </td>
                 )}
                 {activeTab === 'alunos' && (
@@ -914,8 +1017,30 @@ function CadastroUsuario({ onUserChange }) {
                   <label style={styles.label}>
                     Questionário de Prontidão para Atividade Física (PAR-Q)
                   </label>
+                  
+                  {editingUser && !canFillParqAgain(editingUser) && (
+                    <div style={{
+                      padding: '12px',
+                      backgroundColor: '#fff3cd',
+                      borderRadius: '4px',
+                      marginBottom: '15px',
+                      border: '1px solid #ffc107'
+                    }}>
+                      <div style={{ fontWeight: 'bold', color: '#856404', marginBottom: '5px' }}>
+                        ⚠️ Questionário já preenchido
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#856404' }}>
+                        O questionário PAR-Q só pode ser preenchido uma vez por ano. 
+                        Último preenchimento: {formatParqDate(editingUser?.parq_completion_date)}
+                        {getDaysUntilCanFillParq(editingUser) > 0 && (
+                          <span> - Você poderá preencher novamente em {getDaysUntilCanFillParq(editingUser)} dia(s).</span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  
                   <div style={{ fontSize: '12px', color: '#666', marginBottom: '10px' }}>
-                    Marque "Sim" se alguma das perguntas se aplica a você
+                    Responda "Sim" ou "Não" para cada pergunta abaixo
                   </div>
                   
                   {[
@@ -948,32 +1073,67 @@ function CadastroUsuario({ onUserChange }) {
                       question: 'Você sabe de alguma outra razão pela qual não deveria fazer atividade física?'
                     }
                   ].map((item, index) => (
-                    <div key={item.field} style={{ marginBottom: '15px', padding: '10px', border: '1px solid #ddd', borderRadius: '5px' }}>
-                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer', minWidth: '60px' }}>
+                    <div key={item.field} style={{ marginBottom: '15px', padding: '12px', border: '1px solid #ddd', borderRadius: '5px' }}>
+                      <div style={{ marginBottom: '8px', fontSize: '14px', lineHeight: '1.4' }}>
+                        <strong>{index + 1}.</strong> {item.question}
+                      </div>
+                      <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: canFillParqAgain(editingUser) ? 'pointer' : 'not-allowed', opacity: canFillParqAgain(editingUser) ? 1 : 0.6 }}>
                           <input
-                            type="checkbox"
+                            type="radio"
                             name={item.field}
-                            checked={formData[item.field] || false}
-                            onChange={(e) => handleChange({
-                              target: {
-                                name: item.field,
-                                value: e.target.checked
-                              }
-                            })}
+                            value="true"
+                            checked={formData[item.field] === true || formData[item.field] === 'true'}
+                            onChange={handleChange}
+                            disabled={editingUser && !canFillParqAgain(editingUser)}
                             style={{ margin: 0 }}
                           />
-                          <span style={{ fontSize: '14px', fontWeight: 'bold' }}>Sim</span>
+                          <span style={{ fontSize: '14px' }}>Sim</span>
                         </label>
-                        <div style={{ flex: 1, fontSize: '14px', lineHeight: '1.4' }}>
-                          <strong>{index + 1}.</strong> {item.question}
-                        </div>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: canFillParqAgain(editingUser) ? 'pointer' : 'not-allowed', opacity: canFillParqAgain(editingUser) ? 1 : 0.6 }}>
+                          <input
+                            type="radio"
+                            name={item.field}
+                            value="false"
+                            checked={formData[item.field] === false || formData[item.field] === 'false' || formData[item.field] === undefined || formData[item.field] === null}
+                            onChange={handleChange}
+                            disabled={editingUser && !canFillParqAgain(editingUser)}
+                            style={{ margin: 0 }}
+                          />
+                          <span style={{ fontSize: '14px' }}>Não</span>
+                        </label>
                       </div>
                     </div>
                   ))}
                   
                   <div style={{ marginTop: '15px', padding: '10px', backgroundColor: '#f8f9fa', borderRadius: '5px', fontSize: '13px', color: '#666' }}>
                     <strong>Importante:</strong> Se você respondeu "Sim" a alguma pergunta, consulte seu médico antes de começar um programa de atividade física.
+                  </div>
+                  
+                  <div style={{ marginTop: '20px', display: 'flex', gap: '1rem' }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowModal(false);
+                      }}
+                      style={{
+                        ...styles.button,
+                        backgroundColor: '#f5f5f5',
+                        color: '#333',
+                        flex: 1,
+                      }}
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="submit"
+                      style={{
+                        ...styles.button,
+                        flex: 1,
+                      }}
+                    >
+                      {editingUser ? 'Salvar' : `Cadastrar ${activeTab.slice(0, -1).charAt(0).toUpperCase() + activeTab.slice(0, -1).slice(1)}`}
+                    </button>
                   </div>
                 </div>
               )}
@@ -1074,33 +1234,33 @@ function CadastroUsuario({ onUserChange }) {
                 </>
               )}
 
-              <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowModal(false);
-                    // setMensalidade(null);
-                    // setValorMensalidade('');
-                  }}
-                  style={{
-                    ...styles.button,
-                    backgroundColor: '#f5f5f5',
-                    color: '#333',
-                    flex: 1,
-                  }}
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  style={{
-                    ...styles.button,
-                    flex: 1,
-                  }}
-                >
-                  {editingUser ? 'Salvar' : `Cadastrar ${activeTab.slice(0, -1).charAt(0).toUpperCase() + activeTab.slice(0, -1).slice(1)}`}
-                </button>
-              </div>
+              {activeTab !== 'alunos' && (
+                <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowModal(false);
+                    }}
+                    style={{
+                      ...styles.button,
+                      backgroundColor: '#f5f5f5',
+                      color: '#333',
+                      flex: 1,
+                    }}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    style={{
+                      ...styles.button,
+                      flex: 1,
+                    }}
+                  >
+                    {editingUser ? 'Salvar' : `Cadastrar ${activeTab.slice(0, -1).charAt(0).toUpperCase() + activeTab.slice(0, -1).slice(1)}`}
+                  </button>
+                </div>
+              )}
             </form>
           </div>
         </div>

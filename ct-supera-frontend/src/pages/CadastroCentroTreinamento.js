@@ -97,7 +97,7 @@ function CadastroCentroTreinamento({ styles }) {
         <button
           onClick={handleNovoCentro}
           style={{
-            backgroundColor: '#1a237e',
+            backgroundColor: '#1F6C86',
             color: 'white',
             padding: '0.75rem 1.5rem',
             borderRadius: '4px',
@@ -107,7 +107,7 @@ function CadastroCentroTreinamento({ styles }) {
             marginBottom: 16,
           }}
           onMouseEnter={(e) => e.target.style.backgroundColor = '#151b60'}
-          onMouseLeave={(e) => e.target.style.backgroundColor = '#1a237e'}
+          onMouseLeave={(e) => e.target.style.backgroundColor = '#1F6C86'}
         >
           Cadastrar Novo Centro de Treinamento
         </button>
@@ -138,7 +138,7 @@ function CadastroCentroTreinamento({ styles }) {
                   <Link
                     to={`/centros/${centro.id}/turmas`}
                     style={{
-                      color: '#1a237e',
+                      color: '#1F6C86',
                       fontWeight: 600,
                       cursor: 'pointer',
                       textDecoration: 'none'
@@ -296,7 +296,7 @@ function CadastroCentroTreinamento({ styles }) {
             <button
               type="submit"
               style={{
-                backgroundColor: '#1a237e',
+                backgroundColor: '#1F6C86',
                 color: 'white',
                 padding: '0.75rem 1.5rem',
                 borderRadius: '4px',
@@ -306,7 +306,7 @@ function CadastroCentroTreinamento({ styles }) {
                 flex: 1,
               }}
               onMouseEnter={(e) => e.target.style.backgroundColor = '#151b60'}
-              onMouseLeave={(e) => e.target.style.backgroundColor = '#1a237e'}
+              onMouseLeave={(e) => e.target.style.backgroundColor = '#1F6C86'}
             >
               {editId ? 'Salvar' : 'Cadastrar'}
             </button>

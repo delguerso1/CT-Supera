@@ -3,10 +3,15 @@ from .views import (
     MensalidadeListCreateView, MensalidadeRetrieveUpdateDestroyView,
     DespesaListCreateView, DespesaRetrieveUpdateDestroyView,
     SalarioListCreateView, SalarioRetrieveUpdateDestroyView,
-    PagarSalarioAPIView, DashboardFinanceiroAPIView, RelatorioFinanceiroAPIView, GerarPixAPIView, ConsultarStatusPixAPIView,
-    # GerarPagamentoPixAPIView, VerificarStatusPixAPIView, GerarPagamentoBancarioAPIView  # Comentado - usa Mercado Pago
-    # Integração Banco Cora
-    CoraCallbackView, CoraWebhookView, CoraSuccessView, CoraErrorView, CoraInitPaymentView,
+    PagarSalarioAPIView, DashboardFinanceiroAPIView, RelatorioFinanceiroAPIView, 
+    GerarPixAPIView, ConsultarStatusPixAPIView, ConsultarStatusPixPorTransacaoAPIView,
+    # Integração C6 Bank
+    C6BankTestConnectionAPIView, C6BankCreatePixPaymentAPIView, C6BankCheckPaymentStatusAPIView,
+    C6BankTransactionListAPIView, C6BankTransactionDetailAPIView, C6BankWebhookAPIView,
+    CriarPagamentoBancarioAPIView,
+    # API Bank Slip - Boletos
+    GerarBoletoAPIView, ConsultarBoletoAPIView, AlterarBoletoAPIView,
+    CancelarBoletoAPIView, DownloadBoletoPDFAPIView,
 )
 
 app_name = "financeiro"
@@ -17,6 +22,7 @@ urlpatterns = [
     path('mensalidades/<int:pk>/', MensalidadeRetrieveUpdateDestroyView.as_view(), name='mensalidade_detail'),
     path('mensalidades/<int:pk>/gerar-pix/', GerarPixAPIView.as_view(), name='gerar_pix'),
     path('mensalidades/<int:pk>/status-pix/', ConsultarStatusPixAPIView.as_view(), name='status_pix'),
+    path('mensalidades/<int:pk>/gerar-boleto/', GerarBoletoAPIView.as_view(), name='gerar_boleto'),
 
     # Despesas API
     path('despesas/', DespesaListCreateView.as_view(), name='despesa_list_create'),
@@ -32,19 +38,30 @@ urlpatterns = [
     # API para o relatório financeiro
     path('relatorio/', RelatorioFinanceiroAPIView.as_view(), name='relatorio_financeiro_api'),
 
-    # Pagamentos PIX (comentado - usa Mercado Pago)
-    # path('pix/gerar/<int:mensalidade_id>/', GerarPagamentoPixAPIView.as_view(), name='gerar-pagamento-pix'),
-    # path('pix/status/<int:transacao_id>/', VerificarStatusPixAPIView.as_view(), name='verificar-status-pix'),
+    # Pagamentos PIX - Rotas alternativas para compatibilidade com frontend
+    # Frontend chama: financeiro/pix/gerar/${mensalidadeId}/
+    # Frontend chama: financeiro/pix/status/${transacaoId}/
+    path('pix/gerar/<int:mensalidade_id>/', GerarPixAPIView.as_view(), name='gerar-pix-alt'),
+    path('pix/status/<int:transacao_id>/', ConsultarStatusPixPorTransacaoAPIView.as_view(), name='status-pix-transacao'),
     
-    # Pagamentos Bancários (comentado - usa Mercado Pago)
-    # path('pagamento-bancario/gerar/<int:mensalidade_id>/', GerarPagamentoBancarioAPIView.as_view(), name='gerar-pagamento-bancario'),
+    # Pagamento Bancário (Cartão) - Checkout C6 Bank
+    path('pagamento-bancario/gerar/<int:mensalidade_id>/', CriarPagamentoBancarioAPIView.as_view(), name='criar_pagamento_bancario'),
     
     # ========================================
-    # INTEGRAÇÃO BANCO CORA
+    # INTEGRAÇÃO C6 BANK
     # ========================================
-    path('cora/callback/', CoraCallbackView.as_view(), name='cora_callback'),
-    path('cora/webhook/', CoraWebhookView.as_view(), name='cora_webhook'),
-    path('cora/success/', CoraSuccessView.as_view(), name='cora_success'),
-    path('cora/error/', CoraErrorView.as_view(), name='cora_error'),
-    path('cora/init-payment/', CoraInitPaymentView.as_view(), name='cora_init_payment'),
+    path('c6/test-connection/', C6BankTestConnectionAPIView.as_view(), name='c6_test_connection'),
+    path('c6/create-pix-payment/', C6BankCreatePixPaymentAPIView.as_view(), name='c6_create_pix_payment'),
+    path('c6/check-payment-status/<int:transacao_id>/', C6BankCheckPaymentStatusAPIView.as_view(), name='c6_check_payment_status'),
+    path('c6/transactions/', C6BankTransactionListAPIView.as_view(), name='c6_transaction_list'),
+    path('c6/transactions/<int:pk>/', C6BankTransactionDetailAPIView.as_view(), name='c6_transaction_detail'),
+    path('c6/webhook/', C6BankWebhookAPIView.as_view(), name='c6_webhook'),
+    
+    # ========================================
+    # API BANK SLIP - BOLETOS BANCÁRIOS
+    # ========================================
+    path('boletos/<int:transacao_id>/consultar/', ConsultarBoletoAPIView.as_view(), name='consultar_boleto'),
+    path('boletos/<int:transacao_id>/alterar/', AlterarBoletoAPIView.as_view(), name='alterar_boleto'),
+    path('boletos/<int:transacao_id>/cancelar/', CancelarBoletoAPIView.as_view(), name='cancelar_boleto'),
+    path('boletos/<int:transacao_id>/pdf/', DownloadBoletoPDFAPIView.as_view(), name='download_boleto_pdf'),
 ]

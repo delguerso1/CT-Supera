@@ -9,18 +9,22 @@ import {
   ActivityIndicator,
   SafeAreaView,
   Image,
+  RefreshControl,
 } from 'react-native';
 import { useAuth } from '../utils/AuthContext';
-import { funcionarioService, financeiroService, userService } from '../services/api';
-import { User, DashboardStats, Mensalidade } from '../types';
+import { funcionarioService, financeiroService, usuarioService } from '../services/api';
+import { User, PainelGerente, Mensalidade, PreCadastro } from '../types';
 import { NavigationProps } from '../types';
+import CONFIG from '../config';
 
 const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }) => {
   const { user, logout } = useAuth();
-  const [gerente, setGerente] = useState<User | null>(null);
-  const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
+  const [painelGerente, setPainelGerente] = useState<PainelGerente | null>(null);
   const [mensalidades, setMensalidades] = useState<Mensalidade[]>([]);
+  const [alunos, setAlunos] = useState<User[]>([]);
+  const [precadastros, setPrecadastros] = useState<PreCadastro[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [activeSection, setActiveSection] = useState<'dashboard' | 'financeiro' | 'alunos' | 'relatorios'>('dashboard');
 
   useEffect(() => {
@@ -36,23 +40,61 @@ const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }
     }
   }, [route?.name]);
 
+  useEffect(() => {
+    if (activeSection === 'alunos' && user) {
+      loadAlunos();
+    }
+    if (activeSection === 'financeiro' && user) {
+      loadMensalidades();
+    }
+  }, [activeSection, user]);
+
   const loadGerenteData = async () => {
     try {
       setLoading(true);
-      const [gerenteData, statsData, mensalidadesData] = await Promise.all([
-        funcionarioService.getPainelGerente(),
-        financeiroService.getDashboardStats(),
-        financeiroService.getMensalidades()
-      ]);
-      
-      setGerente(gerenteData);
-      setDashboardStats(statsData);
-      setMensalidades(mensalidadesData.data || []);
-    } catch (error) {
-      Alert.alert('Erro', 'Erro ao carregar dados do gerente.');
+      const painelData = await funcionarioService.getPainelGerente();
+      setPainelGerente(painelData);
+    } catch (error: any) {
+      console.error('Erro ao carregar painel do gerente:', error);
+      Alert.alert('Erro', error.response?.data?.error || 'Erro ao carregar dados do gerente.');
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadMensalidades = async () => {
+    try {
+      const response = await financeiroService.getMensalidades();
+      setMensalidades((response as any).results || (response as any).data || []);
+    } catch (error: any) {
+      console.error('Erro ao carregar mensalidades:', error);
+    }
+  };
+
+  const loadAlunos = async () => {
+    try {
+      const alunosData = await usuarioService.listarAlunos();
+      setAlunos(alunosData);
+    } catch (error: any) {
+      console.error('Erro ao carregar alunos:', error);
+    }
+  };
+
+  const loadPrecadastros = async () => {
+    try {
+      const precadastrosData = await funcionarioService.listarPrecadastros();
+      setPrecadastros(precadastrosData);
+    } catch (error: any) {
+      console.error('Erro ao carregar pré-cadastros:', error);
+    }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadGerenteData();
+    if (activeSection === 'alunos') await loadAlunos();
+    if (activeSection === 'financeiro') await loadMensalidades();
+    setRefreshing(false);
   };
 
   const handleLogout = () => {
@@ -78,109 +120,137 @@ const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }
     }).format(value);
   };
 
-  const renderDashboard = () => (
-    <ScrollView style={styles.content}>
-      <View style={styles.header}>
-        <View style={styles.profileSection}>
-          {gerente?.foto_perfil ? (
-            <Image source={{ uri: gerente.foto_perfil }} style={styles.profileImage} />
-          ) : (
-            <View style={styles.profileInitials}>
-              <Text style={styles.profileInitialsText}>
-                {getInitials(gerente?.first_name || '')}
-              </Text>
-            </View>
-          )}
-          <View style={styles.profileInfo}>
-            <Text style={styles.profileName}>
-              {gerente?.first_name} {gerente?.last_name}
-            </Text>
-            <Text style={styles.profileRole}>Gerente</Text>
+  const renderDashboard = () => {
+    if (!painelGerente) return null;
+
+    return (
+      <ScrollView
+        style={styles.content}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
+        <View style={styles.statsGrid}>
+          <View style={styles.statCard}>
+            <Text style={styles.statTitle}>Alunos Ativos</Text>
+            <Text style={styles.statValue}>{painelGerente.alunos_ativos || 0}</Text>
+          </View>
+          
+          <View style={styles.statCard}>
+            <Text style={styles.statTitle}>Professores</Text>
+            <Text style={styles.statValue}>{painelGerente.professores || 0}</Text>
+          </View>
+          
+          <View style={styles.statCard}>
+            <Text style={styles.statTitle}>Turmas</Text>
+            <Text style={styles.statValue}>{painelGerente.turmas?.length || 0}</Text>
           </View>
         </View>
-        <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
-          <Text style={styles.logoutText}>Sair</Text>
-        </TouchableOpacity>
-      </View>
 
-      <View style={styles.statsGrid}>
-        <View style={styles.statCard}>
-          <Text style={styles.statTitle}>Alunos Ativos</Text>
-          <Text style={styles.statValue}>{dashboardStats?.alunosAtivos || 0}</Text>
-        </View>
-        
-        <View style={styles.statCard}>
-          <Text style={styles.statTitle}>Professores</Text>
-          <Text style={styles.statValue}>{dashboardStats?.professores || 0}</Text>
-        </View>
-        
-        <View style={styles.statCard}>
-          <Text style={styles.statTitle}>Turmas</Text>
-          <Text style={styles.statValue}>{dashboardStats?.turmas?.length || 0}</Text>
-        </View>
-      </View>
-
-      <View style={styles.statsGrid}>
-        <View style={styles.statCard}>
-          <Text style={styles.statTitle}>Mensalidades Pendentes</Text>
-          <Text style={styles.statValue}>{dashboardStats?.mensalidadesPendentes || 0}</Text>
-        </View>
-        
-        <View style={styles.statCard}>
-          <Text style={styles.statTitle}>Mensalidades Atrasadas</Text>
-          <Text style={[styles.statValue, { color: '#f44336' }]}>
-            {dashboardStats?.mensalidadesAtrasadas || 0}
-          </Text>
-        </View>
-        
-        <View style={styles.statCard}>
-          <Text style={styles.statTitle}>Mensalidades Pagas</Text>
-          <Text style={[styles.statValue, { color: '#4caf50' }]}>
-            {dashboardStats?.mensalidadesPagas || 0}
-          </Text>
-        </View>
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Atividades Recentes</Text>
-        {dashboardStats?.atividades_recentes?.length === 0 ? (
-          <Text style={styles.noData}>Nenhuma atividade recente.</Text>
-        ) : (
-          dashboardStats?.atividades_recentes?.slice(0, 5).map(activity => (
-            <View key={activity.id} style={styles.activityCard}>
-              <Text style={styles.activityDescription}>{activity.description}</Text>
-              <Text style={styles.activityDate}>{activity.data}</Text>
-            </View>
-          ))
-        )}
-      </View>
-    </ScrollView>
-  );
-
-  const renderFinanceiro = () => (
-    <ScrollView style={styles.content}>
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Gestão Financeira</Text>
-        
-        <View style={styles.financialStats}>
-          <View style={styles.financialCard}>
-            <Text style={styles.financialTitle}>Total Pendente</Text>
-            <Text style={styles.financialValue}>
-              {formatCurrency(mensalidades
-                .filter(m => m.status === 'pendente')
-                .reduce((total, m) => total + m.valor, 0)
-              )}
+        <View style={styles.statsGrid}>
+          <View style={styles.statCard}>
+            <Text style={styles.statTitle}>Mensalidades Pendentes</Text>
+            <Text style={styles.statValue}>{painelGerente.mensalidades_pendentes || 0}</Text>
+          </View>
+          
+          <View style={styles.statCard}>
+            <Text style={styles.statTitle}>Mensalidades Atrasadas</Text>
+            <Text style={[styles.statValue, { color: '#f44336' }]}>
+              {painelGerente.mensalidades_atrasadas || 0}
             </Text>
           </View>
           
-          <View style={styles.financialCard}>
-            <Text style={styles.financialTitle}>Total Atrasado</Text>
-            <Text style={[styles.financialValue, { color: '#f44336' }]}>
-              {formatCurrency(mensalidades
-                .filter(m => m.status === 'atrasado')
-                .reduce((total, m) => total + m.valor, 0)
-              )}
+          <View style={styles.statCard}>
+            <Text style={styles.statTitle}>Mensalidades Pagas</Text>
+            <Text style={[styles.statValue, { color: '#4caf50' }]}>
+              {painelGerente.mensalidades_pagas || 0}
             </Text>
+          </View>
+        </View>
+
+        {painelGerente.precadastros > 0 && (
+          <View style={styles.section}>
+            <View style={styles.warningBox}>
+              <Text style={styles.warningTitle}>
+                ⚠️ {painelGerente.precadastros} Pré-cadastro(s) pendente(s)
+              </Text>
+              <Text style={styles.warningText}>
+                Existem pré-cadastros aguardando conversão em alunos.
+              </Text>
+            </View>
+          </View>
+        )}
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Atividades Recentes</Text>
+          {painelGerente.atividades_recentes?.length === 0 ? (
+            <Text style={styles.noData}>Nenhuma atividade recente.</Text>
+          ) : (
+            painelGerente.atividades_recentes?.slice(0, 5).map(activity => (
+              <View key={activity.id} style={styles.activityCard}>
+                <Text style={styles.activityDescription}>{activity.description}</Text>
+                <Text style={styles.activityDate}>
+                  {new Date(activity.data).toLocaleDateString('pt-BR')}
+                </Text>
+              </View>
+            ))
+          )}
+        </View>
+      </ScrollView>
+    );
+  };
+
+  const renderFinanceiro = () => {
+    const totalPendente = mensalidades
+      .filter(m => m.status === 'pendente')
+      .reduce((total, m) => total + m.valor, 0);
+    const totalAtrasado = mensalidades
+      .filter(m => m.status === 'atrasado')
+      .reduce((total, m) => total + m.valor, 0);
+    const totalPago = mensalidades
+      .filter(m => m.status === 'pago')
+      .reduce((total, m) => total + m.valor, 0);
+
+    return (
+      <ScrollView
+        style={styles.content}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Resumo Financeiro</Text>
+          
+          <View style={styles.financialStats}>
+            <View style={styles.financialCard}>
+              <Text style={styles.financialTitle}>Total Pendente</Text>
+              <Text style={styles.financialValue}>
+                {formatCurrency(totalPendente)}
+              </Text>
+            </View>
+            
+            <View style={styles.financialCard}>
+              <Text style={styles.financialTitle}>Total Atrasado</Text>
+              <Text style={[styles.financialValue, { color: '#f44336' }]}>
+                {formatCurrency(totalAtrasado)}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.financialStats}>
+            <View style={[styles.financialCard, { backgroundColor: '#e8f5e9' }]}>
+              <Text style={styles.financialTitle}>Total Pago</Text>
+              <Text style={[styles.financialValue, { color: '#4caf50' }]}>
+                {formatCurrency(totalPago)}
+              </Text>
+            </View>
+            
+            <View style={[styles.financialCard, { backgroundColor: '#fff3e0' }]}>
+              <Text style={styles.financialTitle}>Total Geral</Text>
+              <Text style={styles.financialValue}>
+                {formatCurrency(totalPendente + totalAtrasado + totalPago)}
+              </Text>
+            </View>
           </View>
         </View>
 
@@ -189,10 +259,17 @@ const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }
           {mensalidades.length === 0 ? (
             <Text style={styles.noData}>Nenhuma mensalidade encontrada.</Text>
           ) : (
-            mensalidades.slice(0, 10).map(mensalidade => (
+            mensalidades.map(mensalidade => (
               <View key={mensalidade.id} style={styles.mensalidadeCard}>
                 <View style={styles.mensalidadeHeader}>
-                  <Text style={styles.mensalidadeAluno}>{mensalidade.aluno_nome}</Text>
+                  <View style={styles.mensalidadeInfo}>
+                    <Text style={styles.mensalidadeAluno}>
+                      {mensalidade.aluno_nome || `Aluno #${mensalidade.aluno}`}
+                    </Text>
+                    <Text style={styles.mensalidadeValue}>
+                      {formatCurrency(mensalidade.valor)}
+                    </Text>
+                  </View>
                   <View style={[
                     styles.statusBadge,
                     { backgroundColor: mensalidade.status === 'pago' ? '#4caf50' : 
@@ -204,77 +281,216 @@ const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }
                     </Text>
                   </View>
                 </View>
-                <Text style={styles.mensalidadeValue}>
-                  {formatCurrency(mensalidade.valor)}
-                </Text>
                 <Text style={styles.mensalidadeDate}>
-                  Vencimento: {mensalidade.data_vencimento}
+                  Vencimento: {new Date(mensalidade.data_vencimento).toLocaleDateString('pt-BR')}
                 </Text>
+                {mensalidade.data_pagamento && (
+                  <Text style={styles.mensalidadeDate}>
+                    Pago em: {new Date(mensalidade.data_pagamento).toLocaleDateString('pt-BR')}
+                  </Text>
+                )}
               </View>
             ))
           )}
         </View>
-      </View>
-    </ScrollView>
-  );
+      </ScrollView>
+    );
+  };
 
-  const renderAlunos = () => (
-    <ScrollView style={styles.content}>
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Gestão de Alunos</Text>
-        
-        <View style={styles.statsGrid}>
-          <View style={styles.statCard}>
-            <Text style={styles.statTitle}>Total de Alunos</Text>
-            <Text style={styles.statValue}>{dashboardStats?.alunosAtivos || 0}</Text>
-          </View>
-          
-          <View style={styles.statCard}>
-            <Text style={styles.statTitle}>Alunos Ativos</Text>
-            <Text style={[styles.statValue, { color: '#4caf50' }]}>
-              {dashboardStats?.alunosAtivos || 0}
-            </Text>
+  const handleConverterPrecadastro = async (precadastro: PreCadastro) => {
+    Alert.alert(
+      'Converter Pré-cadastro',
+      `Deseja converter o pré-cadastro de ${precadastro.nome || precadastro.email} em aluno?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Converter',
+          onPress: async () => {
+            try {
+              await funcionarioService.converterPrecadastro(precadastro.id);
+              Alert.alert('Sucesso', 'Pré-cadastro convertido em aluno com sucesso! Um convite de ativação foi enviado por e-mail.');
+              await loadPrecadastros();
+              await loadGerenteData();
+            } catch (error: any) {
+              Alert.alert('Erro', error.response?.data?.error || 'Erro ao converter pré-cadastro.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const renderAlunos = () => {
+    const alunosAtivos = alunos.filter(a => a.ativo).length;
+    const alunosInativos = alunos.filter(a => !a.ativo).length;
+
+    return (
+      <ScrollView
+        style={styles.content}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Estatísticas</Text>
+          <View style={styles.statsGrid}>
+            <View style={styles.statCard}>
+              <Text style={styles.statTitle}>Total de Alunos</Text>
+              <Text style={styles.statValue}>{alunos.length}</Text>
+            </View>
+            
+            <View style={styles.statCard}>
+              <Text style={styles.statTitle}>Alunos Ativos</Text>
+              <Text style={[styles.statValue, { color: '#4caf50' }]}>
+                {alunosAtivos}
+              </Text>
+            </View>
+            
+            <View style={styles.statCard}>
+              <Text style={styles.statTitle}>Alunos Inativos</Text>
+              <Text style={[styles.statValue, { color: '#f44336' }]}>
+                {alunosInativos}
+              </Text>
+            </View>
           </View>
         </View>
 
-        <TouchableOpacity style={styles.actionButton}>
-          <Text style={styles.actionButtonText}>Ver Todos os Alunos</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity style={styles.actionButton}>
-          <Text style={styles.actionButtonText}>Cadastrar Novo Aluno</Text>
-        </TouchableOpacity>
-      </View>
-    </ScrollView>
-  );
+        {precadastros.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Pré-cadastros Pendentes ({precadastros.length})</Text>
+            {precadastros.map(precadastro => (
+              <View key={precadastro.id} style={styles.precadastroCard}>
+                <View style={styles.precadastroHeader}>
+                  <View style={styles.precadastroInfo}>
+                    <Text style={styles.precadastroNome}>
+                      {precadastro.nome || `${precadastro.first_name || ''} ${precadastro.last_name || ''}`.trim() || 'Sem nome'}
+                    </Text>
+                    <Text style={styles.precadastroEmail}>{precadastro.email}</Text>
+                    {precadastro.telefone && (
+                      <Text style={styles.precadastroTelefone}>{precadastro.telefone}</Text>
+                    )}
+                  </View>
+                  <View style={[styles.statusBadge, { backgroundColor: '#ff9800' }]}>
+                    <Text style={styles.statusText}>Pendente</Text>
+                  </View>
+                </View>
+                <Text style={styles.precadastroDate}>
+                  Cadastrado em: {new Date(precadastro.criado_em).toLocaleDateString('pt-BR')}
+                </Text>
+                <TouchableOpacity
+                  style={styles.converterButton}
+                  onPress={() => handleConverterPrecadastro(precadastro)}
+                >
+                  <Text style={styles.converterButtonText}>Converter em Aluno</Text>
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
+        )}
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Lista de Alunos ({alunos.length})</Text>
+          {alunos.length === 0 ? (
+            <Text style={styles.noData}>Nenhum aluno encontrado.</Text>
+          ) : (
+            alunos.map(aluno => (
+              <TouchableOpacity
+                key={aluno.id}
+                style={styles.alunoCard}
+                onPress={() => {
+                  Alert.alert(
+                    aluno.first_name + ' ' + aluno.last_name,
+                    `Email: ${aluno.email}\n` +
+                    `Telefone: ${aluno.telefone || 'Não informado'}\n` +
+                    `Status: ${aluno.ativo ? 'Ativo' : 'Inativo'}`,
+                    [{ text: 'OK' }]
+                  );
+                }}
+              >
+                <View style={styles.alunoHeader}>
+                  <View style={styles.alunoInfo}>
+                    <Text style={styles.alunoNome}>
+                      {aluno.first_name} {aluno.last_name}
+                    </Text>
+                    <Text style={styles.alunoEmail}>{aluno.email}</Text>
+                  </View>
+                  <View style={[
+                    styles.statusBadge,
+                    { backgroundColor: aluno.ativo ? '#4caf50' : '#f44336' }
+                  ]}>
+                    <Text style={styles.statusText}>
+                      {aluno.ativo ? 'Ativo' : 'Inativo'}
+                    </Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            ))
+          )}
+        </View>
+      </ScrollView>
+    );
+  };
+
+  const handleGerarRelatorioFinanceiro = async () => {
+    try {
+      const relatorio = await financeiroService.getRelatorioFinanceiro();
+      Alert.alert(
+        'Relatório Financeiro',
+        `Receitas: ${formatCurrency(relatorio.receitas || 0)}\n` +
+        `Despesas: ${formatCurrency(relatorio.despesas || 0)}\n` +
+        `Saldo: ${formatCurrency((relatorio.receitas || 0) - (relatorio.despesas || 0))}`,
+        [{ text: 'OK' }]
+      );
+    } catch (error: any) {
+      Alert.alert('Erro', error.response?.data?.error || 'Erro ao gerar relatório financeiro.');
+    }
+  };
 
   const renderRelatorios = () => (
     <ScrollView style={styles.content}>
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Relatórios</Text>
+        <Text style={styles.sectionTitle}>Relatórios Disponíveis</Text>
         
-        <TouchableOpacity style={styles.reportCard}>
+        <TouchableOpacity
+          style={styles.reportCard}
+          onPress={handleGerarRelatorioFinanceiro}
+        >
           <Text style={styles.reportTitle}>Relatório Financeiro</Text>
           <Text style={styles.reportDescription}>
             Relatório detalhado de receitas e despesas
           </Text>
         </TouchableOpacity>
         
-        <TouchableOpacity style={styles.reportCard}>
+        <TouchableOpacity
+          style={styles.reportCard}
+          onPress={() => {
+            Alert.alert('Em Desenvolvimento', 'Esta funcionalidade será implementada em breve.');
+          }}
+        >
           <Text style={styles.reportTitle}>Relatório de Presença</Text>
           <Text style={styles.reportDescription}>
             Estatísticas de presença por turma
           </Text>
         </TouchableOpacity>
         
-        <TouchableOpacity style={styles.reportCard}>
+        <TouchableOpacity
+          style={styles.reportCard}
+          onPress={() => {
+            Alert.alert('Em Desenvolvimento', 'Esta funcionalidade será implementada em breve.');
+          }}
+        >
           <Text style={styles.reportTitle}>Relatório de Alunos</Text>
           <Text style={styles.reportDescription}>
             Dados demográficos e performance dos alunos
           </Text>
         </TouchableOpacity>
         
-        <TouchableOpacity style={styles.reportCard}>
+        <TouchableOpacity
+          style={styles.reportCard}
+          onPress={() => {
+            Alert.alert('Em Desenvolvimento', 'Esta funcionalidade será implementada em breve.');
+          }}
+        >
           <Text style={styles.reportTitle}>Relatório de Turmas</Text>
           <Text style={styles.reportDescription}>
             Análise de ocupação e performance das turmas
@@ -297,6 +513,77 @@ const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Header */}
+      {painelGerente && (
+        <View style={styles.mainHeader}>
+          <View style={styles.headerContent}>
+            <View style={styles.profilePhoto}>
+              {painelGerente.foto_perfil ? (
+                <Image
+                  source={{ uri: `${CONFIG.API_BASE_URL.replace('/api/', '')}${painelGerente.foto_perfil}` }}
+                  style={styles.profileImageHeader}
+                />
+              ) : (
+                <View style={styles.profileInitialsHeader}>
+                  <Text style={styles.profileInitialsTextHeader}>
+                    {getInitials(`${painelGerente.first_name} ${painelGerente.last_name}`)}
+                  </Text>
+                </View>
+              )}
+            </View>
+            <View style={styles.headerInfo}>
+              <Text style={styles.headerName}>
+                {painelGerente.first_name} {painelGerente.last_name}
+              </Text>
+              <Text style={styles.headerRole}>Gerente</Text>
+            </View>
+            <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
+              <Text style={styles.logoutText}>Sair</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
+      {/* Navigation Tabs */}
+      <View style={styles.tabs}>
+        <TouchableOpacity
+          style={[styles.tab, activeSection === 'dashboard' && styles.activeTab]}
+          onPress={() => setActiveSection('dashboard')}
+        >
+          <Text style={[styles.tabText, activeSection === 'dashboard' && styles.activeTabText]}>
+            Dashboard
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, activeSection === 'financeiro' && styles.activeTab]}
+          onPress={() => setActiveSection('financeiro')}
+        >
+          <Text style={[styles.tabText, activeSection === 'financeiro' && styles.activeTabText]}>
+            Financeiro
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, activeSection === 'alunos' && styles.activeTab]}
+          onPress={() => {
+            setActiveSection('alunos');
+            loadPrecadastros();
+          }}
+        >
+          <Text style={[styles.tabText, activeSection === 'alunos' && styles.activeTabText]}>
+            Alunos
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, activeSection === 'relatorios' && styles.activeTab]}
+          onPress={() => setActiveSection('relatorios')}
+        >
+          <Text style={[styles.tabText, activeSection === 'relatorios' && styles.activeTabText]}>
+            Relatórios
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Content */}
       {activeSection === 'dashboard' && renderDashboard()}
       {activeSection === 'financeiro' && renderFinanceiro()}
       {activeSection === 'alunos' && renderAlunos()}
@@ -360,8 +647,8 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   logoutText: {
-    color: '#f44336',
-    fontSize: 16,
+    color: '#fff',
+    fontSize: 14,
     fontWeight: '600',
   },
   statsGrid: {
@@ -524,6 +811,169 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 16,
     fontSize: 16,
+    color: '#666',
+  },
+  mainHeader: {
+    backgroundColor: '#1a237e',
+    paddingVertical: 20,
+    paddingHorizontal: 16,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  profilePhoto: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  profileImageHeader: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+  },
+  profileInitialsHeader: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  profileInitialsTextHeader: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#1a237e',
+  },
+  headerInfo: {
+    flex: 1,
+  },
+  headerName: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  headerRole: {
+    color: '#fff',
+    fontSize: 14,
+    opacity: 0.8,
+  },
+  tabs: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  activeTab: {
+    borderBottomWidth: 2,
+    borderBottomColor: '#1a237e',
+  },
+  tabText: {
+    fontSize: 14,
+    color: '#666',
+  },
+  activeTabText: {
+    color: '#1a237e',
+    fontWeight: 'bold',
+  },
+  warningBox: {
+    backgroundColor: '#fff3cd',
+    borderRadius: 8,
+    padding: 16,
+    marginTop: 12,
+  },
+  warningTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#856404',
+    marginBottom: 8,
+  },
+  warningText: {
+    fontSize: 14,
+    color: '#856404',
+  },
+  mensalidadeInfo: {
+    flex: 1,
+  },
+  precadastroCard: {
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
+  },
+  precadastroHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 8,
+  },
+  precadastroInfo: {
+    flex: 1,
+    marginRight: 12,
+  },
+  precadastroNome: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 4,
+  },
+  precadastroEmail: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 2,
+  },
+  precadastroTelefone: {
+    fontSize: 14,
+    color: '#666',
+  },
+  precadastroDate: {
+    fontSize: 12,
+    color: '#999',
+    marginBottom: 8,
+  },
+  converterButton: {
+    backgroundColor: '#1a237e',
+    borderRadius: 8,
+    padding: 12,
+    alignItems: 'center',
+  },
+  converterButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  alunoCard: {
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 8,
+  },
+  alunoHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  alunoInfo: {
+    flex: 1,
+    marginRight: 12,
+  },
+  alunoNome: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 4,
+  },
+  alunoEmail: {
+    fontSize: 14,
     color: '#666',
   },
 });

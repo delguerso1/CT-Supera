@@ -1,0 +1,239 @@
+openapi: 3.0.3
+info:
+  title: Notificações
+  version: 1.0.6
+  description: |-
+    ## O que é?
+    A API de notificações permite que você receba notificações sempre que o status de um objeto criado por você for modificado. As notificações são enviadas via chamadas HTTP para uma URL configurada por você e são iniciadas do nosso lado.
+
+    ## Endereços dos ambientes:
+
+    | Ambiente | Host                                 | Path          |
+    |:--------:|------------------------------------- |---------------|
+    | Sandbox  | https://baas-api-sandbox.c6bank.info | /v1/webhooks/ |
+    | Produção | https://baas-api.c6bank.info         | /v1/webhooks/ |
+
+    ## Tipos de notificações por produto
+    A tabela abaixo descreve os status notificados para cada um dos produtos.
+
+    | Produto  |Service  | Notificação enviada quando |Status enviado  |
+    |:--------:|---------|----------------------------|----------------|
+    | Boleto   |BANK_SLIP| Criado                     |CREATED         |
+    |          |         | Alterado                   |CREATED         |
+    |          |         | Cancelado (em breve)       |CANCELLED       |
+    |          |         | Pago                       |PAID            |
+    | Checkout |CHECKOUT | Criado                     |CREATED         |
+    |          |         | Expirado                   |EXPIRED         |
+    |          |         | Autorizado                 |AUTHORIZED      |
+    |          |         | Negado                     |DECLINED        |
+    |          |         | Falha                      |ERROR           |
+    |          |         | Cancelado                  |CANCELLED       |
+    |          |         | Pago                       |PAID            |
+
+    ## Formato das notificações
+    Os produtos da tabela acima sempre enviam notificações no formato descrito em <a href="#model/webhooknotification">WebhookNotification</a>, com exceção do PIX, que retorna um array de <a href="https://developers.c6bank.com.br/apis/pix#model/pix">objetos PIX</a>, conforme <a href="https://developers.c6bank.com.br/apis/pix">contrato definido pelo BACEN</a>.
+    Alterações de webhook do PIX devem ser realizadas pela <a href="https://developers.c6bank.com.br/apis/pix">API PIX</a>.
+    Esta API se aplica a todos os outros produtos listados neste portal.
+
+    No menu, é possível explorar os diferentes métodos
+    da API e, na seção de Models, você pode aprender mais sobre os schemas utilizados em cada método.
+
+servers:
+  - url: https://baas-api-sandbox.c6bank.info/v1/webhooks
+    description: Ambiente sandbox
+  - url: https://baas-api.c6bank.info/v1/webhooks
+    description: Ambiente produtivo
+paths:
+  /:
+    parameters:
+      - $ref: '#/components/parameters/PartnerSoftwareName'
+      - $ref: '#/components/parameters/PartnerSoftwareVersion'
+    post:
+      tags:
+        - Webhook
+      summary: Registrar um novo webhook para receber notificações.
+      description: Registra um novo webhook para receber notificações.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WebhookRequest'
+      responses:
+        '200':
+          description: Webhook cadastrado com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookResponse'
+        '4XX':
+          description: Para descrição de erros visite a <a href="https://developers.c6bank.com.br/apis/errors">documentação correspondente</a>.
+        '5XX':
+          description: Para descrição de erros visite a <a href="https://developers.c6bank.com.br/apis/errors">documentação correspondente</a>.
+      security:
+        - OAuth2:
+            - 'webhook.write'
+    get:
+      tags:
+        - Webhook
+      summary: Buscar um webhook cadastrado.
+      description: Busca um webhook cadastrado.
+      parameters:
+        - $ref: "#/components/parameters/Service"
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookResponse'
+        '4XX':
+          description: Para descrição de erros visite a <a href="https://developers.c6bank.com.br/apis/errors">documentação correspondente</a>.
+        '5XX':
+          description: Para descrição de erros visite a <a href="https://developers.c6bank.com.br/apis/errors">documentação correspondente</a>.
+      security:
+        - OAuth2:
+            - 'webhook.write'
+    delete:
+      tags:
+        - Webhook
+      summary: Excluir um webhook cadastrado.
+      description: Exclui um webhook cadastrado.
+      parameters:
+        - $ref: "#/components/parameters/Service"
+      responses:
+        '204':
+          description: OK
+        '4XX':
+          description: Para descrição de erros visite a <a href="https://developers.c6bank.com.br/apis/errors">documentação correspondente</a>.
+        '5XX':
+          description: Para descrição de erros visite a <a href="https://developers.c6bank.com.br/apis/errors">documentação correspondente</a>.
+      security:
+        - OAuth2:
+            - 'webhook.write'
+components:
+  parameters:
+    PartnerSoftwareName:
+      in: header
+      name: partner-software-name
+      description: Nome do software do parceiro
+      schema:
+        type: string
+      required: false
+      example: "Super PDV"
+    PartnerSoftwareVersion:
+      in: header
+      name: partner-software-version
+      description: Versão do software do parceiro
+      schema:
+        type: string
+      required: false
+      example: "1.0.0"
+    Service:
+      in: query
+      name: service
+      description: Nome do serviço
+      schema:
+        type: string
+        enum:
+          - BANK_SLIP
+          - CHECKOUT
+      required: true
+      example: "BANK_SLIP"
+  schemas:
+    ClientId:
+      type: string
+      description: Client Id vinculado ao webhook.
+      example: 6abeb8cd-3dda-4f3a-b038-3b55c9d87d6a
+      readOnly: true
+    Service:
+      type: string
+      description: É o serviço para qual você deseja receber notificações. As notificações são enviadas somente para a mesma chave de integração que gera o objeto a ser notificado.
+        Por exemplo, digameos que se você tinha duas credenciais de integração (client_id A e client_id B) e cadastre um webhook para cada uma delas, usando URLs diferentes.
+        Ao gerar um boleto usando o client_id A, a notificação de pagamento deste boleto será enviada para a URL cadastrada pelo mesmo client_id.
+        Ao mesmo tempo, boletos cadastrados pelo client_id B serão somente notificados a webhook criado por essa mesma chave.
+        Isso é particularmente importate caso você faça uso de um mesmo produto (boleto, por exemplo) através de dois sistemas distintos.
+      enum:
+        - BANK_SLIP
+      example: BANK_SLIP
+    URL:
+      type: string
+      description: URL na qual você deseja receber a chamada de webhook. Um ponto de atenção importante é que somente são aceitas URLs seguras (https).
+      example: https://www.meuendereco.com.br/webhook/xpto
+    WebhookRequest:
+      type: object
+      required:
+        - url
+        - service
+      properties:
+        url:
+          $ref: "#/components/schemas/URL"
+        service:
+          $ref: "#/components/schemas/Service"
+    WebhookResponse:
+      type: object
+      properties:
+        service:
+          $ref: "#/components/schemas/Service"
+        client_id:
+          $ref: "#/components/schemas/ClientId"
+        url:
+          $ref: "#/components/schemas/URL"
+    WebhookNotification:
+      type: object
+      properties:
+        external_id:
+          type: string
+          description: É o id do objeto que está sendo notificado.
+          example: 19BE50723DAA4B0C91789457DC
+        date_time:
+          type: string
+          description: É a data e hora na qual esta notificação está sendo enviada
+          example: '2024-07-12T16:57:32.916512266Z'
+        client_id:
+          $ref: "#/components/schemas/ClientId"
+        partner_id:
+          type: string
+          description: É o identificador do parceiro associado a esta notificação
+          example: PARTNER20000
+        status:
+          type: string
+          description: Status da notificação
+          example: PAID
+        service:
+          $ref: "#/components/schemas/Service"
+        information:
+          type: string
+          description: É o objeto atualizado. Este objeto será diferente, conforme o "service" utilizado.
+          example: '{"external_reference_id":"A1234595",
+                      "amount":123.45,
+                      "due_date":"2024-11-25",
+                      "payer": {
+                        "name":"Nome do Pagador",
+                        "tax_id":"10551349727",
+                        "email":"pagador@email.com.br",
+                        "address":{
+                          "street":"Av. Nove de Julho",
+                          "number":123,
+                          "complement":"Complemento",
+                          "city":"Cidade",
+                          "state":"SP",
+                          "zip_code":"05093000"
+                        }
+                      },
+                      "id":"19BE50723DAA4B0C91789457DC",
+                      "status":"CREATED",
+                      "emission_date":"2024-07-12",
+                      "payment_date":null,
+                      "payment_amount":null,
+                      "internal_id":"A123456","digitable_line":"33690000090304872000175490351030193190000000100","bar_code":"00191878900000050000000002759288002193297817"
+                    }'
+  securitySchemes:
+    OAuth2:
+      type: oauth2
+      flows:
+        clientCredentials:
+          tokenUrl: https://baas-api-sandbox.c6bank.info/v1/auth
+          scopes:
+            'webhook.write': cadastrar e excluir webhooks
+            'webhook.read': consultar webhooks

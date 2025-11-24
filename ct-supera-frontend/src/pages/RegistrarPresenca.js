@@ -117,7 +117,7 @@ function RegistrarPresenca({ turmaId, onSuccess }) {
         type="submit" 
         style={{ 
           marginTop: 12, 
-          background: '#1a237e', 
+          background: '#1F6C86', 
           color: '#fff', 
           border: 'none', 
           borderRadius: 4, 

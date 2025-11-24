@@ -236,14 +236,14 @@ function CadastroTurmas({ centroId, styles }) {
   return (
     <div style={styles.card}>
       <h2 style={styles.cardTitle}>
-        Turmas do Centro: <span style={{ color: '#1a237e' }}>{centroNome}</span>
+        Turmas do Centro: <span style={{ color: '#1F6C86' }}>{centroNome}</span>
       </h2>
 
       {!showForm && (
         <button
           onClick={handleNovaTurma}
           style={{
-            backgroundColor: '#1a237e',
+            backgroundColor: '#1F6C86',
             color: 'white',
             padding: '0.75rem 1.5rem',
             borderRadius: '4px',
@@ -253,7 +253,7 @@ function CadastroTurmas({ centroId, styles }) {
             marginBottom: 16,
           }}
           onMouseEnter={(e) => e.target.style.backgroundColor = '#151b60'}
-          onMouseLeave={(e) => e.target.style.backgroundColor = '#1a237e'}
+          onMouseLeave={(e) => e.target.style.backgroundColor = '#1F6C86'}
         >
           Cadastrar Nova Turma
         </button>
@@ -294,7 +294,7 @@ function CadastroTurmas({ centroId, styles }) {
                 <td style={{ padding: 10 }}>
                   <button
                     style={{ 
-                      color: '#1a237e', 
+                      color: '#1F6C86', 
                       textDecoration: 'underline', 
                       cursor: 'pointer',
                       background: 'none',
@@ -530,7 +530,7 @@ function CadastroTurmas({ centroId, styles }) {
             <button
               type="submit"
               style={{
-                backgroundColor: '#1a237e',
+                backgroundColor: '#1F6C86',
                 color: 'white',
                 padding: '0.75rem 1.5rem',
                 borderRadius: '4px',
@@ -540,7 +540,7 @@ function CadastroTurmas({ centroId, styles }) {
                 flex: 1,
               }}
               onMouseEnter={(e) => e.target.style.backgroundColor = '#151b60'}
-              onMouseLeave={(e) => e.target.style.backgroundColor = '#1a237e'}
+              onMouseLeave={(e) => e.target.style.backgroundColor = '#1F6C86'}
             >
               {editId ? 'Salvar' : 'Cadastrar'}
             </button>
@@ -734,7 +734,7 @@ function CadastroTurmas({ centroId, styles }) {
               onClick={() => setShowAlunosModal(false)}
               style={{
                 marginTop: 16,
-                backgroundColor: '#1a237e',
+                backgroundColor: '#1F6C86',
                 color: 'white',
                 border: 'none',
                 borderRadius: '4px',
@@ -743,7 +743,7 @@ function CadastroTurmas({ centroId, styles }) {
                 cursor: 'pointer',
               }}
               onMouseEnter={(e) => e.target.style.backgroundColor = '#151b60'}
-              onMouseLeave={(e) => e.target.style.backgroundColor = '#1a237e'}
+              onMouseLeave={(e) => e.target.style.backgroundColor = '#1F6C86'}
             >
               Fechar
             </button>

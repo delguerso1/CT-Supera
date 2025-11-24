@@ -206,6 +206,36 @@ class Usuario(AbstractUser):
         
         return not self.has_parq_restrictions()
 
+    def can_fill_parq_again(self):
+        """Verifica se o aluno pode preencher o questionário PAR-Q novamente (1 ano após o último preenchimento)."""
+        if not self.is_aluno():
+            return True
+        
+        # Se nunca preencheu, pode preencher
+        if not self.parq_completed or not self.parq_completion_date:
+            return True
+        
+        # Verifica se passou 1 ano desde o último preenchimento
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        data_preenchimento = self.parq_completion_date
+        if isinstance(data_preenchimento, str):
+            from django.utils.dateparse import parse_datetime
+            data_preenchimento = parse_datetime(data_preenchimento)
+        
+        if data_preenchimento:
+            # Se a data de preenchimento é datetime, converte para date
+            if hasattr(data_preenchimento, 'date'):
+                data_preenchimento = data_preenchimento.date()
+            
+            um_ano_depois = data_preenchimento + timedelta(days=365)
+            hoje = timezone.now().date()
+            
+            return hoje >= um_ano_depois
+        
+        return True
+
     @property
     def idade(self):
         """Calcula idade do usuário com base na data de nascimento."""

@@ -220,9 +220,9 @@ DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'administracao@ctsupera.com
 # URL do frontend para links de ativação
 FRONTEND_URL = os.getenv('FRONTEND_URL', 'https://ctsupera.com.br')
 
-# Configurações do Mercado Pago
-MERCADO_PAGO_ACCESS_TOKEN = os.getenv('MERCADO_PAGO_ACCESS_TOKEN', '')
-MERCADO_PAGO_PUBLIC_KEY = os.getenv('MERCADO_PAGO_PUBLIC_KEY', '')
+# Configurações de pagamento (removido)
+# PAYMENT_ACCESS_TOKEN = os.getenv('PAYMENT_ACCESS_TOKEN', '')
+# PAYMENT_PUBLIC_KEY = os.getenv('PAYMENT_PUBLIC_KEY', '')
 
 # Configurações de logging para produção
 LOGGING = {

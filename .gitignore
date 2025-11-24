@@ -92,6 +92,11 @@ secrets.yml
 .secrets/
 CREDENTIALS.md
 .env
+env_template.txt
+hostinger.env.example
+C6_BANK_CONFIG.example
+env_c6_example.txt
+Markdowns/
 *.key
 *.pem
 id_rsa*

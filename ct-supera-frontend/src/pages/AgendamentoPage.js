@@ -12,7 +12,7 @@ const styles = {
     textAlign: 'center'
   },
   title: {
-    color: '#1a237e',
+    color: '#1F6C86',
     fontWeight: 'bold',
     marginBottom: '24px'
   },
@@ -25,7 +25,7 @@ const styles = {
     fontSize: '1rem'
   },
   button: {
-    backgroundColor: '#1a237e',
+    backgroundColor: '#1F6C86',
     color: 'white',
     padding: '10px 24px',
     border: 'none',

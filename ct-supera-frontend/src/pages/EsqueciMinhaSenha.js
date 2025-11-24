@@ -66,7 +66,7 @@ const EsqueciMinhaSenha = () => {
     container: {
       display: 'flex',
       minHeight: '100vh',
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      background: 'linear-gradient(135deg, #1F6C86 0%, #155a6e 100%)',
       alignItems: 'center',
       justifyContent: 'center',
       padding: '20px',
@@ -116,10 +116,10 @@ const EsqueciMinhaSenha = () => {
       outline: 'none',
     },
     inputFocus: {
-      borderColor: '#667eea',
+      borderColor: '#1F6C86',
     },
     button: {
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      background: 'linear-gradient(135deg, #1F6C86 0%, #155a6e 100%)',
       color: 'white',
       border: 'none',
       padding: '14px 24px',
@@ -132,7 +132,7 @@ const EsqueciMinhaSenha = () => {
     },
     buttonHover: {
       transform: 'translateY(-2px)',
-      boxShadow: '0 6px 20px rgba(102, 126, 234, 0.4)',
+      boxShadow: '0 6px 20px rgba(31, 108, 134, 0.4)',
     },
     buttonDisabled: {
       opacity: 0.6,
@@ -141,8 +141,8 @@ const EsqueciMinhaSenha = () => {
     },
     backButton: {
       background: 'transparent',
-      color: '#667eea',
-      border: '2px solid #667eea',
+      color: '#1F6C86',
+      border: '2px solid #1F6C86',
       padding: '12px 24px',
       borderRadius: '8px',
       fontSize: '16px',

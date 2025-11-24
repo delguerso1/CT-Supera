@@ -1,10 +1,12 @@
 import axios from 'axios';
 
 // Define a URL base dinamicamente com base no ambiente
-const baseURL = process.env.REACT_APP_API_URL || 'https://ctsupera.com.br/api/';
+// Em desenvolvimento (localhost), usa o backend local; caso contrário, usa produção
+const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+const baseURL = process.env.REACT_APP_API_URL || (isDevelopment ? 'http://localhost:8000/api/' : 'https://ctsupera.com.br/api/');
 
 // Define a URL base para imagens/media
-export const MEDIA_URL = process.env.REACT_APP_MEDIA_URL || 'https://ctsupera.com.br';
+export const MEDIA_URL = process.env.REACT_APP_MEDIA_URL || (isDevelopment ? 'http://localhost:8000' : 'https://ctsupera.com.br');
 
 const api = axios.create({
   baseURL: baseURL,

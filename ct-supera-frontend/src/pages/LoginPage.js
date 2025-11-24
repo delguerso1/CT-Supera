@@ -5,7 +5,7 @@ import api from '../services/api';
 const styles = {
   container: {
     minHeight: '100vh',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    background: 'linear-gradient(135deg, #1F6C86 0%, #155a6e 100%)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -56,11 +56,11 @@ const styles = {
     transition: 'border-color 0.3s ease',
     outline: 'none',
     '&:focus': {
-      borderColor: '#667eea',
+      borderColor: '#1F6C86',
     },
   },
   button: {
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    backgroundColor: '#E0CC98',
     color: 'white',
     padding: '14px 24px',
     border: 'none',
@@ -68,11 +68,12 @@ const styles = {
     fontSize: '16px',
     fontWeight: '600',
     cursor: 'pointer',
-    transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+    transition: 'transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease',
     marginTop: '10px',
     '&:hover': {
       transform: 'translateY(-2px)',
-      boxShadow: '0 6px 20px rgba(102, 126, 234, 0.4)',
+      backgroundColor: '#D4C088',
+      boxShadow: '0 6px 20px rgba(224, 204, 152, 0.4)',
     },
   },
   error: {
@@ -99,18 +100,18 @@ const styles = {
     marginBottom: '8px',
   },
   forgotPasswordLink: {
-    color: '#667eea',
+    color: '#1F6C86',
     textDecoration: 'none',
     fontSize: '14px',
     fontWeight: '600',
     padding: '8px 16px',
     borderRadius: '6px',
     backgroundColor: 'white',
-    border: '1px solid #667eea',
+    border: '1px solid #1F6C86',
     display: 'inline-block',
     transition: 'all 0.3s ease',
     '&:hover': {
-      backgroundColor: '#667eea',
+      backgroundColor: '#1F6C86',
       color: 'white',
     },
   },

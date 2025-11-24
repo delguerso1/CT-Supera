@@ -11,7 +11,11 @@ class UsuarioSerializer(serializers.ModelSerializer):
             'id', 'username', 'email', 'first_name', 'last_name',
             'data_nascimento', 'tipo', 'telefone', 'endereco',
             'nome_responsavel', 'telefone_responsavel', 'telefone_emergencia',
-            'ficha_medica', 'ativo', 'foto_perfil'
+            'ficha_medica', 'ativo', 'foto_perfil',
+            # Campos do PAR-Q
+            'parq_question_1', 'parq_question_2', 'parq_question_3', 'parq_question_4',
+            'parq_question_5', 'parq_question_6', 'parq_question_7',
+            'parq_completed', 'parq_completion_date'
         ]
 
 class MensalidadeSerializer(serializers.ModelSerializer):

@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 
 const styles = {
   navbar: {
-    backgroundColor: '#1a237e',
+    backgroundColor: '#1F6C86',
     padding: '1rem',
     color: 'white',
     position: 'relative',
@@ -16,11 +16,16 @@ const styles = {
     margin: '0 auto',
   },
   logo: {
-    fontSize: '1.5rem',
-    fontWeight: 'bold',
-    color: 'white',
+    display: 'flex',
+    alignItems: 'center',
     textDecoration: 'none',
     zIndex: 11,
+  },
+  logoImage: {
+    height: '60px',
+    width: 'auto',
+    maxWidth: '200px',
+    objectFit: 'contain',
   },
   navLinks: {
     display: 'flex',
@@ -36,7 +41,7 @@ const styles = {
     },
   },
   loginButton: {
-    backgroundColor: '#4caf50',
+    backgroundColor: '#E0CC98',
     color: 'white',
     padding: '0.5rem 1rem',
     borderRadius: '4px',
@@ -45,7 +50,7 @@ const styles = {
     position: 'relative',
     transition: 'background-color 0.3s ease',
     '&:hover': {
-      backgroundColor: '#45a049',
+      backgroundColor: '#D4C088',
     },
   },
   dropdown: {
@@ -53,7 +58,7 @@ const styles = {
     top: '110%',
     right: 0,
     background: 'white',
-    color: '#1a237e',
+    color: '#1F6C86',
     borderRadius: '4px',
     boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
     minWidth: '120px',
@@ -67,7 +72,7 @@ const styles = {
     border: 'none',
     width: '100%',
     textAlign: 'left',
-    color: '#1a237e',
+    color: '#1F6C86',
     fontSize: '1rem',
     transition: 'background-color 0.3s ease',
     '&:hover': {
@@ -91,7 +96,7 @@ const styles = {
     top: '100%',
     left: 0,
     right: 0,
-    backgroundColor: '#1a237e',
+    backgroundColor: '#1F6C86',
     flexDirection: 'column',
     padding: '1rem',
     boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
@@ -206,8 +211,12 @@ function Navbar() {
   return (
     <nav style={styles.navbar}>
       <div style={styles.container}>
-        <Link to="/" style={styles.logo}>
-          CT Supera
+        <Link to="/" className="logo" style={styles.logo}>
+          <img 
+            src="/logo-supera-principal.png" 
+            alt="CT Supera - Centro de Treinamento" 
+            style={styles.logoImage}
+          />
         </Link>
         
         {/* Menu desktop */}

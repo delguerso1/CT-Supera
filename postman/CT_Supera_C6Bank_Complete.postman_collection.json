@@ -1,0 +1,1168 @@
+{
+  "info": {
+    "name": "CT Supera - C6 Bank Complete API",
+    "_postman_id": "ct-supera-c6bank-complete-2025",
+    "description": "Coleção completa para todas as APIs do C6 Bank integradas ao sistema CT Supera: PIX, Boleto, Checkout e APIs do sistema Django.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "1.0.0"
+  },
+  "item": [
+    {
+      "name": "1. Autenticação",
+      "item": [
+        {
+          "name": "C6 Bank - Obter Token OAuth2",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Basic {{basic_b64}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "client_credentials",
+                  "type": "text"
+                },
+                {
+                  "key": "scope",
+                  "value": "cob.write cob.read cobv.write cobv.read pix.write pix.read webhook.write webhook.read",
+                  "type": "text",
+                  "description": "Escopos necessários para operações PIX"
+                }
+              ]
+            },
+            "url": {
+              "raw": "https://baas-api-sandbox.c6bank.info/v1/auth/",
+              "protocol": "https",
+              "host": [
+                "baas-api-sandbox",
+                "c6bank",
+                "info"
+              ],
+              "path": [
+                "v1",
+                "auth",
+                ""
+              ]
+            },
+            "description": "Obtém access_token via OAuth2 (client_credentials). Requer certificados SSL mTLS configurados no Postman. Inclui escopos necessários para operações PIX (cob.write, cob.read, cobv.write, cobv.read, pix.write, pix.read, webhook.write, webhook.read)."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Gera Authorization Basic a partir de client_id e client_secret",
+                  "if (!pm.environment.get('basic_b64')) {",
+                  "  const id = pm.environment.get('client_id') || '';",
+                  "  const secret = pm.environment.get('client_secret') || '';",
+                  "  const raw = id + ':' + secret;",
+                  "  pm.environment.set('basic_b64', btoa(raw));",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "if (json && json.access_token) {",
+                  "  pm.environment.set('access_token', json.access_token);",
+                  "  if (json.expires_in) pm.environment.set('access_token_expires_in', json.expires_in.toString());",
+                  "  if (json.scope) console.log('Escopos obtidos: ' + json.scope);",
+                  "  console.log('Token salvo com sucesso!');",
+                  "} else {",
+                  "  console.log('Erro ao obter token. Verifique certificados SSL e credenciais.');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "CT Supera - Testar Conexão C6 Bank",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{django_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{django_base_url}}/api/financeiro/c6/test-connection/",
+              "host": ["{{django_base_url}}"],
+              "path": ["api", "financeiro", "c6", "test-connection"]
+            },
+            "description": "Testa a conexão com C6 Bank através do sistema Django. Requer autenticação Django."
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. PIX - Cobranças",
+      "item": [
+        {
+          "name": "C6 Bank - Criar Cobrança PIX Imediata",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"calendario\": {\n    \"expiracao\": 1800\n  },\n  \"valor\": {\n    \"original\": \"10.00\"\n  },\n  \"chave\": \"{{chave_pix}}\",\n  \"solicitacaoPagador\": \"CT Supera - Mensalidade Teste\"\n}"
+            },
+            "url": {
+              "raw": "{{pix_base}}/cob",
+              "host": ["{{pix_base}}"],
+              "path": ["cob"]
+            },
+            "description": "Cria cobrança PIX imediata com expiração em segundos (padrão: 1800 segundos = 30 minutos)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "if (json && json.txid) {",
+                  "  pm.environment.set('txid', json.txid);",
+                  "  console.log('TXID salvo: ' + json.txid);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "C6 Bank - Criar Cobrança PIX Imediata com Devedor",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"calendario\": {\n    \"expiracao\": 3600\n  },\n  \"valor\": {\n    \"original\": \"10.00\"\n  },\n  \"chave\": \"{{chave_pix}}\",\n  \"solicitacaoPagador\": \"CT Supera - Mensalidade Teste\",\n  \"devedor\": {\n    \"cpf\": \"11144477735\",\n    \"nome\": \"João Silva\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{pix_base}}/cob",
+              "host": ["{{pix_base}}"],
+              "path": ["cob"]
+            },
+            "description": "Cria cobrança PIX imediata com identificação do devedor (CPF/CNPJ e Nome). Expiração em segundos (exemplo: 3600 = 1 hora). NOTA: Para cobrança imediata, o devedor só pode ter CPF/CNPJ e Nome. Email não é permitido (apenas em cobranças com vencimento). IMPORTANTE: O CPF/CNPJ deve ser válido. Use CPFs válidos para testes (ex: 11144477735)."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "if (json && json.txid) {",
+                  "  pm.environment.set('txid', json.txid);",
+                  "  console.log('TXID salvo: ' + json.txid);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "C6 Bank - Criar Cobrança PIX com Vencimento",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"calendario\": {\n    \"dataDeVencimento\": \"2025-12-31\",\n    \"validadeAposVencimento\": 30\n  },\n  \"devedor\": {\n    \"cpf\": \"11144477735\",\n    \"nome\": \"João Silva\",\n    \"logradouro\": \"Rua Exemplo, 123\",\n    \"cidade\": \"São Paulo\",\n    \"uf\": \"SP\",\n    \"cep\": \"01234567\",\n    \"email\": \"joao.silva@exemplo.com\"\n  },\n  \"valor\": {\n    \"original\": \"150.00\",\n    \"multa\": {\n      \"modalidade\": 2,\n      \"valorPerc\": \"15.00\"\n    },\n    \"juros\": {\n      \"modalidade\": 2,\n      \"valorPerc\": \"2.00\"\n    }\n  },\n  \"chave\": \"{{chave_pix}}\",\n  \"solicitacaoPagador\": \"CT Supera - Mensalidade com Vencimento\"\n}"
+            },
+            "url": {
+              "raw": "{{pix_base}}/cobv/{{txid_cobv}}",
+              "host": ["{{pix_base}}"],
+              "path": ["cobv", "{{txid_cobv}}"]
+            },
+            "description": "Cria cobrança PIX com vencimento. Requer TXID único (26-35 caracteres alfanuméricos), devedor com endereço completo, e permite configurar multa e juros. O TXID é gerado automaticamente se não existir."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Gera TXID único sempre (limpa valor antigo se existir)",
+                  "// TXID deve ter entre 26 e 35 caracteres alfanuméricos",
+                  "function gerarCaracteresAleatorios(tamanho) {",
+                  "  let resultado = '';",
+                  "  const caracteres = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';",
+                  "  for (let i = 0; i < tamanho; i++) {",
+                  "    resultado += caracteres.charAt(Math.floor(Math.random() * caracteres.length));",
+                  "  }",
+                  "  return resultado;",
+                  "}",
+                  "",
+                  "// Limpa variável antiga se existir (força geração de novo TXID)",
+                  "pm.environment.unset('txid_cobv');",
+                  "",
+                  "// Gera TXID com exatamente 32 caracteres (dentro do range 26-35)",
+                  "// Formato: COBV (4) + timestamp (6) + aleatório (22) = 32 caracteres",
+                  "const prefixo = 'COBV';",
+                  "const timestamp = Date.now().toString();",
+                  "const parteTimestamp = timestamp.slice(-6); // Últimos 6 dígitos",
+                  "const parteAleatoria = gerarCaracteresAleatorios(22); // 22 caracteres aleatórios",
+                  "const txid_final = prefixo + parteTimestamp + parteAleatoria;",
+                  "",
+                  "// Valida o tamanho (deve ser exatamente 32)",
+                  "if (txid_final.length !== 32) {",
+                  "  console.error('ERRO: TXID gerado com tamanho incorreto: ' + txid_final.length + ' (esperado: 32)');",
+                  "  // Gera um novo com tamanho garantido: COBV (4) + 28 aleatórios = 32",
+                  "  const txid_corrigido = prefixo + gerarCaracteresAleatorios(28);",
+                  "  pm.environment.set('txid_cobv', txid_corrigido);",
+                  "  console.log('TXID corrigido gerado: ' + txid_corrigido + ' (tamanho: ' + txid_corrigido.length + ')');",
+                  "} else {",
+                  "  pm.environment.set('txid_cobv', txid_final);",
+                  "  console.log('TXID gerado: ' + txid_final + ' (tamanho: ' + txid_final.length + ')');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "if (json && json.txid) {",
+                  "  pm.environment.set('txid_cobv', json.txid);",
+                  "  console.log('TXID salvo: ' + json.txid);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "C6 Bank - Consultar Cobrança PIX por TXID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{pix_base}}/cob/{{txid}}",
+              "host": ["{{pix_base}}"],
+              "path": ["cob", "{{txid}}"]
+            },
+            "description": "Consulta uma cobrança PIX específica pelo TXID."
+          }
+        },
+        {
+          "name": "C6 Bank - Listar Cobranças PIX Imediatas",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{pix_base}}/cob?inicio={{data_inicio}}&fim={{data_fim}}&paginaAtual=1&itensPorPagina=10",
+              "host": ["{{pix_base}}"],
+              "path": ["cob"],
+              "query": [
+                {
+                  "key": "inicio",
+                  "value": "{{data_inicio}}",
+                  "description": "Data início (ISO 8601, ex: 2025-01-01T00:00:00Z)"
+                },
+                {
+                  "key": "fim",
+                  "value": "{{data_fim}}",
+                  "description": "Data fim (ISO 8601, ex: 2025-01-31T23:59:59Z)"
+                },
+                {
+                  "key": "cpf",
+                  "value": "{{cpf_filtro}}",
+                  "description": "Filtro por CPF do devedor (11 dígitos, opcional)",
+                  "disabled": true
+                },
+                {
+                  "key": "cnpj",
+                  "value": "{{cnpj_filtro}}",
+                  "description": "Filtro por CNPJ do devedor (14 dígitos, opcional)",
+                  "disabled": true
+                },
+                {
+                  "key": "status",
+                  "value": "{{status_filtro}}",
+                  "description": "Filtro por status (opcional)",
+                  "disabled": true
+                },
+                {
+                  "key": "locationPresente",
+                  "value": "{{location_presente}}",
+                  "description": "Filtro por existência de location (opcional)",
+                  "disabled": true
+                },
+                {
+                  "key": "paginaAtual",
+                  "value": "1",
+                  "description": "Página atual"
+                },
+                {
+                  "key": "itensPorPagina",
+                  "value": "10",
+                  "description": "Itens por página"
+                }
+              ]
+            },
+            "description": "Lista cobranças PIX imediatas por período. Permite filtros por CPF, CNPJ, status e location presente."
+          }
+        },
+        {
+          "name": "C6 Bank - Listar Cobranças PIX com Vencimento",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{pix_base}}/cobv?inicio={{data_inicio}}&fim={{data_fim}}&paginaAtual=1&itensPorPagina=10",
+              "host": ["{{pix_base}}"],
+              "path": ["cobv"],
+              "query": [
+                {
+                  "key": "inicio",
+                  "value": "{{data_inicio}}",
+                  "description": "Data início (ISO 8601, ex: 2025-01-01T00:00:00Z)"
+                },
+                {
+                  "key": "fim",
+                  "value": "{{data_fim}}",
+                  "description": "Data fim (ISO 8601, ex: 2025-01-31T23:59:59Z)"
+                },
+                {
+                  "key": "cpf",
+                  "value": "{{cpf_filtro}}",
+                  "description": "Filtro por CPF do devedor (11 dígitos, opcional)",
+                  "disabled": true
+                },
+                {
+                  "key": "cnpj",
+                  "value": "{{cnpj_filtro}}",
+                  "description": "Filtro por CNPJ do devedor (14 dígitos, opcional)",
+                  "disabled": true
+                },
+                {
+                  "key": "status",
+                  "value": "{{status_filtro}}",
+                  "description": "Filtro por status (opcional)",
+                  "disabled": true
+                },
+                {
+                  "key": "loteCobVId",
+                  "value": "{{lote_cobv_id}}",
+                  "description": "Filtro por ID do lote (opcional)",
+                  "disabled": true
+                },
+                {
+                  "key": "locationPresente",
+                  "value": "{{location_presente}}",
+                  "description": "Filtro por existência de location (opcional)",
+                  "disabled": true
+                },
+                {
+                  "key": "paginaAtual",
+                  "value": "1",
+                  "description": "Página atual"
+                },
+                {
+                  "key": "itensPorPagina",
+                  "value": "10",
+                  "description": "Itens por página"
+                }
+              ]
+            },
+            "description": "Lista cobranças PIX com vencimento por período. Permite filtros por CPF, CNPJ, status, lote e location presente."
+          }
+        },
+        {
+          "name": "C6 Bank - Consultar Cobrança PIX com Vencimento",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{pix_base}}/cobv/{{txid_cobv}}",
+              "host": ["{{pix_base}}"],
+              "path": ["cobv", "{{txid_cobv}}"]
+            },
+            "description": "Consulta uma cobrança PIX com vencimento específica pelo TXID."
+          }
+        },
+        {
+          "name": "C6 Bank - Configurar Webhook PIX",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"webhookUrl\": \"{{webhook_url}}\"\n}"
+            },
+            "url": {
+              "raw": "{{pix_base}}/webhook/{{chave_pix}}",
+              "host": ["{{pix_base}}"],
+              "path": ["webhook", "{{chave_pix}}"]
+            },
+            "description": "Configura webhook para receber notificações de PIX pagos."
+          }
+        },
+        {
+          "name": "CT Supera - Gerar PIX para Mensalidade",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{django_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mensalidade_id\": 1\n}"
+            },
+            "url": {
+              "raw": "{{django_base_url}}/api/financeiro/pix/gerar/{{mensalidade_id}}/",
+              "host": ["{{django_base_url}}"],
+              "path": ["api", "financeiro", "pix", "gerar", "{{mensalidade_id}}"]
+            },
+            "description": "Gera cobrança PIX para uma mensalidade através do sistema Django."
+          }
+        },
+        {
+          "name": "CT Supera - Consultar Status PIX",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{django_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{django_base_url}}/api/financeiro/pix/status/{{transacao_id}}/",
+              "host": ["{{django_base_url}}"],
+              "path": ["api", "financeiro", "pix", "status", "{{transacao_id}}"]
+            },
+            "description": "Consulta o status de uma transação PIX através do sistema Django."
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Boleto Bancário",
+      "item": [
+        {
+          "name": "C6 Bank - Emitir Boleto Simples",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "partner-software-name",
+                "value": "CT Supera",
+                "type": "text"
+              },
+              {
+                "key": "partner-software-version",
+                "value": "1.0.0",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"external_reference_id\": \"B{{timestamp}}\",\n  \"amount\": 10.00,\n  \"due_date\": \"2025-11-12\",\n  \"payer\": {\n    \"name\": \"João Silva\",\n    \"tax_id\": \"12345678909\",\n    \"email\": \"joao.silva@exemplo.com\",\n    \"address\": {\n      \"street\": \"Av. Nove de Julho\",\n      \"number\": 123,\n      \"complement\": \"\",\n      \"city\": \"São Paulo\",\n      \"state\": \"SP\",\n      \"zip_code\": \"05093000\"\n    }\n  },\n  \"instructions\": [\n    \"Não receber após o vencimento\",\n    \"Mensalidade CT Supera\"\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{bankslip_base}}/",
+              "host": ["{{bankslip_base}}"],
+              "path": [""]
+            },
+            "description": "Emite um boleto bancário simples sem juros ou multa."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Gera timestamp para external_reference_id único",
+                  "const timestamp = Date.now().toString().slice(-9);",
+                  "pm.environment.set('timestamp', timestamp);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "if (json && json.id) {",
+                  "  pm.environment.set('boleto_id', json.id);",
+                  "  console.log('Boleto ID salvo: ' + json.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "C6 Bank - Emitir Boleto com Juros e Multa",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              },
+              {
+                "key": "partner-software-name",
+                "value": "CT Supera",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"external_reference_id\": \"{{external_ref_jm}}\",\n  \"amount\": 10.00,\n  \"due_date\": \"2025-11-12\",\n  \"payer\": {\n    \"name\": \"João Silva\",\n    \"tax_id\": \"12345678909\",\n    \"address\": {\n      \"street\": \"Av. Nove de Julho\",\n      \"number\": 123,\n      \"city\": \"São Paulo\",\n      \"state\": \"SP\",\n      \"zip_code\": \"05093000\"\n    }\n  },\n  \"interest\": {\n    \"type\": \"P\",\n    \"value\": 1.0,\n    \"dead_line\": 0\n  },\n  \"fine\": {\n    \"type\": \"P\",\n    \"value\": 2.0,\n    \"dead_line\": 0\n  }\n}"
+            },
+            "url": {
+              "raw": "{{bankslip_base}}/",
+              "host": ["{{bankslip_base}}"],
+              "path": [""]
+            },
+            "description": "Emite boleto com juros diários (1%) e multa (2%) após vencimento."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Gera external_reference_id válido (máximo 10 caracteres)",
+                  "// Formato: B + últimos 7 dígitos do timestamp + JM = B1234567JM (10 caracteres)",
+                  "const timestamp = Date.now().toString();",
+                  "const last7 = timestamp.slice(-7);",
+                  "const externalRef = 'B' + last7 + 'JM';",
+                  "pm.environment.set('external_ref_jm', externalRef);",
+                  "console.log('external_reference_id gerado: ' + externalRef + ' (' + externalRef.length + ' caracteres)');"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "if (json && json.id) {",
+                  "  pm.environment.set('boleto_id', json.id);",
+                  "  console.log('Boleto ID salvo: ' + json.id);",
+                  "  console.log('⚠️ IMPORTANTE: A resposta de criação não mostra juros e multa.');",
+                  "  console.log('Use a requisição \"Consultar Boleto\" para ver os campos interest e fine.');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "C6 Bank - Emitir Boleto com Desconto",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"external_reference_id\": \"{{external_ref_desc}}\",\n  \"amount\": 10.00,\n  \"due_date\": \"2025-11-12\",\n  \"payer\": {\n    \"name\": \"João Silva\",\n    \"tax_id\": \"12345678909\",\n    \"address\": {\n      \"street\": \"Av. Nove de Julho\",\n      \"number\": 123,\n      \"city\": \"São Paulo\",\n      \"state\": \"SP\",\n      \"zip_code\": \"05093000\"\n    }\n  },\n  \"discount\": {\n    \"discount_type\": \"P\",\n    \"first\": {\n      \"value\": 10.0,\n      \"dead_line\": 10\n    },\n    \"second\": {\n      \"value\": 5.0,\n      \"dead_line\": 5\n    }\n  }\n}"
+            },
+            "url": {
+              "raw": "{{bankslip_base}}/",
+              "host": ["{{bankslip_base}}"],
+              "path": [""]
+            },
+            "description": "Emite boleto com desconto progressivo (10% até 10 dias antes, 5% até 5 dias antes)."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Gera external_reference_id válido (máximo 10 caracteres)",
+                  "// Formato: B + últimos 6 dígitos do timestamp + DESC = B123456DESC (10 caracteres)",
+                  "const timestamp = Date.now().toString();",
+                  "const last6 = timestamp.slice(-6);",
+                  "const externalRef = 'B' + last6 + 'DESC';",
+                  "pm.environment.set('external_ref_desc', externalRef);",
+                  "console.log('external_reference_id gerado: ' + externalRef + ' (' + externalRef.length + ' caracteres)');"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "if (json && json.id) {",
+                  "  pm.environment.set('boleto_id', json.id);",
+                  "  console.log('Boleto ID salvo: ' + json.id);",
+                  "  console.log('⚠️ IMPORTANTE: A resposta de criação não mostra desconto.');",
+                  "  console.log('Use a requisição \"Consultar Boleto\" para ver os campos discount.');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "C6 Bank - Consultar Boleto",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              },
+              {
+                "key": "partner-software-name",
+                "value": "CT Supera",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{bankslip_base}}/{{boleto_id}}",
+              "host": ["{{bankslip_base}}"],
+              "path": ["{{boleto_id}}"]
+            },
+            "description": "Consulta um boleto pelo ID. Retorna todos os campos incluindo interest e fine."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "",
+                  "// Verifica se juros foram configurados",
+                  "if (json.interest) {",
+                  "  console.log('✅ JUROS CONFIGURADOS:');",
+                  "  console.log('  Tipo: ' + json.interest.type + ' (P=Percentual, V=Valor)');",
+                  "  console.log('  Valor: ' + json.interest.value);",
+                  "  console.log('  Dead Line: ' + json.interest.dead_line + ' dias');",
+                  "} else {",
+                  "  console.log('⚠️ Nenhum juro configurado');",
+                  "}",
+                  "",
+                  "// Verifica se multa foi configurada",
+                  "if (json.fine) {",
+                  "  console.log('✅ MULTA CONFIGURADA:');",
+                  "  console.log('  Tipo: ' + json.fine.type + ' (P=Percentual, V=Valor)');",
+                  "  console.log('  Valor: ' + json.fine.value);",
+                  "  console.log('  Dead Line: ' + json.fine.dead_line + ' dias');",
+                  "} else {",
+                  "  console.log('⚠️ Nenhuma multa configurada');",
+                  "}",
+                  "",
+                  "// Verifica se desconto foi configurado",
+                  "if (json.discount) {",
+                  "  console.log('✅ DESCONTO CONFIGURADO:');",
+                  "  console.log('  Tipo: ' + json.discount.discount_type);",
+                  "  if (json.discount.first) {",
+                  "    console.log('  Primeiro: ' + json.discount.first.value + ' até ' + json.discount.first.dead_line + ' dias antes');",
+                  "  }",
+                  "}",
+                  "",
+                  "console.log('\\n📋 DADOS COMPLETOS DO BOLETO:');",
+                  "console.log(JSON.stringify(json, null, 2));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "C6 Bank - Alterar Boleto",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 15.00,\n  \"due_date\": \"2025-11-20\",\n  \"fine\": {\n    \"type\": \"P\",\n    \"value\": 3.0,\n    \"dead_line\": 0\n  }\n}"
+            },
+            "url": {
+              "raw": "{{bankslip_base}}/{{boleto_id}}",
+              "host": ["{{bankslip_base}}"],
+              "path": ["{{boleto_id}}"]
+            },
+            "description": "Altera valor, data de vencimento e multa de um boleto."
+          }
+        },
+        {
+          "name": "C6 Bank - Cancelar Boleto",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{bankslip_base}}/{{boleto_id}}/cancel",
+              "host": ["{{bankslip_base}}"],
+              "path": ["{{boleto_id}}", "cancel"]
+            },
+            "description": "Cancela um boleto emitido."
+          }
+        },
+        {
+          "name": "C6 Bank - Download PDF do Boleto",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Accept",
+                "value": "application/pdf",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{bankslip_base}}/{{boleto_id}}/pdf",
+              "host": ["{{bankslip_base}}"],
+              "path": ["{{boleto_id}}", "pdf"]
+            },
+            "description": "Obtém o PDF do boleto."
+          }
+        },
+        {
+          "name": "CT Supera - Gerar Boleto para Mensalidade",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{django_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{django_base_url}}/api/financeiro/mensalidades/{{mensalidade_id}}/gerar-boleto/",
+              "host": ["{{django_base_url}}"],
+              "path": ["api", "financeiro", "mensalidades", "{{mensalidade_id}}", "gerar-boleto"]
+            },
+            "description": "Gera boleto bancário para uma mensalidade através do sistema Django."
+          }
+        },
+        {
+          "name": "CT Supera - Consultar Boleto",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{django_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{django_base_url}}/api/financeiro/boletos/{{transacao_id}}/consultar/",
+              "host": ["{{django_base_url}}"],
+              "path": ["api", "financeiro", "boletos", "{{transacao_id}}", "consultar"]
+            },
+            "description": "Consulta um boleto através do sistema Django."
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Checkout (Cartão)",
+      "item": [
+        {
+          "name": "C6 Bank - Criar Checkout Cartão Crédito",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 50.00,\n  \"description\": \"CT Supera - Mensalidade\",\n  \"payer\": {\n    \"name\": \"João Silva\",\n    \"tax_id\": \"12345678900\",\n    \"email\": \"joao.silva@exemplo.com\",\n    \"phone_number\": \"11987654321\"\n  },\n  \"payment\": {\n    \"card\": {\n      \"type\": \"CREDIT\",\n      \"installments\": 1,\n      \"interest_type\": \"BY_SELLER\",\n      \"authenticate\": \"NOT_REQUIRED\",\n      \"save_card\": false,\n      \"capture\": true\n    }\n  },\n  \"expiration_date_time\": \"2025-11-06T17:32:20.000Z\"\n}"
+            },
+            "url": {
+              "raw": "{{checkout_base}}/",
+              "host": ["{{checkout_base}}"],
+              "path": [""]
+            },
+            "description": "Cria checkout com cartão de crédito sem autenticação 3D Secure."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201', function () {",
+                  "  pm.response.to.have.status(201);",
+                  "});",
+                  "const json = pm.response.json();",
+                  "if (json && json.id) {",
+                  "  pm.environment.set('checkout_id', json.id);",
+                  "  console.log('Checkout ID salvo: ' + json.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "C6 Bank - Criar Checkout Cartão Débito",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 50.00,\n  \"description\": \"CT Supera - Mensalidade\",\n  \"payer\": {\n    \"name\": \"João Silva\",\n    \"tax_id\": \"12345678900\",\n    \"email\": \"joao.silva@exemplo.com\"\n  },\n  \"payment\": {\n    \"card\": {\n      \"type\": \"DEBIT\",\n      \"installments\": 1,\n      \"authenticate\": \"NOT_REQUIRED\",\n      \"capture\": true\n    }\n  },\n  \"expiration_date_time\": \"2025-11-06T17:32:20.000Z\"\n}"
+            },
+            "url": {
+              "raw": "{{checkout_base}}/",
+              "host": ["{{checkout_base}}"],
+              "path": [""]
+            },
+            "description": "Cria checkout com cartão de débito."
+          }
+        },
+        {
+          "name": "C6 Bank - Consultar Checkout",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{checkout_base}}/{{checkout_id}}",
+              "host": ["{{checkout_base}}"],
+              "path": ["{{checkout_id}}"]
+            },
+            "description": "Consulta um checkout pelo ID."
+          }
+        },
+        {
+          "name": "C6 Bank - Cancelar Checkout",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{checkout_base}}/{{checkout_id}}/cancel",
+              "host": ["{{checkout_base}}"],
+              "path": ["{{checkout_id}}", "cancel"]
+            },
+            "description": "Cancela um checkout existente."
+          }
+        },
+        {
+          "name": "CT Supera - Criar Checkout para Mensalidade",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{django_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{django_base_url}}/api/financeiro/pagamento-bancario/gerar/{{mensalidade_id}}/",
+              "host": ["{{django_base_url}}"],
+              "path": ["api", "financeiro", "pagamento-bancario", "gerar", "{{mensalidade_id}}"]
+            },
+            "description": "Cria checkout de cartão para uma mensalidade através do sistema Django."
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Transações e Webhooks",
+      "item": [
+        {
+          "name": "CT Supera - Listar Transações C6 Bank",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{django_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{django_base_url}}/api/financeiro/c6/transactions/?status=pendente&tipo=pix",
+              "host": ["{{django_base_url}}"],
+              "path": ["api", "financeiro", "c6", "transactions"],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "pendente",
+                  "description": "Filtro por status"
+                },
+                {
+                  "key": "tipo",
+                  "value": "pix",
+                  "description": "Filtro por tipo (pix, boleto, cartao)"
+                }
+              ]
+            },
+            "description": "Lista todas as transações C6 Bank do sistema."
+          }
+        },
+        {
+          "name": "CT Supera - Detalhes da Transação",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Token {{django_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{django_base_url}}/api/financeiro/c6/transactions/{{transacao_id}}/",
+              "host": ["{{django_base_url}}"],
+              "path": ["api", "financeiro", "c6", "transactions", "{{transacao_id}}"]
+            },
+            "description": "Obtém detalhes de uma transação específica."
+          }
+        },
+        {
+          "name": "CT Supera - Webhook PIX (Simulação)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "[\n  {\n    \"endToEndId\": \"E1234567890123456789012345678901\",\n    \"txid\": \"{{txid}}\",\n    \"valor\": \"10.00\",\n    \"horario\": \"2025-10-30T12:34:56Z\",\n    \"infoPagador\": \"Teste CT Supera\"\n  }\n]"
+            },
+            "url": {
+              "raw": "{{django_base_url}}/api/financeiro/c6/webhook/",
+              "host": ["{{django_base_url}}"],
+              "path": ["api", "financeiro", "c6", "webhook"]
+            },
+            "description": "Simula webhook PIX recebido do C6 Bank. O webhook real é enviado automaticamente pelo C6 Bank."
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "https://baas-api-sandbox.c6bank.info",
+      "type": "string"
+    }
+  ]
+}
+

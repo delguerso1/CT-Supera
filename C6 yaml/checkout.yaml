@@ -1,0 +1,834 @@
+openapi: 3.0.3
+
+info:
+  title: "Checkout C6 Bank"
+  description: |-
+    ## O que é?
+
+    Nosso serviço que permite a integração entre aplicativos e sistemas de comércio eletrônico. Ela permite a criação, consulta e cancelamento de checkouts, além de oferecer suporte a diversos métodos de pagamento.
+
+    ## Objetivo
+
+    O objetivo desta API é fornecer uma interface consistente e bem documentada para que desenvolvedores possam integrar seus aplicativos com os meios de pagamento do C6 Bank.
+
+    ## O que esta API permite?
+
+    1. **Criar Checkout:**
+      - Permite criar um novo checkout e definir as formas de pagamento aceitas.
+      - Deve incluir informações como valor, pagador, data de expiração e métodos de pagamento aceitos.
+      - Caso os dados do pagador não sejam informados, eles serão solicitados em tempo de transação, diretamente no checkout.
+      - A criação de um checkout retorna o ID desse checkout e uma URL. O ID é o identificador que você pode usar para consultar, cancelar e capturar o checkout, e a URL é para onde o cliente pagador deve ser direcionado para usar o checkout.
+
+    2. **Consultar Checkout:**
+      - Permite consultar detalhes de um checkout existente através do ID recebido na criação do checkout.
+      - Retorna informações sobre o valor, status do pagamento e outras relevantes.
+      - É através desta API que você pode identificar se o pagamento foi realizado com sucesso.
+
+    3. **Capturar Checkout:**
+      (DISPONÍVEL EM BREVE)
+      - Permite capturar um checkout.
+      - Por padrão, checkouts são criados com captura automática, mas é possível desativar essa funcionalidade (`payment.card.capture` = false). Nesse caso, este método deve ser usado para capturar a transação.
+      - Você pode usar a captura manual quando sua operação necessitar de validação adicional antes da finalização do pedido.
+      - Um caso de uso comum é a validação de estoque pós-compra. Muitas lojas virtuais realizam a venda ao cliente (com captura manual), e, se a transação for autorizada, checam manualmente o estoque e, caso confirmada a disponibilidade, capturam a transação.
+
+    4. **Cancelar Checkout:**
+      - Permite cancelar um checkout.
+      - Checkouts ainda não finalizados (não pagos pelo pagador) são abortados, enquanto checkouts já pagos são extornados (sempre que a forma de pagamento permitir).
+      - Atualiza o status do checkout para "CANCELLED".
+
+    5. **Tokenizar Cartões:**
+      - Permite que você receba um token referente a um cartão (`payment.card.save_card` = true) usado para pagamento de um checkout.
+      - Um token é retornado sempre que solicitado e que o pagamento do checkout for realizado com sucesso.
+
+    6. **Transação com Cartão Tokenizado:**
+      - Você pode usar tokens previamente obtidos para realizar novas autorizações sem que o cliente tenha que digitar novamente os dados do cartão. Isso também pode ser usado para transações recorrentes, como assinaturas ou renovações periódicas.
+
+    ## Suporte a Métodos de Pagamento
+
+    Um checkout gerado por esta API suporta os seguintes métodos de pagamento:
+
+      - Cartão de débito
+      - Cartão de crédito
+      - Pix
+      - Boleto (DISPONÍVEL EM BREVE)
+      - Bolepix (DISPONÍVEL EM BREVE)
+      - Outros (DISPONÍVEL EM BREVE)
+
+    ## Métodos da API
+
+    Os métodos disponíveis na API são:
+
+    > [Criar um Checkout](./checkout#tag/checkouts/POST/)
+
+    > [Consultar um Checkout](./checkout#tag/checkout/GET/{id})
+
+    > [Capturar um Checkout](./checkout#tag/checkout/GET/{id}/capture)
+
+    > [Cancelar um Checkout](./checkout#tag/checkout/PUT/{id}/cancel)
+
+    > [Autorizar uma transação usando um cartão tokenizado](./checkout#tag/checkout/POST/authorize)
+
+    Você também pode navegar facilmente pelo menu lateral.  No menu, é possível explorar os diferentes métodos
+    da API e, na seção de Models, você pode aprender mais sobre os schemas utilizados em cada método.
+
+    ## Endereços dos Ambientes:
+
+    | Ambiente | Host                                 | Path           |
+    |:--------:|------------------------------------- |----------------|
+    | Sandbox  | https://baas-api-sandbox.c6bank.info | /v1/checkouts/ |
+    | Produção | https://baas-api.c6bank.info         | /v1/checkouts/ |
+
+    ## Informações Úteis:
+    - [Termos de Uso (ao usar essa API, você concorda com estes termos)](https://www.c6bank.com.br/termos-de-uso/)
+    - [Saiba mais sobre o C6 Bank](https://www.c6bank.com)
+    - [Saiba mais sobre este produto do C6 Bank](https://www.c6bank.com.br/link-de-pagamento)
+
+  version: 1.1.0
+
+servers:
+  - url: https://baas-api-sandbox.c6bank.info/v1/checkouts
+    description: Ambiente sandbox
+  - url: https://baas-api.c6bank.info/v1/checkouts
+    description: Ambiente produtivo
+
+tags:
+  - name: Checkout
+    description: Operações de checkout
+
+paths:
+  /:
+    post:
+      tags:
+        - Checkout
+      summary: Criar um checkout.
+      description: Cria um novo checkout. Cada checkout pode receber até 3 tentativas de pagamento. A cada tentativa de pagamento pelo cliente você receberá uma notificação, caso tenha cadastrado um webhook correspondente.
+      operationId: createCheckout
+      parameters:
+        - $ref: '#/components/parameters/Authorization'
+        - $ref: '#/components/parameters/PartnerSoftwareName'
+        - $ref: '#/components/parameters/PartnerSoftwareVersion'
+      requestBody:
+        description: Informações necessárias para criar um checkout. Importante reiterar que, para uma autorização direta o cartão tokenizado (`payment.card.card_info.token`) sempre deve ser enviado.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/checkout"
+      responses:
+        '201':
+          description: Checkout criado com sucesso.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    $ref: "#/components/schemas/id"
+                  url:
+                    $ref: "#/components/schemas/url"
+        '4XX':
+          description: Para descrição de erros, visite a <a href="https://developers.c6bank.com.br/apis/errors">documentação correspondente</a>.
+        '5XX':
+          description: Para descrição de erros, visite a <a href="https://developers.c6bank.com.br/apis/errors">documentação correspondente</a>.
+      security:
+        - OAuth2:
+            - checkout.write
+
+  /authorize:
+    parameters:
+      - $ref: '#/components/parameters/Authorization'
+      - $ref: '#/components/parameters/PartnerSoftwareName'
+      - $ref: '#/components/parameters/PartnerSoftwareVersion'
+    post:
+      tags:
+        - Checkout
+      summary: Autorizar um checkout usando um cartão tokenizado.
+      description: Permite a autorização automática e síncrona de um checkout, utilizando um token de cartão obtido em uma autorização anterior.
+      operationId: authorize
+      requestBody:
+        description: Informações necessárias para autorizar um checkout.
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                amount:
+                  $ref: '#/components/schemas/amount'
+                description:
+                  $ref: '#/components/schemas/description'
+                emission_date_time:
+                  $ref: '#/components/schemas/emission_date_time'
+                expiration_date_time:
+                  $ref: '#/components/schemas/expiration_date_time'
+                external_reference_id:
+                  $ref: '#/components/schemas/external_reference_id'
+                id:
+                  $ref: '#/components/schemas/id'
+                payer:
+                  $ref: '#/components/schemas/payer'
+                payment:
+                  type: object
+                  properties:
+                        card:
+                          type: object
+                          properties:
+                            type:
+                              type: string
+                              example: CREDIT
+                            installments:
+                              type: integer
+                              example: 1
+                            interest_type:
+                              type: string
+                              example: BY_SELLER
+                            authenticate:
+                              type: string
+                              example: NOT_REQUIRED
+                            save_card:
+                              type: boolean
+                              example: true
+                            recurrent:
+                              type: boolean
+                              example: false
+                            authorization_code:
+                              type: string
+                              example: 819922
+                            return_code:
+                              type: string
+                              example: "4"
+                            message:
+                              type: string
+                              example: Operation Successful
+                            card_info:
+                              type: object
+                              properties:
+                                number:
+                                  type: string
+                                  example: 483430******6234
+                                expiration_month:
+                                  type: string
+                                  example: "02"
+                                expiration_year:
+                                  type: string
+                                  example: "2027"
+                                brand:
+                                  type: string
+                                  example: VISA
+                                holder_name:
+                                  type: string
+                                  example: PEDRO
+                                token:
+                                  type: string
+                                  example: a543769c-c1be-4940-8069-e6729e2be711137161
+      responses:
+        '200':
+          description: Transação processada com sucesso. Avalie o conteúdo do objeto para verificar o status da autorização.
+          content:
+              application/json:
+                schema:
+                  type: object
+                  properties:
+                    amount:
+                      $ref: '#/components/schemas/amount'
+                    description:
+                      $ref: '#/components/schemas/description'
+                    emission_date_time:
+                      $ref: '#/components/schemas/emission_date_time'
+                    expiration_date_time:
+                      $ref: '#/components/schemas/expiration_date_time'
+                    external_reference_id:
+                      $ref: '#/components/schemas/external_reference_id'
+                    id:
+                      $ref: '#/components/schemas/id'
+                    payer:
+                      $ref: '#/components/schemas/payer'
+                    payment:
+                      type: object
+                      properties:
+                        card:
+                          type: object
+                          properties:
+                            type:
+                              type: string
+                              example: CREDIT
+                            installments:
+                              type: integer
+                              example: 1
+                            interest_type:
+                              type: string
+                              example: BY_SELLER
+                            authenticate:
+                              type: string
+                              example: NOT_REQUIRED
+                            save_card:
+                              type: boolean
+                              example: true
+                            recurrent:
+                              type: boolean
+                              example: false
+                            authorization_code:
+                              type: string
+                              example: 819922
+                            return_code:
+                              type: string
+                              example: "4"
+                            message:
+                              type: string
+                              example: Operation Successful
+                            card_info:
+                              type: object
+                              properties:
+                                number:
+                                  type: string
+                                  example: 483430******6234
+                                expiration_month:
+                                  type: string
+                                  example: "02"
+                                expiration_year:
+                                  type: string
+                                  example: "2027"
+                                brand:
+                                  type: string
+                                  example: VISA
+                                holder_name:
+                                  type: string
+                                  example: PEDRO
+                                token:
+                                  type: string
+                                  example: a543769c-c1be-4940-8069-e6729e2be711137161
+                    redirect_url:
+                      $ref: '#/components/schemas/redirect_url'
+                    status:
+                      $ref: '#/components/schemas/status'
+        '4XX':
+          description: Para descrição de erros, visite a <a href="https://developers.c6bank.com.br/apis/errors">documentação correspondente</a>.
+        '5XX':
+          description: Para descrição de erros, visite a <a href="https://developers.c6bank.com.br/apis/errors">documentação correspondente</a>.
+      security:
+        - OAuth2:
+            - checkout.read
+
+  /{id}:
+    parameters:
+      - $ref: '#/components/parameters/Authorization'
+      - $ref: '#/components/parameters/PartnerSoftwareName'
+      - $ref: '#/components/parameters/PartnerSoftwareVersion'
+      - $ref: '#/components/parameters/CheckoutId'
+    get:
+      tags:
+        - Checkout
+      summary: Consultar um checkout existente.
+      description: Obtém, de maneira síncrona, informações de um checkout existente a partir de um ID.
+      operationId: getCheckout
+      responses:
+        '200':
+          description: Checkout consultado com sucesso.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  amount:
+                    $ref: '#/components/schemas/amount'
+                  description:
+                    $ref: '#/components/schemas/description'
+                  emission_date_time:
+                    $ref: '#/components/schemas/emission_date_time'
+                  expiration_date_time:
+                    $ref: '#/components/schemas/expiration_date_time'
+                  external_reference_id:
+                    $ref: '#/components/schemas/external_reference_id'
+                  payment_date_time:
+                    $ref: '#/components/schemas/payment_date_time'
+                  id:
+                    $ref: '#/components/schemas/id'
+                  payer:
+                    $ref: '#/components/schemas/payer'
+                  payment:
+                    type: object
+                    description: Informações de pagamento do checkout (O objeto retornado dependerá da forma de pagamento utilizada).
+                    properties:
+                          card:
+                            type: object
+                            description: Informações de pagamento via cartão de crédito ou débito.
+                            properties:
+                              type:
+                                type: string
+                                example: CREDIT
+                              installments:
+                                type: integer
+                                example: 1
+                              interest_type:
+                                type: string
+                                example: BY_SELLER
+                              authenticate:
+                                type: string
+                                example: NOT_REQUIRED
+                              save_card:
+                                type: boolean
+                                example: true
+                              recurrent:
+                                type: boolean
+                                example: false
+                              authorization_code:
+                                type: string
+                                example: 819922
+                              return_code:
+                                type: string
+                                example: "4"
+                              message:
+                                type: string
+                                example: Operation Successful
+                              card_info:
+                                type: object
+                                properties:
+                                  number:
+                                    type: string
+                                    example: 483430******6234
+                                  expiration_month:
+                                    type: string
+                                    example: "02"
+                                  expiration_year:
+                                    type: string
+                                    example: "2027"
+                                  brand:
+                                    type: string
+                                    example: VISA
+                                  holder_name:
+                                    type: string
+                                    example: PEDRO
+                                  token:
+                                    type: string
+                                    example: a543769c-c1be-4940-8069-e6729e2be711137161
+                          pix:
+                            type: object
+                            description: Informações de pagamento via Pix.
+                            properties:
+                                  qr_code:
+                                    description: QR Code gerado para o checkout via Pix. (Apresentado apenas quando status é "IN PROGRESS")
+                                    type: string
+                                    example: "00020101021126880014br.gov.bcb.pix0114c6bank.com.br52040000530398654041.005802BR5913C6 Bank5925C6 Bank - Link de Pagamento6009Sao Paulo62070503***6304A0B1"
+                                  qr_code_url:
+                                    description: URL gerada para o checkout via Pix. (Apresentado apenas quando status é "IN PROGRESS")
+                                    $ref: "#/components/schemas/url"
+                                  payer:
+                                    type: object
+                                    description: Informações de quem realizou o pagamento via Pix (Apresentado apenas quando status é "PAID").
+                                    properties:
+                                      name:
+                                        type: string
+                                        example: José da Silva
+                                      document:
+                                        type: string
+                                        example: '12345678910'
+                                  payment_amount:
+                                    description: Valor pago via Pix (Apresentado apenas quando status é "PAID").
+                                    type: number
+                                    example: 123.45
+                                  e2e_id:
+                                    description: Identificador E2E do pagamento via Pix (Apresentado apenas quando status é "PAID").
+                                    type: string
+                                    example: 1234567890abcdef1234567890abcdef
+                  redirect_url:
+                    $ref: '#/components/schemas/redirect_url'
+                  status:
+                    $ref: '#/components/schemas/status'
+                  url:
+                    $ref: '#/components/schemas/url'
+        '4XX':
+          description: Para descrição de erros, visite a <a href="https://developers.c6bank.com.br/apis/errors">documentação correspondente</a>.
+        '5XX':
+          description: Para descrição de erros, visite a <a href="https://developers.c6bank.com.br/apis/errors">documentação correspondente</a>.
+      security:
+          - OAuth2:
+              - checkout.read
+
+  /{id}/capture:
+    put:
+      tags:
+        - Checkout
+      summary: Capturar um checkout.
+      description: Captura um checkout dado um ID (DISPONÍVEL EM BREVE).
+      operationId: captureCheckout
+      parameters:
+        - $ref: '#/components/parameters/Authorization'
+        - $ref: '#/components/parameters/PartnerSoftwareName'
+        - $ref: '#/components/parameters/PartnerSoftwareVersion'
+        - $ref: '#/components/parameters/CheckoutId'
+      responses:
+        '204':
+          description: Checkout capturado com sucesso.
+        '4XX':
+          description: Para descrição de erros, visite a <a href="https://developers.c6bank.com.br/apis/errors">documentação correspondente</a>.
+        '5XX':
+          description: Para descrição de erros, visite a <a href="https://developers.c6bank.com.br/apis/errors">documentação correspondente</a>.
+      security:
+        - OAuth2:
+            - checkout.capture
+
+  /{id}/cancel:
+    put:
+      tags:
+        - Checkout
+      summary: Cancelar um checkout existente.
+      description: Cancela um checkout existente dado um ID. Checkouts não finalizados (não pagos pelo pagador) são abortados, enquanto checkouts já pagos são extornados (sempre que a forma de pagamento permitir).
+      operationId: cancelCheckout
+      parameters:
+        - $ref: '#/components/parameters/Authorization'
+        - $ref: '#/components/parameters/PartnerSoftwareName'
+        - $ref: '#/components/parameters/PartnerSoftwareVersion'
+        - $ref: '#/components/parameters/CheckoutId'
+      responses:
+        '204':
+          description: Checkout cancelado com sucesso.
+        '4XX':
+          description: Para descrição de erros, visite a <a href="https://developers.c6bank.com.br/apis/errors">documentação correspondente</a>.
+        '5XX':
+          description: Para descrição de erros, visite a <a href="https://developers.c6bank.com.br/apis/errors">documentação correspondente</a>.
+      security:
+        - OAuth2:
+            - checkout.cancel
+
+components:
+  parameters:
+    Authorization:
+      in: header
+      name: Authorization
+      description: Token de acesso para autenticação. Deve ser enviado no formato "Bearer {token}".
+      schema:
+        type: string
+      required: true
+      example: "Bearer eyJraWQiOiJrZXkiLCJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..."
+    PartnerSoftwareName:
+      in: header
+      name: partner-software-name
+      description: Nome do software do parceiro
+      schema:
+        type: string
+      required: false
+      example: "Super PDV"
+    PartnerSoftwareVersion:
+      in: header
+      name: partner-software-version
+      description: Versão do software do parceiro
+      schema:
+        type: string
+      required: false
+      example: "1.0.0"
+    CheckoutId:
+      in: path
+      name: id
+      description: Identificador único do checkout, utilizado em operações de consulta, cancelamento, alteração, etc. É a principal chave da transação para o ambiente C6 Bank.
+      schema:
+        type: string
+      required: true
+      example: "01J3NCKY6Q99QC4D7T733D35QD"
+  schemas:
+    address:
+      type: object
+      description: É o endereço da parte pagadora do título. Aquele para quem o checkout se destina. Este nó é o nó raiz, que agrupa os dados do endereço do cliente pagador.
+      required:
+        - city
+        - number
+        - state
+        - street
+        - zip_code
+      properties:
+        street:
+          type: string
+          example: Av. Nove de Julho
+          maxLength: 40
+          description: Nome da rua do endereço do cliente pagador. A quantidade total de caracteres deste campo e do campo "number" somadas não podem ultrapassar 40 posições.
+        number:
+          type: number
+          example: 123
+          description: Número da rua do endereço do cliente pagador. A quantidade total de caracteres deste campo e do campo "street" somadas não podem ultrapassar 40 posições.
+        complement:
+          type: string
+          example: Complemento
+          maxLength: 24
+          description: Complemento do endereço do cliente pagador.
+        city:
+          type: string
+          example: Rio de Janeiro
+          maxLength: 40
+          description: Cidade do endereço do cliente pagador.
+        state:
+          type: string
+          example: RJ
+          maxLength: 2
+          pattern: "[A-Z]{2}"
+          description: UF do endereço do cliente pagador.
+        zip_code:
+          type: string
+          example: '05093000'
+          minLength: 8
+          maxLength: 8
+          pattern: "\\d{8}"
+          description: CEP do endereço do cliente pagador.
+    amount:
+      type: number
+      example: 123.45
+      description: Define o valor principal do checkout.
+    card:
+      type: object
+      description: É o objeto base, que configura a cobrança em cartão. É neste objeto que você define a quantidade de parcelas, tipo de parcelamento, se o usuário pode selecionar a quantidade de parcelas ou se ela é fixa, etc.
+      required:
+        - type
+        - installments
+      properties:
+        authenticate:
+          type: string
+          enum:
+            - REQUIRED
+            - OPTIONAL
+            - NOT_REQUIRED
+          default: "NOT_REQUIRED"
+          description: Sinaliza se a transação deve ser autenticada pelo emissor. No caso da opção 'OPTIONAL', haverá a tentativa de autenticação do portador, mas, caso não seja possível realizá-la, a transação segue para autorização. Esta informação é retornada na consulta do checkout.
+        authorization_code:
+          type: string
+          description: Código de autorização da transação.
+          example: "123456"
+          readOnly: true
+        capture:
+          type: boolean
+          default: true
+          description: Sinaliza se a transação deve ser captura automaticamente (comportamento padrão) ou será capturada posteriormente.
+        captured_amount:
+          type: integer
+          description: Valor da transação capturado. É usando em caso de capturas parciais.
+          readOnly: true
+          example: "EM BREVE"
+        card_info:
+          $ref: '#/components/schemas/card_info'
+        fixed_installments:
+          type: boolean
+          default: true
+          description: Define se o pagador pode selecionar a quantidade de parcelas ou se ela é fixa, conforme "installments".
+        installments:
+          type: integer
+          minimum: 1
+          maximum: 12
+          description: Quantidade máxima de parcelas para esse checkout. Se superior a 1, "interest_type" deve ser informado.
+        interest_type:
+          type: string
+          enum:
+            - BY_SELLER
+            - BY_ISSUER
+          description: "Usado para transações parceladas (installments maior que 1). É o tipo de financiamento da operação: Issuer (Parcelado Emissor), Seller (Parcelado Loja)"
+        recurrent:
+          type: boolean
+          default: false
+          example: false
+          description: Sinaliza se a transação é recorrente. Esta informação é enviada ao emissor do cartão e pode ajudar no percentual de aprovação de transações recorrentes.
+        save_card:
+          type: boolean
+          default: false
+          example: false
+          description: Define se o cartão deve ser salvo (cartões salvos podem ser usados para transações futuras sem que o portador tenha que informar os dados novamente). Caso a transação seja aprovada, o cartão tokenizado será retornado na resposta da transação.
+        soft_descriptor:
+          type: string
+          example: "EM BREVE"
+          description: DISPONÍVEL EM BREVE
+        type:
+          type: string
+          enum:
+            - DEBIT
+            - CREDIT
+          description: "Define o tipo da transação DEBIT (débito) e CREDIT (crédito)."
+    card_info:
+      type: object
+      description: Objeto base das informações do cartão utilizado no pagamento do checkout.
+      properties:
+        number:
+          type: string
+          description: 'TPAN (Truncated Primary Account Number) também conhecido como "número do cartão truncado".'
+          example: "453970******0561"
+          readOnly: true
+        brand:
+          type: string
+          description: Bandeira do cartão.
+          example: "VISA"
+          readOnly: true
+        holder_name:
+          type: string
+          description: Nome do portador do cartão.
+          example: "Zé da Silva"
+          readOnly: true
+        expiration_month:
+          type: string
+          description: Mês de validade do cartão.
+          readOnly: true
+          example: "04"
+        expiration_year:
+          type: string
+          description: Ano de validade do cartão.
+          readOnly: true
+          example: "2026"
+        token:
+          type: string
+          description: Token do cartão. Retornado em operações onde o checkout é comandado a armazenar o cartão (save_card = true). Este token deve ser enviado caso uma nova cobrança deva ser executada para este mesmo cartão. Caso enviado, uma tentativa de pagamento do checkout é automaticamente realizada com este cartão.
+          example: "be4cbeb1-abb2-4913-8165-f86962143fa021"
+    pix:
+      type: object
+      description: É o objeto base, que configura a cobrança via Pix.
+      required:
+        - key
+      properties:
+        key:
+          type: string
+          description: Define a chave pix utilizada para gerar o QR Code do checkout. "AUTO" (padrão) significa que o C6 Bank irá gerar uma chave aleatória para o checkout. OUTRAS OPÇÕES DE CHAVES DISPONÍVEIS EM BREVE.
+          example: "AUTO"
+    checkout:
+      required:
+        - amount
+        - payment
+      type: object
+      properties:
+        amount:
+          $ref: '#/components/schemas/amount'
+        description:
+          $ref: '#/components/schemas/description'
+        emission_date_time:
+          $ref: '#/components/schemas/emission_date_time'
+        expiration_date_time:
+          $ref: '#/components/schemas/expiration_date_time'
+        external_reference_id:
+          $ref: '#/components/schemas/external_reference_id'
+        id:
+          $ref: '#/components/schemas/id'
+        payer:
+          $ref: '#/components/schemas/payer'
+        payment:
+          $ref: '#/components/schemas/payment'
+          properties:
+            card:
+              $ref: '#/components/schemas/card'
+            pix:
+              $ref: "#/components/schemas/pix"
+        redirect_url:
+          $ref: '#/components/schemas/redirect_url'
+        status:
+          $ref: '#/components/schemas/status'
+        url:
+          $ref: '#/components/schemas/url'
+    description:
+      type: string
+      example: Cobrança do produto A, para o cliente B, pedido 1234.
+      description: Campo de texto livre, para descrição da transação.
+    emission_date_time:
+      type: string
+      format: date-time
+      example: 2024-08-16T13:18:05.802Z
+      readOnly: true
+      description: Data e hora da criação do checkout.
+    expiration_date_time:
+      type: string
+      format: date-time
+      example: 2024-08-16T13:18:05.802Z
+      readOnly: true
+      description: Data e hora em que o checkout expira. Caso não seja informado, o prazo padrão será de 7 dias corridos. Se o pagamento não for realizado até essa data, o status do checkout será alterado automaticamente para EXPIRED.
+    external_reference_id:
+      type: string
+      example: A123456789
+      pattern: '^[a-zA-Z0-9]{1,10}$'
+      minLength: 1
+      maxLength: 10
+      description: É o identificador do lado do agente externo. Não é consistido pelo C6 Bank, mas não pode ser repetido para um mesmo cliente. É transportado e retornado nas operações de consulta. Caso não seja enviado, um identificador aleatório será automaticamente gerado.
+    fraud_analysis:
+      type: object
+      description: É o resultado da avaliação da transação, realizada pelo nosso antifraude.
+      readOnly: true
+      properties:
+        analyzed:
+          type: boolean
+          example: true
+          readOnly: true
+          description: Especifica se a transação foi avaliada pelo antifraude.
+        recommendation:
+          type: string
+          description: É a recomendação do antifraude após análise da transação.
+          readOnly: true
+          enum:
+            - APPROVE
+            - DENY
+    id:
+      type: string
+      readOnly: true
+      example: "e4cf07fc-6b14-4477-a694-5053189726f7"
+      description: Utilizado como identificador forte do objeto. Também é utilizado em operações de consulta, cancelamento, alteração, etc. É a principal chave da transação para o ambiente C6 Bank.
+    payer:
+      type: object
+      description: É a parte pagadora do checkout. Aquele para quem o checkout se destina. Este nó é o nó raiz, que agrupa os dados do cliente pagador. Todos os elementos do pagador funcionam de maneira opcional na API, mas obrigatória para a transação. Isso significa que, se não forem enviados na chamada à API, serão solicitados ao pagador no momento da transação. Caso sejam enviados, o pagador não poderá editá-los.
+      properties:
+        name:
+          type: string
+          example: José da Silva
+          maxLength: 40
+          pattern: "^(?!\\s*$).+"
+          description: É o nome (no caso de PF) ou a Razão Social (no caso de PJ).
+        tax_id:
+          type: string
+          example: '12345678910'
+          minLength: 11
+          maxLength: 14
+          description: É o documento fiscal (CPF em caso de PF e CNPJ em caso de PJ/MEI) do cliente pagador (sacado). Deve ser enviado sem máscara, respeitando os zeros à esquerda.
+        email:
+          type: string
+          format: email
+          example: pagador@email.com.br
+          maxLength: 200
+          pattern: "^[a-z0-9.!#$&amp;'*+\\/=?^_`{|}~-]+@[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*$"
+          description: Endereço de email do cliente pagador.
+        phone_number:
+          type: string
+          example: '99999999999'
+          description: É o número de telefone do pagador.
+        address:
+          $ref: '#/components/schemas/address'
+    payment:
+      type: object
+      required: []
+      description: Define as informações de pagamento do checkout. É possível definir mais de uma forma de pagamento, mas apenas uma será utilizada para o pagamento do checkout.
+    payment_date_time:
+      type: string
+      format: date-time
+      example: 2024-08-16T13:18:05.802Z
+      readOnly: true
+      description: Data e hora em que o checkout foi pago.
+    redirect_url:
+      type: string
+      description: É a URL da loja virtual a qual o pagador deve ser encaminhado após o uso do checkout. Pode ser ignorado caso você faça uso do checkout transparente.
+      example: "http://www.seusite.com.br/finalizaPedido"
+    status:
+      type: string
+      readOnly: true
+      enum:
+        - CREATED
+        - IN PROGRESS
+        - AUTHORIZED, CONFIRMATION PENDING
+        - CONFIRMATION REQUESTED
+        - PAID
+        - CANCELLATION REQUESTED
+        - CANCELLED
+        - DECLINED
+        - EXPIRED
+        - ERROR
+      description: Define o status do checkout. Ao criar um checkout seu status será "CREATED". Os status "CANCELLED", "ERROR", "EXPIRED", "PAID" e "DECLINED" são terminais (não podem ser alterados). Os demais status são intermediários e serão alterados por ações do usuário ou do adquirente.
+    url:
+      type: string
+      readOnly: true
+      description: É a URL do checkout em si. Aquela a qual o pagador deve ser encaminhado, para uso do checkout. Pode ser ignorado caso você faça uso do checkout transparente.
+      example: https://checkout.c6bank.info/01J3NCKY6Q99QC4D7T733D35QD
+  securitySchemes:
+    OAuth2:
+      type: oauth2
+      flows:
+       clientCredentials:
+          tokenUrl: https://baas-api-sandbox.c6bank.info/v1/auth
+          scopes:
+            checkout.write: Cria e modifica checkouts.
+            checkout.read: Consulta checkout.
+            checkout.capture: Captura checkout.
+            checkout.cancel: Cancela checkout.

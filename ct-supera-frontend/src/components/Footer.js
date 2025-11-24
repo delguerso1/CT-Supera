@@ -2,7 +2,7 @@ import React from 'react';
 
 const styles = {
   footer: {
-    backgroundColor: '#1a237e',
+    backgroundColor: '#1F6C86',
     color: 'white',
     textAlign: 'center',
     padding: '2rem 1rem 1rem 1rem',

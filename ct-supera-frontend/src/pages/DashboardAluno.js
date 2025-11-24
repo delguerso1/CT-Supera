@@ -28,7 +28,7 @@ const styles = {
   },
   sidebar: {
     width: '280px',
-    backgroundColor: '#1a237e',
+    backgroundColor: '#1F6C86',
     color: 'white',
     padding: '20px',
     boxShadow: '2px 0 10px rgba(0,0,0,0.1)',
@@ -60,7 +60,7 @@ const styles = {
     justifyContent: 'center',
     margin: '0 auto 15px',
     fontSize: '40px',
-    color: '#1a237e',
+    color: '#1F6C86',
     border: '3px solid rgba(255,255,255,0.3)',
     cursor: 'pointer',
     transition: 'all 0.3s ease'
@@ -101,7 +101,7 @@ const styles = {
   },
   contentTitle: {
     fontSize: '24px',
-    color: '#1a237e',
+    color: '#1F6C86',
     marginBottom: '30px',
     display: 'flex',
     alignItems: 'center',
@@ -130,7 +130,7 @@ const styles = {
   statValue: {
     fontSize: '28px',
     fontWeight: 'bold',
-    color: '#1a237e',
+    color: '#1F6C86',
     marginBottom: '4px'
   },
   statSubtitle: {
@@ -205,7 +205,7 @@ const styles = {
     marginTop: '20px'
   },
   primaryButton: {
-    backgroundColor: '#1a237e',
+    backgroundColor: '#1F6C86',
     color: 'white',
     border: 'none',
     borderRadius: '8px',
@@ -290,6 +290,16 @@ const styles = {
   },
   bankButton: {
     backgroundColor: '#1976d2',
+    color: 'white',
+    border: 'none',
+    borderRadius: '6px',
+    padding: '8px 16px',
+    fontSize: '14px',
+    cursor: 'pointer',
+    transition: 'background-color 0.3s ease'
+  },
+  boletoButton: {
+    backgroundColor: '#ff9800',
     color: 'white',
     border: 'none',
     borderRadius: '6px',
@@ -387,8 +397,10 @@ function DashboardAluno({ user }) {
   const [checkinLoading, setCheckinLoading] = useState(false);
   const [mensalidadesPendentes, setMensalidadesPendentes] = useState([]);
   const [transacaoPix, setTransacaoPix] = useState(null);
+  const [transacaoBoleto, setTransacaoBoleto] = useState(null);
   const [pagamentoLoading, setPagamentoLoading] = useState(false);
   const [pagamentoBancarioLoading, setPagamentoBancarioLoading] = useState(false);
+  const [pagamentoBoletoLoading, setPagamentoBoletoLoading] = useState(false);
   const [statusHoje, setStatusHoje] = useState({
     checkin_realizado: false,
     presenca_confirmada: false,
@@ -423,6 +435,12 @@ function DashboardAluno({ user }) {
       try {
         setLoading(true);
         const resp = await api.get('alunos/painel-aluno/');
+        console.log('[DEBUG] Dados do aluno recebidos:', resp.data.usuario);
+        console.log('[DEBUG] Par-Q completed:', resp.data.usuario.parq_completed);
+        console.log('[DEBUG] Par-Q completion_date:', resp.data.usuario.parq_completion_date);
+        console.log('[DEBUG] Tipo de parq_completed:', typeof resp.data.usuario.parq_completed);
+        console.log('[DEBUG] Tipo de parq_completion_date:', typeof resp.data.usuario.parq_completion_date);
+        console.log('[DEBUG] Todos os campos do usuario:', Object.keys(resp.data.usuario));
         setAluno(resp.data.usuario);
         setHistoricoAulas(resp.data.historico_aulas);
         setHistoricoMensalidades(resp.data.historico_pagamentos);
@@ -489,8 +507,81 @@ function DashboardAluno({ user }) {
     setErro('');
   };
 
+  // Função para verificar se pode preencher o Par-Q novamente
+  const canFillParqAgain = () => {
+    if (!aluno?.parq_completed || !aluno?.parq_completion_date) {
+      return true; // Pode preencher se nunca preencheu
+    }
+    
+    const dataPreenchimento = new Date(aluno.parq_completion_date);
+    const umAnoDepois = new Date(dataPreenchimento);
+    umAnoDepois.setFullYear(umAnoDepois.getFullYear() + 1);
+    const hoje = new Date();
+    
+    return hoje >= umAnoDepois;
+  };
+
+  // Função para calcular dias restantes até poder preencher novamente
+  const getDaysUntilCanFillParq = () => {
+    if (!aluno?.parq_completed || !aluno?.parq_completion_date) {
+      return 0;
+    }
+    
+    const dataPreenchimento = new Date(aluno.parq_completion_date);
+    const umAnoDepois = new Date(dataPreenchimento);
+    umAnoDepois.setFullYear(umAnoDepois.getFullYear() + 1);
+    const hoje = new Date();
+    
+    const diffTime = umAnoDepois - hoje;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    return diffDays > 0 ? diffDays : 0;
+  };
+
+  // Função para verificar se algum campo Par-Q foi alterado
+  const hasParqChanges = () => {
+    if (!aluno) return false;
+    const parqFields = ['parq_question_1', 'parq_question_2', 'parq_question_3', 'parq_question_4',
+                       'parq_question_5', 'parq_question_6', 'parq_question_7'];
+    
+    return parqFields.some(field => {
+      const originalValue = aluno[field] || false;
+      const formValue = form[field] || false;
+      return originalValue !== formValue;
+    });
+  };
+
+  // Função para formatar data e hora do preenchimento do Par-Q
+  const formatParqDate = (dateString) => {
+    if (!dateString) return 'Data não disponível';
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        return 'Data inválida';
+      }
+      return date.toLocaleString('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch (error) {
+      console.error('Erro ao formatar data:', error, dateString);
+      return 'Erro ao formatar data';
+    }
+  };
+
   const handleChange = e => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+    let value;
+    if (e.target.type === 'radio') {
+      value = e.target.value === 'true';
+    } else if (e.target.type === 'checkbox') {
+      value = e.target.checked;
+    } else {
+      value = e.target.value;
+    }
+    setForm({ ...form, [e.target.name]: value });
   };
 
   const handleSubmit = async e => {
@@ -520,13 +611,24 @@ function DashboardAluno({ user }) {
       ativo: aluno.ativo,
     };
     try {
-      await api.put(`usuarios/${aluno.id}/`, fullForm);
+      const updateResponse = await api.put(`usuarios/${aluno.id}/`, fullForm);
+      console.log('[DEBUG] Resposta do PUT usuarios:', updateResponse.data);
+      console.log('[DEBUG] Par-Q na resposta PUT - completed:', updateResponse.data.parq_completed);
+      console.log('[DEBUG] Par-Q na resposta PUT - completion_date:', updateResponse.data.parq_completion_date);
+      
       setSuccess('Dados atualizados com sucesso!');
       setEditMode(false);
       const resp = await api.get('alunos/painel-aluno/');
+      console.log('[DEBUG] Resposta do GET painel-aluno:', resp.data);
+      console.log('[DEBUG] Usuario completo:', resp.data.usuario);
+      console.log('[DEBUG] Par-Q completed:', resp.data.usuario.parq_completed);
+      console.log('[DEBUG] Par-Q completion_date:', resp.data.usuario.parq_completion_date);
+      console.log('[DEBUG] Tipo de parq_completed:', typeof resp.data.usuario.parq_completed);
+      console.log('[DEBUG] Tipo de parq_completion_date:', typeof resp.data.usuario.parq_completion_date);
       setAluno(resp.data.usuario);
     } catch (err) {
-      setErro('Erro ao atualizar dados.');
+      const errorMessage = err.response?.data?.parq_question_1 || err.response?.data?.detail || 'Erro ao atualizar dados.';
+      setErro(Array.isArray(errorMessage) ? errorMessage[0] : errorMessage);
     }
   };
 
@@ -628,6 +730,58 @@ function DashboardAluno({ user }) {
       setErro(err.response?.data?.error || 'Erro ao gerar pagamento bancário.');
     } finally {
       setPagamentoBancarioLoading(false);
+    }
+  };
+
+  const handleGerarBoleto = async (mensalidadeId) => {
+    try {
+      setPagamentoBoletoLoading(true);
+      setErro('');
+      setSuccess('');
+      setTransacaoBoleto(null);
+
+      const response = await api.post(`financeiro/mensalidades/${mensalidadeId}/gerar-boleto/`);
+      
+      if (response.data.transacao) {
+        setTransacaoBoleto(response.data.transacao);
+        setSuccess(response.data.message || 'Boleto gerado com sucesso!');
+        
+        // Atualiza a lista de mensalidades
+        const resp = await api.get('alunos/painel-aluno/');
+        setMensalidadesPendentes(resp.data.mensalidades_pendentes || []);
+        setHistoricoMensalidades(resp.data.historico_pagamentos || []);
+      } else {
+        setErro('Erro ao gerar boleto. Tente novamente.');
+      }
+
+    } catch (err) {
+      console.error('Erro ao gerar boleto:', err);
+      setErro(err.response?.data?.error || 'Erro ao gerar boleto.');
+    } finally {
+      setPagamentoBoletoLoading(false);
+    }
+  };
+
+  const handleDownloadBoletoPDF = async (transacaoId) => {
+    try {
+      const response = await api.get(`financeiro/boletos/${transacaoId}/pdf/`, {
+        responseType: 'blob'
+      });
+      
+      // Cria um link para download
+      const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `boleto_${transacaoId}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      
+      setSuccess('PDF do boleto baixado com sucesso!');
+    } catch (err) {
+      console.error('Erro ao baixar PDF do boleto:', err);
+      setErro(err.response?.data?.error || 'Erro ao baixar PDF do boleto.');
     }
   };
 
@@ -813,7 +967,7 @@ function DashboardAluno({ user }) {
       }}>
         <h3 style={{
           fontSize: '18px',
-          color: '#1a237e',
+          color: '#1F6C86',
           marginBottom: '20px',
           display: 'flex',
           alignItems: 'center',
@@ -841,7 +995,7 @@ function DashboardAluno({ user }) {
               justifyContent: 'center',
               margin: '0 auto 10px',
               fontSize: '48px',
-              color: '#1a237e',
+              color: '#1F6C86',
               border: '3px solid #e0e0e0',
               overflow: 'hidden',
               backgroundImage: aluno?.foto_perfil ? `url(${MEDIA_URL}${aluno.foto_perfil}?t=${aluno._photoTimestamp || Date.now()})` : 'none',
@@ -889,7 +1043,7 @@ function DashboardAluno({ user }) {
               <label
                 htmlFor="foto-input"
                 style={{
-                  backgroundColor: '#1a237e',
+                  backgroundColor: '#1F6C86',
                   color: 'white',
                   padding: '12px 20px',
                   borderRadius: '8px',
@@ -1073,8 +1227,30 @@ function DashboardAluno({ user }) {
             <label style={styles.label}>
               Questionário de Prontidão para Atividade Física (PAR-Q)
             </label>
+            
+            {!canFillParqAgain() && (
+              <div style={{
+                padding: '12px',
+                backgroundColor: '#fff3cd',
+                borderRadius: '4px',
+                marginBottom: '15px',
+                border: '1px solid #ffc107'
+              }}>
+                <div style={{ fontWeight: 'bold', color: '#856404', marginBottom: '5px' }}>
+                  ⚠️ Questionário já preenchido
+                </div>
+                <div style={{ fontSize: '12px', color: '#856404' }}>
+                  O questionário PAR-Q só pode ser preenchido uma vez por ano. 
+                  Último preenchimento: {formatParqDate(aluno?.parq_completion_date)}
+                  {getDaysUntilCanFillParq() > 0 && (
+                    <span> - Você poderá preencher novamente em {getDaysUntilCanFillParq()} dia(s).</span>
+                  )}
+                </div>
+              </div>
+            )}
+            
             <div style={{ fontSize: '12px', color: '#666', marginBottom: '10px' }}>
-              Marque "Sim" se alguma das perguntas se aplica a você
+              Responda "Sim" ou "Não" para cada pergunta abaixo
             </div>
             
             {[
@@ -1107,42 +1283,63 @@ function DashboardAluno({ user }) {
                 question: 'Você sabe de alguma outra razão pela qual não deveria fazer atividade física?'
               }
             ].map((item, index) => (
-              <div key={item.field} style={{ marginBottom: '10px', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' }}>
-                <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', cursor: 'pointer' }}>
-                  <input
-                    type="checkbox"
-                    name={item.field}
-                    checked={form[item.field] || false}
-                    onChange={(e) => handleChange({
-                      target: {
-                        name: item.field,
-                        value: e.target.checked
-                      }
-                    })}
-                    style={{ margin: 0, marginTop: '2px' }}
-                  />
-                  <div style={{ flex: 1, fontSize: '13px', lineHeight: '1.3' }}>
-                    <strong>{index + 1}.</strong> {item.question}
-                  </div>
-                </label>
+              <div key={item.field} style={{ marginBottom: '15px', padding: '12px', border: '1px solid #ddd', borderRadius: '4px' }}>
+                <div style={{ marginBottom: '8px', fontSize: '13px', lineHeight: '1.3' }}>
+                  <strong>{index + 1}.</strong> {item.question}
+                </div>
+                <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: canFillParqAgain() ? 'pointer' : 'not-allowed', opacity: canFillParqAgain() ? 1 : 0.6 }}>
+                    <input
+                      type="radio"
+                      name={item.field}
+                      value="true"
+                      checked={form[item.field] === true || form[item.field] === 'true'}
+                      onChange={handleChange}
+                      disabled={!canFillParqAgain()}
+                      style={{ margin: 0 }}
+                    />
+                    <span style={{ fontSize: '13px' }}>Sim</span>
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: canFillParqAgain() ? 'pointer' : 'not-allowed', opacity: canFillParqAgain() ? 1 : 0.6 }}>
+                    <input
+                      type="radio"
+                      name={item.field}
+                      value="false"
+                      checked={form[item.field] === false || form[item.field] === 'false' || form[item.field] === undefined || form[item.field] === null}
+                      onChange={handleChange}
+                      disabled={!canFillParqAgain()}
+                      style={{ margin: 0 }}
+                    />
+                    <span style={{ fontSize: '13px' }}>Não</span>
+                  </label>
+                </div>
               </div>
             ))}
             
             <div style={{ marginTop: '10px', padding: '8px', backgroundColor: '#f8f9fa', borderRadius: '4px', fontSize: '12px', color: '#666' }}>
               <strong>Importante:</strong> Se você respondeu "Sim" a alguma pergunta, consulte seu médico antes de começar um programa de atividade física.
             </div>
-          </div>
-          <div style={styles.buttonGroup}>
-            <button type="submit" style={styles.primaryButton}>
-              Salvar Alterações
-            </button>
-            <button
-              type="button"
-              onClick={handleCancel}
-              style={styles.secondaryButton}
-            >
-              Cancelar
-            </button>
+            
+            <div style={{ marginTop: '20px', display: 'flex', gap: '10px' }}>
+              <button 
+                type="submit" 
+                style={{
+                  ...styles.primaryButton,
+                  opacity: (canFillParqAgain() || !hasParqChanges()) ? 1 : 0.6,
+                  cursor: (canFillParqAgain() || !hasParqChanges()) ? 'pointer' : 'not-allowed'
+                }}
+                disabled={!canFillParqAgain() && hasParqChanges()}
+              >
+                Salvar Alterações
+              </button>
+              <button
+                type="button"
+                onClick={handleCancel}
+                style={styles.secondaryButton}
+              >
+                Cancelar
+              </button>
+            </div>
           </div>
         </form>
       ) : (
@@ -1199,7 +1396,7 @@ function DashboardAluno({ user }) {
         }}>
           <h3 style={{
             fontSize: '18px',
-            color: '#1a237e',
+            color: '#1F6C86',
             marginBottom: '15px',
             display: 'flex',
             alignItems: 'center',
@@ -1209,29 +1406,81 @@ function DashboardAluno({ user }) {
             Questionário PAR-Q (Prontidão para Atividade Física)
           </h3>
           
-          {aluno?.parq_completed ? (
-            <div>
-              <div style={{
-                backgroundColor: '#e8f5e9',
-                padding: '12px',
-                borderRadius: '8px',
-                marginBottom: '15px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px'
-              }}>
-                <span style={{ fontSize: '20px' }}>✅</span>
-                <div>
-                  <div style={{ fontWeight: 'bold', color: '#2e7d32' }}>
-                    Questionário Completo
+          {(() => {
+            // Debug: verificar valores
+            const hasParqCompleted = aluno?.parq_completed === true || aluno?.parq_completed === 'true';
+            const hasCompletionDate = aluno?.parq_completion_date;
+            const hasAnyParqAnswer = [1, 2, 3, 4, 5, 6, 7].some(i => {
+              const value = aluno?.[`parq_question_${i}`];
+              return value === true || value === 'true' || value === false || value === 'false';
+            });
+            
+            console.log('[DEBUG RENDER] hasParqCompleted:', hasParqCompleted, 'value:', aluno?.parq_completed);
+            console.log('[DEBUG RENDER] hasCompletionDate:', hasCompletionDate, 'value:', aluno?.parq_completion_date);
+            console.log('[DEBUG RENDER] hasAnyParqAnswer:', hasAnyParqAnswer);
+            console.log('[DEBUG RENDER] aluno object:', aluno);
+            
+            const shouldShow = hasParqCompleted || hasCompletionDate || hasAnyParqAnswer;
+            
+            if (!shouldShow) {
+              return (
+                <div style={{
+                  padding: '20px',
+                  backgroundColor: '#fff3cd',
+                  borderRadius: '8px',
+                  border: '1px solid #ffc107',
+                  textAlign: 'center'
+                }}>
+                  <span style={{ fontSize: '48px', marginBottom: '10px', display: 'block' }}>📋</span>
+                  <div style={{ fontSize: '16px', color: '#856404', marginBottom: '10px' }}>
+                    <strong>Questionário PAR-Q Pendente</strong>
                   </div>
-                  {aluno?.parq_completion_date && (
-                    <div style={{ fontSize: '12px', color: '#666' }}>
-                      Preenchido em: {new Date(aluno.parq_completion_date).toLocaleDateString('pt-BR')}
-                    </div>
-                  )}
+                  <div style={{ fontSize: '14px', color: '#666', marginBottom: '15px' }}>
+                    Preencha o questionário PAR-Q para avaliar sua aptidão para atividade física.
+                  </div>
+                  <button
+                    onClick={handleEdit}
+                    style={{
+                      ...styles.primaryButton,
+                      backgroundColor: '#ff9800'
+                    }}
+                  >
+                    Preencher Questionário
+                  </button>
                 </div>
-              </div>
+              );
+            }
+            
+            return (
+              <div>
+                <div style={{
+                  backgroundColor: '#e8f5e9',
+                  padding: '15px',
+                  borderRadius: '8px',
+                  marginBottom: '15px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  border: '1px solid #c8e6c9'
+                }}>
+                  <span style={{ fontSize: '24px' }}>✅</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 'bold', color: '#2e7d32', marginBottom: '6px', fontSize: '16px' }}>
+                      Questionário {hasParqCompleted || hasCompletionDate ? 'Completo' : 'Respondido'}
+                    </div>
+                    {hasCompletionDate && (
+                      <div style={{ fontSize: '14px', color: '#424242', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <span style={{ fontWeight: 'bold' }}>Preenchido em:</span>
+                        <span style={{ color: '#1F6C86' }}>{formatParqDate(aluno.parq_completion_date)}</span>
+                      </div>
+                    )}
+                    {!hasCompletionDate && (
+                      <div style={{ fontSize: '14px', color: '#666', fontStyle: 'italic' }}>
+                        Data de preenchimento não disponível
+                      </div>
+                    )}
+                  </div>
+                </div>
               
               {[
                 {
@@ -1316,33 +1565,9 @@ function DashboardAluno({ user }) {
                   </div>
                 </div>
               )}
-            </div>
-          ) : (
-            <div style={{
-              padding: '20px',
-              backgroundColor: '#fff3cd',
-              borderRadius: '8px',
-              border: '1px solid #ffc107',
-              textAlign: 'center'
-            }}>
-              <span style={{ fontSize: '48px', marginBottom: '10px', display: 'block' }}>📋</span>
-              <div style={{ fontSize: '16px', color: '#856404', marginBottom: '10px' }}>
-                <strong>Questionário PAR-Q Pendente</strong>
               </div>
-              <div style={{ fontSize: '14px', color: '#666', marginBottom: '15px' }}>
-                Preencha o questionário PAR-Q para avaliar sua aptidão para atividade física.
-              </div>
-              <button
-                onClick={handleEdit}
-                style={{
-                  ...styles.primaryButton,
-                  backgroundColor: '#ff9800'
-                }}
-              >
-                Preencher Questionário
-              </button>
-            </div>
-          )}
+            );
+          })()}
         </div>
         
           <div style={{ gridColumn: '1 / -1' }}>
@@ -1528,10 +1753,10 @@ function DashboardAluno({ user }) {
                         <button
                           className="pix-button"
                           onClick={() => handleGerarPix(mensalidade.id)}
-                          disabled={pagamentoLoading || pagamentoBancarioLoading}
+                          disabled={pagamentoLoading || pagamentoBancarioLoading || pagamentoBoletoLoading}
                           style={{
                             ...styles.pixButton,
-                            opacity: (pagamentoLoading || pagamentoBancarioLoading) ? 0.7 : 1
+                            opacity: (pagamentoLoading || pagamentoBancarioLoading || pagamentoBoletoLoading) ? 0.7 : 1
                           }}
                         >
                           {pagamentoLoading ? 'Gerando PIX...' : 'Pagar com PIX'}
@@ -1539,13 +1764,24 @@ function DashboardAluno({ user }) {
                         <button
                           className="bank-button"
                           onClick={() => handleGerarPagamentoBancario(mensalidade.id)}
-                          disabled={pagamentoLoading || pagamentoBancarioLoading}
+                          disabled={pagamentoLoading || pagamentoBancarioLoading || pagamentoBoletoLoading}
                           style={{
                             ...styles.bankButton,
-                            opacity: (pagamentoBancarioLoading || pagamentoLoading) ? 0.7 : 1
+                            opacity: (pagamentoBancarioLoading || pagamentoLoading || pagamentoBoletoLoading) ? 0.7 : 1
                           }}
                         >
                           {pagamentoBancarioLoading ? 'Gerando Banco...' : 'Pagar com Cartão'}
+                        </button>
+                        <button
+                          className="boleto-button"
+                          onClick={() => handleGerarBoleto(mensalidade.id)}
+                          disabled={pagamentoLoading || pagamentoBancarioLoading || pagamentoBoletoLoading}
+                          style={{
+                            ...styles.boletoButton,
+                            opacity: (pagamentoBoletoLoading || pagamentoLoading || pagamentoBancarioLoading) ? 0.7 : 1
+                          }}
+                        >
+                          {pagamentoBoletoLoading ? 'Gerando Boleto...' : 'Gerar Boleto'}
                         </button>
                       </div>
                     </td>
@@ -1609,10 +1845,10 @@ function DashboardAluno({ user }) {
                         <button
                           className="pix-button"
                           onClick={() => handleGerarPix(mensalidade.id)}
-                          disabled={pagamentoLoading || pagamentoBancarioLoading}
+                          disabled={pagamentoLoading || pagamentoBancarioLoading || pagamentoBoletoLoading}
                           style={{
                             ...styles.pixButton,
-                            opacity: (pagamentoLoading || pagamentoBancarioLoading) ? 0.7 : 1
+                            opacity: (pagamentoLoading || pagamentoBancarioLoading || pagamentoBoletoLoading) ? 0.7 : 1
                           }}
                         >
                           {pagamentoLoading ? 'Gerando PIX...' : 'Pagar com PIX'}
@@ -1620,13 +1856,24 @@ function DashboardAluno({ user }) {
                         <button
                           className="bank-button"
                           onClick={() => handleGerarPagamentoBancario(mensalidade.id)}
-                          disabled={pagamentoLoading || pagamentoBancarioLoading}
+                          disabled={pagamentoLoading || pagamentoBancarioLoading || pagamentoBoletoLoading}
                           style={{
                             ...styles.bankButton,
-                            opacity: (pagamentoBancarioLoading || pagamentoLoading) ? 0.7 : 1
+                            opacity: (pagamentoBancarioLoading || pagamentoLoading || pagamentoBoletoLoading) ? 0.7 : 1
                           }}
                         >
                           {pagamentoBancarioLoading ? 'Gerando Banco...' : 'Pagar com Cartão'}
+                        </button>
+                        <button
+                          className="boleto-button"
+                          onClick={() => handleGerarBoleto(mensalidade.id)}
+                          disabled={pagamentoLoading || pagamentoBancarioLoading || pagamentoBoletoLoading}
+                          style={{
+                            ...styles.boletoButton,
+                            opacity: (pagamentoBoletoLoading || pagamentoLoading || pagamentoBancarioLoading) ? 0.7 : 1
+                          }}
+                        >
+                          {pagamentoBoletoLoading ? 'Gerando Boleto...' : 'Gerar Boleto'}
                         </button>
                       </div>
                     )}
@@ -1772,6 +2019,44 @@ function DashboardAluno({ user }) {
                   Copiar
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {transacaoBoleto && (
+          <div className="pix-container" style={styles.pixContainer}>
+            <h3 style={styles.pixTitle}>Boleto Bancário</h3>
+            <p style={{ color: '#666', marginBottom: '20px' }}>
+              Boleto gerado com sucesso! Use a linha digitável abaixo para pagar em qualquer banco, aplicativo ou internet banking.
+            </p>
+            <div style={{ marginBottom: '20px' }}>
+              <p style={{ color: '#666', marginBottom: '10px', fontWeight: 'bold' }}>Linha Digitável:</p>
+              <div className="pix-code-wrapper" style={styles.pixCodeWrapper}>
+                <code className="pix-code" style={styles.pixCode}>{transacaoBoleto.boleto_codigo || 'Linha digitável não disponível'}</code>
+                <button
+                  className="copy-button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(transacaoBoleto.boleto_codigo);
+                    setSuccess('Linha digitável copiada!');
+                  }}
+                  style={styles.copyButton}
+                >
+                  Copiar
+                </button>
+              </div>
+            </div>
+            <div style={{ marginTop: '20px', textAlign: 'center' }}>
+              <button
+                onClick={() => handleDownloadBoletoPDF(transacaoBoleto.id)}
+                style={{
+                  ...styles.primaryButton,
+                  backgroundColor: '#ff9800',
+                  padding: '12px 24px',
+                  fontSize: '16px'
+                }}
+              >
+                📄 Baixar PDF do Boleto
+              </button>
             </div>
           </div>
         )}

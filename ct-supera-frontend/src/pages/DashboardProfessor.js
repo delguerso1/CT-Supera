@@ -28,7 +28,7 @@ const styles = {
   },
   sidebar: {
     width: '280px',
-    backgroundColor: '#1a237e',
+    backgroundColor: '#1F6C86',
     color: 'white',
     padding: '20px',
     boxShadow: '2px 0 10px rgba(0,0,0,0.1)',
@@ -60,7 +60,7 @@ const styles = {
     justifyContent: 'center',
     margin: '0 auto 15px',
     fontSize: '40px',
-    color: '#1a237e',
+    color: '#1F6C86',
     border: '3px solid rgba(255,255,255,0.3)',
     cursor: 'pointer',
     transition: 'all 0.3s ease'
@@ -101,7 +101,7 @@ const styles = {
   },
   contentTitle: {
     fontSize: '24px',
-    color: '#1a237e',
+    color: '#1F6C86',
     marginBottom: '30px',
     display: 'flex',
     alignItems: 'center',
@@ -130,7 +130,7 @@ const styles = {
   statValue: {
     fontSize: '28px',
     fontWeight: 'bold',
-    color: '#1a237e',
+    color: '#1F6C86',
     marginBottom: '4px'
   },
   statSubtitle: {
@@ -173,7 +173,7 @@ const styles = {
     marginTop: '20px'
   },
   primaryButton: {
-    backgroundColor: '#1a237e',
+    backgroundColor: '#1F6C86',
     color: 'white',
     border: 'none',
     borderRadius: '8px',
@@ -268,7 +268,7 @@ const styles = {
   },
   modalTitle: {
     fontSize: '20px',
-    color: '#1a237e',
+    color: '#1F6C86',
     marginBottom: '20px'
   },
   checkboxContainer: {
@@ -626,7 +626,7 @@ function DashboardProfessor({ user }) {
                   backgroundColor: '#f5f5f5'
                 }
               }} onClick={() => setCtSelecionado(ct)}>
-                <h4 style={{ margin: '0 0 8px 0', color: '#1a237e' }}>{ct.nome}</h4>
+                <h4 style={{ margin: '0 0 8px 0', color: '#1F6C86' }}>{ct.nome}</h4>
                 <p style={{ margin: 0, color: '#666' }}>
                   Clique para ver as turmas deste centro
                 </p>
@@ -655,7 +655,7 @@ function DashboardProfessor({ user }) {
       }}>
         <h3 style={{
           fontSize: '18px',
-          color: '#1a237e',
+          color: '#1F6C86',
           marginBottom: '20px',
           display: 'flex',
           alignItems: 'center',
@@ -683,7 +683,7 @@ function DashboardProfessor({ user }) {
               justifyContent: 'center',
               margin: '0 auto 10px',
               fontSize: '48px',
-              color: '#1a237e',
+              color: '#1F6C86',
               border: '3px solid #e0e0e0',
               overflow: 'hidden',
               backgroundImage: professor?.foto_perfil ? `url(${MEDIA_URL}${professor.foto_perfil}?t=${professor._photoTimestamp || Date.now()})` : 'none',
@@ -729,7 +729,7 @@ function DashboardProfessor({ user }) {
               <label
                 htmlFor="foto-input"
                 style={{
-                  backgroundColor: '#1a237e',
+                  backgroundColor: '#1F6C86',
                   color: 'white',
                   padding: '12px 20px',
                   borderRadius: '8px',
@@ -992,7 +992,7 @@ function DashboardProfessor({ user }) {
                     backgroundColor: '#f5f5f5'
                   }
                 }} onClick={() => setCtSelecionado(ct)}>
-                  <h4 style={{ margin: '0 0 8px 0', color: '#1a237e' }}>{ct.nome}</h4>
+                  <h4 style={{ margin: '0 0 8px 0', color: '#1F6C86' }}>{ct.nome}</h4>
                   <p style={{ margin: 0, color: '#666' }}>
                     Clique para ver as turmas deste centro
                   </p>
