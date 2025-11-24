@@ -6,11 +6,12 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
-# Carrega as variáveis de ambiente do arquivo .env
-load_dotenv()
-
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Carrega as variáveis de ambiente do arquivo .env na raiz do projeto
+env_path = BASE_DIR / '.env'
+load_dotenv(dotenv_path=env_path)
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY')
@@ -223,6 +224,16 @@ FRONTEND_URL = os.getenv('FRONTEND_URL', 'https://ctsupera.com.br')
 # Configurações de pagamento (removido)
 # PAYMENT_ACCESS_TOKEN = os.getenv('PAYMENT_ACCESS_TOKEN', '')
 # PAYMENT_PUBLIC_KEY = os.getenv('PAYMENT_PUBLIC_KEY', '')
+
+# Configurações do C6 Bank (valores devem vir do arquivo .env)
+C6_BANK_CLIENT_ID = os.getenv('C6_BANK_CLIENT_ID')
+C6_BANK_CLIENT_SECRET = os.getenv('C6_BANK_CLIENT_SECRET')
+C6_BANK_CHAVE_PIX = os.getenv('C6_BANK_CHAVE_PIX')
+C6_BANK_CERT_PATH = os.getenv('C6_BANK_CERT_PATH', 'certificados/certificado.crt')
+C6_BANK_KEY_PATH = os.getenv('C6_BANK_KEY_PATH', 'certificados/chave.key')
+C6_BANK_SANDBOX_URL = os.getenv('C6_BANK_SANDBOX_URL', 'https://baas-api-sandbox.c6bank.info')
+C6_BANK_PRODUCTION_URL = os.getenv('C6_BANK_PRODUCTION_URL', 'https://baas-api.c6bank.info')
+C6_BANK_ENVIRONMENT = os.getenv('C6_BANK_ENVIRONMENT', 'sandbox')  # sandbox ou production
 
 # Configurações de logging para produção
 LOGGING = {
