@@ -175,7 +175,7 @@ jobs:
             max_attempts=10
             attempt=0
             while [ $attempt -lt $max_attempts ]; do
-              if curl -f -s -o /dev/null http://localhost:8000 || curl -f -s -o /dev/null https://ctsupera.com.br; then
+              if curl -f -s -o /dev/null http://localhost:8001/api/status/ || curl -f -s -o /dev/null https://ctsupera.com.br/api/status/; then
                 echo "✅ Aplicação respondendo corretamente!"
                 break
               fi
