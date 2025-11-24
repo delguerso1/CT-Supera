@@ -157,6 +157,13 @@ jobs:
             echo "📁 Coletando arquivos estáticos..."
             python manage.py collectstatic --settings=app.settings_hostinger --noinput
             
+            echo "🌐 Atualizando configuração do Nginx..."
+            if [ -f "nginx_hostinger.conf" ]; then
+              sudo cp nginx_hostinger.conf /etc/nginx/sites-available/ctsupera
+              sudo ln -sf /etc/nginx/sites-available/ctsupera /etc/nginx/sites-enabled/
+              sudo nginx -t && sudo systemctl reload nginx || echo "⚠️ Erro ao atualizar Nginx"
+            fi
+            
             echo "🔄 Reiniciando serviço..."
             sudo systemctl restart ctsupera
             
