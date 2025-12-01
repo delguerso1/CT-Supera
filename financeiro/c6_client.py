@@ -205,10 +205,33 @@ class C6BankClient:
             logger.warning(f"  - BASE_DIR: {BASE_DIR}")
             
             # Tenta verificar caminhos alternativos
-            alt_cert = BASE_DIR / "certificados" / "Producao" / "cert.crt"
-            alt_key = BASE_DIR / "certificados" / "Producao" / "cert.key"
-            logger.warning(f"  - Tentativa alternativa cert: {alt_cert} (existe: {alt_cert.exists()})")
-            logger.warning(f"  - Tentativa alternativa key: {alt_key} (existe: {alt_key.exists()})")
+            caminhos_alternativos = [
+                (BASE_DIR / "certificados" / "Producao" / "cert.crt", BASE_DIR / "certificados" / "Producao" / "cert.key"),
+                (BASE_DIR / "certificados" / "Producao" / "certificado.crt", BASE_DIR / "certificados" / "Producao" / "certificado.key"),
+                (Path("/root/ct-supera/certificados/Producao/cert.crt"), Path("/root/ct-supera/certificados/Producao/cert.key")),
+            ]
+            
+            for alt_cert, alt_key in caminhos_alternativos:
+                logger.warning(f"  - Tentando: cert={alt_cert} (existe: {alt_cert.exists()}), key={alt_key} (existe: {alt_key.exists()})")
+                if alt_cert.exists() and alt_key.exists():
+                    logger.info(f"✅ Usando caminhos alternativos encontrados!")
+                    cert_config = {
+                        'cert': (str(alt_cert), str(alt_key))
+                    }
+                    logger.info(f"Certificados SSL configurados (alternativos): {alt_cert}, {alt_key}")
+                    return cert_config
+            
+            # Lista arquivos na pasta de certificados para debug
+            try:
+                cert_dir = BASE_DIR / "certificados" / "Producao"
+                if cert_dir.exists():
+                    logger.warning(f"  - Arquivos em {cert_dir}:")
+                    for arquivo in cert_dir.iterdir():
+                        logger.warning(f"    - {arquivo.name} (existe: {arquivo.exists()})")
+                else:
+                    logger.warning(f"  - Pasta {cert_dir} não existe")
+            except Exception as e:
+                logger.warning(f"  - Erro ao listar certificados: {e}")
             
             logger.warning("Continuando sem certificados SSL")
             
