@@ -186,9 +186,18 @@ class C6BankClient:
         logger.info(f"  - cert_path resolvido: {cert_path_str}")
         logger.info(f"  - key_path resolvido: {key_path_str}")
         
-        # Verifica se os arquivos existem
-        cert_exists = cert_path_abs.exists()
-        key_exists = key_path_abs.exists()
+        # Verifica se os arquivos existem (trata erros de permissão)
+        try:
+            cert_exists = cert_path_abs.exists()
+        except (PermissionError, OSError):
+            cert_exists = False
+            logger.warning(f"  - Erro de permissão ao verificar cert: {cert_path_abs}")
+        
+        try:
+            key_exists = key_path_abs.exists()
+        except (PermissionError, OSError):
+            key_exists = False
+            logger.warning(f"  - Erro de permissão ao verificar key: {key_path_abs}")
         
         logger.info(f"  - cert existe: {cert_exists}")
         logger.info(f"  - key existe: {key_exists}")
@@ -204,30 +213,48 @@ class C6BankClient:
             logger.warning(f"  - Key: {key_path_str} (existe: {key_exists})")
             logger.warning(f"  - BASE_DIR: {BASE_DIR}")
             
-            # Tenta verificar caminhos alternativos
+            # Tenta verificar caminhos alternativos (apenas caminhos relativos ao BASE_DIR)
             caminhos_alternativos = [
                 (BASE_DIR / "certificados" / "Producao" / "cert.crt", BASE_DIR / "certificados" / "Producao" / "cert.key"),
                 (BASE_DIR / "certificados" / "Producao" / "certificado.crt", BASE_DIR / "certificados" / "Producao" / "certificado.key"),
-                (Path("/root/ct-supera/certificados/Producao/cert.crt"), Path("/root/ct-supera/certificados/Producao/cert.key")),
             ]
             
-            for alt_cert, alt_key in caminhos_alternativos:
-                logger.warning(f"  - Tentando: cert={alt_cert} (existe: {alt_cert.exists()}), key={alt_key} (existe: {alt_key.exists()})")
-                if alt_cert.exists() and alt_key.exists():
-                    logger.info(f"✅ Usando caminhos alternativos encontrados!")
-                    cert_config = {
-                        'cert': (str(alt_cert), str(alt_key))
-                    }
-                    logger.info(f"Certificados SSL configurados (alternativos): {alt_cert}, {alt_key}")
-                    return cert_config
+            # Adiciona caminho absoluto do servidor apenas se BASE_DIR indicar que estamos no servidor
+            if str(BASE_DIR).startswith('/root/ct-supera'):
+                caminhos_alternativos.append(
+                    (Path("/root/ct-supera/certificados/Producao/cert.crt"), Path("/root/ct-supera/certificados/Producao/cert.key"))
+                )
             
-            # Lista arquivos na pasta de certificados para debug
+            for alt_cert, alt_key in caminhos_alternativos:
+                try:
+                    cert_existe = alt_cert.exists()
+                    key_existe = alt_key.exists()
+                    logger.warning(f"  - Tentando: cert={alt_cert} (existe: {cert_existe}), key={alt_key} (existe: {key_existe})")
+                    if cert_existe and key_existe:
+                        logger.info(f"✅ Usando caminhos alternativos encontrados!")
+                        cert_config = {
+                            'cert': (str(alt_cert), str(alt_key))
+                        }
+                        logger.info(f"Certificados SSL configurados (alternativos): {alt_cert}, {alt_key}")
+                        return cert_config
+                except (PermissionError, OSError) as e:
+                    # Ignora erros de permissão (pode acontecer em CI/CD)
+                    logger.debug(f"  - Erro ao verificar {alt_cert}: {e}")
+                    continue
+            
+            # Lista arquivos na pasta de certificados para debug (trata erros de permissão)
             try:
                 cert_dir = BASE_DIR / "certificados" / "Producao"
                 if cert_dir.exists():
-                    logger.warning(f"  - Arquivos em {cert_dir}:")
-                    for arquivo in cert_dir.iterdir():
-                        logger.warning(f"    - {arquivo.name} (existe: {arquivo.exists()})")
+                    try:
+                        logger.warning(f"  - Arquivos em {cert_dir}:")
+                        for arquivo in cert_dir.iterdir():
+                            try:
+                                logger.warning(f"    - {arquivo.name} (existe: {arquivo.exists()})")
+                            except (PermissionError, OSError):
+                                logger.warning(f"    - {arquivo.name} (erro ao verificar)")
+                    except (PermissionError, OSError) as e:
+                        logger.warning(f"  - Erro de permissão ao listar arquivos: {e}")
                 else:
                     logger.warning(f"  - Pasta {cert_dir} não existe")
             except Exception as e:
