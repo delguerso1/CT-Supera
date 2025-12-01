@@ -164,15 +164,27 @@ class C6BankClient:
             # Último fallback: diretório atual
             BASE_DIR = Path.cwd()
         
+        # Resolve caminhos - se for relativo, resolve a partir do BASE_DIR
+        # Se estiver no servidor (/root/ct-supera), também tenta caminho absoluto
         if os.path.isabs(self.cert_path):
             cert_path_abs = Path(self.cert_path)
         else:
             cert_path_abs = BASE_DIR / self.cert_path
+            # Se estiver no servidor, também tenta caminho absoluto como fallback
+            if str(BASE_DIR) == '/root/ct-supera' and not cert_path_abs.exists():
+                cert_path_abs_servidor = Path("/root/ct-supera") / self.cert_path
+                if cert_path_abs_servidor.exists():
+                    cert_path_abs = cert_path_abs_servidor
         
         if os.path.isabs(self.key_path):
             key_path_abs = Path(self.key_path)
         else:
             key_path_abs = BASE_DIR / self.key_path
+            # Se estiver no servidor, também tenta caminho absoluto como fallback
+            if str(BASE_DIR) == '/root/ct-supera' and not key_path_abs.exists():
+                key_path_abs_servidor = Path("/root/ct-supera") / self.key_path
+                if key_path_abs_servidor.exists():
+                    key_path_abs = key_path_abs_servidor
         
         # Converte para string para compatibilidade
         cert_path_str = str(cert_path_abs)
@@ -245,20 +257,43 @@ class C6BankClient:
             # Lista arquivos na pasta de certificados para debug (trata erros de permissão)
             try:
                 cert_dir = BASE_DIR / "certificados" / "Producao"
+                cert_dir_abs = Path("/root/ct-supera/certificados/Producao")
+                
+                # Tenta listar usando caminho relativo
                 if cert_dir.exists():
                     try:
                         logger.warning(f"  - Arquivos em {cert_dir}:")
+                        arquivos_encontrados = []
                         for arquivo in cert_dir.iterdir():
                             try:
-                                logger.warning(f"    - {arquivo.name} (existe: {arquivo.exists()})")
-                            except (PermissionError, OSError):
-                                logger.warning(f"    - {arquivo.name} (erro ao verificar)")
+                                arquivos_encontrados.append(arquivo.name)
+                                logger.warning(f"    - {arquivo.name} (tamanho: {arquivo.stat().st_size if arquivo.is_file() else 'N/A'} bytes)")
+                            except (PermissionError, OSError) as e:
+                                logger.warning(f"    - {arquivo.name} (erro ao verificar: {e})")
+                        
+                        if not arquivos_encontrados:
+                            logger.warning(f"    - Nenhum arquivo encontrado na pasta")
                     except (PermissionError, OSError) as e:
                         logger.warning(f"  - Erro de permissão ao listar arquivos: {e}")
                 else:
                     logger.warning(f"  - Pasta {cert_dir} não existe")
+                
+                # Tenta listar usando caminho absoluto também
+                if cert_dir_abs.exists() and str(cert_dir_abs) != str(cert_dir):
+                    try:
+                        logger.warning(f"  - Arquivos em {cert_dir_abs} (absoluto):")
+                        for arquivo in cert_dir_abs.iterdir():
+                            try:
+                                logger.warning(f"    - {arquivo.name} (tamanho: {arquivo.stat().st_size if arquivo.is_file() else 'N/A'} bytes)")
+                            except (PermissionError, OSError) as e:
+                                logger.warning(f"    - {arquivo.name} (erro ao verificar: {e})")
+                    except (PermissionError, OSError) as e:
+                        logger.warning(f"  - Erro de permissão ao listar arquivos absolutos: {e}")
+                        
             except Exception as e:
                 logger.warning(f"  - Erro ao listar certificados: {e}")
+                import traceback
+                logger.warning(f"  - Traceback: {traceback.format_exc()}")
             
             logger.warning("Continuando sem certificados SSL")
             
@@ -451,6 +486,16 @@ class C6BankClient:
             headers_extra (dict): Headers extras para adicionar (opcional)
         """
         try:
+            # Re-verifica certificados se não estiverem configurados (pode ter sido inicializado antes dos certificados estarem disponíveis)
+            if not self.cert_config.get('cert'):
+                logger.warning("Certificados não configurados, tentando re-verificar...")
+                self.cert_config = self._setup_certificates()
+                if not self.cert_config.get('cert'):
+                    logger.error("❌ ATENÇÃO: Certificados SSL não encontrados! A autenticação mTLS pode falhar.")
+                    logger.error(f"   Cert path configurado: {self.cert_path}")
+                    logger.error(f"   Key path configurado: {self.key_path}")
+                    logger.error(f"   Ambiente: {self.environment}")
+            
             # Obtém o token de acesso
             access_token = self._get_access_token()
             

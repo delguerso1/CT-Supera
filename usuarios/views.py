@@ -369,7 +369,11 @@ class ReenviarConviteAPIView(APIView):
 
     def post(self, request, usuario_id):
         try:
-            usuario = Usuario.objects.get(id=usuario_id, tipo="aluno")
+            # Aceita alunos, professores e gerentes
+            usuario = Usuario.objects.get(
+                id=usuario_id, 
+                tipo__in=["aluno", "professor", "gerente"]
+            )
             
             # Verifica se o usuário tem e-mail
             if not usuario.email:

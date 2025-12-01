@@ -166,14 +166,6 @@ function CadastroUsuario({ onUserChange }) {
     telefone_emergencia: '',
     nome_responsavel: '',
     ficha_medica: '',
-    // Campos do PAR-Q
-    parq_question_1: false,
-    parq_question_2: false,
-    parq_question_3: false,
-    parq_question_4: false,
-    parq_question_5: false,
-    parq_question_6: false,
-    parq_question_7: false,
   });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -371,14 +363,6 @@ function CadastroUsuario({ onUserChange }) {
       if (formData.ficha_medica) dados.ficha_medica = formData.ficha_medica;
       if (diaVencimento) dados.dia_vencimento = parseInt(diaVencimento);
       if (valorMensalidadeNovo) dados.valor_mensalidade = parseFloat(valorMensalidadeNovo);
-      // Campos do Par-Q
-      dados.parq_question_1 = formData.parq_question_1 || false;
-      dados.parq_question_2 = formData.parq_question_2 || false;
-      dados.parq_question_3 = formData.parq_question_3 || false;
-      dados.parq_question_4 = formData.parq_question_4 || false;
-      dados.parq_question_5 = formData.parq_question_5 || false;
-      dados.parq_question_6 = formData.parq_question_6 || false;
-      dados.parq_question_7 = formData.parq_question_7 || false;
     }
 
     // Campos específicos para professores
@@ -433,13 +417,6 @@ function CadastroUsuario({ onUserChange }) {
         telefone_emergencia: user.telefone_emergencia || '',
         nome_responsavel: user.nome_responsavel || '',
         ficha_medica: user.ficha_medica || '',
-        parq_question_1: user.parq_question_1 || false,
-        parq_question_2: user.parq_question_2 || false,
-        parq_question_3: user.parq_question_3 || false,
-        parq_question_4: user.parq_question_4 || false,
-        parq_question_5: user.parq_question_5 || false,
-        parq_question_6: user.parq_question_6 || false,
-        parq_question_7: user.parq_question_7 || false,
       });
     
     // Carregar campos específicos de professor
@@ -574,15 +551,33 @@ function CadastroUsuario({ onUserChange }) {
 
   // Função para filtrar usuários por CT
   const getFilteredUsers = () => {
-    if (!filtroCtSelecionado || activeTab !== 'alunos') {
+    // Se não há filtro selecionado ou não está na aba de alunos, retorna todos
+    if (!filtroCtSelecionado || filtroCtSelecionado === '' || activeTab !== 'alunos') {
       return users;
     }
     
+    // Converte o filtro para número
+    const filtroId = parseInt(filtroCtSelecionado, 10);
+    if (isNaN(filtroId)) {
+      return users;
+    }
+    
+    // Filtra os usuários que têm o CT selecionado
     return users.filter(user => {
-      if (!Array.isArray(user.centros_treinamento) || user.centros_treinamento.length === 0) {
+      // Verifica se o usuário tem centros de treinamento
+      if (!user.centros_treinamento || !Array.isArray(user.centros_treinamento) || user.centros_treinamento.length === 0) {
         return false;
       }
-      return user.centros_treinamento.some(ct => ct.id === parseInt(filtroCtSelecionado));
+      
+      // Verifica se algum dos CTs do usuário corresponde ao filtro
+      return user.centros_treinamento.some(ct => {
+        if (!ct || ct.id === null || ct.id === undefined) {
+          return false;
+        }
+        // Converte o ID do CT para número para comparação
+        const ctId = typeof ct.id === 'number' ? ct.id : parseInt(String(ct.id), 10);
+        return !isNaN(ctId) && ctId === filtroId;
+      });
     });
   };
 
@@ -804,7 +799,7 @@ function CadastroUsuario({ onUserChange }) {
                       Matricular
                     </button>
                   )}
-                  {activeTab === 'alunos' && !user.is_active && user.email && user.email !== 'pendente' && (
+                  {(activeTab === 'alunos' || activeTab === 'professores' || activeTab === 'gerentes') && !user.is_active && user.email && user.email !== 'pendente' && (
                     <button
                       style={{ 
                         ...styles.actionButton,
@@ -1011,132 +1006,31 @@ function CadastroUsuario({ onUserChange }) {
                 </>
               )}
 
-              {/* Ficha Médica - apenas para alunos */}
-              {activeTab === 'alunos' && (
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>
-                    Questionário de Prontidão para Atividade Física (PAR-Q)
-                  </label>
-                  
-                  {editingUser && !canFillParqAgain(editingUser) && (
-                    <div style={{
-                      padding: '12px',
-                      backgroundColor: '#fff3cd',
-                      borderRadius: '4px',
-                      marginBottom: '15px',
-                      border: '1px solid #ffc107'
-                    }}>
-                      <div style={{ fontWeight: 'bold', color: '#856404', marginBottom: '5px' }}>
-                        ⚠️ Questionário já preenchido
-                      </div>
-                      <div style={{ fontSize: '12px', color: '#856404' }}>
-                        O questionário PAR-Q só pode ser preenchido uma vez por ano. 
-                        Último preenchimento: {formatParqDate(editingUser?.parq_completion_date)}
-                        {getDaysUntilCanFillParq(editingUser) > 0 && (
-                          <span> - Você poderá preencher novamente em {getDaysUntilCanFillParq(editingUser)} dia(s).</span>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                  
-                  <div style={{ fontSize: '12px', color: '#666', marginBottom: '10px' }}>
-                    Responda "Sim" ou "Não" para cada pergunta abaixo
-                  </div>
-                  
-                  {[
-                    {
-                      field: 'parq_question_1',
-                      question: 'Alguma vez um médico disse que você tem um problema de coração e que só deveria fazer atividade física recomendada por um médico?'
-                    },
-                    {
-                      field: 'parq_question_2',
-                      question: 'Você sente dor no peito quando faz atividade física?'
-                    },
-                    {
-                      field: 'parq_question_3',
-                      question: 'No último mês, você teve dor no peito quando não estava fazendo atividade física?'
-                    },
-                    {
-                      field: 'parq_question_4',
-                      question: 'Você perde o equilíbrio por causa de tontura ou alguma vez perdeu a consciência?'
-                    },
-                    {
-                      field: 'parq_question_5',
-                      question: 'Você tem algum problema ósseo ou articular que poderia piorar com a mudança de sua atividade física?'
-                    },
-                    {
-                      field: 'parq_question_6',
-                      question: 'Atualmente um médico está prescrevendo medicamentos para sua pressão arterial ou condição cardíaca?'
-                    },
-                    {
-                      field: 'parq_question_7',
-                      question: 'Você sabe de alguma outra razão pela qual não deveria fazer atividade física?'
-                    }
-                  ].map((item, index) => (
-                    <div key={item.field} style={{ marginBottom: '15px', padding: '12px', border: '1px solid #ddd', borderRadius: '5px' }}>
-                      <div style={{ marginBottom: '8px', fontSize: '14px', lineHeight: '1.4' }}>
-                        <strong>{index + 1}.</strong> {item.question}
-                      </div>
-                      <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: canFillParqAgain(editingUser) ? 'pointer' : 'not-allowed', opacity: canFillParqAgain(editingUser) ? 1 : 0.6 }}>
-                          <input
-                            type="radio"
-                            name={item.field}
-                            value="true"
-                            checked={formData[item.field] === true || formData[item.field] === 'true'}
-                            onChange={handleChange}
-                            disabled={editingUser && !canFillParqAgain(editingUser)}
-                            style={{ margin: 0 }}
-                          />
-                          <span style={{ fontSize: '14px' }}>Sim</span>
-                        </label>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: canFillParqAgain(editingUser) ? 'pointer' : 'not-allowed', opacity: canFillParqAgain(editingUser) ? 1 : 0.6 }}>
-                          <input
-                            type="radio"
-                            name={item.field}
-                            value="false"
-                            checked={formData[item.field] === false || formData[item.field] === 'false' || formData[item.field] === undefined || formData[item.field] === null}
-                            onChange={handleChange}
-                            disabled={editingUser && !canFillParqAgain(editingUser)}
-                            style={{ margin: 0 }}
-                          />
-                          <span style={{ fontSize: '14px' }}>Não</span>
-                        </label>
-                      </div>
-                    </div>
-                  ))}
-                  
-                  <div style={{ marginTop: '15px', padding: '10px', backgroundColor: '#f8f9fa', borderRadius: '5px', fontSize: '13px', color: '#666' }}>
-                    <strong>Importante:</strong> Se você respondeu "Sim" a alguma pergunta, consulte seu médico antes de começar um programa de atividade física.
-                  </div>
-                  
-                  <div style={{ marginTop: '20px', display: 'flex', gap: '1rem' }}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowModal(false);
-                      }}
-                      style={{
-                        ...styles.button,
-                        backgroundColor: '#f5f5f5',
-                        color: '#333',
-                        flex: 1,
-                      }}
-                    >
-                      Cancelar
-                    </button>
-                    <button
-                      type="submit"
-                      style={{
-                        ...styles.button,
-                        flex: 1,
-                      }}
-                    >
-                      {editingUser ? 'Salvar' : `Cadastrar ${activeTab.slice(0, -1).charAt(0).toUpperCase() + activeTab.slice(0, -1).slice(1)}`}
-                    </button>
-                  </div>
-                </div>
-              )}
+              <div style={{ marginTop: '20px', display: 'flex', gap: '1rem' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowModal(false);
+                  }}
+                  style={{
+                    ...styles.button,
+                    backgroundColor: '#f5f5f5',
+                    color: '#333',
+                    flex: 1,
+                  }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  style={{
+                    ...styles.button,
+                    flex: 1,
+                  }}
+                >
+                  {editingUser ? 'Salvar' : `Cadastrar ${activeTab.slice(0, -1).charAt(0).toUpperCase() + activeTab.slice(0, -1).slice(1)}`}
+                </button>
+              </div>
 
               {/* Campo tipo de usuário - só mostra se for cadastro de gerente */}
               {activeTab === 'gerentes' && (

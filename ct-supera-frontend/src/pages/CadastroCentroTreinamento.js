@@ -191,127 +191,179 @@ function CadastroCentroTreinamento({ styles }) {
         </table>
       </div>
 
-      {/* Formulário de cadastro/edição */}
+      {/* Modal de cadastro/edição */}
       {showForm && (
-        <form
-          style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 24 }}
-          onSubmit={handleSubmit}
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '20px',
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowForm(false);
+              setEditId(null);
+              setFormData({ nome: '', endereco: '', telefone: '' });
+              setError('');
+              setSuccess('');
+            }
+          }}
         >
-          {error && (
-            <div style={{ color: '#c62828', background: '#ffebee', padding: 8, borderRadius: 4, marginBottom: 10 }}>
-              {error}
-            </div>
-          )}
-          {success && (
-            <div style={{ color: '#2e7d32', background: '#e8f5e9', padding: 8, borderRadius: 4, marginBottom: 10 }}>
-              {success}
-            </div>
-          )}
+          <div
+            style={{
+              backgroundColor: 'white',
+              borderRadius: '8px',
+              padding: '24px',
+              maxWidth: '500px',
+              width: '100%',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 style={{ marginTop: 0, marginBottom: '20px', fontSize: '1.5rem', color: '#333' }}>
+              {editId ? 'Editar Centro de Treinamento' : 'Novo Centro de Treinamento'}
+            </h3>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <label style={{ fontWeight: 500, marginBottom: 2 }} htmlFor="nome">
-              Nome do Centro
-            </label>
-            <input
-              type="text"
-              id="nome"
-              name="nome"
-              value={formData.nome}
-              onChange={handleChange}
-              style={{
-                padding: '8px',
-                borderRadius: 4,
-                border: '1px solid #ccc',
-                fontSize: '1rem'
-              }}
-              required
-            />
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <label style={{ fontWeight: 500, marginBottom: 2 }} htmlFor="endereco">
-              Endereço
-            </label>
-            <input
-              type="text"
-              id="endereco"
-              name="endereco"
-              value={formData.endereco}
-              onChange={handleChange}
-              style={{
-                padding: '8px',
-                borderRadius: 4,
-                border: '1px solid #ccc',
-                fontSize: '1rem'
-              }}
-              required
-            />
-          </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <label style={{ fontWeight: 500, marginBottom: 2 }} htmlFor="telefone">
-              Telefone
-            </label>
-            <input
-              type="tel"
-              id="telefone"
-              name="telefone"
-              value={formData.telefone}
-              onChange={handleChange}
-              style={{
-                padding: '8px',
-                borderRadius: 4,
-                border: '1px solid #ccc',
-                fontSize: '1rem'
-              }}
-              required
-            />
-          </div>
-
-          <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
-            <button
-              type="button"
-              onClick={() => {
-                setShowForm(false);
-                setEditId(null);
-                setFormData({ nome: '', endereco: '', telefone: '' });
-                setError('');
-                setSuccess('');
-              }}
-              style={{
-                backgroundColor: '#f5f5f5',
-                color: '#333',
-                padding: '0.75rem 1.5rem',
-                borderRadius: '4px',
-                border: 'none',
-                fontSize: '1rem',
-                cursor: 'pointer',
-                flex: 1,
-              }}
-              onMouseEnter={(e) => e.target.style.backgroundColor = '#e0e0e0'}
-              onMouseLeave={(e) => e.target.style.backgroundColor = '#f5f5f5'}
+            <form
+              style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}
+              onSubmit={handleSubmit}
             >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              style={{
-                backgroundColor: '#1F6C86',
-                color: 'white',
-                padding: '0.75rem 1.5rem',
-                borderRadius: '4px',
-                border: 'none',
-                fontSize: '1rem',
-                cursor: 'pointer',
-                flex: 1,
-              }}
-              onMouseEnter={(e) => e.target.style.backgroundColor = '#151b60'}
-              onMouseLeave={(e) => e.target.style.backgroundColor = '#1F6C86'}
-            >
-              {editId ? 'Salvar' : 'Cadastrar'}
-            </button>
+              {error && (
+                <div style={{ color: '#c62828', background: '#ffebee', padding: '12px', borderRadius: '4px', fontSize: '0.9rem' }}>
+                  {error}
+                </div>
+              )}
+              {success && (
+                <div style={{ color: '#2e7d32', background: '#e8f5e9', padding: '12px', borderRadius: '4px', fontSize: '0.9rem' }}>
+                  {success}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontWeight: 500, fontSize: '0.9rem', color: '#555' }} htmlFor="nome">
+                  Nome do Centro *
+                </label>
+                <input
+                  type="text"
+                  id="nome"
+                  name="nome"
+                  value={formData.nome}
+                  onChange={handleChange}
+                  style={{
+                    padding: '10px',
+                    borderRadius: '4px',
+                    border: '1px solid #ddd',
+                    fontSize: '0.95rem',
+                    width: '100%',
+                    boxSizing: 'border-box',
+                  }}
+                  required
+                />
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontWeight: 500, fontSize: '0.9rem', color: '#555' }} htmlFor="endereco">
+                  Endereço *
+                </label>
+                <input
+                  type="text"
+                  id="endereco"
+                  name="endereco"
+                  value={formData.endereco}
+                  onChange={handleChange}
+                  style={{
+                    padding: '10px',
+                    borderRadius: '4px',
+                    border: '1px solid #ddd',
+                    fontSize: '0.95rem',
+                    width: '100%',
+                    boxSizing: 'border-box',
+                  }}
+                  required
+                />
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontWeight: 500, fontSize: '0.9rem', color: '#555' }} htmlFor="telefone">
+                  Telefone *
+                </label>
+                <input
+                  type="tel"
+                  id="telefone"
+                  name="telefone"
+                  value={formData.telefone}
+                  onChange={handleChange}
+                  style={{
+                    padding: '10px',
+                    borderRadius: '4px',
+                    border: '1px solid #ddd',
+                    fontSize: '0.95rem',
+                    width: '100%',
+                    boxSizing: 'border-box',
+                  }}
+                  placeholder="(00) 00000-0000"
+                  required
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowForm(false);
+                    setEditId(null);
+                    setFormData({ nome: '', endereco: '', telefone: '' });
+                    setError('');
+                    setSuccess('');
+                  }}
+                  style={{
+                    backgroundColor: '#f5f5f5',
+                    color: '#333',
+                    padding: '10px 20px',
+                    borderRadius: '4px',
+                    border: 'none',
+                    fontSize: '0.95rem',
+                    cursor: 'pointer',
+                    flex: 1,
+                    transition: 'background-color 0.2s',
+                  }}
+                  onMouseEnter={(e) => e.target.style.backgroundColor = '#e0e0e0'}
+                  onMouseLeave={(e) => e.target.style.backgroundColor = '#f5f5f5'}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  style={{
+                    backgroundColor: '#1F6C86',
+                    color: 'white',
+                    padding: '10px 20px',
+                    borderRadius: '4px',
+                    border: 'none',
+                    fontSize: '0.95rem',
+                    cursor: 'pointer',
+                    flex: 1,
+                    transition: 'background-color 0.2s',
+                  }}
+                  onMouseEnter={(e) => e.target.style.backgroundColor = '#151b60'}
+                  onMouseLeave={(e) => e.target.style.backgroundColor = '#1F6C86'}
+                >
+                  {editId ? 'Salvar' : 'Cadastrar'}
+                </button>
+              </div>
+            </form>
           </div>
-        </form>
+        </div>
       )}
     </div>
   );

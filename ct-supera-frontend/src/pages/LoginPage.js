@@ -61,7 +61,7 @@ const styles = {
   },
   button: {
     backgroundColor: '#E0CC98',
-    color: 'white',
+    color: '#1F6C86',
     padding: '14px 24px',
     border: 'none',
     borderRadius: '8px',

@@ -42,13 +42,15 @@ const styles = {
   },
   loginButton: {
     backgroundColor: '#E0CC98',
-    color: 'white',
+    color: '#1F6C86',
     padding: '0.5rem 1rem',
     borderRadius: '4px',
     border: 'none',
     cursor: 'pointer',
     position: 'relative',
+    fontWeight: '600',
     transition: 'background-color 0.3s ease',
+    textDecoration: 'none',
     '&:hover': {
       backgroundColor: '#D4C088',
     },

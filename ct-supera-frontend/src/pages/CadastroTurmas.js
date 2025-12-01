@@ -263,12 +263,12 @@ function CadastroTurmas({ centroId, styles }) {
         <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 400 }}>
           <thead>
             <tr style={{ background: '#f5f5f5' }}>
-              <th style={{ padding: 10, borderBottom: '2px solid #eee', textAlign: 'left' }}>Dias</th>
-              <th style={{ padding: 10, borderBottom: '2px solid #eee', textAlign: 'left' }}>Horário</th>
-              <th style={{ padding: 10, borderBottom: '2px solid #eee', textAlign: 'left' }}>Capacidade</th>
-              <th style={{ padding: 10, borderBottom: '2px solid #eee', textAlign: 'left' }}>Professor</th>
-              <th style={{ padding: 10, borderBottom: '2px solid #eee', textAlign: 'left' }}>Alunos</th>
-              <th style={{ padding: 10, borderBottom: '2px solid #eee', textAlign: 'center' }}>Ações</th>
+              <th style={{ padding: 12, borderBottom: '2px solid #eee', textAlign: 'center' }}>Dias</th>
+              <th style={{ padding: 12, borderBottom: '2px solid #eee', textAlign: 'center' }}>Horário</th>
+              <th style={{ padding: 12, borderBottom: '2px solid #eee', textAlign: 'center' }}>Capacidade</th>
+              <th style={{ padding: 12, borderBottom: '2px solid #eee', textAlign: 'center' }}>Professor</th>
+              <th style={{ padding: 12, borderBottom: '2px solid #eee', textAlign: 'center' }}>Alunos</th>
+              <th style={{ padding: 12, borderBottom: '2px solid #eee', textAlign: 'center' }}>Ações</th>
             </tr>
           </thead>
           <tbody>
@@ -281,17 +281,17 @@ function CadastroTurmas({ centroId, styles }) {
             )}
             {turmas.map((turma) => (
               <tr key={turma.id} style={{ borderBottom: '1px solid #eee' }}>
-                <td style={{ padding: 10 }}>
+                <td style={{ padding: 12, textAlign: 'center' }}>
                   {/* Exibe os nomes dos dias da semana, se vierem no objeto */}
                   {turma.dias_semana_nomes
                     ? turma.dias_semana_nomes.join(', ')
                     : (turma.dias_semana || []).join(', ')
                   }
                 </td>
-                <td style={{ padding: 10 }}>{turma.horario}</td>
-                <td style={{ padding: 10 }}>{turma.capacidade_maxima}</td>
-                <td style={{ padding: 10 }}>{turma.professor_nome || turma.professor}</td>
-                <td style={{ padding: 10 }}>
+                <td style={{ padding: 12, textAlign: 'center' }}>{turma.horario}</td>
+                <td style={{ padding: 12, textAlign: 'center' }}>{turma.capacidade_maxima}</td>
+                <td style={{ padding: 12, textAlign: 'center' }}>{turma.professor_nome || turma.professor || '-'}</td>
+                <td style={{ padding: 12, textAlign: 'center' }}>
                   <button
                     style={{ 
                       color: '#1F6C86', 
@@ -300,84 +300,89 @@ function CadastroTurmas({ centroId, styles }) {
                       background: 'none',
                       border: 'none',
                       padding: 0,
-                      font: 'inherit'
+                      font: 'inherit',
+                      margin: '0 auto',
+                      display: 'block'
                     }}
                     onClick={(e) => {
                       e.preventDefault();
                       handleShowAlunosTurma(turma.id);
                     }}
                   >
-                    {turma.alunos_count}
+                    {turma.alunos_count || 0}
                   </button>
                 </td>
-                <td style={{ padding: 10, textAlign: 'center' }}>
-                  <button
-                    onClick={() => handleEdit(turma)}
-                    style={{
-                      padding: '0.5rem 1rem',
-                      borderRadius: '4px',
-                      border: 'none',
-                      cursor: 'pointer',
-                      marginRight: '0.5rem',
-                      fontSize: '0.9rem',
-                      backgroundColor: '#2196f3',
-                      color: 'white',
-                    }}
-                    onMouseEnter={(e) => e.target.style.backgroundColor = '#1976d2'}
-                    onMouseLeave={(e) => e.target.style.backgroundColor = '#2196f3'}
-                  >
-                    Editar
-                  </button>
-                  <button
-                    onClick={() => handleDelete(turma.id)}
-                    style={{
-                      padding: '0.5rem 1rem',
-                      borderRadius: '4px',
-                      border: 'none',
-                      cursor: 'pointer',
-                      marginRight: '0.5rem',
-                      fontSize: '0.9rem',
-                      backgroundColor: '#f44336',
-                      color: 'white',
-                    }}
-                    onMouseEnter={(e) => e.target.style.backgroundColor = '#d32f2f'}
-                    onMouseLeave={(e) => e.target.style.backgroundColor = '#f44336'}
-                  >
-                    Excluir
-                  </button>
-                  <button
-                    onClick={() => handleShowAddAluno(turma.id)}
-                    style={{
-                      padding: '0.5rem 1rem',
-                      borderRadius: '4px',
-                      border: 'none',
-                      cursor: 'pointer',
-                      marginRight: '0.5rem',
-                      fontSize: '0.9rem',
-                      backgroundColor: '#4caf50',
-                      color: 'white',
-                    }}
-                    onMouseEnter={(e) => e.target.style.backgroundColor = '#45a049'}
-                    onMouseLeave={(e) => e.target.style.backgroundColor = '#4caf50'}
-                  >
-                    + Aluno
-                  </button>
-                  <button
-                    onClick={() => handleShowRemoveAluno(turma.id)}
-                    style={{
-                      padding: '0.5rem 1rem',
-                      borderRadius: '4px',
-                      border: 'none',
-                      cursor: 'pointer',
-                      fontSize: '0.9rem',
-                      backgroundColor: '#ff9800',
-                      color: 'white',
-                    }}
-                    onMouseEnter={(e) => e.target.style.backgroundColor = '#f57c00'}
-                    onMouseLeave={(e) => e.target.style.backgroundColor = '#ff9800'}
-                  >
-                    - Aluno
-                  </button>
+                <td style={{ padding: 12, textAlign: 'center' }}>
+                  <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    <button
+                      onClick={() => handleEdit(turma)}
+                      style={{
+                        padding: '0.5rem 1rem',
+                        borderRadius: '4px',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontSize: '0.9rem',
+                        backgroundColor: '#2196f3',
+                        color: 'white',
+                        transition: 'background-color 0.2s',
+                      }}
+                      onMouseEnter={(e) => e.target.style.backgroundColor = '#1976d2'}
+                      onMouseLeave={(e) => e.target.style.backgroundColor = '#2196f3'}
+                    >
+                      Editar
+                    </button>
+                    <button
+                      onClick={() => handleDelete(turma.id)}
+                      style={{
+                        padding: '0.5rem 1rem',
+                        borderRadius: '4px',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontSize: '0.9rem',
+                        backgroundColor: '#f44336',
+                        color: 'white',
+                        transition: 'background-color 0.2s',
+                      }}
+                      onMouseEnter={(e) => e.target.style.backgroundColor = '#d32f2f'}
+                      onMouseLeave={(e) => e.target.style.backgroundColor = '#f44336'}
+                    >
+                      Excluir
+                    </button>
+                    <button
+                      onClick={() => handleShowAddAluno(turma.id)}
+                      style={{
+                        padding: '0.5rem 1rem',
+                        borderRadius: '4px',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontSize: '0.9rem',
+                        backgroundColor: '#4caf50',
+                        color: 'white',
+                        transition: 'background-color 0.2s',
+                      }}
+                      onMouseEnter={(e) => e.target.style.backgroundColor = '#45a049'}
+                      onMouseLeave={(e) => e.target.style.backgroundColor = '#4caf50'}
+                    >
+                      + Aluno
+                    </button>
+                    <button
+                      onClick={() => handleShowRemoveAluno(turma.id)}
+                      style={{
+                        padding: '0.5rem 1rem',
+                        borderRadius: '4px',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontSize: '0.9rem',
+                        backgroundColor: '#ff9800',
+                        color: 'white',
+                        transition: 'background-color 0.2s',
+                      }}
+                      onMouseEnter={(e) => e.target.style.backgroundColor = '#f57c00'}
+                      onMouseLeave={(e) => e.target.style.backgroundColor = '#ff9800'}
+                    >
+                      - Aluno
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}

@@ -39,12 +39,13 @@ const styles = {
   },
   agendamentoButton: {
     display: 'inline-block',
-    backgroundColor: '#4caf50',
-    color: 'white',
+    backgroundColor: '#E0CC98',
+    color: '#1F6C86',
     padding: '1rem 2rem',
     borderRadius: '4px',
     textDecoration: 'none !important',
     fontSize: '1.1rem',
+    fontWeight: '600',
     transition: 'background-color 0.3s',
   },
 };
