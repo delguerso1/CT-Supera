@@ -523,10 +523,12 @@ class C6BankClient:
             if not chave_pix:
                 raise Exception("Chave PIX não configurada. Verifique C6_BANK_CHAVE_PIX nas configurações.")
             
-            # Endpoint conforme documentação oficial: POST /v2/pix/cob
+            # Endpoint conforme documentação oficial: POST /cob
             # Documentação: pix-api.yaml linha 164-200
-            endpoint = "/v2/pix/cob"
-            logger.info(f"Criando cobrança PIX: {self.base_url}{endpoint}")
+            # O pix_base_url já inclui /v2/pix, então o endpoint é apenas /cob
+            # Passa a URL completa porque _make_request usa base_url por padrão
+            endpoint = f"{self.pix_base_url}/cob"
+            logger.info(f"Criando cobrança PIX: {endpoint}")
             logger.info(f"Chave PIX: {chave_pix[:20]}... (mascarada)")
             logger.info(f"Valor: R$ {valor:.2f}, Descrição: {descricao}, Expiração: {expiracao_segundos}s")
             if 'devedor' in cobranca_data:
@@ -573,10 +575,10 @@ class C6BankClient:
             dict: Status da cobrança PIX
         """
         try:
-            # Endpoint conforme documentação oficial: GET /v2/pix/cob/{txid}
+            # Endpoint conforme documentação oficial: GET /cob/{txid}
             # Documentação: pix-api.yaml linha 129-163
-            endpoint = f"/v2/pix/cob/{txid}"
-            logger.info(f"Consultando cobrança PIX: {self.base_url}{endpoint}")
+            endpoint = f"{self.pix_base_url}/cob/{txid}"
+            logger.info(f"Consultando cobrança PIX: {endpoint}")
             
             response = self._make_request('GET', endpoint)
             
@@ -666,7 +668,7 @@ class C6BankClient:
             if cpf and cnpj:
                 raise Exception("CPF e CNPJ não podem ser utilizados ao mesmo tempo.")
             
-            endpoint = "/v2/pix/cob"
+            endpoint = f"{self.pix_base_url}/cob"
             
             params = {
                 'inicio': inicio,
@@ -810,9 +812,9 @@ class C6BankClient:
             if desconto:
                 cobranca_data["valor"]["desconto"] = desconto
             
-            # Endpoint conforme documentação: PUT /v2/pix/cobv/{txid}
-            endpoint = f"/v2/pix/cobv/{txid}"
-            logger.info(f"Criando cobrança PIX com vencimento: {self.base_url}{endpoint}")
+            # Endpoint conforme documentação: PUT /cobv/{txid}
+            endpoint = f"{self.pix_base_url}/cobv/{txid}"
+            logger.info(f"Criando cobrança PIX com vencimento: {endpoint}")
             logger.info(f"TXID: {txid}, Valor: R$ {valor:.2f}, Vencimento: {data_vencimento}")
             logger.info(f"Devedor: {devedor_limpo.get('nome')} ({'CPF' if devedor_limpo.get('cpf') else 'CNPJ' if devedor_limpo.get('cnpj') else 'N/A'})")
             
@@ -859,7 +861,7 @@ class C6BankClient:
             if cpf and cnpj:
                 raise Exception("CPF e CNPJ não podem ser utilizados ao mesmo tempo.")
             
-            endpoint = "/v2/pix/cobv"
+            endpoint = f"{self.pix_base_url}/cobv"
             
             params = {
                 'inicio': inicio,
@@ -918,9 +920,9 @@ class C6BankClient:
             dict: Dados da cobrança PIX com vencimento
         """
         try:
-            # Endpoint conforme documentação: GET /v2/pix/cobv/{txid}
-            endpoint = f"/v2/pix/cobv/{txid}"
-            logger.info(f"Consultando cobrança PIX com vencimento: {self.base_url}{endpoint}")
+            # Endpoint conforme documentação: GET /cobv/{txid}
+            endpoint = f"{self.pix_base_url}/cobv/{txid}"
+            logger.info(f"Consultando cobrança PIX com vencimento: {endpoint}")
             
             response = self._make_request('GET', endpoint)
             
@@ -947,8 +949,8 @@ class C6BankClient:
             dict: Dados do webhook configurado
         """
         try:
-            # Endpoint conforme documentação: PUT /v2/pix/webhook/{chave}
-            endpoint = f"/v2/pix/webhook/{chave_pix}"
+            # Endpoint conforme documentação: PUT /webhook/{chave}
+            endpoint = f"{self.pix_base_url}/webhook/{chave_pix}"
             
             webhook_data = {
                 "webhookUrl": webhook_url
@@ -982,7 +984,7 @@ class C6BankClient:
             dict: Dados do webhook
         """
         try:
-            endpoint = f"/v2/pix/webhook/{chave_pix}"
+            endpoint = f"{self.pix_base_url}/webhook/{chave_pix}"
             
             response = self._make_request('GET', endpoint)
             
@@ -1008,7 +1010,7 @@ class C6BankClient:
             bool: True se removido com sucesso
         """
         try:
-            endpoint = f"/v2/pix/webhook/{chave_pix}"
+            endpoint = f"{self.pix_base_url}/webhook/{chave_pix}"
             
             response = self._make_request('DELETE', endpoint)
             
@@ -1039,7 +1041,7 @@ class C6BankClient:
             dict: Lista de webhooks
         """
         try:
-            endpoint = "/v2/pix/webhook"
+            endpoint = f"{self.pix_base_url}/webhook"
             
             params = {
                 'paginaAtual': pagina,
@@ -1087,8 +1089,9 @@ class C6BankClient:
         try:
             from datetime import datetime, timedelta
             
-            # Endpoint conforme documentação: POST /v1/checkouts/
-            endpoint = "/v1/checkouts/"
+            # Endpoint conforme documentação: POST /checkouts/
+            # O checkout_base_url já inclui /v1/checkouts, então o endpoint é apenas /
+            endpoint = f"{self.checkout_base_url}/"
             
             # Calcula data de expiração (formato ISO 8601 com timezone Z)
             expiration = (datetime.now() + timedelta(hours=expiration_hours)).strftime('%Y-%m-%dT%H:%M:%S.000Z')
@@ -1109,6 +1112,7 @@ class C6BankClient:
                 checkout_data["external_reference_id"] = external_reference_id
             
             logger.info(f"Criando checkout: R$ {amount}")
+            logger.info(f"Endpoint: {endpoint}")
             
             response = self._make_request('POST', endpoint, data=checkout_data)
             
@@ -1136,7 +1140,7 @@ class C6BankClient:
             dict: Dados do checkout
         """
         try:
-            endpoint = f"/v1/checkouts/{checkout_id}"
+            endpoint = f"{self.checkout_base_url}/{checkout_id}"
             
             response = self._make_request('GET', endpoint)
             
@@ -1162,7 +1166,7 @@ class C6BankClient:
             bool: True se cancelado com sucesso
         """
         try:
-            endpoint = f"/v1/checkouts/{checkout_id}/cancel"
+            endpoint = f"{self.checkout_base_url}/{checkout_id}/cancel"
             
             response = self._make_request('PUT', endpoint)
             
@@ -1196,7 +1200,7 @@ class C6BankClient:
         try:
             from datetime import datetime
             
-            endpoint = "/v1/checkouts/authorize"
+            endpoint = f"{self.checkout_base_url}/authorize"
             
             authorize_data = {
                 "amount": amount,
@@ -1365,7 +1369,7 @@ class C6BankClient:
             if not re.match(r'^[a-zA-Z0-9]{1,10}$', external_ref_str):
                 raise Exception(f"external_reference_id inválido. Deve seguir o padrão ^[a-zA-Z0-9]{{1,10}}$ (apenas letras e números, máximo 10 caracteres). Recebido: '{external_ref_str}' ({len(external_ref_str)} caracteres)")
             
-            endpoint = "/v1/bank_slips/"
+            endpoint = f"{self.bankslip_base_url}/"
             
             # Conforme bankslip-api.yaml linha 300-327 (bank_slip_create_request)
             bank_slip_data = {
@@ -1436,7 +1440,7 @@ class C6BankClient:
             dict: Dados completos do boleto
         """
         try:
-            endpoint = f"/v1/bank_slips/{bank_slip_id}"
+            endpoint = f"{self.bankslip_base_url}/{bank_slip_id}"
             
             # Headers opcionais
             headers_extra = {}
@@ -1479,7 +1483,7 @@ class C6BankClient:
             dict: Dados atualizados do boleto
         """
         try:
-            endpoint = f"/v1/bank_slips/{bank_slip_id}"
+            endpoint = f"{self.bankslip_base_url}/{bank_slip_id}"
             
             # Conforme bankslip-api.yaml linha 286-299 (bank_slip_alter_request)
             # Pelo menos um campo deve ser fornecido
@@ -1534,7 +1538,7 @@ class C6BankClient:
             bool: True se cancelado com sucesso
         """
         try:
-            endpoint = f"/v1/bank_slips/{bank_slip_id}/cancel"
+            endpoint = f"{self.bankslip_base_url}/{bank_slip_id}/cancel"
             
             # Headers opcionais
             headers_extra = {}
@@ -1573,7 +1577,7 @@ class C6BankClient:
             bytes: Conteúdo do PDF em bytes
         """
         try:
-            endpoint = f"/v1/bank_slips/{bank_slip_id}/pdf"
+            endpoint = f"{self.bankslip_base_url}/{bank_slip_id}/pdf"
             
             # Headers opcionais
             headers_extra = {}
