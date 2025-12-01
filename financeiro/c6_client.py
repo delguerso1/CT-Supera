@@ -12,6 +12,7 @@ from datetime import datetime, timedelta
 from django.conf import settings
 from django.core.cache import cache
 import os
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -150,20 +151,44 @@ class C6BankClient:
             logger.warning("Caminhos dos certificados não configurados - continuando sem certificados")
             return cert_config
         
+        # Resolve caminhos relativos baseado no BASE_DIR do Django
+        # Se o caminho já for absoluto, mantém; se for relativo, resolve a partir do BASE_DIR
+        try:
+            # Tenta obter BASE_DIR do settings
+            if hasattr(settings, 'BASE_DIR'):
+                BASE_DIR = Path(settings.BASE_DIR)
+            else:
+                # Fallback: assume que estamos na raiz do projeto Django
+                BASE_DIR = Path(__file__).resolve().parent.parent.parent
+        except Exception:
+            # Último fallback: diretório atual
+            BASE_DIR = Path.cwd()
+        
+        if os.path.isabs(self.cert_path):
+            cert_path_abs = Path(self.cert_path)
+        else:
+            cert_path_abs = BASE_DIR / self.cert_path
+        
+        if os.path.isabs(self.key_path):
+            key_path_abs = Path(self.key_path)
+        else:
+            key_path_abs = BASE_DIR / self.key_path
+        
+        # Converte para string para compatibilidade
+        cert_path_str = str(cert_path_abs)
+        key_path_str = str(key_path_abs)
+        
         # Verifica se os arquivos existem
-        if os.path.exists(self.cert_path) and os.path.exists(self.key_path):
-            # Usa caminhos absolutos para evitar problemas de encoding
-            cert_path_abs = os.path.abspath(self.cert_path)
-            key_path_abs = os.path.abspath(self.key_path)
-            
+        if cert_path_abs.exists() and key_path_abs.exists():
             cert_config = {
-                'cert': (cert_path_abs, key_path_abs)
+                'cert': (cert_path_str, key_path_str)
             }
-            logger.info(f"Certificados SSL configurados: {cert_path_abs}, {key_path_abs}")
+            logger.info(f"Certificados SSL configurados: {cert_path_str}, {key_path_str}")
         else:
             logger.warning(f"Arquivos de certificado não encontrados:")
-            logger.warning(f"  - Cert: {self.cert_path} (existe: {os.path.exists(self.cert_path) if self.cert_path else 'N/A'})")
-            logger.warning(f"  - Key: {self.key_path} (existe: {os.path.exists(self.key_path) if self.key_path else 'N/A'})")
+            logger.warning(f"  - Cert: {cert_path_str} (existe: {cert_path_abs.exists()})")
+            logger.warning(f"  - Key: {key_path_str} (existe: {key_path_abs.exists()})")
+            logger.warning(f"  - BASE_DIR: {BASE_DIR}")
             logger.warning("Continuando sem certificados SSL")
             
         return cert_config
