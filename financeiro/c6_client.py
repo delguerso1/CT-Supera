@@ -178,17 +178,38 @@ class C6BankClient:
         cert_path_str = str(cert_path_abs)
         key_path_str = str(key_path_abs)
         
+        # Log detalhado para debug
+        logger.info(f"[CERT DEBUG] Resolvendo certificados:")
+        logger.info(f"  - cert_path original: {self.cert_path}")
+        logger.info(f"  - key_path original: {self.key_path}")
+        logger.info(f"  - BASE_DIR: {BASE_DIR}")
+        logger.info(f"  - cert_path resolvido: {cert_path_str}")
+        logger.info(f"  - key_path resolvido: {key_path_str}")
+        
         # Verifica se os arquivos existem
-        if cert_path_abs.exists() and key_path_abs.exists():
+        cert_exists = cert_path_abs.exists()
+        key_exists = key_path_abs.exists()
+        
+        logger.info(f"  - cert existe: {cert_exists}")
+        logger.info(f"  - key existe: {key_exists}")
+        
+        if cert_exists and key_exists:
             cert_config = {
                 'cert': (cert_path_str, key_path_str)
             }
-            logger.info(f"Certificados SSL configurados: {cert_path_str}, {key_path_str}")
+            logger.info(f"✅ Certificados SSL configurados: {cert_path_str}, {key_path_str}")
         else:
-            logger.warning(f"Arquivos de certificado não encontrados:")
-            logger.warning(f"  - Cert: {cert_path_str} (existe: {cert_path_abs.exists()})")
-            logger.warning(f"  - Key: {key_path_str} (existe: {key_path_abs.exists()})")
+            logger.warning(f"❌ Arquivos de certificado não encontrados:")
+            logger.warning(f"  - Cert: {cert_path_str} (existe: {cert_exists})")
+            logger.warning(f"  - Key: {key_path_str} (existe: {key_exists})")
             logger.warning(f"  - BASE_DIR: {BASE_DIR}")
+            
+            # Tenta verificar caminhos alternativos
+            alt_cert = BASE_DIR / "certificados" / "Producao" / "cert.crt"
+            alt_key = BASE_DIR / "certificados" / "Producao" / "cert.key"
+            logger.warning(f"  - Tentativa alternativa cert: {alt_cert} (existe: {alt_cert.exists()})")
+            logger.warning(f"  - Tentativa alternativa key: {alt_key} (existe: {alt_key.exists()})")
+            
             logger.warning("Continuando sem certificados SSL")
             
         return cert_config
@@ -402,24 +423,35 @@ class C6BankClient:
             if headers_extra:
                 headers.update(headers_extra)
             
-            logger.info(f"Fazendo requisição {method} para: {url}")
-            
             # Prepara os certificados
             cert_tuple = self.cert_config.get('cert') if self.cert_config.get('cert') else None
             
+            logger.info(f"Fazendo requisição {method} para: {url}")
+            logger.info(f"Headers: {dict(headers)}")
+            logger.info(f"Certificados configurados: {bool(cert_tuple)}")
+            
             # Faz a requisição
-            response = requests.request(
-                method=method,
-                url=url,
-                headers=headers,
-                json=data,
-                params=params,
-                cert=cert_tuple,
-                timeout=30
-            )
+            try:
+                response = requests.request(
+                    method=method,
+                    url=url,
+                    headers=headers,
+                    json=data,
+                    params=params,
+                    cert=cert_tuple,
+                    timeout=30
+                )
+            except Exception as e:
+                logger.error(f"Erro na requisição HTTP: {str(e)}")
+                logger.error(f"URL: {url}")
+                logger.error(f"Método: {method}")
+                raise
             
             # Log da resposta
             logger.info(f"Resposta recebida: {response.status_code}")
+            if response.status_code >= 400:
+                logger.error(f"Erro na resposta: Status {response.status_code}")
+                logger.error(f"Resposta: {response.text[:500]}")
             
             # Verifica se a resposta não foi bem-sucedida (não é 2XX)
             if not (200 <= response.status_code < 300):
