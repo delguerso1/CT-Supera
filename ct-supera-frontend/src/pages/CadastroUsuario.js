@@ -275,37 +275,6 @@ function CadastroUsuario({ onUserChange }) {
     return telefone;
   };
 
-  // Função para verificar se pode preencher o Par-Q novamente
-  const canFillParqAgain = (user) => {
-    if (!user || !user.parq_completed || !user.parq_completion_date) {
-      return true; // Pode preencher se nunca preencheu ou não há usuário
-    }
-    
-    const dataPreenchimento = new Date(user.parq_completion_date);
-    const umAnoDepois = new Date(dataPreenchimento);
-    umAnoDepois.setFullYear(umAnoDepois.getFullYear() + 1);
-    const hoje = new Date();
-    
-    return hoje >= umAnoDepois;
-  };
-
-  // Função para calcular dias restantes até poder preencher novamente
-  const getDaysUntilCanFillParq = (user) => {
-    if (!user || !user.parq_completed || !user.parq_completion_date) {
-      return 0;
-    }
-    
-    const dataPreenchimento = new Date(user.parq_completion_date);
-    const umAnoDepois = new Date(dataPreenchimento);
-    umAnoDepois.setFullYear(umAnoDepois.getFullYear() + 1);
-    const hoje = new Date();
-    
-    const diffTime = umAnoDepois - hoje;
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
-    return diffDays > 0 ? diffDays : 0;
-  };
-
   // Função para formatar data e hora do preenchimento do Par-Q
   const formatParqDate = (dateString) => {
     if (!dateString) return 'N/A';
