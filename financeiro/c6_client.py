@@ -126,21 +126,15 @@ class C6BankClient:
         self.key_path = settings.C6_BANK_KEY_PATH
         self.environment = settings.C6_BANK_ENVIRONMENT
         
-        # URLs baseadas no ambiente (conforme documentação oficial)
-        if self.environment == 'sandbox':
-            self.base_url = "https://baas-api-sandbox.c6bank.info"
-            self.auth_url = f"{self.base_url}/v1/auth/"
-            self.pix_base_url = f"{self.base_url}/v2/pix"  # Endpoint PIX conforme documentação
-            self.checkout_base_url = f"{self.base_url}/v1/checkouts"  # Endpoint Checkout conforme checkout.yaml
-            self.statements_base_url = f"{self.base_url}/v1/c6pay/statement"  # Endpoint Statements conforme c6pay-statements.yaml
-            self.bankslip_base_url = f"{self.base_url}/v1/bank_slips"  # Endpoint Boleto conforme bankslip-api.yaml
-        else:
-            self.base_url = "https://baas-api.c6bank.info"
-            self.auth_url = f"{self.base_url}/v1/auth/"
-            self.pix_base_url = f"{self.base_url}/v2/pix"  # Endpoint PIX conforme documentação
-            self.checkout_base_url = f"{self.base_url}/v1/checkouts"  # Endpoint Checkout conforme checkout.yaml
-            self.statements_base_url = f"{self.base_url}/v1/c6pay/statement"  # Endpoint Statements conforme c6pay-statements.yaml
-            self.bankslip_base_url = f"{self.base_url}/v1/bank_slips"  # Endpoint Boleto conforme bankslip-api.yaml
+        # URLs baseadas no ambiente (usa C6_BANK_BASE_URL do settings)
+        self.base_url = getattr(settings, 'C6_BANK_BASE_URL', 
+                               'https://baas-api-sandbox.c6bank.info' if self.environment == 'sandbox' 
+                               else 'https://baas-api.c6bank.info')
+        self.auth_url = f"{self.base_url}/v1/auth/"
+        self.pix_base_url = f"{self.base_url}/v2/pix"  # Endpoint PIX conforme documentação
+        self.checkout_base_url = f"{self.base_url}/v1/checkouts"  # Endpoint Checkout conforme checkout.yaml
+        self.statements_base_url = f"{self.base_url}/v1/c6pay/statement"  # Endpoint Statements conforme c6pay-statements.yaml
+        self.bankslip_base_url = f"{self.base_url}/v1/bank_slips"  # Endpoint Boleto conforme bankslip-api.yaml
         
         # Configuração de certificados SSL
         self.cert_config = self._setup_certificates()

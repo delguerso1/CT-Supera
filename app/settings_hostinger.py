@@ -226,14 +226,27 @@ FRONTEND_URL = os.getenv('FRONTEND_URL', 'https://ctsupera.com.br')
 # PAYMENT_PUBLIC_KEY = os.getenv('PAYMENT_PUBLIC_KEY', '')
 
 # Configurações do C6 Bank (valores devem vir do arquivo .env)
-C6_BANK_CLIENT_ID = os.getenv('C6_BANK_CLIENT_ID')
-C6_BANK_CLIENT_SECRET = os.getenv('C6_BANK_CLIENT_SECRET')
-C6_BANK_CHAVE_PIX = os.getenv('C6_BANK_CHAVE_PIX')
-C6_BANK_CERT_PATH = os.getenv('C6_BANK_CERT_PATH', 'certificados/certificado.crt')
-C6_BANK_KEY_PATH = os.getenv('C6_BANK_KEY_PATH', 'certificados/chave.key')
+C6_BANK_ENVIRONMENT = os.getenv('C6_BANK_ENVIRONMENT', 'sandbox').lower()  # sandbox ou production
+
+# Seleciona as configurações baseadas no ambiente
+if C6_BANK_ENVIRONMENT == 'production':
+    C6_BANK_CLIENT_ID = os.getenv('C6_BANK_PRODUCTION_CLIENT_ID')
+    C6_BANK_CLIENT_SECRET = os.getenv('C6_BANK_PRODUCTION_CLIENT_SECRET')
+    C6_BANK_CHAVE_PIX = os.getenv('C6_BANK_PRODUCTION_CHAVE_PIX')
+    C6_BANK_CERT_PATH = os.getenv('C6_BANK_PRODUCTION_CERT_PATH', 'certificados/Producao/cert.crt')
+    C6_BANK_KEY_PATH = os.getenv('C6_BANK_PRODUCTION_KEY_PATH', 'certificados/Producao/cert.key')
+    C6_BANK_BASE_URL = os.getenv('C6_BANK_PRODUCTION_URL', 'https://baas-api.c6bank.info')
+else:  # sandbox (padrão)
+    C6_BANK_CLIENT_ID = os.getenv('C6_BANK_SANDBOX_CLIENT_ID')
+    C6_BANK_CLIENT_SECRET = os.getenv('C6_BANK_SANDBOX_CLIENT_SECRET')
+    C6_BANK_CHAVE_PIX = os.getenv('C6_BANK_SANDBOX_CHAVE_PIX')
+    C6_BANK_CERT_PATH = os.getenv('C6_BANK_SANDBOX_CERT_PATH', 'certificados/Sandbox/certificado.crt')
+    C6_BANK_KEY_PATH = os.getenv('C6_BANK_SANDBOX_KEY_PATH', 'certificados/Sandbox/chave.key')
+    C6_BANK_BASE_URL = os.getenv('C6_BANK_SANDBOX_URL', 'https://baas-api-sandbox.c6bank.info')
+
+# URLs mantidas para compatibilidade
 C6_BANK_SANDBOX_URL = os.getenv('C6_BANK_SANDBOX_URL', 'https://baas-api-sandbox.c6bank.info')
 C6_BANK_PRODUCTION_URL = os.getenv('C6_BANK_PRODUCTION_URL', 'https://baas-api.c6bank.info')
-C6_BANK_ENVIRONMENT = os.getenv('C6_BANK_ENVIRONMENT', 'sandbox')  # sandbox ou production
 
 # Configurações de logging para produção
 LOGGING = {

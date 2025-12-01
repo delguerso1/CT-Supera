@@ -249,12 +249,24 @@ CSRF_COOKIE_SAMESITE = 'Lax'
 CSRF_TRUSTED_ORIGINS = ['http://localhost:3000', 'http://127.0.0.1:3000']
 
 # Configurações do C6 Bank
-C6_BANK_CLIENT_ID = os.getenv('C6_BANK_CLIENT_ID', '77ad35b0-d34e-4e97-b394-6bd6889c358a')
-C6_BANK_CLIENT_SECRET = os.getenv('C6_BANK_CLIENT_SECRET', '6haSDzRpSCNBBv9Z1Cvw4VlerEbk4ga7')
-C6_BANK_CHAVE_PIX = os.getenv('C6_BANK_CHAVE_PIX', '54a61847-7b38-4f71-8b3a-b49179bce9c8')
-C6_BANK_CERT_PATH = os.getenv('C6_BANK_CERT_PATH', 'certificados/certificado.crt')
-C6_BANK_KEY_PATH = os.getenv('C6_BANK_KEY_PATH', 'certificados/chave.key')
-# URLs corretas conforme documentação oficial C6 Bank
+C6_BANK_ENVIRONMENT = os.getenv('C6_BANK_ENVIRONMENT', 'sandbox').lower()  # sandbox ou production
+
+# Seleciona as configurações baseadas no ambiente
+if C6_BANK_ENVIRONMENT == 'production':
+    C6_BANK_CLIENT_ID = os.getenv('C6_BANK_PRODUCTION_CLIENT_ID')
+    C6_BANK_CLIENT_SECRET = os.getenv('C6_BANK_PRODUCTION_CLIENT_SECRET')
+    C6_BANK_CHAVE_PIX = os.getenv('C6_BANK_PRODUCTION_CHAVE_PIX')
+    C6_BANK_CERT_PATH = os.getenv('C6_BANK_PRODUCTION_CERT_PATH', 'certificados/Producao/cert.crt')
+    C6_BANK_KEY_PATH = os.getenv('C6_BANK_PRODUCTION_KEY_PATH', 'certificados/Producao/cert.key')
+    C6_BANK_BASE_URL = os.getenv('C6_BANK_PRODUCTION_URL', 'https://baas-api.c6bank.info')
+else:  # sandbox (padrão)
+    C6_BANK_CLIENT_ID = os.getenv('C6_BANK_SANDBOX_CLIENT_ID', '77ad35b0-d34e-4e97-b394-6bd6889c358a')
+    C6_BANK_CLIENT_SECRET = os.getenv('C6_BANK_SANDBOX_CLIENT_SECRET', '6haSDzRpSCNBBv9Z1Cvw4VlerEbk4ga7')
+    C6_BANK_CHAVE_PIX = os.getenv('C6_BANK_SANDBOX_CHAVE_PIX', '54a61847-7b38-4f71-8b3a-b49179bce9c8')
+    C6_BANK_CERT_PATH = os.getenv('C6_BANK_SANDBOX_CERT_PATH', 'certificados/Sandbox/certificado.crt')
+    C6_BANK_KEY_PATH = os.getenv('C6_BANK_SANDBOX_KEY_PATH', 'certificados/Sandbox/chave.key')
+    C6_BANK_BASE_URL = os.getenv('C6_BANK_SANDBOX_URL', 'https://baas-api-sandbox.c6bank.info')
+
+# URLs mantidas para compatibilidade
 C6_BANK_SANDBOX_URL = os.getenv('C6_BANK_SANDBOX_URL', 'https://baas-api-sandbox.c6bank.info')
 C6_BANK_PRODUCTION_URL = os.getenv('C6_BANK_PRODUCTION_URL', 'https://baas-api.c6bank.info')
-C6_BANK_ENVIRONMENT = os.getenv('C6_BANK_ENVIRONMENT', 'sandbox')  # sandbox ou production
