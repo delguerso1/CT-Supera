@@ -7,7 +7,7 @@ from django.db.models import Sum
 from django.utils import timezone
 from .models import Mensalidade, Despesa, Salario, TransacaoC6Bank
 from .serializers import MensalidadeSerializer, DespesaSerializer, SalarioSerializer, TransacaoC6BankSerializer
-from .c6_client import c6_client, C6BankError, C6BankMethodNotAllowedError
+from .c6_client import c6_client, C6BankError, C6BankMethodNotAllowedError, C6BankInvalidRequestError
 from django.shortcuts import get_object_or_404
 from django.conf import settings
 from datetime import timedelta
@@ -1102,6 +1102,8 @@ class GerarBoletoAPIView(APIView):
             
         except C6BankMethodNotAllowedError as e:
             # Erro 405 - Método não permitido
+            # Retorna 405 ao invés de 500 para indicar erro do cliente (4xx)
+            # e evitar retries automáticos que não fazem sentido para este tipo de erro
             logger.error(f"Erro 405 ao gerar boleto: {str(e)}")
             logger.error(f"Detalhes: {e.detail if hasattr(e, 'detail') and e.detail else 'N/A'}")
             logger.error(f"Type: {e.type if hasattr(e, 'type') else 'N/A'}")
@@ -1115,12 +1117,62 @@ class GerarBoletoAPIView(APIView):
                     'detail': e.detail if hasattr(e, 'detail') and e.detail else None,
                     'correlation_id': e.correlation_id if hasattr(e, 'correlation_id') and e.correlation_id else None
                 }
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            }, status=status.HTTP_405_METHOD_NOT_ALLOWED)
+        except C6BankInvalidRequestError as e:
+            # Erro 400 - Requisição inválida
+            # Retorna 400 ao invés de 500 para indicar erro do cliente (4xx)
+            logger.error(f"Erro 400 ao gerar boleto: {str(e)}")
+            logger.error(f"Detalhes: {e.detail if hasattr(e, 'detail') and e.detail else 'N/A'}")
+            logger.error(f"Type: {e.type if hasattr(e, 'type') else 'N/A'}")
+            logger.error(f"Correlation ID: {e.correlation_id if hasattr(e, 'correlation_id') and e.correlation_id else 'N/A'}")
+            
+            # Tenta extrair informações úteis do erro
+            error_message = str(e)
+            if "CPF" in error_message.upper() or "tax_id" in error_message.lower():
+                # Erro relacionado ao CPF
+                return Response({
+                    'error': f'Erro ao validar CPF: {error_message}. Por favor, verifique se o CPF do aluno está correto e tem 11 dígitos numéricos.',
+                    'debug_info': {
+                        'aluno_id': mensalidade.aluno.id,
+                        'cpf_original': getattr(mensalidade.aluno, 'cpf', 'N/A'),
+                        'nome': getattr(mensalidade.aluno, 'get_full_name', lambda: 'N/A')()
+                    },
+                    'error_details': {
+                        'status': e.status if hasattr(e, 'status') else 400,
+                        'detail': e.detail if hasattr(e, 'detail') and e.detail else None,
+                        'correlation_id': e.correlation_id if hasattr(e, 'correlation_id') and e.correlation_id else None
+                    }
+                }, status=status.HTTP_400_BAD_REQUEST)
+            else:
+                # Outro tipo de erro 400
+                return Response({
+                    'error': f'Erro ao gerar boleto: {error_message}',
+                    'error_details': {
+                        'status': e.status if hasattr(e, 'status') else 400,
+                        'title': e.title if hasattr(e, 'title') else None,
+                        'detail': e.detail if hasattr(e, 'detail') and e.detail else None,
+                        'correlation_id': e.correlation_id if hasattr(e, 'correlation_id') and e.correlation_id else None
+                    }
+                }, status=status.HTTP_400_BAD_REQUEST)
         except C6BankError as e:
             # Outros erros C6 Bank
             error_message = str(e)
+            error_status = e.status if hasattr(e, 'status') else None
+            
+            # Tenta extrair o status code da mensagem se não estiver no atributo
+            # Formato: "[400] Requisição inválida"
+            import re
+            if error_status is None:
+                status_match = re.search(r'\[(\d{3})\]', error_message)
+                if status_match:
+                    try:
+                        error_status = int(status_match.group(1))
+                        logger.info(f"Status code extraído da mensagem de erro: {error_status}")
+                    except (ValueError, AttributeError):
+                        pass
+            
             logger.error(f"Erro C6 Bank ao gerar boleto: {error_message}")
-            logger.error(f"Status: {e.status if hasattr(e, 'status') else 'N/A'}")
+            logger.error(f"Status: {error_status}")
             logger.error(f"Type: {e.type if hasattr(e, 'type') else 'N/A'}")
             logger.error(f"Detail: {e.detail if hasattr(e, 'detail') and e.detail else 'N/A'}")
             
@@ -1135,21 +1187,66 @@ class GerarBoletoAPIView(APIView):
                         'nome': getattr(mensalidade.aluno, 'get_full_name', lambda: 'N/A')()
                     },
                     'error_details': {
-                        'status': e.status if hasattr(e, 'status') else None,
+                        'status': error_status,
                         'detail': e.detail if hasattr(e, 'detail') and e.detail else None
                     }
                 }, status=status.HTTP_400_BAD_REQUEST)
             else:
+                # Mapeia o código de status HTTP do erro C6 Bank para o código apropriado
+                # Erros 4xx são erros do cliente, 5xx são erros do servidor
+                if error_status and 400 <= error_status < 500:
+                    # Erro do cliente (4xx) - mapeia para o código HTTP apropriado
+                    status_map = {
+                        400: status.HTTP_400_BAD_REQUEST,
+                        401: status.HTTP_401_UNAUTHORIZED,
+                        403: status.HTTP_403_FORBIDDEN,
+                        404: status.HTTP_404_NOT_FOUND,
+                        405: status.HTTP_405_METHOD_NOT_ALLOWED,
+                        422: status.HTTP_422_UNPROCESSABLE_ENTITY,
+                        429: status.HTTP_429_TOO_MANY_REQUESTS,
+                    }
+                    http_status = status_map.get(error_status, status.HTTP_400_BAD_REQUEST)
+                elif error_status and 500 <= error_status < 600:
+                    # Erro do servidor (5xx)
+                    http_status = status.HTTP_500_INTERNAL_SERVER_ERROR
+                else:
+                    # Status desconhecido ou None - tenta extrair da mensagem
+                    if error_status is None:
+                        # Tenta extrair código 4xx da mensagem (ex: "[400] Requisição inválida")
+                        status_match = re.search(r'\[(4\d{2})\]', error_message)
+                        if status_match:
+                            try:
+                                extracted_status = int(status_match.group(1))
+                                status_map = {
+                                    400: status.HTTP_400_BAD_REQUEST,
+                                    401: status.HTTP_401_UNAUTHORIZED,
+                                    403: status.HTTP_403_FORBIDDEN,
+                                    404: status.HTTP_404_NOT_FOUND,
+                                    422: status.HTTP_422_UNPROCESSABLE_ENTITY,
+                                    429: status.HTTP_429_TOO_MANY_REQUESTS,
+                                }
+                                http_status = status_map.get(extracted_status, status.HTTP_400_BAD_REQUEST)
+                                error_status = extracted_status  # Atualiza para usar no response
+                                logger.info(f"Status code 4xx extraído da mensagem e mapeado: {extracted_status} -> {http_status}")
+                            except (ValueError, AttributeError):
+                                http_status = status.HTTP_500_INTERNAL_SERVER_ERROR
+                        else:
+                            # Não conseguiu extrair código 4xx - assume erro do servidor
+                            http_status = status.HTTP_500_INTERNAL_SERVER_ERROR
+                    else:
+                        # Status conhecido mas fora do range esperado
+                        http_status = status.HTTP_500_INTERNAL_SERVER_ERROR
+                
                 # Outro tipo de erro C6 Bank
                 return Response({
                     'error': f'Erro ao gerar boleto: {error_message}',
                     'error_details': {
-                        'status': e.status if hasattr(e, 'status') else None,
+                        'status': error_status,
                         'title': e.title if hasattr(e, 'title') else None,
                         'detail': e.detail if hasattr(e, 'detail') and e.detail else None,
                         'correlation_id': e.correlation_id if hasattr(e, 'correlation_id') and e.correlation_id else None
                     }
-                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                }, status=http_status)
         except Exception as e:
             error_message = str(e)
             logger.error(f"Erro ao gerar boleto: {error_message}")
