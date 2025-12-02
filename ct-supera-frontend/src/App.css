@@ -1,8 +1,12 @@
 .App {
   text-align: center;
   min-height: 100vh;
+  min-height: -webkit-fill-available;
   display: flex;
   flex-direction: column;
+  position: relative;
+  width: 100%;
+  overflow-x: hidden;
 }
 
 .App-logo {

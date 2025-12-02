@@ -1,18 +1,43 @@
 /* Estilos responsivos para o CT Supera */
 
+/* Animações */
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* Mobile First - Base styles for mobile */
 @media (max-width: 768px) {
-  /* Navbar mobile */
+  /* Navbar mobile - melhorias */
   .nav-links {
     display: none !important;
   }
   
   .mobile-menu-button {
     display: block !important;
+    min-width: 44px !important;
+    min-height: 44px !important;
+    padding: 0.5rem !important;
+    font-size: 1.5rem !important;
+    border-radius: 6px !important;
+    transition: background-color 0.2s ease !important;
+  }
+
+  .mobile-menu-button:active {
+    background-color: rgba(255, 255, 255, 0.1) !important;
   }
   
   .mobile-nav-links {
     display: flex !important;
+    animation: slideDown 0.3s ease-out !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+    padding: 1rem !important;
   }
   
   .container {
@@ -23,6 +48,11 @@
   .logo img {
     height: 45px !important;
     max-width: 150px !important;
+  }
+
+  /* Navbar mobile melhorada */
+  nav {
+    padding: 0.75rem 1rem !important;
   }
 
   /* HomePage mobile */
@@ -63,25 +93,43 @@
     padding: 1.5rem !important;
     margin: 1rem !important;
     max-width: none !important;
+    min-height: auto !important;
+  }
+
+  .login-card {
+    padding: 1.5rem !important;
+    border-radius: 12px !important;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15) !important;
   }
   
   .login-title {
     font-size: 1.5rem !important;
+    margin-bottom: 0.5rem !important;
   }
   
   .login-subtitle {
     font-size: 0.9rem !important;
+    margin-bottom: 1.5rem !important;
   }
   
   .form-group input {
     font-size: 16px !important; /* Previne zoom no iOS */
     padding: 0.75rem !important;
+    border-width: 2px !important;
   }
   
   .btn {
-    padding: 0.75rem 1rem !important;
+    padding: 0.875rem 1rem !important;
     font-size: 1rem !important;
     width: 100% !important;
+    min-height: 44px !important;
+    border-radius: 8px !important;
+    font-weight: 600 !important;
+    transition: all 0.2s ease !important;
+  }
+
+  .btn:active {
+    transform: scale(0.98) !important;
   }
 
   /* Forms mobile */
@@ -179,33 +227,87 @@
   }
   
   /* Profile photo mobile */
-  .profile-photo {
-    width: 60px !important;
-    height: 60px !important;
-    font-size: 24px !important;
-    margin: 0 auto 0.5rem !important;
+  .profile-photo,
+  [style*="profilePhoto"] {
+    width: 80px !important;
+    height: 80px !important;
+    font-size: 32px !important;
+    margin: 0 auto 1rem !important;
+    min-width: 80px !important;
+    min-height: 80px !important;
   }
   
-  .profile-name {
-    font-size: 1rem !important;
-    margin-bottom: 0.25rem !important;
+  .profile-name,
+  [style*="profileName"] {
+    font-size: 1.1rem !important;
+    margin-bottom: 0.5rem !important;
+    font-weight: 600 !important;
   }
   
-  .profile-status {
-    font-size: 0.8rem !important;
+  .profile-status,
+  [style*="profileStatus"] {
+    font-size: 0.9rem !important;
+    margin-bottom: 1rem !important;
   }
   
   /* Menu items mobile */
   .menu-item {
-    padding: 0.75rem 1rem !important;
-    margin-bottom: 0.25rem !important;
-    font-size: 0.9rem !important;
-    border-radius: 6px !important;
+    padding: 0.875rem 1rem !important;
+    margin-bottom: 0.5rem !important;
+    font-size: 1rem !important;
+    border-radius: 8px !important;
+    min-height: 44px !important;
+    display: flex !important;
+    align-items: center !important;
+    -webkit-tap-highlight-color: transparent !important;
+    transition: background-color 0.2s ease !important;
+  }
+
+  .menu-item:active {
+    background-color: rgba(255, 255, 255, 0.15) !important;
   }
   
   .menu-icon {
-    margin-right: 0.5rem !important;
-    font-size: 16px !important;
+    margin-right: 0.75rem !important;
+    font-size: 18px !important;
+  }
+
+  /* Botões de ação nos dashboards */
+  .primaryButton,
+  .secondaryButton,
+  .actionButton {
+    min-height: 44px !important;
+    padding: 0.875rem 1.5rem !important;
+    font-size: 1rem !important;
+    border-radius: 8px !important;
+    -webkit-tap-highlight-color: transparent !important;
+  }
+
+  .primaryButton:active,
+  .secondaryButton:active,
+  .actionButton:active {
+    transform: scale(0.98) !important;
+    opacity: 0.9 !important;
+  }
+
+  /* Sidebar menu items - garantir tamanho mínimo */
+  [class*="menuItem"],
+  [style*="menuItem"] {
+    min-height: 44px !important;
+    padding: 0.875rem 1rem !important;
+  }
+
+  /* Form groups mobile - melhor espaçamento */
+  .formGroup,
+  [class*="formGroup"] {
+    margin-bottom: 1rem !important;
+  }
+
+  /* Content area mobile */
+  .dashboard-content-area,
+  .contentArea {
+    padding: 1rem !important;
+    margin-bottom: 1rem !important;
   }
   
   /* Tables mobile - melhor scroll horizontal */
@@ -229,38 +331,65 @@
   }
   
   /* Payment buttons mobile */
-  .payment-buttons {
+  .payment-buttons,
+  [style*="paymentButtons"] {
     display: flex !important;
     flex-direction: column !important;
-    gap: 0.5rem !important;
+    gap: 0.75rem !important;
+    width: 100% !important;
   }
   
   .pix-button,
-  .bank-button {
-    padding: 0.5rem 0.75rem !important;
-    font-size: 0.8rem !important;
-    border-radius: 4px !important;
-    min-height: 40px !important;
+  .bank-button,
+  .boleto-button,
+  [style*="pixButton"],
+  [style*="bankButton"],
+  [style*="boletoButton"] {
+    padding: 0.875rem 1rem !important;
+    font-size: 1rem !important;
+    border-radius: 8px !important;
+    min-height: 48px !important;
+    width: 100% !important;
+    font-weight: 600 !important;
+    -webkit-tap-highlight-color: transparent !important;
+  }
+
+  .pix-button:active,
+  .bank-button:active,
+  .boleto-button:active {
+    transform: scale(0.98) !important;
+    opacity: 0.9 !important;
   }
   
   /* Check-in card mobile */
-  .checkin-card {
-    padding: 1rem !important;
-    margin-bottom: 1rem !important;
-    border-radius: 8px !important;
+  .checkin-card,
+  [style*="checkinCard"] {
+    padding: 1.25rem !important;
+    margin-bottom: 1.5rem !important;
+    border-radius: 12px !important;
   }
   
-  .checkin-title {
-    font-size: 1rem !important;
-    margin-bottom: 0.5rem !important;
+  .checkin-title,
+  [style*="checkinTitle"] {
+    font-size: 1.1rem !important;
+    margin-bottom: 0.75rem !important;
+    font-weight: 600 !important;
   }
   
-  .checkin-button {
+  .checkin-button,
+  [style*="checkinButton"] {
     width: 100% !important;
-    padding: 0.75rem !important;
-    font-size: 1rem !important;
-    min-height: 44px !important;
-    border-radius: 6px !important;
+    padding: 1rem !important;
+    font-size: 1.1rem !important;
+    min-height: 48px !important;
+    border-radius: 8px !important;
+    font-weight: 600 !important;
+    -webkit-tap-highlight-color: transparent !important;
+  }
+
+  .checkin-button:active {
+    transform: scale(0.98) !important;
+    opacity: 0.9 !important;
   }
   
   /* Modal mobile */
@@ -343,15 +472,25 @@
     padding: 0.5rem !important;
   }
 
-  /* Buttons mobile */
+  /* Buttons mobile - já definido acima, mas garantir consistência */
   .btn {
     min-height: 44px !important; /* Tamanho mínimo para touch */
-    padding: 0.75rem 1rem !important;
+    padding: 0.875rem 1rem !important;
+    border-radius: 8px !important;
+    font-weight: 600 !important;
+    transition: all 0.2s ease !important;
+    -webkit-tap-highlight-color: transparent !important;
+  }
+
+  .btn:active {
+    transform: scale(0.98) !important;
+    opacity: 0.9 !important;
   }
   
   .btn-sm {
-    min-height: 36px !important;
-    padding: 0.5rem 0.75rem !important;
+    min-height: 44px !important; /* Mesmo tamanho mínimo em mobile */
+    padding: 0.625rem 0.875rem !important;
+    font-size: 0.9rem !important;
   }
 
   /* Cards mobile */
@@ -408,6 +547,75 @@
   
   .mb-3-mobile {
     margin-bottom: 1rem !important;
+  }
+
+  /* Footer mobile */
+  footer {
+    padding: 1.5rem 1rem 1rem 1rem !important;
+    font-size: 0.9rem !important;
+    margin-top: 2rem !important;
+    border-top-left-radius: 0 !important;
+    border-top-right-radius: 0 !important;
+  }
+
+  footer .links {
+    flex-direction: column !important;
+    gap: 0.75rem !important;
+    margin-bottom: 1rem !important;
+  }
+
+  footer .links a {
+    padding: 0.5rem 0 !important;
+    font-size: 0.9rem !important;
+    min-height: 44px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    transition: opacity 0.2s ease !important;
+  }
+
+  footer .links a:active {
+    opacity: 0.7 !important;
+  }
+
+  footer .copyright {
+    font-size: 0.85rem !important;
+    margin-top: 0.75rem !important;
+  }
+
+  /* HomePage mobile melhorias */
+  .hero {
+    padding: 2.5rem 1rem !important;
+  }
+
+  /* Melhorias gerais de espaçamento */
+  section {
+    padding: 1.5rem 0 !important;
+  }
+
+  /* Inputs e selects mobile */
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="tel"],
+  input[type="number"],
+  select,
+  textarea {
+    min-height: 44px !important;
+    padding: 0.75rem !important;
+    font-size: 16px !important;
+    border-radius: 8px !important;
+  }
+
+  /* Melhorias de scroll em mobile */
+  .table-responsive {
+    -webkit-overflow-scrolling: touch !important;
+    scroll-behavior: smooth !important;
+  }
+
+  /* Melhorar espaçamento entre elementos interativos */
+  .form-group + .form-group {
+    margin-top: 1rem !important;
   }
 }
 
@@ -483,13 +691,33 @@
     transform: none !important;
   }
   
+  .btn:active {
+    transform: scale(0.98) !important;
+    opacity: 0.9 !important;
+  }
+  
   .nav-link:hover {
     color: inherit !important;
+  }
+
+  .nav-link:active {
+    opacity: 0.8 !important;
   }
   
   .card:hover {
     transform: none !important;
     box-shadow: inherit !important;
+  }
+
+  /* Melhorar feedback visual em elementos tocáveis */
+  a:active,
+  button:active {
+    opacity: 0.8 !important;
+  }
+
+  /* Remover efeitos hover em touch devices */
+  *:hover {
+    transition: none !important;
   }
 }
 
@@ -504,14 +732,62 @@
 /* Landscape mobile */
 @media (max-width: 768px) and (orientation: landscape) {
   .hero {
-    padding: 1rem !important;
+    padding: 1.5rem 1rem !important;
   }
   
   .hero-title {
-    font-size: 1.5rem !important;
+    font-size: 1.75rem !important;
+    margin-bottom: 0.5rem !important;
   }
   
   .hero-subtitle {
-    font-size: 0.9rem !important;
+    font-size: 0.95rem !important;
+    margin-bottom: 1rem !important;
+  }
+
+  /* Reduzir espaçamentos verticais em landscape */
+  .login-container {
+    padding: 1rem !important;
+  }
+
+  .login-card {
+    padding: 1.25rem !important;
+  }
+
+  footer {
+    padding: 1rem !important;
+    margin-top: 1.5rem !important;
+  }
+
+  /* Navbar mais compacta em landscape */
+  nav {
+    padding: 0.5rem 1rem !important;
+  }
+
+  .logo img {
+    height: 40px !important;
+  }
+}
+
+/* Melhorias para telas muito pequenas (iPhone SE, etc) */
+@media (max-width: 375px) {
+  .hero-title {
+    font-size: 1.75rem !important;
+  }
+
+  .section-title {
+    font-size: 1.35rem !important;
+  }
+
+  .login-card {
+    padding: 1.25rem !important;
+  }
+
+  .login-title {
+    font-size: 1.35rem !important;
+  }
+
+  .container {
+    padding: 0 0.75rem !important;
   }
 }

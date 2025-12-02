@@ -10,7 +10,8 @@ const styles = {
     fontSize: '1rem',
     borderTopLeftRadius: '16px',
     borderTopRightRadius: '16px',
-    boxShadow: '0 -2px 8px rgba(0,0,0,0.07)'
+    boxShadow: '0 -2px 8px rgba(0,0,0,0.07)',
+    width: '100%'
   },
   links: {
     margin: '0.5rem 0',
@@ -23,7 +24,9 @@ const styles = {
     color: '#90caf9',
     textDecoration: 'none',
     fontWeight: 500,
-    fontSize: '1rem'
+    fontSize: '1rem',
+    transition: 'opacity 0.2s ease',
+    WebkitTapHighlightColor: 'transparent'
   },
   copyright: {
     marginTop: '1rem',

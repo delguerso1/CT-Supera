@@ -90,7 +90,12 @@ const styles = {
     fontSize: '1.5rem',
     cursor: 'pointer',
     padding: '0.5rem',
+    minWidth: '44px',
+    minHeight: '44px',
+    borderRadius: '6px',
     zIndex: 11,
+    transition: 'background-color 0.2s ease',
+    WebkitTapHighlightColor: 'transparent',
   },
   mobileNavLinks: {
     display: 'none',
@@ -101,18 +106,24 @@ const styles = {
     backgroundColor: '#1F6C86',
     flexDirection: 'column',
     padding: '1rem',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
     zIndex: 10,
+    animation: 'slideDown 0.3s ease-out',
   },
   mobileNavLink: {
     color: 'white',
     textDecoration: 'none',
     fontSize: '1.1rem',
-    padding: '0.75rem 0',
+    padding: '0.875rem 0',
+    minHeight: '44px',
+    display: 'flex',
+    alignItems: 'center',
     borderBottom: '1px solid rgba(255,255,255,0.1)',
-    transition: 'color 0.3s ease',
-    '&:hover': {
-      color: '#90caf9',
+    transition: 'background-color 0.2s ease, opacity 0.2s ease',
+    WebkitTapHighlightColor: 'transparent',
+    '&:active': {
+      backgroundColor: 'rgba(255,255,255,0.1)',
+      opacity: 0.9,
     },
     '&:last-child': {
       borderBottom: 'none',
@@ -146,6 +157,7 @@ function Navbar() {
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const navigate = useNavigate();
   const dropdownRef = useRef();
+  const mobileMenuRef = useRef();
 
   // Verificar autenticação sempre que o componente monta
   useEffect(() => {
@@ -192,12 +204,20 @@ function Navbar() {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setShowDropdown(false);
       }
+      if (mobileMenuRef.current && !mobileMenuRef.current.contains(event.target) && 
+          event.target.className !== 'mobile-menu-button') {
+        setShowMobileMenu(false);
+      }
     }
-    if (showDropdown) {
+    if (showDropdown || showMobileMenu) {
       document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('touchstart', handleClickOutside);
     }
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showDropdown]);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
+  }, [showDropdown, showMobileMenu]);
 
 
   const handleLogout = () => {
@@ -281,16 +301,26 @@ function Navbar() {
         {/* Botão menu mobile */}
         <button
           className="mobile-menu-button"
-          style={styles.mobileMenuButton}
+          style={{
+            ...styles.mobileMenuButton,
+            backgroundColor: showMobileMenu ? 'rgba(255,255,255,0.1)' : 'transparent'
+          }}
           onClick={() => setShowMobileMenu(!showMobileMenu)}
+          aria-label={showMobileMenu ? "Fechar menu" : "Abrir menu"}
+          aria-expanded={showMobileMenu}
         >
-          ☰
+          {showMobileMenu ? '✕' : '☰'}
         </button>
       </div>
 
       {/* Menu mobile */}
       {showMobileMenu && (
-        <div className="mobile-nav-links" style={styles.mobileNavLinks}>
+        <div 
+          ref={mobileMenuRef}
+          className="mobile-nav-links" 
+          style={styles.mobileNavLinks}
+          role="menu"
+        >
           <Link 
             to="/quem-somos" 
             style={styles.mobileNavLink}
@@ -322,7 +352,7 @@ function Navbar() {
           {user ? (
             <>
               <button
-                style={{...styles.mobileNavLink, background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer'}}
+                style={{...styles.mobileNavLink, background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', width: '100%'}}
                 onClick={() => {
                   setShowMobileMenu(false);
                   navigate(
@@ -337,7 +367,7 @@ function Navbar() {
                 Meu Painel
               </button>
               <button
-                style={{...styles.mobileNavLink, background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer'}}
+                style={{...styles.mobileNavLink, background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', width: '100%'}}
                 onClick={() => {
                   setShowMobileMenu(false);
                   handleLogout();
