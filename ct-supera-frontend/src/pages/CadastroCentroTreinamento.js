@@ -150,40 +150,44 @@ function CadastroCentroTreinamento({ styles }) {
                 <td style={{ padding: 10 }}>{centro.endereco}</td>
                 <td style={{ padding: 10 }}>{centro.telefone}</td>
                 <td style={{ padding: 10, textAlign: 'center' }}>
-                  <button
-                    onClick={() => handleEdit(centro)}
-                    style={{
-                      padding: '0.5rem 1rem',
-                      borderRadius: '4px',
-                      border: 'none',
-                      cursor: 'pointer',
-                      marginRight: '0.5rem',
-                      fontSize: '0.9rem',
-                      backgroundColor: '#2196f3',
-                      color: 'white',
-                    }}
-                    onMouseEnter={(e) => e.target.style.backgroundColor = '#1976d2'}
-                    onMouseLeave={(e) => e.target.style.backgroundColor = '#2196f3'}
-                  >
-                    Editar
-                  </button>
-                  <button
-                    onClick={() => handleDelete(centro.id)}
-                    style={{
-                      padding: '0.5rem 1rem',
-                      borderRadius: '4px',
-                      border: 'none',
-                      cursor: 'pointer',
-                      marginRight: '0.5rem',
-                      fontSize: '0.9rem',
-                      backgroundColor: '#f44336',
-                      color: 'white',
-                    }}
-                    onMouseEnter={(e) => e.target.style.backgroundColor = '#d32f2f'}
-                    onMouseLeave={(e) => e.target.style.backgroundColor = '#f44336'}
-                  >
-                    Excluir
-                  </button>
+                  <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+                    <button
+                      onClick={() => handleEdit(centro)}
+                      style={{
+                        padding: '0.5rem 0.875rem',
+                        borderRadius: '6px',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontSize: '0.85rem',
+                        backgroundColor: '#2196f3',
+                        color: 'white',
+                        minHeight: '36px',
+                        whiteSpace: 'nowrap',
+                      }}
+                      onMouseEnter={(e) => e.target.style.backgroundColor = '#1976d2'}
+                      onMouseLeave={(e) => e.target.style.backgroundColor = '#2196f3'}
+                    >
+                      Editar
+                    </button>
+                    <button
+                      onClick={() => handleDelete(centro.id)}
+                      style={{
+                        padding: '0.5rem 0.875rem',
+                        borderRadius: '6px',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontSize: '0.85rem',
+                        backgroundColor: '#f44336',
+                        color: 'white',
+                        minHeight: '36px',
+                        whiteSpace: 'nowrap',
+                      }}
+                      onMouseEnter={(e) => e.target.style.backgroundColor = '#d32f2f'}
+                      onMouseLeave={(e) => e.target.style.backgroundColor = '#f44336'}
+                    >
+                      Excluir
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}

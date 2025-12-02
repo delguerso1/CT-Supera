@@ -34,6 +34,7 @@ const styles = {
     display: 'flex',
     gap: '1rem',
     marginBottom: '2rem',
+    flexWrap: 'wrap',
   },
   tab: {
     padding: '0.75rem 1.5rem',
@@ -42,6 +43,8 @@ const styles = {
     backgroundColor: '#f5f5f5',
     cursor: 'pointer',
     fontSize: '1rem',
+    minHeight: '44px',
+    whiteSpace: 'nowrap',
     '&:hover': {
       backgroundColor: '#e0e0e0',
     },

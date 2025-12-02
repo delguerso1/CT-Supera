@@ -55,6 +55,32 @@
     padding: 0.75rem 1rem !important;
   }
 
+  /* Dropdown do Navbar em mobile */
+  nav [style*="position: relative"] {
+    position: relative !important;
+    z-index: 1001 !important;
+  }
+
+  nav [style*="dropdown"] {
+    position: absolute !important;
+    top: 100% !important;
+    right: 0 !important;
+    left: auto !important;
+    z-index: 1002 !important;
+    margin-top: 0.5rem !important;
+    min-width: 150px !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2) !important;
+  }
+
+  nav [style*="dropdownItem"] {
+    min-height: 44px !important;
+    padding: 0.875rem 1rem !important;
+    font-size: 1rem !important;
+    display: block !important;
+    width: 100% !important;
+    text-align: left !important;
+  }
+
   /* HomePage mobile */
   .hero {
     padding: 2rem 1rem !important;
@@ -301,6 +327,152 @@
   .formGroup,
   [class*="formGroup"] {
     margin-bottom: 1rem !important;
+  }
+
+  /* Tabs de gestão de usuários mobile */
+  [style*="tabs"] {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 0.5rem !important;
+    margin-bottom: 1.5rem !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    padding-bottom: 0.5rem !important;
+  }
+
+  [style*="tabs"] button,
+  [style*="tab"] {
+    min-height: 44px !important;
+    padding: 0.875rem 1.25rem !important;
+    font-size: 0.95rem !important;
+    white-space: nowrap !important;
+    flex: 1 1 auto !important;
+    min-width: 100px !important;
+    max-width: 100% !important;
+    border-radius: 8px !important;
+    font-weight: 500 !important;
+    text-align: center !important;
+  }
+
+  /* Tabelas mobile - melhor scroll e layout */
+  .table-responsive,
+  [style*="overflowX"] {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    width: 100% !important;
+    margin: 0 !important;
+    border-radius: 8px !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1) !important;
+  }
+
+  table,
+  [style*="table"] {
+    width: 100% !important;
+    min-width: 600px !important;
+    font-size: 0.875rem !important;
+    border-collapse: collapse !important;
+  }
+
+  table th,
+  table td,
+  [style*="th"],
+  [style*="td"] {
+    padding: 0.75rem 0.5rem !important;
+    white-space: nowrap !important;
+    max-width: 200px !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  /* Botões de ação em tabelas mobile */
+  table [style*="actionButton"],
+  table [style*="editButton"],
+  table [style*="deleteButton"],
+  table button {
+    min-height: 36px !important;
+    padding: 0.5rem 0.75rem !important;
+    font-size: 0.85rem !important;
+    margin: 0.25rem !important;
+    border-radius: 6px !important;
+    white-space: nowrap !important;
+  }
+
+  /* Botões de ação em Centro de Treinamento */
+  [style*="Editar"],
+  [style*="Excluir"] {
+    min-height: 36px !important;
+    padding: 0.5rem 0.875rem !important;
+    font-size: 0.85rem !important;
+    margin: 0.25rem 0.5rem !important;
+    border-radius: 6px !important;
+    white-space: nowrap !important;
+  }
+
+  /* Controle Financeiro mobile */
+  [style*="ControleFinanceiro"],
+  [style*="controle"],
+  [style*="Painel Financeiro"] {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    box-sizing: border-box !important;
+    padding: 1rem !important;
+  }
+
+  /* Cards de estatísticas financeiras mobile */
+  [style*="display: flex"][style*="gap: 32"] {
+    flex-direction: column !important;
+    gap: 1rem !important;
+    margin-bottom: 1.5rem !important;
+  }
+
+  [style*="display: flex"][style*="gap: 32"] > div {
+    padding: 1rem !important;
+    background: #f8f9fa !important;
+    border-radius: 8px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Filtros e controles mobile */
+  [style*="marginBottom: 16"],
+  [style*="marginBottom: 12"] {
+    flex-direction: column !important;
+    gap: 0.75rem !important;
+    width: 100% !important;
+  }
+
+  [style*="marginBottom: 16"] input,
+  [style*="marginBottom: 16"] select,
+  [style*="marginBottom: 12"] input,
+  [style*="marginBottom: 12"] select {
+    width: 100% !important;
+    min-height: 44px !important;
+    font-size: 16px !important;
+    padding: 0.75rem !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Garantir que conteúdo não fique escondido */
+  .dashboard-content-area,
+  .contentArea,
+  [style*="contentArea"] {
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    padding: 1rem !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Cards e containers mobile */
+  [style*="container"],
+  [style*="card"] {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+    padding: 1rem !important;
+    overflow-x: hidden !important;
   }
 
   /* Content area mobile */

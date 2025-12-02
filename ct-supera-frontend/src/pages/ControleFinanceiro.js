@@ -199,23 +199,23 @@ function ControleFinanceiro({ user, onDataChange }) {
   if (erro) return <div style={{ color: 'red' }}>{erro}</div>;
 
   return (
-    <div style={styles?.card || { background: '#fff', padding: 24, borderRadius: 8 }}>
+    <div style={{...styles?.card, background: '#fff', padding: 24, borderRadius: 8, width: '100%', maxWidth: '100%', boxSizing: 'border-box', overflowX: 'hidden'}}>
       <h2 style={styles?.cardTitle || { color: '#1F6C86' }}>Painel Financeiro</h2>
-      <div style={{ marginBottom: 16 }}>
-        <label>
+      <div style={{ marginBottom: 16, display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           Mês:
-          <select value={mes} onChange={e => setMes(Number(e.target.value))} style={{ marginLeft: 8, marginRight: 16 }}>
+          <select value={mes} onChange={e => setMes(Number(e.target.value))} style={{ padding: '0.5rem', borderRadius: 4, border: '1px solid #ccc', minHeight: '44px', fontSize: '16px' }}>
             {dashboard?.meses?.map(m => (
               <option key={m} value={m}>{m}</option>
             ))}
           </select>
         </label>
-        <label>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           Ano:
-          <input type="number" value={ano} onChange={e => setAno(Number(e.target.value))} style={{ width: 80, marginLeft: 8 }} />
+          <input type="number" value={ano} onChange={e => setAno(Number(e.target.value))} style={{ width: 100, padding: '0.5rem', borderRadius: 4, border: '1px solid #ccc', minHeight: '44px', fontSize: '16px' }} />
         </label>
       </div>
-      <div style={{ display: 'flex', gap: 32, marginBottom: 24 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', marginBottom: 24 }}>
         <div>
           <strong>Total Recebido:</strong>
           <div style={{ color: '#2e7d32', fontSize: 20 }}>R$ {dashboard?.total_pago?.toFixed(2)}</div>
@@ -242,18 +242,18 @@ function ControleFinanceiro({ user, onDataChange }) {
       </div>
 
       <h3 style={{ color: '#1F6C86', marginTop: 32 }}>Mensalidades</h3>
-      <div style={{ marginBottom: 12, display: 'flex', gap: 16, alignItems: 'center' }}>
+      <div style={{ marginBottom: 12, display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center' }}>
         <input
           type="text"
           placeholder="Buscar aluno..."
           value={mensalidadeBusca}
           onChange={e => { setMensalidadeBusca(e.target.value); setPagina(1); }}
-          style={{ padding: 8, borderRadius: 4, border: '1px solid #ccc', minWidth: 180 }}
+          style={{ padding: '0.75rem', borderRadius: 4, border: '1px solid #ccc', minWidth: 180, flex: '1 1 auto', minHeight: '44px', fontSize: '16px' }}
         />
         <select
           value={mensalidadeStatus}
           onChange={e => { setMensalidadeStatus(e.target.value); setPagina(1); }}
-          style={{ padding: 8, borderRadius: 4, border: '1px solid #ccc' }}
+          style={{ padding: '0.75rem', borderRadius: 4, border: '1px solid #ccc', minHeight: '44px', fontSize: '16px', flex: '1 1 auto' }}
         >
           <option value="">Todos os status</option>
           <option value="pago">Pago</option>
