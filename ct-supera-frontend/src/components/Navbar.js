@@ -267,8 +267,9 @@ function Navbar() {
               {user.first_name}
             </button>
             {showDropdown && (
-              <div style={styles.dropdown}>
+              <div className="navbar-dropdown" style={styles.dropdown}>
                 <button
+                  className="navbar-dropdown-item"
                   style={styles.dropdownItem}
                   onClick={() => {
                     setShowDropdown(false);
@@ -284,6 +285,7 @@ function Navbar() {
                   Meu Painel
                 </button>
                 <button
+                  className="navbar-dropdown-item"
                   style={styles.dropdownItem}
                   onClick={handleLogout}
                 >

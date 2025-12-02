@@ -199,9 +199,9 @@ function ControleFinanceiro({ user, onDataChange }) {
   if (erro) return <div style={{ color: 'red' }}>{erro}</div>;
 
   return (
-    <div style={{...styles?.card, background: '#fff', padding: 24, borderRadius: 8, width: '100%', maxWidth: '100%', boxSizing: 'border-box', overflowX: 'hidden'}}>
+    <div className="controle-financeiro-container" style={{...styles?.card, background: '#fff', padding: 24, borderRadius: 8, width: '100%', maxWidth: '100%', boxSizing: 'border-box', overflowX: 'hidden'}}>
       <h2 style={styles?.cardTitle || { color: '#1F6C86' }}>Painel Financeiro</h2>
-      <div style={{ marginBottom: 16, display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center' }}>
+      <div className="controle-financeiro-filtros" style={{ marginBottom: 16, display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center' }}>
         <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           Mês:
           <select value={mes} onChange={e => setMes(Number(e.target.value))} style={{ padding: '0.5rem', borderRadius: 4, border: '1px solid #ccc', minHeight: '44px', fontSize: '16px' }}>
@@ -215,7 +215,7 @@ function ControleFinanceiro({ user, onDataChange }) {
           <input type="number" value={ano} onChange={e => setAno(Number(e.target.value))} style={{ width: 100, padding: '0.5rem', borderRadius: 4, border: '1px solid #ccc', minHeight: '44px', fontSize: '16px' }} />
         </label>
       </div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', marginBottom: 24 }}>
+      <div className="controle-financeiro-stats" style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', marginBottom: 24 }}>
         <div>
           <strong>Total Recebido:</strong>
           <div style={{ color: '#2e7d32', fontSize: 20 }}>R$ {dashboard?.total_pago?.toFixed(2)}</div>
@@ -242,7 +242,7 @@ function ControleFinanceiro({ user, onDataChange }) {
       </div>
 
       <h3 style={{ color: '#1F6C86', marginTop: 32 }}>Mensalidades</h3>
-      <div style={{ marginBottom: 12, display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center' }}>
+      <div className="controle-financeiro-busca" style={{ marginBottom: 12, display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center' }}>
         <input
           type="text"
           placeholder="Buscar aluno..."

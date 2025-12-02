@@ -150,8 +150,9 @@ function CadastroCentroTreinamento({ styles }) {
                 <td style={{ padding: 10 }}>{centro.endereco}</td>
                 <td style={{ padding: 10 }}>{centro.telefone}</td>
                 <td style={{ padding: 10, textAlign: 'center' }}>
-                  <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+                  <div className="centro-treinamento-actions" style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', flexWrap: 'wrap' }}>
                     <button
+                      className="centro-treinamento-action-btn"
                       onClick={() => handleEdit(centro)}
                       style={{
                         padding: '0.5rem 0.875rem',
@@ -170,6 +171,7 @@ function CadastroCentroTreinamento({ styles }) {
                       Editar
                     </button>
                     <button
+                      className="centro-treinamento-action-btn"
                       onClick={() => handleDelete(centro.id)}
                       style={{
                         padding: '0.5rem 0.875rem',

@@ -567,8 +567,9 @@ function CadastroUsuario({ onUserChange }) {
         </button>
       </div>
 
-      <div style={styles.tabs}>
+      <div className="gestao-usuarios-tabs" style={styles.tabs}>
         <button
+          className="gestao-usuarios-tab"
           style={{
             ...styles.tab,
             ...(activeTab === 'alunos' ? styles.activeTab : {}),
@@ -578,6 +579,7 @@ function CadastroUsuario({ onUserChange }) {
           Alunos
         </button>
         <button
+          className="gestao-usuarios-tab"
           style={{
             ...styles.tab,
             ...(activeTab === 'professores' ? styles.activeTab : {}),
@@ -587,6 +589,7 @@ function CadastroUsuario({ onUserChange }) {
           Professores
         </button>
         <button
+          className="gestao-usuarios-tab"
           style={{
             ...styles.tab,
             ...(activeTab === 'gerentes' ? styles.activeTab : {}),
@@ -596,6 +599,7 @@ function CadastroUsuario({ onUserChange }) {
           Gerentes
         </button>
         <button
+          className="gestao-usuarios-tab"
           style={{
             ...styles.tab,
             ...(activeTab === 'precadastros' ? styles.activeTab : {}),
@@ -665,21 +669,22 @@ function CadastroUsuario({ onUserChange }) {
           Carregando...
         </div>
       ) : (
-        <table style={styles.table}>
-          <thead>
-            <tr>
-              <th style={styles.th}>Nome</th>
-              <th style={styles.th}>CPF</th>
-              <th style={styles.th}>E-mail</th>
-              <th style={styles.th}>Telefone</th>
-              {activeTab === 'alunos' && <th style={styles.th}>Centro(s) de Treinamento</th>}
-              {activeTab === 'alunos' && <th style={styles.th}>Par-Q</th>}
-              {activeTab === 'alunos' && <th style={styles.th}>Status</th>}
-              {activeTab === 'precadastros' && <th style={styles.th}>Status</th>}
-              <th style={styles.th}>Ações</th>
-            </tr>
-          </thead>
-          <tbody>
+        <div className="table-responsive">
+          <table className="gestao-usuarios-table" style={styles.table}>
+            <thead>
+              <tr>
+                <th style={styles.th}>Nome</th>
+                <th style={styles.th}>CPF</th>
+                <th style={styles.th}>E-mail</th>
+                <th style={styles.th}>Telefone</th>
+                {activeTab === 'alunos' && <th style={styles.th}>Centro(s) de Treinamento</th>}
+                {activeTab === 'alunos' && <th style={styles.th}>Par-Q</th>}
+                {activeTab === 'alunos' && <th style={styles.th}>Status</th>}
+                {activeTab === 'precadastros' && <th style={styles.th}>Status</th>}
+                <th style={styles.th}>Ações</th>
+              </tr>
+            </thead>
+            <tbody>
             {getFilteredUsers().map(user => (
               <tr key={user.id}>
                 <td style={styles.td}>
@@ -787,8 +792,9 @@ function CadastroUsuario({ onUserChange }) {
                 </td>
               </tr>
             ))}
-          </tbody>
-        </table>
+            </tbody>
+          </table>
+        </div>
       )}
 
       {showModal && (
