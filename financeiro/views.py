@@ -1161,7 +1161,6 @@ class GerarBoletoAPIView(APIView):
             
             # Tenta extrair o status code da mensagem se não estiver no atributo
             # Formato: "[400] Requisição inválida"
-            import re
             if error_status is None:
                 status_match = re.search(r'\[(\d{3})\]', error_message)
                 if status_match:
