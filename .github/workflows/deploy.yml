@@ -129,8 +129,12 @@ jobs:
             --exclude '.env' \
             --exclude 'logs/' \
             --exclude 'backups/' \
+            --exclude 'certificados/' \
             --exclude '*.tar.gz' \
             --exclude '*.zip' \
+            --exclude '*.key' \
+            --exclude '*.pem' \
+            --exclude '*.crt' \
             ./ ${{ secrets.USERNAME }}@${{ secrets.HOST }}:/root/ct-supera/
 
       - name: Sincronizar Frontend Build

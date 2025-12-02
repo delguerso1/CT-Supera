@@ -7,7 +7,7 @@ from django.db.models import Sum
 from django.utils import timezone
 from .models import Mensalidade, Despesa, Salario, TransacaoC6Bank
 from .serializers import MensalidadeSerializer, DespesaSerializer, SalarioSerializer, TransacaoC6BankSerializer
-from .c6_client import c6_client
+from .c6_client import c6_client, C6BankError, C6BankMethodNotAllowedError
 from django.shortcuts import get_object_or_404
 from django.conf import settings
 from datetime import timedelta
@@ -1100,9 +1100,61 @@ class GerarBoletoAPIView(APIView):
                 }
             }, status=status.HTTP_201_CREATED)
             
+        except C6BankMethodNotAllowedError as e:
+            # Erro 405 - Método não permitido
+            logger.error(f"Erro 405 ao gerar boleto: {str(e)}")
+            logger.error(f"Detalhes: {e.detail if hasattr(e, 'detail') and e.detail else 'N/A'}")
+            logger.error(f"Type: {e.type if hasattr(e, 'type') else 'N/A'}")
+            logger.error(f"Correlation ID: {e.correlation_id if hasattr(e, 'correlation_id') and e.correlation_id else 'N/A'}")
+            
+            return Response({
+                'error': f'Erro ao gerar boleto: O método HTTP não é permitido para este endpoint. Verifique a configuração da API do C6 Bank.',
+                'error_details': {
+                    'status': e.status,
+                    'title': e.title,
+                    'detail': e.detail if hasattr(e, 'detail') and e.detail else None,
+                    'correlation_id': e.correlation_id if hasattr(e, 'correlation_id') and e.correlation_id else None
+                }
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        except C6BankError as e:
+            # Outros erros C6 Bank
+            error_message = str(e)
+            logger.error(f"Erro C6 Bank ao gerar boleto: {error_message}")
+            logger.error(f"Status: {e.status if hasattr(e, 'status') else 'N/A'}")
+            logger.error(f"Type: {e.type if hasattr(e, 'type') else 'N/A'}")
+            logger.error(f"Detail: {e.detail if hasattr(e, 'detail') and e.detail else 'N/A'}")
+            
+            # Tenta extrair informações úteis do erro
+            if "CPF" in error_message.upper() or "tax_id" in error_message.lower():
+                # Erro relacionado ao CPF
+                return Response({
+                    'error': f'Erro ao validar CPF: {error_message}. Por favor, verifique se o CPF do aluno está correto e tem 11 dígitos numéricos.',
+                    'debug_info': {
+                        'aluno_id': mensalidade.aluno.id,
+                        'cpf_original': getattr(mensalidade.aluno, 'cpf', 'N/A'),
+                        'nome': getattr(mensalidade.aluno, 'get_full_name', lambda: 'N/A')()
+                    },
+                    'error_details': {
+                        'status': e.status if hasattr(e, 'status') else None,
+                        'detail': e.detail if hasattr(e, 'detail') and e.detail else None
+                    }
+                }, status=status.HTTP_400_BAD_REQUEST)
+            else:
+                # Outro tipo de erro C6 Bank
+                return Response({
+                    'error': f'Erro ao gerar boleto: {error_message}',
+                    'error_details': {
+                        'status': e.status if hasattr(e, 'status') else None,
+                        'title': e.title if hasattr(e, 'title') else None,
+                        'detail': e.detail if hasattr(e, 'detail') and e.detail else None,
+                        'correlation_id': e.correlation_id if hasattr(e, 'correlation_id') and e.correlation_id else None
+                    }
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
         except Exception as e:
             error_message = str(e)
             logger.error(f"Erro ao gerar boleto: {error_message}")
+            import traceback
+            logger.error(f"Traceback completo: {traceback.format_exc()}")
             
             # Tenta extrair informações úteis do erro
             if "CPF" in error_message.upper() or "tax_id" in error_message.lower():

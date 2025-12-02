@@ -113,6 +113,11 @@ class C6BankGatewayTimeoutError(C6BankError):
     pass
 
 
+class C6BankMethodNotAllowedError(C6BankError):
+    """Erro 405 - Método não permitido"""
+    pass
+
+
 class C6BankClient:
     """
     Cliente para comunicação com a API do C6 Bank
@@ -343,6 +348,7 @@ class C6BankClient:
                 401: 'unauthorized',
                 403: 'access_denied',
                 404: 'not_found',
+                405: 'method_not_allowed',
                 422: 'unprocessable_entity',
                 429: 'too_many_requests',
                 500: 'internal_server_error',
@@ -359,6 +365,7 @@ class C6BankClient:
                 401: 'Não autorizado',
                 403: 'Acesso negado',
                 404: 'Entidade não encontrada',
+                405: 'Método não permitido',
                 422: 'Entidade não pode ser processada',
                 429: 'Muitas requisições',
                 500: 'Erro interno do servidor',
@@ -386,6 +393,7 @@ class C6BankClient:
             401: C6BankUnauthorizedError,
             403: C6BankAccessDeniedError,
             404: C6BankNotFoundError,
+            405: C6BankMethodNotAllowedError,
             422: C6BankUnprocessableEntityError,
             429: C6BankTooManyRequestsError,
             500: C6BankInternalServerError,
@@ -522,8 +530,12 @@ class C6BankClient:
             cert_tuple = self.cert_config.get('cert') if self.cert_config.get('cert') else None
             
             logger.info(f"Fazendo requisição {method} para: {url}")
+            logger.info(f"Endpoint recebido: {endpoint}")
+            logger.info(f"URL final: {url}")
             logger.info(f"Headers: {dict(headers)}")
             logger.info(f"Certificados configurados: {bool(cert_tuple)}")
+            if data:
+                logger.info(f"Dados do payload (resumido): {json.dumps(data, indent=2, ensure_ascii=False)[:500]}...")
             
             # Faz a requisição
             try:
@@ -546,7 +558,13 @@ class C6BankClient:
             logger.info(f"Resposta recebida: {response.status_code}")
             if response.status_code >= 400:
                 logger.error(f"Erro na resposta: Status {response.status_code}")
-                logger.error(f"Resposta: {response.text[:500]}")
+                logger.error(f"URL da requisição: {url}")
+                logger.error(f"Método HTTP: {method}")
+                logger.error(f"Headers Allow (métodos permitidos): {response.headers.get('Allow', 'N/A')}")
+                logger.error(f"Resposta completa: {response.text[:1000]}")
+                if response.status_code == 405:
+                    logger.error(f"[ERRO 405] Método não permitido. Método usado: {method}, URL: {url}")
+                    logger.error(f"[ERRO 405] Métodos permitidos segundo o servidor: {response.headers.get('Allow', 'Não informado')}")
             
             # Verifica se a resposta não foi bem-sucedida (não é 2XX)
             if not (200 <= response.status_code < 300):
@@ -1496,7 +1514,13 @@ class C6BankClient:
             if not re.match(r'^[a-zA-Z0-9]{1,10}$', external_ref_str):
                 raise Exception(f"external_reference_id inválido. Deve seguir o padrão ^[a-zA-Z0-9]{{1,10}}$ (apenas letras e números, máximo 10 caracteres). Recebido: '{external_ref_str}' ({len(external_ref_str)} caracteres)")
             
+            # Constrói o endpoint: usa o path relativo / que será concatenado com bankslip_base_url
+            # A documentação mostra que o servidor base é /v1/bank_slips e o path é /
             endpoint = f"{self.bankslip_base_url}/"
+            logger.info(f"[DEBUG BOLETO] Endpoint construído: {endpoint}")
+            logger.info(f"[DEBUG BOLETO] Base URL: {self.base_url}")
+            logger.info(f"[DEBUG BOLETO] Bankslip Base URL: {self.bankslip_base_url}")
+            logger.info(f"[DEBUG BOLETO] Método HTTP: POST")
             
             # Conforme bankslip-api.yaml linha 300-327 (bank_slip_create_request)
             bank_slip_data = {
