@@ -14,11 +14,70 @@ from datetime import timedelta
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from django.http import JsonResponse
+from decimal import Decimal
 import json
 import logging
 import re
 
 logger = logging.getLogger(__name__)
+
+
+# ========================================
+# FUNÇÕES AUXILIARES PARA MULTA E MORA
+# ========================================
+
+def calcular_multa_mora(mensalidade):
+    """
+    Calcula multa (2%) e mora (1% ao mês) para mensalidade atrasada.
+    
+    Args:
+        mensalidade: Objeto Mensalidade
+        
+    Returns:
+        dict com:
+            - dias_atraso: número de dias em atraso (0 se não estiver atrasada)
+            - valor_multa: valor da multa (2% do valor original)
+            - valor_mora: valor da mora (1% ao mês proporcional aos dias)
+            - valor_total: valor original + multa + mora
+            - esta_atrasada: boolean indicando se está atrasada
+    """
+    hoje = timezone.now().date()
+    data_vencimento = mensalidade.data_vencimento
+    
+    # Se não está atrasada, retorna valores zerados
+    if hoje <= data_vencimento:
+        return {
+            'dias_atraso': 0,
+            'valor_multa': 0,
+            'valor_mora': 0,
+            'valor_total': float(mensalidade.valor),
+            'esta_atrasada': False
+        }
+    
+    # Calcula dias de atraso
+    dias_atraso = (hoje - data_vencimento).days
+    
+    # Valor original da mensalidade
+    valor_original = float(mensalidade.valor)
+    
+    # Multa: 2% do valor original (cobrada uma única vez)
+    valor_multa = valor_original * 0.02
+    
+    # Mora: 1% ao mês (proporcional aos dias)
+    # 1% ao mês = 1% / 30 dias = 0.0333% ao dia
+    percentual_mora_diario = 0.01 / 30
+    valor_mora = valor_original * percentual_mora_diario * dias_atraso
+    
+    # Valor total
+    valor_total = valor_original + valor_multa + valor_mora
+    
+    return {
+        'dias_atraso': dias_atraso,
+        'valor_multa': round(valor_multa, 2),
+        'valor_mora': round(valor_mora, 2),
+        'valor_total': round(valor_total, 2),
+        'esta_atrasada': True
+    }
 
 
 # Mensalidades API
@@ -186,8 +245,10 @@ class GerarPixAPIView(APIView):
                     'error': 'Chave PIX não configurada no servidor. Entre em contato com o suporte.'
                 }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             
-            # Valida o valor da mensalidade
-            valor_mensalidade = float(mensalidade.valor)
+            # Calcula multa e mora se a mensalidade estiver atrasada
+            calculo_multa_mora = calcular_multa_mora(mensalidade)
+            valor_mensalidade = calculo_multa_mora['valor_total']
+            
             if valor_mensalidade <= 0:
                 logger.error(f"Valor da mensalidade inválido: {valor_mensalidade}")
                 return Response({
@@ -202,9 +263,16 @@ class GerarPixAPIView(APIView):
             
             # Cria o pagamento PIX via C6 Bank
             descricao = f"Mensalidade {mensalidade.data_vencimento.strftime('%m/%Y')} - {mensalidade.aluno.get_full_name()}"
+            if calculo_multa_mora['esta_atrasada']:
+                descricao += f" (Multa: R$ {calculo_multa_mora['valor_multa']:.2f}, Mora: R$ {calculo_multa_mora['valor_mora']:.2f})"
+            
             expiracao_segundos = 1800  # 30 minutos de validade (1800 segundos)
             
-            logger.info(f"[DEBUG PIX] Gerando PIX para mensalidade {mensalidade.id}, valor: R$ {valor_mensalidade:.2f}")
+            logger.info(f"[DEBUG PIX] Gerando PIX para mensalidade {mensalidade.id}, valor original: R$ {float(mensalidade.valor):.2f}")
+            if calculo_multa_mora['esta_atrasada']:
+                logger.info(f"[DEBUG PIX] Mensalidade atrasada: {calculo_multa_mora['dias_atraso']} dias")
+                logger.info(f"[DEBUG PIX] Multa: R$ {calculo_multa_mora['valor_multa']:.2f}, Mora: R$ {calculo_multa_mora['valor_mora']:.2f}")
+            logger.info(f"[DEBUG PIX] Valor total a cobrar: R$ {valor_mensalidade:.2f}")
             logger.info(f"[DEBUG PIX] Descrição: {descricao}")
             logger.info(f"[DEBUG PIX] Chave PIX configurada: {bool(settings.C6_BANK_CHAVE_PIX)}")
             
@@ -234,10 +302,11 @@ class GerarPixAPIView(APIView):
             data_expiracao = timezone.now() + timedelta(seconds=expiracao_segundos)
             
             # Cria a transação no banco de dados
+            # Armazena o valor total (com multa e mora) na transação
             transacao = TransacaoC6Bank.objects.create(
                 mensalidade=mensalidade,
                 tipo='pix',
-                valor=mensalidade.valor,
+                valor=Decimal(str(valor_mensalidade)),  # Valor total com multa e mora
                 txid=txid,
                 chave_pix=settings.C6_BANK_CHAVE_PIX,
                 descricao=descricao,
@@ -653,8 +722,14 @@ class CriarPagamentoBancarioAPIView(APIView):
                 }
             }
             
+            # Calcula multa e mora se a mensalidade estiver atrasada
+            calculo_multa_mora = calcular_multa_mora(mensalidade)
+            valor_total = calculo_multa_mora['valor_total']
+            
             # Cria o checkout via C6 Bank
             descricao = f"Mensalidade {mensalidade.data_vencimento.strftime('%m/%Y')} - {aluno.get_full_name()}"
+            if calculo_multa_mora['esta_atrasada']:
+                descricao += f" (Multa: R$ {calculo_multa_mora['valor_multa']:.2f}, Mora: R$ {calculo_multa_mora['valor_mora']:.2f})"
             expiracao_horas = 24  # 24 horas de validade
             
             # Formata external_reference_id conforme checkout.yaml linha 732-738
@@ -663,8 +738,15 @@ class CriarPagamentoBancarioAPIView(APIView):
             mensalidade_id_str = str(mensalidade.id)[:9]  # Garante máximo 9 dígitos
             external_ref = f"M{mensalidade_id_str.zfill(9)}"  # Preenche com zeros à esquerda até 9 dígitos
             
+            logger.info(f"[DEBUG CARTÃO] Gerando checkout para mensalidade {mensalidade.id}")
+            logger.info(f"[DEBUG CARTÃO] Valor original: R$ {float(mensalidade.valor):.2f}")
+            if calculo_multa_mora['esta_atrasada']:
+                logger.info(f"[DEBUG CARTÃO] Mensalidade atrasada: {calculo_multa_mora['dias_atraso']} dias")
+                logger.info(f"[DEBUG CARTÃO] Multa: R$ {calculo_multa_mora['valor_multa']:.2f}, Mora: R$ {calculo_multa_mora['valor_mora']:.2f}")
+            logger.info(f"[DEBUG CARTÃO] Valor total a cobrar: R$ {valor_total:.2f}")
+            
             checkout = c6_client.create_checkout(
-                amount=float(mensalidade.valor),
+                amount=valor_total,
                 description=descricao,
                 payer=payer_info,
                 payment=payment_config,
@@ -676,10 +758,11 @@ class CriarPagamentoBancarioAPIView(APIView):
             data_expiracao = timezone.now() + timedelta(hours=expiracao_horas)
             
             # Cria a transação no banco de dados
+            # Armazena o valor total (com multa e mora) na transação
             transacao = TransacaoC6Bank.objects.create(
                 mensalidade=mensalidade,
                 tipo='cartao',
-                valor=mensalidade.valor,
+                valor=Decimal(str(valor_total)),  # Valor total com multa e mora
                 txid=checkout.get('id'),  # ID do checkout como txid
                 payment_url=checkout.get('url'),
                 descricao=descricao,
@@ -1034,6 +1117,24 @@ class GerarBoletoAPIView(APIView):
             logger.info(f"Gerando boleto para aluno: {nome_completo}, CPF: {cpf_limpo} (length: {len(cpf_limpo)}), Mensalidade: {mensalidade.id}")
             logger.info(f"Payload payer validado: name='{payer['name']}', tax_id length={len(payer['tax_id'])}, address={address}")
             
+            # Calcula multa e mora se a mensalidade estiver atrasada
+            calculo_multa_mora = calcular_multa_mora(mensalidade)
+            valor_mensalidade = float(mensalidade.valor)
+            
+            # Valida o valor da mensalidade conforme limites do C6 Bank
+            # C6 Bank: mínimo R$ 5,00 e máximo R$ 500.000,00
+            if valor_mensalidade < 5.00:
+                logger.error(f"Valor da mensalidade abaixo do mínimo: R$ {valor_mensalidade:.2f}")
+                return Response({
+                    'error': f'Valor da mensalidade (R$ {valor_mensalidade:.2f}) está abaixo do mínimo permitido para boletos (R$ 5,00). Por favor, entre em contato com o suporte.'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            if valor_mensalidade > 500000.00:
+                logger.error(f"Valor da mensalidade acima do máximo: R$ {valor_mensalidade:.2f}")
+                return Response({
+                    'error': f'Valor da mensalidade (R$ {valor_mensalidade:.2f}) está acima do máximo permitido para boletos (R$ 500.000,00). Por favor, entre em contato com o suporte.'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
             # Data de vencimento
             due_date = mensalidade.data_vencimento.strftime('%Y-%m-%d')
             
@@ -1043,10 +1144,33 @@ class GerarBoletoAPIView(APIView):
                 f"Mensalidade {mensalidade.data_vencimento.strftime('%m/%Y')}"
             ]
             
+            # Configura multa e mora para boleto (se estiver atrasada)
+            fine = None
+            interest = None
+            if calculo_multa_mora['esta_atrasada']:
+                # Multa: 2% (tipo P = percentual, dead_line 0 = começa no dia seguinte ao vencimento)
+                fine = {
+                    "type": "P",
+                    "value": 2.0,
+                    "dead_line": 0
+                }
+                # Mora: 1% ao mês (tipo P = percentual, dead_line 0 = começa no dia seguinte ao vencimento)
+                # O C6 Bank calcula automaticamente proporcional aos dias
+                interest = {
+                    "type": "P",
+                    "value": 1.0,
+                    "dead_line": 0
+                }
+                logger.info(f"[DEBUG BOLETO] Mensalidade atrasada: {calculo_multa_mora['dias_atraso']} dias")
+                logger.info(f"[DEBUG BOLETO] Multa configurada: 2%")
+                logger.info(f"[DEBUG BOLETO] Mora configurada: 1% ao mês")
+            
             # Debug: Mostra exatamente o que será enviado
             logger.info(f"[DEBUG BOLETO] External Reference ID: {external_ref}")
-            logger.info(f"[DEBUG BOLETO] Amount: {float(mensalidade.valor)}")
+            logger.info(f"[DEBUG BOLETO] Amount: {valor_mensalidade}")
             logger.info(f"[DEBUG BOLETO] Due Date: {due_date}")
+            logger.info(f"[DEBUG BOLETO] Fine: {fine}")
+            logger.info(f"[DEBUG BOLETO] Interest: {interest}")
             logger.info(f"[DEBUG BOLETO] Payer completo: {json.dumps(payer, indent=2, ensure_ascii=False)}")
             
             # Cria o boleto via C6 Bank
@@ -1054,10 +1178,12 @@ class GerarBoletoAPIView(APIView):
             try:
                 boleto_response = c6_client.create_bank_slip(
                     external_reference_id=external_ref,
-                    amount=float(mensalidade.valor),
+                    amount=valor_mensalidade,
                     due_date=due_date,
                     payer=payer,
                     instructions=instructions,
+                    fine=fine,
+                    interest=interest,
                     partner_software_name="CT Supera",
                     partner_software_version="1.0.0"
                 )
@@ -1077,13 +1203,18 @@ class GerarBoletoAPIView(APIView):
             data_expiracao = timezone.now() + timedelta(days=30)
             
             # Cria a transação no banco de dados
+            # Armazena o valor original (o C6 Bank calculará multa e mora automaticamente)
+            descricao_boleto = f"Boleto - Mensalidade {mensalidade.data_vencimento.strftime('%m/%Y')} - {aluno.get_full_name()}"
+            if calculo_multa_mora['esta_atrasada']:
+                descricao_boleto += f" (Multa: 2%, Mora: 1% ao mês)"
+            
             transacao = TransacaoC6Bank.objects.create(
                 mensalidade=mensalidade,
                 tipo='boleto',
-                valor=mensalidade.valor,
+                valor=mensalidade.valor,  # Valor original (multa e mora calculadas pelo C6 Bank)
                 txid=boleto_id,  # ID do boleto como txid
                 boleto_codigo=digitable_line,
-                descricao=f"Boleto - Mensalidade {mensalidade.data_vencimento.strftime('%m/%Y')} - {aluno.get_full_name()}",
+                descricao=descricao_boleto,
                 data_expiracao=data_expiracao,
                 resposta_api=boleto_response
             )
@@ -1128,7 +1259,22 @@ class GerarBoletoAPIView(APIView):
             
             # Tenta extrair informações úteis do erro
             error_message = str(e)
-            if "CPF" in error_message.upper() or "tax_id" in error_message.lower():
+            error_detail = e.detail if hasattr(e, 'detail') and e.detail else None
+            
+            # Verifica se o erro é relacionado ao valor (amount)
+            if "amount" in error_message.lower() or (error_detail and "amount" in str(error_detail).lower()):
+                # Erro relacionado ao valor
+                valor_mensalidade = float(mensalidade.valor)
+                return Response({
+                    'error': f'Erro ao gerar boleto: O valor da mensalidade (R$ {valor_mensalidade:.2f}) está fora do range permitido. A API do C6 Bank aceita valores entre R$ 5,00 e R$ 500.000,00. Por favor, entre em contato com o suporte.',
+                    'error_details': {
+                        'status': e.status if hasattr(e, 'status') else 400,
+                        'detail': error_detail,
+                        'valor_mensalidade': valor_mensalidade,
+                        'correlation_id': e.correlation_id if hasattr(e, 'correlation_id') and e.correlation_id else None
+                    }
+                }, status=status.HTTP_400_BAD_REQUEST)
+            elif "CPF" in error_message.upper() or "tax_id" in error_message.lower():
                 # Erro relacionado ao CPF
                 return Response({
                     'error': f'Erro ao validar CPF: {error_message}. Por favor, verifique se o CPF do aluno está correto e tem 11 dígitos numéricos.',
@@ -1139,7 +1285,7 @@ class GerarBoletoAPIView(APIView):
                     },
                     'error_details': {
                         'status': e.status if hasattr(e, 'status') else 400,
-                        'detail': e.detail if hasattr(e, 'detail') and e.detail else None,
+                        'detail': error_detail,
                         'correlation_id': e.correlation_id if hasattr(e, 'correlation_id') and e.correlation_id else None
                     }
                 }, status=status.HTTP_400_BAD_REQUEST)
@@ -1150,7 +1296,7 @@ class GerarBoletoAPIView(APIView):
                     'error_details': {
                         'status': e.status if hasattr(e, 'status') else 400,
                         'title': e.title if hasattr(e, 'title') else None,
-                        'detail': e.detail if hasattr(e, 'detail') and e.detail else None,
+                        'detail': error_detail,
                         'correlation_id': e.correlation_id if hasattr(e, 'correlation_id') and e.correlation_id else None
                     }
                 }, status=status.HTTP_400_BAD_REQUEST)
