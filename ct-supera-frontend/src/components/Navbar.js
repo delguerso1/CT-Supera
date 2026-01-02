@@ -55,6 +55,26 @@ const styles = {
       backgroundColor: '#D4C088',
     },
   },
+  buttonsContainer: {
+    display: 'flex',
+    gap: '0.75rem',
+    alignItems: 'center',
+  },
+  instagramButton: {
+    backgroundColor: '#E4405F',
+    color: 'white',
+    padding: '0.5rem 1rem',
+    border: 'none',
+    borderRadius: '4px',
+    fontSize: '0.95rem',
+    fontWeight: '600',
+    cursor: 'pointer',
+    transition: 'transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease',
+    textDecoration: 'none',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   dropdown: {
     position: 'absolute',
     top: '110%',
@@ -257,48 +277,68 @@ function Navbar() {
           </Link>
         </div>
 
-        {/* Botão de login desktop */}
-        {user ? (
-          <div style={{ position: 'relative' }} ref={dropdownRef}>
-            <button
-              style={styles.loginButton}
-              onClick={() => setShowDropdown((prev) => !prev)}
-            >
-              {user.first_name}
-            </button>
-            {showDropdown && (
-              <div className="navbar-dropdown" style={styles.dropdown}>
-                <button
-                  className="navbar-dropdown-item"
-                  style={styles.dropdownItem}
-                  onClick={() => {
-                    setShowDropdown(false);
-                    navigate(
-                      user.tipo === 'gerente'
-                        ? '/dashboard/gerente'
-                        : user.tipo === 'professor'
-                        ? '/dashboard/professor'
-                        : '/dashboard/aluno'
-                    );
-                  }}
-                >
-                  Meu Painel
-                </button>
-                <button
-                  className="navbar-dropdown-item"
-                  style={styles.dropdownItem}
-                  onClick={handleLogout}
-                >
-                  Sair
-                </button>
-              </div>
-            )}
-          </div>
-        ) : (
-          <Link to="/login" style={styles.loginButton}>
-            Login
-          </Link>
-        )}
+        {/* Botões desktop */}
+        <div style={styles.buttonsContainer}>
+          <a 
+            href="https://www.instagram.com/ctsupera?utm_source=ig_web_button_share_sheet&igsh=ZDNlZDc0MzIxNw==" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            style={styles.instagramButton}
+            onMouseEnter={(e) => {
+              e.target.style.transform = 'translateY(-2px)';
+              e.target.style.backgroundColor = '#C13584';
+              e.target.style.boxShadow = '0 4px 12px rgba(225, 64, 95, 0.4)';
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.transform = 'translateY(0)';
+              e.target.style.backgroundColor = '#E4405F';
+              e.target.style.boxShadow = 'none';
+            }}
+          >
+            📷 Instagram
+          </a>
+          {user ? (
+            <div style={{ position: 'relative' }} ref={dropdownRef}>
+              <button
+                style={styles.loginButton}
+                onClick={() => setShowDropdown((prev) => !prev)}
+              >
+                {user.first_name}
+              </button>
+              {showDropdown && (
+                <div className="navbar-dropdown" style={styles.dropdown}>
+                  <button
+                    className="navbar-dropdown-item"
+                    style={styles.dropdownItem}
+                    onClick={() => {
+                      setShowDropdown(false);
+                      navigate(
+                        user.tipo === 'gerente'
+                          ? '/dashboard/gerente'
+                          : user.tipo === 'professor'
+                          ? '/dashboard/professor'
+                          : '/dashboard/aluno'
+                      );
+                    }}
+                  >
+                    Meu Painel
+                  </button>
+                  <button
+                    className="navbar-dropdown-item"
+                    style={styles.dropdownItem}
+                    onClick={handleLogout}
+                  >
+                    Sair
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <Link to="/login" style={styles.loginButton}>
+              Login
+            </Link>
+          )}
+        </div>
 
         {/* Botão menu mobile */}
         <button
@@ -351,6 +391,15 @@ function Navbar() {
           >
             Galeria de Fotos
           </Link>
+          <a 
+            href="https://www.instagram.com/ctsupera?utm_source=ig_web_button_share_sheet&igsh=ZDNlZDc0MzIxNw==" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            style={styles.mobileNavLink}
+            onClick={() => setShowMobileMenu(false)}
+          >
+            📷 Instagram
+          </a>
           {user ? (
             <>
               <button

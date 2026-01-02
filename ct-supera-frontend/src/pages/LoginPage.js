@@ -70,11 +70,6 @@ const styles = {
     cursor: 'pointer',
     transition: 'transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease',
     marginTop: '10px',
-    '&:hover': {
-      transform: 'translateY(-2px)',
-      backgroundColor: '#D4C088',
-      boxShadow: '0 6px 20px rgba(224, 204, 152, 0.4)',
-    },
   },
   error: {
     color: '#e74c3c',
@@ -110,36 +105,6 @@ const styles = {
     border: '1px solid #1F6C86',
     display: 'inline-block',
     transition: 'all 0.3s ease',
-    '&:hover': {
-      backgroundColor: '#1F6C86',
-      color: 'white',
-    },
-  },
-  buttonContainer: {
-    display: 'flex',
-    gap: '12px',
-    marginTop: '10px',
-  },
-  instagramButton: {
-    backgroundColor: '#E4405F',
-    color: 'white',
-    padding: '14px 24px',
-    border: 'none',
-    borderRadius: '8px',
-    fontSize: '16px',
-    fontWeight: '600',
-    cursor: 'pointer',
-    transition: 'transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease',
-    textDecoration: 'none',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
-    '&:hover': {
-      transform: 'translateY(-2px)',
-      backgroundColor: '#C13584',
-      boxShadow: '0 6px 20px rgba(225, 64, 95, 0.4)',
-    },
   },
 };
 
@@ -148,6 +113,11 @@ function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const navigate = useNavigate();
+
+  // Debug: Verificar se o componente está renderizando
+  React.useEffect(() => {
+    console.log('LoginPage renderizado - Botão Instagram deve estar visível');
+  }, []);
 
   const formatarCPF = (value) => {
     const cpfNumeros = value.replace(/\D/g, '');
@@ -245,19 +215,23 @@ function LoginPage() {
             />
           </div>
           
-          <div style={styles.buttonContainer}>
-            <button type="submit" className="btn btn-primary" style={{...styles.button, flex: 1}}>
-              🚀 Entrar
-            </button>
-            <a 
-              href="https://www.instagram.com/ctsupera?utm_source=ig_web_button_share_sheet&igsh=ZDNlZDc0MzIxNw==" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              style={styles.instagramButton}
-            >
-              📷 Instagram
-            </a>
-          </div>
+          <button 
+            type="submit" 
+            className="btn btn-primary" 
+            style={styles.button}
+            onMouseEnter={(e) => {
+              e.target.style.transform = 'translateY(-2px)';
+              e.target.style.backgroundColor = '#D4C088';
+              e.target.style.boxShadow = '0 6px 20px rgba(224, 204, 152, 0.4)';
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.transform = 'translateY(0)';
+              e.target.style.backgroundColor = '#E0CC98';
+              e.target.style.boxShadow = 'none';
+            }}
+          >
+            🚀 Entrar
+          </button>
           
           {error && <div className="alert alert-danger" style={styles.error}>{error}</div>}
         </form>

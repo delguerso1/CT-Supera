@@ -22,7 +22,7 @@ SyslogIdentifier=ctsupera
 # Configurações de segurança
 NoNewPrivileges=true
 PrivateTmp=true
-ProtectSystem=read-only
+ProtectSystem=strict
 #ProtectHome=true
 ReadWritePaths=/root/ct-supera
 ProtectKernelTunables=true
