@@ -215,23 +215,23 @@ function LoginPage() {
             />
           </div>
           
-          <button 
-            type="submit" 
-            className="btn btn-primary" 
+            <button 
+              type="submit" 
+              className="btn btn-primary" 
             style={styles.button}
-            onMouseEnter={(e) => {
-              e.target.style.transform = 'translateY(-2px)';
-              e.target.style.backgroundColor = '#D4C088';
-              e.target.style.boxShadow = '0 6px 20px rgba(224, 204, 152, 0.4)';
-            }}
-            onMouseLeave={(e) => {
-              e.target.style.transform = 'translateY(0)';
-              e.target.style.backgroundColor = '#E0CC98';
-              e.target.style.boxShadow = 'none';
-            }}
-          >
-            🚀 Entrar
-          </button>
+              onMouseEnter={(e) => {
+                e.target.style.transform = 'translateY(-2px)';
+                e.target.style.backgroundColor = '#D4C088';
+                e.target.style.boxShadow = '0 6px 20px rgba(224, 204, 152, 0.4)';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.transform = 'translateY(0)';
+                e.target.style.backgroundColor = '#E0CC98';
+                e.target.style.boxShadow = 'none';
+              }}
+            >
+              🚀 Entrar
+            </button>
           
           {error && <div className="alert alert-danger" style={styles.error}>{error}</div>}
         </form>

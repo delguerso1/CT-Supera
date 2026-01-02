@@ -297,47 +297,47 @@ function Navbar() {
           >
             📷 Instagram
           </a>
-          {user ? (
-            <div style={{ position: 'relative' }} ref={dropdownRef}>
-              <button
-                style={styles.loginButton}
-                onClick={() => setShowDropdown((prev) => !prev)}
-              >
-                {user.first_name}
-              </button>
-              {showDropdown && (
-                <div className="navbar-dropdown" style={styles.dropdown}>
-                  <button
-                    className="navbar-dropdown-item"
-                    style={styles.dropdownItem}
-                    onClick={() => {
-                      setShowDropdown(false);
-                      navigate(
-                        user.tipo === 'gerente'
-                          ? '/dashboard/gerente'
-                          : user.tipo === 'professor'
-                          ? '/dashboard/professor'
-                          : '/dashboard/aluno'
-                      );
-                    }}
-                  >
-                    Meu Painel
-                  </button>
-                  <button
-                    className="navbar-dropdown-item"
-                    style={styles.dropdownItem}
-                    onClick={handleLogout}
-                  >
-                    Sair
-                  </button>
-                </div>
-              )}
-            </div>
-          ) : (
-            <Link to="/login" style={styles.loginButton}>
-              Login
-            </Link>
-          )}
+        {user ? (
+          <div style={{ position: 'relative' }} ref={dropdownRef}>
+            <button
+              style={styles.loginButton}
+              onClick={() => setShowDropdown((prev) => !prev)}
+            >
+              {user.first_name}
+            </button>
+            {showDropdown && (
+              <div className="navbar-dropdown" style={styles.dropdown}>
+                <button
+                  className="navbar-dropdown-item"
+                  style={styles.dropdownItem}
+                  onClick={() => {
+                    setShowDropdown(false);
+                    navigate(
+                      user.tipo === 'gerente'
+                        ? '/dashboard/gerente'
+                        : user.tipo === 'professor'
+                        ? '/dashboard/professor'
+                        : '/dashboard/aluno'
+                    );
+                  }}
+                >
+                  Meu Painel
+                </button>
+                <button
+                  className="navbar-dropdown-item"
+                  style={styles.dropdownItem}
+                  onClick={handleLogout}
+                >
+                  Sair
+                </button>
+              </div>
+            )}
+          </div>
+        ) : (
+          <Link to="/login" style={styles.loginButton}>
+            Login
+          </Link>
+        )}
         </div>
 
         {/* Botão menu mobile */}
