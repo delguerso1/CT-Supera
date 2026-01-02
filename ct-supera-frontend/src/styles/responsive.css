@@ -114,7 +114,7 @@
     width: 56px !important;
     height: 56px !important;
     bottom: 16px !important;
-    left: 16px !important;
+    right: 16px !important;
   }
 
   .whatsapp-float-button svg {

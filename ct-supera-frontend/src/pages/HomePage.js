@@ -51,7 +51,7 @@ const styles = {
   whatsappButton: {
     position: 'fixed',
     bottom: '20px',
-    left: '20px',
+    right: '20px',
     width: '60px',
     height: '60px',
     backgroundColor: '#25D366',
@@ -63,7 +63,7 @@ const styles = {
     cursor: 'pointer',
     transition: 'transform 0.3s ease, box-shadow 0.3s ease, background-color 0.3s ease',
     textDecoration: 'none',
-    zIndex: 1000,
+    zIndex: 9999,
   },
 };
 
