@@ -109,6 +109,19 @@
     margin: 1rem 0 !important;
   }
 
+  /* Botão flutuante WhatsApp mobile */
+  .whatsapp-float-button {
+    width: 56px !important;
+    height: 56px !important;
+    bottom: 16px !important;
+    left: 16px !important;
+  }
+
+  .whatsapp-float-button svg {
+    width: 28px !important;
+    height: 28px !important;
+  }
+
   /* Login page mobile */
   .login-container {
     padding: 1.5rem !important;
