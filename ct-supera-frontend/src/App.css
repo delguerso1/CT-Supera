@@ -132,3 +132,9 @@
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(224, 204, 152, 0.3);
 }
+
+/* Botão flutuante WhatsApp - garantindo que fique fixo na viewport */
+.whatsapp-float-button {
+  position: fixed !important;
+  z-index: 99999 !important;
+}

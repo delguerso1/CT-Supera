@@ -63,7 +63,7 @@ const styles = {
     cursor: 'pointer',
     transition: 'transform 0.3s ease, box-shadow 0.3s ease, background-color 0.3s ease',
     textDecoration: 'none',
-    zIndex: 9999,
+    zIndex: 99999,
   },
 };
 
