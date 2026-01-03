@@ -49,7 +49,7 @@ const styles = {
     transition: 'background-color 0.3s',
   },
   whatsappButton: {
-    position: 'fixed',
+    position: 'absolute',
     bottom: '20px',
     right: '20px',
     width: '60px',
@@ -65,6 +65,10 @@ const styles = {
     textDecoration: 'none',
     zIndex: 99999,
   },
+  pageWrapper: {
+    position: 'relative',
+    minHeight: '100vh',
+  },
 };
 
 function HomePage() {
@@ -75,7 +79,7 @@ function HomePage() {
   const whatsappUrl = `https://wa.me/${whatsappNumber}`;
   
   return (
-    <div>
+    <div style={styles.pageWrapper}>
       <div className="hero" style={styles.hero}>
         <h1 className="hero-title" style={styles.title}>Bem-vindo ao CT Supera</h1>
         <p className="hero-subtitle" style={styles.subtitle}>

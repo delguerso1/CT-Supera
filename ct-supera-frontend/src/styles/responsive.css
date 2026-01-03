@@ -111,7 +111,7 @@
 
   /* Botão flutuante WhatsApp mobile */
   .whatsapp-float-button {
-    position: fixed !important;
+    position: absolute !important;
     width: 56px !important;
     height: 56px !important;
     bottom: 16px !important;
