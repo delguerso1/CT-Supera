@@ -143,6 +143,16 @@ jobs:
             ct-supera-frontend/build/ \
             ${{ secrets.USERNAME }}@${{ secrets.HOST }}:/root/ct-supera/ct-supera-frontend/build/
 
+      - name: Configurar cron de mensalidades
+        run: |
+          ssh ${{ secrets.USERNAME }}@${{ secrets.HOST }} << 'EOF'
+            set -e
+            chmod +x /root/ct-supera/scripts/gerar_mensalidades.sh
+            ( crontab -l 2>/dev/null | grep -v gerar_mensalidades.sh ; \
+              echo "5 0 * * * /root/ct-supera/scripts/gerar_mensalidades.sh >> /root/ct-supera/logs/gerar_mensalidades.log 2>&1" \
+            ) | crontab -
+          EOF
+
       - name: Executar deploy no servidor
         run: |
           ssh ${{ secrets.USERNAME }}@${{ secrets.HOST }} << 'EOF'

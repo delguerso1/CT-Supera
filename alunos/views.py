@@ -49,6 +49,7 @@ class RealizarPagamentoAPIView(APIView):
 
         mensalidade.status = "pago"
         mensalidade.save()
+        Mensalidade.criar_proxima_mensalidade(mensalidade)
 
         return Response({"message": "Pagamento realizado com sucesso!", "mensalidade": MensalidadeSerializer(mensalidade).data}, status=status.HTTP_200_OK)
 

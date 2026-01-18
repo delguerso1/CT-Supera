@@ -127,6 +127,7 @@ class UsuarioSerializer(serializers.ModelSerializer):
         parq_fields = ['parq_question_1', 'parq_question_2', 'parq_question_3', 'parq_question_4',
                        'parq_question_5', 'parq_question_6', 'parq_question_7']
         
+        parq_fields_present = any(field in validated_data for field in parq_fields)
         parq_fields_updated = False
         for field in parq_fields:
             if field in validated_data:
@@ -163,8 +164,8 @@ class UsuarioSerializer(serializers.ModelSerializer):
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
             
-        # Se campos PAR-Q foram atualizados, marcar como completo
-        if parq_fields_updated and instance.is_aluno():
+        # Se campos PAR-Q foram enviados pela primeira vez ou atualizados, marcar como completo
+        if instance.is_aluno() and (parq_fields_updated or (parq_fields_present and not instance.parq_completed)):
             from django.utils import timezone
             instance.parq_completed = True
             instance.parq_completion_date = timezone.now()

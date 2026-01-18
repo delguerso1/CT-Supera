@@ -101,3 +101,5 @@ Markdowns/
 *.pem
 id_rsa*
 github_actions_key*
+credentials.json
+*credentials*.json

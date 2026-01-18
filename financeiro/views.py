@@ -422,6 +422,14 @@ class ConsultarStatusPixPorTransacaoAPIView(APIView):
                         mensalidade = transacao.mensalidade
                         mensalidade.status = 'pago'
                         mensalidade.save()
+                        proxima = Mensalidade.criar_proxima_mensalidade(mensalidade)
+                        if proxima:
+                            logger.info(
+                                "Mensalidade %s criada para %s/%s após pagamento",
+                                proxima.id,
+                                str(proxima.data_vencimento.month).zfill(2),
+                                proxima.data_vencimento.year
+                            )
                         logger.info(f"Mensalidade {mensalidade.id} marcada como paga após consulta de status")
                         
                     elif status_pix == 'REMOVIDA_PELO_USUARIO_RECEBEDOR':
@@ -504,6 +512,14 @@ class ConsultarStatusPixAPIView(APIView):
                         # Atualiza o status da mensalidade
                         mensalidade.status = 'pago'
                         mensalidade.save()
+                        proxima = Mensalidade.criar_proxima_mensalidade(mensalidade)
+                        if proxima:
+                            logger.info(
+                                "Mensalidade %s criada para %s/%s após pagamento",
+                                proxima.id,
+                                str(proxima.data_vencimento.month).zfill(2),
+                                proxima.data_vencimento.year
+                            )
                         logger.info(f"Mensalidade {mensalidade.id} marcada como paga após consulta de status")
                         
                     elif status_pix == 'REMOVIDA_PELO_USUARIO_RECEBEDOR':
@@ -924,6 +940,14 @@ class C6BankWebhookAPIView(APIView):
             if mensalidade.status != 'pago':
                 mensalidade.status = 'pago'
                 mensalidade.save()
+                proxima = Mensalidade.criar_proxima_mensalidade(mensalidade)
+                if proxima:
+                    logger.info(
+                        "Mensalidade %s criada para %s/%s após pagamento",
+                        proxima.id,
+                        str(proxima.data_vencimento.month).zfill(2),
+                        proxima.data_vencimento.year
+                    )
                 logger.info(f"Mensalidade {mensalidade.id} marcada como paga")
             
             logger.info(f"✅ PIX processado com sucesso: Transação {transacao.id}, EndToEndId: {end_to_end_id}, Valor: R$ {valor}")
@@ -1456,6 +1480,14 @@ class ConsultarBoletoAPIView(APIView):
                         mensalidade = transacao.mensalidade
                         mensalidade.status = 'pago'
                         mensalidade.save()
+                        proxima = Mensalidade.criar_proxima_mensalidade(mensalidade)
+                        if proxima:
+                            logger.info(
+                                "Mensalidade %s criada para %s/%s após pagamento",
+                                proxima.id,
+                                str(proxima.data_vencimento.month).zfill(2),
+                                proxima.data_vencimento.year
+                            )
                         logger.info(f"Mensalidade {mensalidade.id} marcada como paga após consulta de boleto")
                         
                     elif status_boleto == 'CANCELLED' and transacao.status != 'cancelado':

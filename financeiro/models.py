@@ -1,6 +1,7 @@
 from django.db import models
 from django.utils import timezone
-from datetime import timedelta
+from datetime import timedelta, date
+from calendar import monthrange
 from usuarios.models import Usuario  
 
 CATEGORIAS_DESPESAS = [
@@ -21,6 +22,7 @@ class Mensalidade(models.Model):
     valor = models.DecimalField(max_digits=7, decimal_places=2, default=150.00)  # 🔹 Valor padrão da mensalidade
     data_inicio = models.DateField(auto_now_add=True)  # 🔹 Define data de início automática
     data_vencimento = models.DateField()
+    data_pagamento = models.DateTimeField(null=True, blank=True)
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="pendente")
     observacoes = models.TextField(blank=True, null=True)
 
@@ -30,10 +32,51 @@ class Mensalidade(models.Model):
         if not self.data_vencimento:
             self.data_vencimento = self.data_inicio + timedelta(days=30)  # 🔹 Define vencimento automático
 
+        if self.status == "pago" and not self.data_pagamento:
+            self.data_pagamento = timezone.now()
+
         if self.status == "pendente" and hoje > self.data_vencimento:
             self.status = "atrasado"
 
         super().save(*args, **kwargs)
+
+    @staticmethod
+    def _calcular_data_vencimento(aluno, ano, mes, dia_referencia):
+        dia_vencimento = aluno.dia_vencimento or dia_referencia
+        try:
+            dia_vencimento = int(dia_vencimento)
+        except (TypeError, ValueError):
+            dia_vencimento = dia_referencia
+        ultimo_dia = monthrange(ano, mes)[1]
+        dia_vencimento = min(dia_vencimento, ultimo_dia)
+        return date(ano, mes, dia_vencimento)
+
+    @classmethod
+    def criar_proxima_mensalidade(cls, mensalidade_base):
+        referencia = mensalidade_base.data_vencimento
+        if not referencia:
+            return None
+        ano = referencia.year + 1 if referencia.month == 12 else referencia.year
+        mes = 1 if referencia.month == 12 else referencia.month + 1
+        data_vencimento = cls._calcular_data_vencimento(
+            mensalidade_base.aluno,
+            ano,
+            mes,
+            referencia.day
+        )
+        existe = cls.objects.filter(
+            aluno=mensalidade_base.aluno,
+            data_vencimento__year=ano,
+            data_vencimento__month=mes
+        ).exists()
+        if existe:
+            return None
+        valor = mensalidade_base.aluno.valor_mensalidade or mensalidade_base.valor
+        return cls.objects.create(
+            aluno=mensalidade_base.aluno,
+            valor=valor,
+            data_vencimento=data_vencimento
+        )
 
     def __str__(self):
         return f"{self.aluno.get_full_name()} - R${self.valor} ({self.get_status_display()})"

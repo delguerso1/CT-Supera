@@ -4,6 +4,9 @@
 # Backup diário às 2:00 da manhã
 0 2 * * * /root/ct-supera/backup_hostinger.sh >> /root/backups/backup.log 2>&1
 
+# Geração automática de mensalidades (diário às 00:05)
+5 0 * * * /root/ct-supera/scripts/gerar_mensalidades.sh >> /root/ct-supera/logs/gerar_mensalidades.log 2>&1
+
 # Limpeza de logs antigos (semanal)
 0 3 * * 0 find /root/ct-supera/logs -name "*.log" -mtime +30 -delete
 

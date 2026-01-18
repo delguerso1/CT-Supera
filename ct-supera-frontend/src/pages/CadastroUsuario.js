@@ -181,6 +181,9 @@ function CadastroUsuario({ onUserChange }) {
   const [pixProfessor, setPixProfessor] = useState('');
   const [centrosTreinamento, setCentrosTreinamento] = useState([]);
   const [filtroCtSelecionado, setFiltroCtSelecionado] = useState('');
+  const [showParqModal, setShowParqModal] = useState(false);
+  const [selectedParqUser, setSelectedParqUser] = useState(null);
+  const [parqActionLoading, setParqActionLoading] = useState(false);
 
   // Defina fetchUsers usando useCallback
   const fetchUsers = useCallback(async () => {
@@ -289,6 +292,73 @@ function CadastroUsuario({ onUserChange }) {
       hour: '2-digit',
       minute: '2-digit'
     });
+  };
+
+  const parqQuestions = [
+    {
+      field: 'parq_question_1',
+      question: 'Alguma vez um médico disse que você tem um problema de coração e que só deveria fazer atividade física recomendada por um médico?'
+    },
+    {
+      field: 'parq_question_2',
+      question: 'Você sente dor no peito quando faz atividade física?'
+    },
+    {
+      field: 'parq_question_3',
+      question: 'No último mês, você teve dor no peito quando não estava fazendo atividade física?'
+    },
+    {
+      field: 'parq_question_4',
+      question: 'Você perde o equilíbrio por causa de tontura ou alguma vez perdeu a consciência?'
+    },
+    {
+      field: 'parq_question_5',
+      question: 'Você tem algum problema ósseo ou articular que poderia piorar com a mudança de sua atividade física?'
+    },
+    {
+      field: 'parq_question_6',
+      question: 'Atualmente um médico está prescrevendo medicamentos para sua pressão arterial ou condição cardíaca?'
+    },
+    {
+      field: 'parq_question_7',
+      question: 'Você sabe de alguma outra razão pela qual não deveria fazer atividade física?'
+    }
+  ];
+
+  const handleOpenParqModal = (user) => {
+    setSelectedParqUser(user);
+    setShowParqModal(true);
+  };
+
+  const handleCloseParqModal = () => {
+    setShowParqModal(false);
+    setSelectedParqUser(null);
+  };
+
+  const handleAllowParqEdit = async () => {
+    if (!selectedParqUser) return;
+    const confirm = window.confirm('Liberar o aluno para alterar o PAR-Q?');
+    if (!confirm) return;
+    try {
+      setParqActionLoading(true);
+      await api.patch(`usuarios/${selectedParqUser.id}/`, {
+        parq_completed: false,
+        parq_completion_date: null
+      });
+      setSuccess('Aluno liberado para alterar o PAR-Q.');
+      setError('');
+      await fetchUsers();
+      setSelectedParqUser(prev => prev ? {
+        ...prev,
+        parq_completed: false,
+        parq_completion_date: null
+      } : prev);
+    } catch (err) {
+      const message = err.response?.data?.error || err.response?.data?.detail || 'Erro ao liberar alteração do PAR-Q.';
+      setError(Array.isArray(message) ? message[0] : message);
+    } finally {
+      setParqActionLoading(false);
+    }
   };
 
   const handleChange = (e) => {
@@ -702,40 +772,55 @@ function CadastroUsuario({ onUserChange }) {
                 )}
                 {activeTab === 'alunos' && (
                   <td style={styles.td}>
-                    {user.parq_completed ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {user.parq_completed ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <span style={{
+                            padding: '4px 12px',
+                            borderRadius: '12px',
+                            fontSize: '11px',
+                            fontWeight: 'bold',
+                            backgroundColor: '#e8f5e9',
+                            color: '#2e7d32',
+                            display: 'inline-block',
+                            width: 'fit-content'
+                          }}>
+                            ✅ Completo
+                          </span>
+                          {user.parq_completion_date && (
+                            <span style={{ fontSize: '10px', color: '#666' }}>
+                              {formatParqDate(user.parq_completion_date)}
+                            </span>
+                          )}
+                        </div>
+                      ) : (
                         <span style={{
                           padding: '4px 12px',
                           borderRadius: '12px',
                           fontSize: '11px',
                           fontWeight: 'bold',
-                          backgroundColor: '#e8f5e9',
-                          color: '#2e7d32',
+                          backgroundColor: '#fff3cd',
+                          color: '#856404',
                           display: 'inline-block',
                           width: 'fit-content'
                         }}>
-                          ✅ Completo
+                          ⏳ Pendente
                         </span>
-                        {user.parq_completion_date && (
-                          <span style={{ fontSize: '10px', color: '#666' }}>
-                            {formatParqDate(user.parq_completion_date)}
-                          </span>
-                        )}
-                      </div>
-                    ) : (
-                      <span style={{
-                        padding: '4px 12px',
-                        borderRadius: '12px',
-                        fontSize: '11px',
-                        fontWeight: 'bold',
-                        backgroundColor: '#fff3cd',
-                        color: '#856404',
-                        display: 'inline-block',
-                        width: 'fit-content'
-                      }}>
-                        ⏳ Pendente
-                      </span>
-                    )}
+                      )}
+                      <button
+                        type="button"
+                        style={{
+                          ...styles.actionButton,
+                          backgroundColor: '#1F6C86',
+                          color: 'white',
+                          padding: '0.4rem 0.75rem',
+                          fontSize: '0.8rem'
+                        }}
+                        onClick={() => handleOpenParqModal(user)}
+                      >
+                        Ver respostas
+                      </button>
+                    </div>
                   </td>
                 )}
                 {activeTab === 'alunos' && (
@@ -1134,6 +1219,53 @@ function CadastroUsuario({ onUserChange }) {
                 </div>
               )}
             </form>
+          </div>
+        </div>
+      )}
+
+      {showParqModal && selectedParqUser && (
+        <div style={styles.modal}>
+          <div style={styles.modalContent}>
+            <h2 style={styles.title}>
+              Respostas PAR-Q - {selectedParqUser.first_name} {selectedParqUser.last_name}
+            </h2>
+            <div style={{ marginBottom: '1rem', color: '#666', fontSize: '14px' }}>
+              Status: {selectedParqUser.parq_completed ? 'Completo' : 'Pendente'}
+              {selectedParqUser.parq_completion_date && (
+                <span> • {formatParqDate(selectedParqUser.parq_completion_date)}</span>
+              )}
+            </div>
+            <div style={{ display: 'grid', gap: '12px' }}>
+              {parqQuestions.map((item, index) => (
+                <div key={item.field} style={{ padding: '12px', border: '1px solid #e0e0e0', borderRadius: '6px' }}>
+                  <div style={{ fontSize: '13px', marginBottom: '6px' }}>
+                    <strong>{index + 1}.</strong> {item.question}
+                  </div>
+                  <div style={{ fontSize: '13px', fontWeight: 'bold', color: selectedParqUser[item.field] ? '#c62828' : '#2e7d32' }}>
+                    {selectedParqUser[item.field] ? 'Sim' : 'Não'}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
+              {selectedParqUser.parq_completed && (
+                <button
+                  type="button"
+                  style={{ ...styles.actionButton, backgroundColor: '#ff9800', color: 'white' }}
+                  onClick={handleAllowParqEdit}
+                  disabled={parqActionLoading}
+                >
+                  {parqActionLoading ? 'Liberando...' : 'Permitir alteração'}
+                </button>
+              )}
+              <button
+                type="button"
+                style={{ ...styles.actionButton, backgroundColor: '#757575', color: 'white' }}
+                onClick={handleCloseParqModal}
+              >
+                Fechar
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -14,6 +14,7 @@ class Command(BaseCommand):
         ano = hoje.year
         mes = hoje.month
         total_geradas = 0
+        total_geradas_atraso = 0
 
         alunos = Usuario.objects.filter(tipo='aluno', ativo=True)
 
@@ -39,4 +40,23 @@ class Command(BaseCommand):
                 )
                 total_geradas += 1
 
-        self.stdout.write(self.style.SUCCESS(f'{total_geradas} mensalidade(s) gerada(s) com sucesso.'))
+        # Gera mensalidade do próximo mês para alunos com atraso >= 15 dias
+        limite_atraso = hoje - timedelta(days=15)
+        mensalidades_atrasadas = Mensalidade.objects.filter(
+            status__in=['pendente', 'atrasado'],
+            data_vencimento__lte=limite_atraso
+        ).select_related('aluno')
+        for mensalidade in mensalidades_atrasadas:
+            aluno = mensalidade.aluno
+            if hasattr(aluno, 'ativo') and not aluno.ativo:
+                continue
+            criada = Mensalidade.criar_proxima_mensalidade(mensalidade)
+            if criada:
+                total_geradas_atraso += 1
+
+        self.stdout.write(
+            self.style.SUCCESS(
+                f'{total_geradas} mensalidade(s) do mês gerada(s); '
+                f'{total_geradas_atraso} mensalidade(s) gerada(s) por atraso.'
+            )
+        )
