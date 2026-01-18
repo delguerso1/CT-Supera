@@ -21,11 +21,16 @@ class UsuarioSerializer(serializers.ModelSerializer):
 class MensalidadeSerializer(serializers.ModelSerializer):
     valor = serializers.DecimalField(max_digits=10, decimal_places=2, coerce_to_string=False)
     data_vencimento = serializers.DateField(format="%Y-%m-%d")
-    data_pagamento = serializers.DateField(format="%Y-%m-%d", allow_null=True)
+    data_pagamento = serializers.SerializerMethodField()
     
     class Meta:
         model = Mensalidade
         fields = ['id', 'aluno', 'valor', 'data_vencimento', 'data_pagamento', 'status']
+
+    def get_data_pagamento(self, obj):
+        if not obj.data_pagamento:
+            return None
+        return obj.data_pagamento.strftime("%Y-%m-%d")
 
 class PresencaSerializer(serializers.ModelSerializer):
     class Meta:
