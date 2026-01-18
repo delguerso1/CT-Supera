@@ -88,6 +88,17 @@ class PainelAlunoAPIView(APIView):
         else:
             idade = None
 
+        mensalidades_em_atraso = Mensalidade.objects.filter(
+            aluno=usuario,
+            status="atrasado"
+        )
+        mensalidades_pendentes_vencidas = Mensalidade.objects.filter(
+            aluno=usuario,
+            status="pendente",
+            data_vencimento__lt=hoje
+        )
+        pode_fazer_checkin = not (mensalidades_em_atraso.exists() or mensalidades_pendentes_vencidas.exists())
+
         return Response({
             "usuario": UsuarioSerializer(usuario).data,
             "historico_aulas": historico_aulas.values(),
@@ -98,7 +109,7 @@ class PainelAlunoAPIView(APIView):
             "status_hoje": {
                 "checkin_realizado": presenca_hoje.checkin_realizado if presenca_hoje else False,
                 "presenca_confirmada": presenca_hoje.presenca_confirmada if presenca_hoje else False,
-                "pode_fazer_checkin": not Mensalidade.objects.filter(aluno=usuario, status__in=["pendente", "atrasado"]).exists()
+                "pode_fazer_checkin": pode_fazer_checkin
             }
         })
 
@@ -109,15 +120,24 @@ class RealizarCheckinAPIView(APIView):
 
     def post(self, request):
         usuario = request.user
+        hoje = date.today()
         mensalidades_pendentes = Mensalidade.objects.filter(
-            aluno=usuario, 
-            status__in=["pendente", "atrasado"]
+            aluno=usuario,
+            status="atrasado"
+        ).order_by('data_vencimento')
+        mensalidades_pendentes_vencidas = Mensalidade.objects.filter(
+            aluno=usuario,
+            status="pendente",
+            data_vencimento__lt=hoje
         ).order_by('data_vencimento')
 
-        if mensalidades_pendentes.exists():
+        if mensalidades_pendentes.exists() or mensalidades_pendentes_vencidas.exists():
             return Response({
                 "error": "Você possui pendências de pagamento!",
-                "mensalidades_pendentes": MensalidadeSerializer(mensalidades_pendentes, many=True).data
+                "mensalidades_pendentes": MensalidadeSerializer(
+                    list(mensalidades_pendentes) + list(mensalidades_pendentes_vencidas),
+                    many=True
+                ).data
             }, status=status.HTTP_403_FORBIDDEN)
 
         hoje = date.today()
