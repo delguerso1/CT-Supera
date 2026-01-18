@@ -289,8 +289,8 @@ function Navbar() {
           <Link to="/supera-news" style={styles.navLink}>
             Supera News
           </Link>
-          <Link to="/formacao-atletas" style={styles.navLink}>
-            Formação de Atletas
+          <Link to="/alunos" style={styles.navLink}>
+            Alunos
           </Link>
           <Link to="/galeria" style={styles.navLink}>
             Galeria de Fotos
@@ -412,11 +412,11 @@ function Navbar() {
             Supera News
           </Link>
           <Link 
-            to="/formacao-atletas" 
+            to="/alunos" 
             style={styles.mobileNavLink}
             onClick={() => setShowMobileMenu(false)}
           >
-            Formação de Atletas
+            Alunos
           </Link>
           <Link 
             to="/galeria" 

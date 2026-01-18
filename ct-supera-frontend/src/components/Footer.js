@@ -41,7 +41,7 @@ function Footer() {
       <div style={styles.links}>
         <a href="/quem-somos" style={styles.link}>Quem Somos</a>
         <a href="/supera-news" style={styles.link}>Supera News</a>
-        <a href="/formacao-atletas" style={styles.link}>Formação de Atletas</a>
+        <a href="/alunos" style={styles.link}>Alunos</a>
         <a href="/galeria" style={styles.link}>Galeria de Fotos</a>
         <a href="/agendamento" style={styles.link}>Agende sua Aula</a>
       </div>

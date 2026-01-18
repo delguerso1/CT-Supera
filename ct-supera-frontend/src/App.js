@@ -69,7 +69,8 @@ function App() {
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/supera-news" element={<SuperaNews />} />
-          <Route path="/formacao-atletas" element={<FormacaoAtletas />} />
+          <Route path="/alunos" element={<FormacaoAtletas />} />
+          <Route path="/formacao-atletas" element={<Navigate to="/alunos" replace />} />
           <Route path="/galeria" element={<GaleriaFotos />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/esqueci-senha" element={<EsqueciMinhaSenha />} />

@@ -40,7 +40,7 @@ const styles = {
     left: 0,
     height: '100vh',
     overflowY: 'auto',
-    zIndex: 1000
+    zIndex: 10
   },
   mainContent: {
     flex: 1,
