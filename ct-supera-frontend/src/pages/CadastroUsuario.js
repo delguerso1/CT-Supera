@@ -841,12 +841,14 @@ function CadastroUsuario({ onUserChange }) {
         <h2 style={styles.title}>
           {activeTab === 'precadastros' ? 'Gerenciar Pré-cadastros' : `Gerenciar ${activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}`}
         </h2>
-        <button style={styles.button} onClick={handleNewUser}>
-          {activeTab === 'precadastros' ? 'Novo Pré-cadastro' : 
-           activeTab === 'professores' ? 'Novo Professor' :
-           activeTab === 'gerentes' ? 'Novo Gerente' :
-           `Novo ${activeTab.slice(0, -1).charAt(0).toUpperCase() + activeTab.slice(0, -1).slice(1)}`}
-        </button>
+        {activeTab !== 'alunos' && (
+          <button style={styles.button} onClick={handleNewUser}>
+            {activeTab === 'precadastros' ? 'Novo Pré-cadastro' : 
+             activeTab === 'professores' ? 'Novo Professor' :
+             activeTab === 'gerentes' ? 'Novo Gerente' :
+             `Novo ${activeTab.slice(0, -1).charAt(0).toUpperCase() + activeTab.slice(0, -1).slice(1)}`}
+          </button>
+        )}
       </div>
 
       <div className="gestao-usuarios-tabs" style={styles.tabs}>

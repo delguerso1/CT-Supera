@@ -100,6 +100,8 @@ class PreCadastro(models.Model):
                     logger.error(f"Erro ao enviar convite de ativação para {usuario_aluno.email}: {e}")
                     # Não falha o cadastro se o e-mail não for enviado
                     # O usuário pode solicitar novo convite posteriormente
+            return usuario_aluno
+        return self.usuario
 
 
 class Usuario(AbstractUser):

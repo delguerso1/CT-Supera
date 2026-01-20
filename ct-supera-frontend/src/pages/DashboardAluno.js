@@ -381,6 +381,32 @@ function formatCurrency(value) {
   return Number(value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
+function formatDateOnly(dateString) {
+  if (!dateString) return '-';
+  const parts = String(dateString).split('-');
+  if (parts.length !== 3) {
+    return new Date(dateString).toLocaleDateString();
+  }
+  const [year, month, day] = parts.map(Number);
+  return new Date(year, month - 1, day).toLocaleDateString('pt-BR');
+}
+
+function formatMonthYear(dateString) {
+  if (!dateString) return '-';
+  const parts = String(dateString).split('-');
+  if (parts.length !== 3) {
+    return new Date(dateString).toLocaleDateString('pt-BR', {
+      month: 'long',
+      year: 'numeric'
+    });
+  }
+  const [year, month, day] = parts.map(Number);
+  return new Date(year, month - 1, day).toLocaleDateString('pt-BR', {
+    month: 'long',
+    year: 'numeric'
+  });
+}
+
 function getInitials(name) {
   if (!name) return '?';
   return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
@@ -648,16 +674,16 @@ function DashboardAluno({ user }) {
     setSuccess('');
     setErro('');
     const parqPayload = {
-      parq_question_1: form.parq_question_1,
-      parq_question_2: form.parq_question_2,
-      parq_question_3: form.parq_question_3,
-      parq_question_4: form.parq_question_4,
-      parq_question_5: form.parq_question_5,
-      parq_question_6: form.parq_question_6,
-      parq_question_7: form.parq_question_7,
-      parq_question_8: form.parq_question_8,
-      parq_question_9: form.parq_question_9,
-      parq_question_10: form.parq_question_10,
+      parq_question_1: Boolean(form.parq_question_1),
+      parq_question_2: Boolean(form.parq_question_2),
+      parq_question_3: Boolean(form.parq_question_3),
+      parq_question_4: Boolean(form.parq_question_4),
+      parq_question_5: Boolean(form.parq_question_5),
+      parq_question_6: Boolean(form.parq_question_6),
+      parq_question_7: Boolean(form.parq_question_7),
+      parq_question_8: Boolean(form.parq_question_8),
+      parq_question_9: Boolean(form.parq_question_9),
+      parq_question_10: Boolean(form.parq_question_10),
     };
     try {
       const updateResponse = await api.put(`usuarios/${aluno.id}/`, parqPayload);
@@ -1697,16 +1723,13 @@ function DashboardAluno({ user }) {
                 {mensalidadesPendentes.map(mensalidade => (
                   <tr key={mensalidade.id}>
                     <td style={styles.td}>
-                      {new Date(mensalidade.data_vencimento).toLocaleDateString('pt-BR', {
-                        month: 'long',
-                        year: 'numeric'
-                      })}
+                      {formatMonthYear(mensalidade.data_vencimento)}
                     </td>
                     <td style={styles.td}>
                       {formatCurrency(mensalidade.valor)}
                     </td>
                     <td style={styles.td}>
-                      {new Date(mensalidade.data_vencimento).toLocaleDateString()}
+                      {formatDateOnly(mensalidade.data_vencimento)}
                     </td>
                     <td style={styles.td}>
                       <span style={{
@@ -1783,16 +1806,13 @@ function DashboardAluno({ user }) {
               {historicoMensalidades.map(mensalidade => (
                 <tr key={mensalidade.id}>
                   <td style={styles.td}>
-                    {new Date(mensalidade.data_vencimento).toLocaleDateString('pt-BR', {
-                      month: 'long',
-                      year: 'numeric'
-                    })}
+                      {formatMonthYear(mensalidade.data_vencimento)}
                   </td>
                   <td style={styles.td}>
                     {formatCurrency(mensalidade.valor)}
                   </td>
                   <td style={styles.td}>
-                    {new Date(mensalidade.data_vencimento).toLocaleDateString()}
+                      {formatDateOnly(mensalidade.data_vencimento)}
                   </td>
                   <td style={styles.td}>
                     <span style={{

@@ -1742,7 +1742,10 @@ class C6BankClient:
             # Para PDF, precisa fazer requisição sem JSON
             access_token = self._get_access_token()
             
-            url = f"{self.base_url}{endpoint}"
+            if endpoint.startswith('http://') or endpoint.startswith('https://'):
+                url = endpoint
+            else:
+                url = f"{self.base_url}{endpoint}"
             headers = {
                 'Authorization': f'Bearer {access_token}',
                 'Accept': 'application/pdf'

@@ -230,7 +230,7 @@ class UsuarioSerializer(serializers.ModelSerializer):
         if 'last_name' in attrs:
             attrs['last_name'] = self._formatar_nome(attrs['last_name'])
         tipo = attrs.get('tipo', getattr(self.instance, 'tipo', None))
-        if tipo == 'aluno':
+        if tipo == 'aluno' and ('plano' in attrs or 'dias_habilitados' in attrs):
             plano = attrs.get('plano', getattr(self.instance, 'plano', None))
             dias = attrs.get('dias_habilitados', None)
             if plano:
