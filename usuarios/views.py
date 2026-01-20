@@ -18,6 +18,7 @@ from decimal import Decimal, InvalidOperation
 from .serializers import UsuarioSerializer, PreCadastroSerializer, MensalidadeSerializer, SalarioSerializer
 from datetime import date, timedelta
 from django.core.mail import send_mail
+from django.db import transaction
 import logging
 from calendar import monthrange
 
@@ -304,6 +305,51 @@ class AceitarContratoAPIView(APIView):
                 "message": "Contrato aceito com sucesso!",
                 "user": UsuarioSerializer(usuario).data
             },
+            status=status.HTTP_200_OK
+        )
+
+
+class ReverterAlunoParaPreCadastroAPIView(APIView):
+    """API para mover aluno para pré-cadastro."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, usuario_id):
+        usuario = get_object_or_404(Usuario, id=usuario_id, tipo="aluno")
+        if request.user.tipo not in ["gerente", "professor"]:
+            return Response({"error": "Permissão negada."}, status=status.HTTP_403_FORBIDDEN)
+
+        with transaction.atomic():
+            precadastro = None
+            if usuario.cpf:
+                precadastro = PreCadastro.objects.filter(cpf=usuario.cpf).first()
+            if not precadastro and usuario.email:
+                precadastro = PreCadastro.objects.filter(email=usuario.email).first()
+
+            if precadastro:
+                precadastro.first_name = usuario.first_name
+                precadastro.last_name = usuario.last_name
+                precadastro.cpf = usuario.cpf
+                precadastro.telefone = usuario.telefone or precadastro.telefone
+                precadastro.data_nascimento = usuario.data_nascimento
+                precadastro.email = usuario.email or precadastro.email
+                precadastro.status = "pendente"
+                precadastro.usuario = None
+                precadastro.save()
+            else:
+                precadastro = PreCadastro.objects.create(
+                    first_name=usuario.first_name,
+                    last_name=usuario.last_name,
+                    cpf=usuario.cpf,
+                    telefone=usuario.telefone or "(00)00000-0000",
+                    data_nascimento=usuario.data_nascimento,
+                    email=usuario.email or "pendente",
+                    status="pendente"
+                )
+
+            usuario.delete()
+
+        return Response(
+            {"message": "Aluno movido para pré-cadastro com sucesso!", "precadastro_id": precadastro.id},
             status=status.HTTP_200_OK
         )
 

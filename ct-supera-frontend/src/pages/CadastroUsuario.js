@@ -552,14 +552,22 @@ function CadastroUsuario({ onUserChange }) {
   const handleDelete = async (userId) => {
     if (window.confirm('Tem certeza que deseja excluir este registro?')) {
       try {
-        const response = await api.delete(`usuarios/${userId}/`);
-        if (response.status === 204) {
-          setSuccess(activeTab === 'precadastros' ? 'Pré-cadastro excluído com sucesso!' : 'Usuário excluído com sucesso!');
-          fetchUsers();
+        if (activeTab === 'alunos') {
+          const response = await api.post(`usuarios/reverter-aluno/${userId}/`);
+          if (response.data?.message) {
+            setSuccess('Aluno movido para pré-cadastro com sucesso!');
+            fetchUsers();
+          }
+        } else {
+          const response = await api.delete(`usuarios/${userId}/`);
+          if (response.status === 204) {
+            setSuccess(activeTab === 'precadastros' ? 'Pré-cadastro excluído com sucesso!' : 'Usuário excluído com sucesso!');
+            fetchUsers();
+          }
         }
       } catch (error) {
         console.error('[DEBUG] Erro ao excluir:', error);
-        setError('Erro ao excluir. Tente novamente.');
+        setError(error.response?.data?.error || 'Erro ao excluir. Tente novamente.');
       }
     }
   };
@@ -938,18 +946,26 @@ function CadastroUsuario({ onUserChange }) {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                       {user.parq_completed ? (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                          <span style={{
-                            padding: '4px 12px',
-                            borderRadius: '12px',
-                            fontSize: '11px',
-                            fontWeight: 'bold',
-                            backgroundColor: '#e8f5e9',
-                            color: '#2e7d32',
-                            display: 'inline-block',
-                            width: 'fit-content'
-                          }}>
-                            ✅ Completo
-                          </span>
+                          {(() => {
+                            const temRestricao = Array.from({ length: 10 }, (_, i) => i + 1).some((idx) => {
+                              const value = user[`parq_question_${idx}`];
+                              return value === true || value === 'true';
+                            });
+                            return (
+                              <span style={{
+                                padding: '4px 12px',
+                                borderRadius: '12px',
+                                fontSize: '11px',
+                                fontWeight: 'bold',
+                                backgroundColor: temRestricao ? '#ffebee' : '#e8f5e9',
+                                color: temRestricao ? '#c62828' : '#2e7d32',
+                                display: 'inline-block',
+                                width: 'fit-content'
+                              }}>
+                                ✅ Completo
+                              </span>
+                            );
+                          })()}
                           {user.parq_completion_date && (
                             <span style={{ fontSize: '10px', color: '#666' }}>
                               {formatParqDate(user.parq_completion_date)}
@@ -1011,12 +1027,14 @@ function CadastroUsuario({ onUserChange }) {
                     >
                       Editar
                     </button>
-                    <button
-                      style={{ ...styles.actionButton, ...styles.deleteButton }}
-                      onClick={() => handleDelete(user.id)}
-                    >
-                      Excluir
-                    </button>
+                    {activeTab !== 'precadastros' && (
+                      <button
+                        style={{ ...styles.actionButton, ...styles.deleteButton }}
+                        onClick={() => handleDelete(user.id)}
+                      >
+                        Excluir
+                      </button>
+                    )}
                     {activeTab === 'precadastros' && user.status !== 'matriculado' && (
                       <button
                         style={{ ...styles.actionButton, ...styles.editButton }}

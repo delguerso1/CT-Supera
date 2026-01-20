@@ -28,6 +28,20 @@ class UsuarioSerializer(serializers.ModelSerializer):
     tipo_display = serializers.SerializerMethodField()
     centros_treinamento = serializers.SerializerMethodField()
 
+    def _formatar_nome(self, valor):
+        if not valor:
+            return valor
+        partes = [p for p in valor.strip().split(' ') if p]
+        partes_formatadas = []
+        for parte in partes:
+            subpartes = [sp for sp in parte.split('-') if sp]
+            subpartes_formatadas = [
+                sp[0].upper() + sp[1:].lower() if sp else ''
+                for sp in subpartes
+            ]
+            partes_formatadas.append('-'.join(subpartes_formatadas))
+        return ' '.join(partes_formatadas)
+
     class Meta:
         model = Usuario
         fields = [
@@ -186,6 +200,14 @@ class UsuarioSerializer(serializers.ModelSerializer):
         ):
             instance.atualizar_mensalidades_pendentes()
         return instance
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        if 'first_name' in attrs:
+            attrs['first_name'] = self._formatar_nome(attrs['first_name'])
+        if 'last_name' in attrs:
+            attrs['last_name'] = self._formatar_nome(attrs['last_name'])
+        return attrs
 
 class PreCadastroSerializer(serializers.ModelSerializer):
     dia_vencimento = serializers.IntegerField(required=False, allow_null=True)

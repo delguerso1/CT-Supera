@@ -98,7 +98,7 @@ function ContratoAceite() {
         localStorage.setItem('user', JSON.stringify(response.data.user));
       }
       setSuccess('Contrato aceito com sucesso! Redirecionando...');
-      navigate('/dashboard/aluno', { replace: true });
+      window.location.replace('/dashboard/aluno');
     } catch (err) {
       const message = err.response?.data?.error || 'Erro ao registrar aceite. Tente novamente.';
       setError(message);
