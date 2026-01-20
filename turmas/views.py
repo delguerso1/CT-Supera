@@ -21,10 +21,8 @@ def _validar_aluno_turma(aluno, turma):
 
     dias_turma = set(turma.dias_semana.values_list('id', flat=True))
     dias_aluno = set(aluno.dias_habilitados.values_list('id', flat=True))
-    if len(dias_turma) > limite:
-        return False, f"Turma exige {len(dias_turma)} dia(s), acima do plano {aluno.plano}."
-    if not dias_turma.issubset(dias_aluno):
-        return False, "Dias da turma não estão dentro dos dias habilitados do aluno."
+    if not dias_aluno.issubset(dias_turma):
+        return False, "Dias habilitados do aluno não estão dentro dos dias da turma."
 
     return True, None
 
