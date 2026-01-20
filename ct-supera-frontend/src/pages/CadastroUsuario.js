@@ -1371,7 +1371,7 @@ function CadastroUsuario({ onUserChange }) {
                 </div>
               )}
 
-              {formData.tipo === 'aluno' && (
+              {formData.tipo === 'aluno' && activeTab !== 'precadastros' && (
                 <>
                   <div style={styles.formGroup}>
                     <label style={styles.label} htmlFor="diaVencimento">

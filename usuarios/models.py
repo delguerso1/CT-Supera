@@ -44,6 +44,20 @@ class PreCadastro(models.Model):
             raise PermissionDenied("⚠️ Apenas professores e gerentes podem finalizar o agendamento.")
 
         if not self.usuario:
+            def _formatar_nome(valor):
+                if not valor:
+                    return valor
+                partes = [p for p in valor.strip().split(' ') if p]
+                partes_formatadas = []
+                for parte in partes:
+                    subpartes = [sp for sp in parte.split('-') if sp]
+                    subpartes_formatadas = [
+                        sp[0].upper() + sp[1:].lower() if sp else ''
+                        for sp in subpartes
+                    ]
+                    partes_formatadas.append('-'.join(subpartes_formatadas))
+                return ' '.join(partes_formatadas)
+
             # Verifica a idade do aluno
             idade = None
             if self.data_nascimento:
@@ -71,8 +85,8 @@ class PreCadastro(models.Model):
                 email=self.email if self.email else "",
                 password=None,  # Não define senha - usuário definirá via link
                 tipo="aluno",
-                first_name=self.first_name,
-                last_name=self.last_name or "",
+                first_name=_formatar_nome(self.first_name),
+                last_name=_formatar_nome(self.last_name or ""),
                 telefone=self.telefone,
                 cpf=self.cpf,
                 data_nascimento=self.data_nascimento,
