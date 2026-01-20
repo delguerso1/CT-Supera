@@ -21,4 +21,4 @@ class PresencaSerializer(serializers.ModelSerializer):
 class TurmaSerializer(serializers.ModelSerializer):
     class Meta:
         model = Turma
-        fields = ['id', 'ct', 'dias_semana', 'horario', 'capacidade_maxima', 'professor', 'alunos']
+        fields = ['id', 'ct', 'dias_semana', 'horario', 'capacidade_maxima', 'professores', 'alunos']
