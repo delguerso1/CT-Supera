@@ -23,6 +23,56 @@ from calendar import monthrange
 
 logger = logging.getLogger(__name__)
 
+def criar_mensalidades_matricula(aluno, valor_mensalidade, valor_primeira_mensalidade=None, dia_vencimento=None):
+    if not aluno:
+        return
+
+    if valor_primeira_mensalidade is None:
+        valor_primeira_mensalidade = valor_mensalidade
+
+    mensalidades_pagas = Mensalidade.objects.filter(aluno=aluno, status="pago").exists()
+    if not mensalidades_pagas:
+        Mensalidade.objects.filter(aluno=aluno).delete()
+
+    hoje = timezone.now().date()
+    data_primeiro_vencimento = hoje + timedelta(days=2)
+    valor_matricula = Decimal("90.00")
+    Mensalidade.objects.create(
+        aluno=aluno,
+        valor=valor_primeira_mensalidade + valor_matricula,
+        data_vencimento=data_primeiro_vencimento,
+        observacoes="Inclui R$ 90,00 de matrícula."
+    )
+
+    dia_venc = dia_vencimento or aluno.dia_vencimento or data_primeiro_vencimento.day
+    try:
+        dia_venc = int(dia_venc)
+    except (TypeError, ValueError):
+        dia_venc = data_primeiro_vencimento.day
+
+    base_date = data_primeiro_vencimento
+    if base_date.day < dia_venc:
+        ano = base_date.year
+        mes = base_date.month
+    else:
+        ano = base_date.year + 1 if base_date.month == 12 else base_date.year
+        mes = 1 if base_date.month == 12 else base_date.month + 1
+
+    ultimo_dia = monthrange(ano, mes)[1]
+    dia = min(dia_venc, ultimo_dia)
+    data_vencimento = date(ano, mes, dia)
+    existe = Mensalidade.objects.filter(
+        aluno=aluno,
+        data_vencimento__year=ano,
+        data_vencimento__month=mes
+    ).exists()
+    if not existe:
+        Mensalidade.objects.create(
+            aluno=aluno,
+            valor=valor_mensalidade,
+            data_vencimento=data_vencimento
+        )
+
 class ListarPrecadastrosAPIView(ListCreateAPIView):
     """API para listar e criar pré-cadastros. Lista apenas pré-cadastros pendentes."""
     serializer_class = PreCadastroSerializer
@@ -120,40 +170,12 @@ class FinalizarAgendamentoAPIView(APIView):
                 valor_mensalidade=valor_mensalidade
             )
             if usuario_aluno:
-                mensalidades_existentes = Mensalidade.objects.filter(aluno=usuario_aluno)
-                if not mensalidades_existentes.exists():
-                    hoje = timezone.now().date()
-                    data_primeiro_vencimento = hoje + timedelta(days=2)
-                    valor_matricula = Decimal("90.00")
-                    Mensalidade.objects.create(
-                        aluno=usuario_aluno,
-                        valor=valor_primeira_mensalidade + valor_matricula,
-                        data_vencimento=data_primeiro_vencimento,
-                        observacoes="Inclui R$ 90,00 de matrícula."
-                    )
-
-                    # Cria a próxima mensalidade no dia escolhido
-                    base_date = data_primeiro_vencimento
-                    if base_date.day < dia_vencimento:
-                        ano = base_date.year
-                        mes = base_date.month
-                    else:
-                        ano = base_date.year + 1 if base_date.month == 12 else base_date.year
-                        mes = 1 if base_date.month == 12 else base_date.month + 1
-                    ultimo_dia = monthrange(ano, mes)[1]
-                    dia = min(dia_vencimento, ultimo_dia)
-                    data_vencimento = date(ano, mes, dia)
-                    existe = Mensalidade.objects.filter(
-                        aluno=usuario_aluno,
-                        data_vencimento__year=ano,
-                        data_vencimento__month=mes
-                    ).exists()
-                    if not existe:
-                        Mensalidade.objects.create(
-                            aluno=usuario_aluno,
-                            valor=valor_mensalidade,
-                            data_vencimento=data_vencimento
-                        )
+                criar_mensalidades_matricula(
+                    usuario_aluno,
+                    valor_mensalidade=valor_mensalidade,
+                    valor_primeira_mensalidade=valor_primeira_mensalidade,
+                    dia_vencimento=dia_vencimento
+                )
             return Response({"message": "Pré-cadastro convertido em aluno com sucesso!"}, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({"error": f"Erro ao finalizar agendamento: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
@@ -359,7 +381,14 @@ class ListarCriarUsuariosAPIView(ListCreateAPIView):
         try:
             serializer = self.get_serializer(data=request.data)
             serializer.is_valid(raise_exception=True)
-            self.perform_create(serializer)
+            instance = serializer.save()
+            if instance.tipo == "aluno" and instance.valor_mensalidade:
+                criar_mensalidades_matricula(
+                    instance,
+                    valor_mensalidade=Decimal(str(instance.valor_mensalidade)),
+                    valor_primeira_mensalidade=Decimal(str(instance.valor_mensalidade)),
+                    dia_vencimento=instance.dia_vencimento
+                )
             headers = self.get_success_headers(serializer.data)
             # Retorna o objeto criado (com id)
             return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)

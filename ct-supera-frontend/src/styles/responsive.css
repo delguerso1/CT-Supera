@@ -325,6 +325,14 @@
     opacity: 0.9 !important;
   }
 
+  /* Botões de ação menores no mobile */
+  .actionButton,
+  [class*="actionButton"] {
+    padding: 0.4rem 0.7rem !important;
+    font-size: 0.8rem !important;
+    min-height: 32px !important;
+  }
+
   /* Sidebar menu items - garantir tamanho mínimo */
   [class*="menuItem"],
   [style*="menuItem"] {

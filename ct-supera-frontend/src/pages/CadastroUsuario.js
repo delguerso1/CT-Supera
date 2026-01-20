@@ -74,12 +74,12 @@ const styles = {
     color: '#666',
   },
   actionButton: {
-    padding: '0.5rem 1rem',
+    padding: '0.35rem 0.7rem',
     borderRadius: '4px',
     border: 'none',
     cursor: 'pointer',
     marginRight: '0.5rem',
-    fontSize: '0.9rem',
+    fontSize: '0.8rem',
   },
   avatar: {
     width: '36px',
@@ -979,39 +979,41 @@ function CadastroUsuario({ onUserChange }) {
                   <td style={styles.td}>{user.status || '-'}</td>
                 )}
                 <td style={styles.td}>
-                  <button
-                    style={{ ...styles.actionButton, ...styles.editButton }}
-                    onClick={() => handleEdit(user)}
-                  >
-                    Editar
-                  </button>
-                  <button
-                    style={{ ...styles.actionButton, ...styles.deleteButton }}
-                    onClick={() => handleDelete(user.id)}
-                  >
-                    Excluir
-                  </button>
-                  {activeTab === 'precadastros' && user.status !== 'matriculado' && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
                     <button
                       style={{ ...styles.actionButton, ...styles.editButton }}
-                      onClick={() => handleConvertPreCadastro(user.id)}
+                      onClick={() => handleEdit(user)}
                     >
-                      Matricular
+                      Editar
                     </button>
-                  )}
-                  {(activeTab === 'alunos' || activeTab === 'professores' || activeTab === 'gerentes') && !user.is_active && user.email && user.email !== 'pendente' && (
                     <button
-                      style={{ 
-                        ...styles.actionButton,
-                        backgroundColor: '#ff9800',
-                        color: 'white',
-                      }}
-                      onClick={() => handleReenviarAtivacao(user.id)}
-                      title="Reenviar e-mail de ativação da conta"
+                      style={{ ...styles.actionButton, ...styles.deleteButton }}
+                      onClick={() => handleDelete(user.id)}
                     >
-                      ✉️ Reenviar Ativação
+                      Excluir
                     </button>
-                  )}
+                    {activeTab === 'precadastros' && user.status !== 'matriculado' && (
+                      <button
+                        style={{ ...styles.actionButton, ...styles.editButton }}
+                        onClick={() => handleConvertPreCadastro(user.id)}
+                      >
+                        Matricular
+                      </button>
+                    )}
+                    {(activeTab === 'alunos' || activeTab === 'professores' || activeTab === 'gerentes') && !user.is_active && user.email && user.email !== 'pendente' && (
+                      <button
+                        style={{ 
+                          ...styles.actionButton,
+                          backgroundColor: '#ff9800',
+                          color: 'white',
+                        }}
+                        onClick={() => handleReenviarAtivacao(user.id)}
+                        title="Reenviar e-mail de ativação da conta"
+                      >
+                        ✉️ Reenviar Ativação
+                      </button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}

@@ -170,15 +170,16 @@ const styles = {
   buttonGroup: {
     display: 'flex',
     gap: '12px',
-    marginTop: '20px'
+    marginTop: '20px',
+    flexWrap: 'wrap'
   },
   primaryButton: {
     backgroundColor: '#1F6C86',
     color: 'white',
     border: 'none',
     borderRadius: '8px',
-    padding: '12px 24px',
-    fontSize: '16px',
+    padding: '8px 16px',
+    fontSize: '14px',
     fontWeight: 'bold',
     cursor: 'pointer',
     transition: 'all 0.3s ease'
@@ -188,8 +189,8 @@ const styles = {
     color: '#666',
     border: 'none',
     borderRadius: '8px',
-    padding: '12px 24px',
-    fontSize: '16px',
+    padding: '8px 16px',
+    fontSize: '14px',
     cursor: 'pointer',
     transition: 'all 0.3s ease'
   },
@@ -293,8 +294,8 @@ const styles = {
     color: 'white',
     border: 'none',
     borderRadius: '6px',
-    padding: '8px 16px',
-    fontSize: '14px',
+    padding: '6px 12px',
+    fontSize: '12px',
     cursor: 'pointer',
     transition: 'background-color 0.3s ease'
   },
