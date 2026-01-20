@@ -14,8 +14,10 @@ class UsuarioSerializer(serializers.ModelSerializer):
             'ficha_medica', 'ativo', 'foto_perfil',
             # Campos do PAR-Q
             'parq_question_1', 'parq_question_2', 'parq_question_3', 'parq_question_4',
-            'parq_question_5', 'parq_question_6', 'parq_question_7',
-            'parq_completed', 'parq_completion_date'
+            'parq_question_5', 'parq_question_6', 'parq_question_7', 'parq_question_8',
+            'parq_question_9', 'parq_question_10',
+            'parq_completed', 'parq_completion_date',
+            'contrato_aceito', 'contrato_aceito_em'
         ]
 
 class MensalidadeSerializer(serializers.ModelSerializer):

@@ -13,7 +13,7 @@ class TurmaForm(forms.ModelForm):
 
     class Meta:
         model = Turma
-        fields = ["ct", "dias_semana", "horario", "capacidade_maxima", "professor", "alunos"]
+        fields = ["ct", "dias_semana", "horario", "capacidade_maxima", "professores", "alunos"]
 
     def __init__(self, *args, **kwargs):
         user = kwargs.pop("user", None)
@@ -21,4 +21,4 @@ class TurmaForm(forms.ModelForm):
         self.fields["alunos"].queryset = Usuario.objects.filter(tipo="aluno")
 
         if user:
-            self.fields["professor"].queryset = Usuario.objects.filter(tipo="professor")  # 🔹 Filtra apenas professores
+            self.fields["professores"].queryset = Usuario.objects.filter(tipo="professor")  # 🔹 Filtra apenas professores

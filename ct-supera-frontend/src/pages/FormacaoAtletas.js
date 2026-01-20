@@ -14,6 +14,19 @@ function FormacaoAtletas() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
+  const formatarNome = (valor) => {
+    if (!valor) return '';
+    return valor
+      .toLowerCase()
+      .split(' ')
+      .filter(part => part.trim() !== '')
+      .map(part => part
+        .split('-')
+        .map(p => (p ? p.charAt(0).toUpperCase() + p.slice(1) : ''))
+        .join('-'))
+      .join(' ');
+  };
+
   const formatarTelefone = (telefone) => {
     const numeros = telefone.replace(/\D/g, '').slice(0, 11);
     if (numeros.length >= 2 && numeros.length <= 6) {
@@ -30,6 +43,9 @@ function FormacaoAtletas() {
   const handleChange = (e) => {
     const { name, value } = e.target;
     let valorFormatado = value;
+    if (name === 'first_name' || name === 'last_name') {
+      valorFormatado = formatarNome(value);
+    }
     if (name === 'telefone') {
       valorFormatado = formatarTelefone(value);
     }

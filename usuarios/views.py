@@ -14,7 +14,7 @@ from usuarios.forms import DefinirSenhaForm
 from usuarios.serializers import DefinirSenhaSerializer, SolicitarRecuperacaoSenhaSerializer, RedefinirSenhaSerializer
 from financeiro.models import Mensalidade
 from django.utils import timezone
-from datetime import timedelta
+from decimal import Decimal, InvalidOperation
 from .serializers import UsuarioSerializer, PreCadastroSerializer, MensalidadeSerializer, SalarioSerializer
 from datetime import date, timedelta
 from django.core.mail import send_mail
@@ -49,18 +49,67 @@ class FinalizarAgendamentoAPIView(APIView):
 
     def post(self, request, precadastro_id):
         precadastro = get_object_or_404(PreCadastro, id=precadastro_id)
-        cpf = request.data.get("cpf")
+        if precadastro.usuario:
+            return Response({"error": "Este pré-cadastro já foi convertido em aluno."}, status=status.HTTP_400_BAD_REQUEST)
+
+        cpf = request.data.get("cpf") or precadastro.cpf
         dia_vencimento = request.data.get("dia_vencimento")
+        plano = request.data.get("plano")
         valor_mensalidade = request.data.get("valor_mensalidade")
+        valor_primeira_mensalidade = request.data.get("valor_primeira_mensalidade")
+        plano_familia = request.data.get("plano_familia")
         
         print(f"[DEBUG] Finalizando agendamento - PreCadastro ID: {precadastro_id}")
         print(f"[DEBUG] CPF: {cpf}")
         print(f"[DEBUG] Dia vencimento: {dia_vencimento}")
+        print(f"[DEBUG] Plano: {plano}")
         print(f"[DEBUG] Valor mensalidade: {valor_mensalidade}")
+        print(f"[DEBUG] Valor primeira mensalidade: {valor_primeira_mensalidade}")
+        print(f"[DEBUG] Plano família: {plano_familia}")
         print(f"[DEBUG] Data nascimento do pré-cadastro: {precadastro.data_nascimento}")
-        
-        if not cpf or len(cpf) != 11 or not cpf.isdigit():
+
+        if cpf:
+            cpf = "".join([c for c in str(cpf) if c.isdigit()])
+        if not cpf or len(cpf) != 11:
             return Response({"error": "CPF inválido ou não fornecido."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            dia_vencimento = int(dia_vencimento)
+        except (TypeError, ValueError):
+            return Response({"error": "Dia de vencimento inválido."}, status=status.HTTP_400_BAD_REQUEST)
+        if dia_vencimento not in [1, 5, 10]:
+            return Response({"error": "Dia de vencimento deve ser 1, 5 ou 10."}, status=status.HTTP_400_BAD_REQUEST)
+
+        plano_valores = {
+            "3x": Decimal("150.00"),
+            "2x": Decimal("130.00"),
+            "1x": Decimal("110.00"),
+        }
+        try:
+            if valor_mensalidade is not None:
+                valor_mensalidade = Decimal(str(valor_mensalidade))
+            elif plano in plano_valores:
+                valor_mensalidade = plano_valores[plano]
+            else:
+                return Response({"error": "Plano inválido ou valor da mensalidade não informado."}, status=status.HTTP_400_BAD_REQUEST)
+            if valor_primeira_mensalidade is not None:
+                valor_primeira_mensalidade = Decimal(str(valor_primeira_mensalidade))
+            else:
+                valor_primeira_mensalidade = valor_mensalidade
+        except (InvalidOperation, TypeError):
+            return Response({"error": "Valores de mensalidade inválidos."}, status=status.HTTP_400_BAD_REQUEST)
+
+        plano_familia_bool = bool(plano_familia)
+        if isinstance(plano_familia, str):
+            plano_familia_bool = plano_familia.strip().lower() in ["true", "1", "sim", "yes"]
+
+        if plano_familia_bool:
+            desconto_familia = Decimal("10.00")
+            valor_mensalidade = valor_mensalidade - desconto_familia
+            valor_primeira_mensalidade = valor_primeira_mensalidade - desconto_familia
+
+        if valor_mensalidade <= 0 or valor_primeira_mensalidade <= 0:
+            return Response({"error": "Valores de mensalidade devem ser maiores que zero."}, status=status.HTTP_400_BAD_REQUEST)
 
         precadastro.cpf = cpf
         precadastro.save()
@@ -70,19 +119,41 @@ class FinalizarAgendamentoAPIView(APIView):
                 dia_vencimento=dia_vencimento,
                 valor_mensalidade=valor_mensalidade
             )
-            # Cria mensalidade para o novo aluno, se ainda não existir
-            if usuario_aluno and not Mensalidade.objects.filter(aluno=usuario_aluno).exists():
-                hoje = date.today()
-                dia = int(usuario_aluno.dia_vencimento) if usuario_aluno.dia_vencimento else hoje.day
-                # Garante que o dia não ultrapasse o último dia do mês
-                ultimo_dia = monthrange(hoje.year, hoje.month)[1]
-                dia = min(dia, ultimo_dia)
-                data_vencimento = hoje.replace(day=dia)
-                Mensalidade.objects.create(
-                    aluno=usuario_aluno,
-                    valor=usuario_aluno.valor_mensalidade or 150.00,
-                    data_vencimento=data_vencimento
-                )
+            if usuario_aluno:
+                mensalidades_existentes = Mensalidade.objects.filter(aluno=usuario_aluno)
+                if not mensalidades_existentes.exists():
+                    hoje = timezone.now().date()
+                    data_primeiro_vencimento = hoje + timedelta(days=2)
+                    valor_matricula = Decimal("90.00")
+                    Mensalidade.objects.create(
+                        aluno=usuario_aluno,
+                        valor=valor_primeira_mensalidade + valor_matricula,
+                        data_vencimento=data_primeiro_vencimento,
+                        observacoes="Inclui R$ 90,00 de matrícula."
+                    )
+
+                    # Cria a próxima mensalidade no dia escolhido
+                    base_date = data_primeiro_vencimento
+                    if base_date.day < dia_vencimento:
+                        ano = base_date.year
+                        mes = base_date.month
+                    else:
+                        ano = base_date.year + 1 if base_date.month == 12 else base_date.year
+                        mes = 1 if base_date.month == 12 else base_date.month + 1
+                    ultimo_dia = monthrange(ano, mes)[1]
+                    dia = min(dia_vencimento, ultimo_dia)
+                    data_vencimento = date(ano, mes, dia)
+                    existe = Mensalidade.objects.filter(
+                        aluno=usuario_aluno,
+                        data_vencimento__year=ano,
+                        data_vencimento__month=mes
+                    ).exists()
+                    if not existe:
+                        Mensalidade.objects.create(
+                            aluno=usuario_aluno,
+                            valor=valor_mensalidade,
+                            data_vencimento=data_vencimento
+                        )
             return Response({"message": "Pré-cadastro convertido em aluno com sucesso!"}, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({"error": f"Erro ao finalizar agendamento: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
@@ -147,7 +218,10 @@ class LoginAPIView(APIView):
                     return Response({
                         "message": "Login realizado com sucesso!",
                         "token": token.key,
-                        "user": UsuarioSerializer(user).data
+                        "user": UsuarioSerializer(user).data,
+                        "requires_contract_acceptance": bool(
+                            user.tipo == "aluno" and not getattr(user, "contrato_aceito", False)
+                        )
                     }, status=status.HTTP_200_OK)
                 else:
                     print(f"[DEBUG] Tentativa de login para usuário inativo: {cpf}")
@@ -178,6 +252,38 @@ class LogoutAPIView(APIView):
     def post(self, request):
         logout(request)
         return Response({"message": "Logout realizado com sucesso!"}, status=status.HTTP_200_OK)
+
+
+class AceitarContratoAPIView(APIView):
+    """API para registrar aceite do contrato pelo aluno."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        usuario = request.user
+        if usuario.tipo != "aluno":
+            return Response({"error": "Apenas alunos podem aceitar o contrato."}, status=status.HTTP_403_FORBIDDEN)
+
+        if usuario.contrato_aceito:
+            return Response({"message": "Contrato já aceito.", "user": UsuarioSerializer(usuario).data}, status=status.HTTP_200_OK)
+
+        ip = request.META.get('HTTP_X_FORWARDED_FOR')
+        if ip:
+            ip = ip.split(',')[0].strip()
+        else:
+            ip = request.META.get('REMOTE_ADDR')
+
+        usuario.contrato_aceito = True
+        usuario.contrato_aceito_em = timezone.now()
+        usuario.contrato_aceito_ip = ip
+        usuario.save(update_fields=['contrato_aceito', 'contrato_aceito_em', 'contrato_aceito_ip'])
+
+        return Response(
+            {
+                "message": "Contrato aceito com sucesso!",
+                "user": UsuarioSerializer(usuario).data
+            },
+            status=status.HTTP_200_OK
+        )
 
 
 class AtivarContaAPIView(APIView):

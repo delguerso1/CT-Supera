@@ -155,7 +155,9 @@ function LoginPage() {
         
         // Redireciona com base no tipo de usuário
         const userType = response.data.user.tipo;
-        if (userType === 'gerente') {
+        if (userType === 'aluno' && response.data.user.contrato_aceito === false) {
+          navigate('/contrato');
+        } else if (userType === 'gerente') {
           navigate('/dashboard/gerente');
         } else if (userType === 'professor') {
           navigate('/dashboard/professor');

@@ -13,7 +13,12 @@ class Turma(models.Model):
     dias_semana = models.ManyToManyField(DiaSemana)  # 🔹 Agora aceita vários dias!
     horario = models.TimeField()
     capacidade_maxima = models.PositiveIntegerField(default=0)
-    professor = models.ForeignKey(Usuario, on_delete=models.SET_NULL, null=True, blank=True, related_name="turmas")  # 🔹 Relaciona com o usuário
+    professores = models.ManyToManyField(
+        Usuario,
+        blank=True,
+        related_name="turmas",
+        limit_choices_to={"tipo": "professor"}
+    )
     alunos = models.ManyToManyField(Usuario, blank=True, related_name="turmas_aluno")
     ativo = models.BooleanField(default=True)  # <-- Adicione esta linha
 

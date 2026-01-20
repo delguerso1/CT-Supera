@@ -292,7 +292,7 @@ class HistoricoAulasProfessorAPIView(APIView):
 
     def get(self, request):
         professor = request.user
-        turmas = Turma.objects.filter(professor=professor)
+        turmas = Turma.objects.filter(professores=professor)
 
         historico = []
         for turma in turmas:

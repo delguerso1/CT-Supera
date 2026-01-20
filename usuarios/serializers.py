@@ -40,8 +40,10 @@ class UsuarioSerializer(serializers.ModelSerializer):
             'centros_treinamento',
             # Campos do PAR-Q
             'parq_question_1', 'parq_question_2', 'parq_question_3', 'parq_question_4',
-            'parq_question_5', 'parq_question_6', 'parq_question_7',
-            'parq_completed', 'parq_completion_date'
+            'parq_question_5', 'parq_question_6', 'parq_question_7', 'parq_question_8',
+            'parq_question_9', 'parq_question_10',
+            'parq_completed', 'parq_completion_date',
+            'contrato_aceito', 'contrato_aceito_em'
         ]
         extra_kwargs = {
             'password': {'write_only': True}
@@ -87,7 +89,9 @@ class UsuarioSerializer(serializers.ModelSerializer):
             # Remove campos PAR-Q para professor e gerente
             for field in ['parq_question_1', 'parq_question_2', 'parq_question_3', 
                          'parq_question_4', 'parq_question_5', 'parq_question_6', 
-                         'parq_question_7', 'parq_completed', 'parq_completion_date']:
+                         'parq_question_7', 'parq_question_8', 'parq_question_9',
+                         'parq_question_10', 'parq_completed', 'parq_completion_date',
+                         'contrato_aceito', 'contrato_aceito_em']:
                 representation.pop(field, None)
         
         return representation
@@ -125,7 +129,8 @@ class UsuarioSerializer(serializers.ModelSerializer):
         
         # Verificar se algum campo PAR-Q foi realmente alterado (valor mudou)
         parq_fields = ['parq_question_1', 'parq_question_2', 'parq_question_3', 'parq_question_4',
-                       'parq_question_5', 'parq_question_6', 'parq_question_7']
+                       'parq_question_5', 'parq_question_6', 'parq_question_7', 'parq_question_8',
+                       'parq_question_9', 'parq_question_10']
         
         parq_fields_present = any(field in validated_data for field in parq_fields)
         parq_fields_updated = False
@@ -186,9 +191,31 @@ class PreCadastroSerializer(serializers.ModelSerializer):
     dia_vencimento = serializers.IntegerField(required=False, allow_null=True)
     valor_mensalidade = serializers.DecimalField(max_digits=7, decimal_places=2, required=False, allow_null=True)
 
+    def _formatar_nome(self, valor):
+        if not valor:
+            return valor
+        partes = [p for p in valor.strip().split(' ') if p]
+        partes_formatadas = []
+        for parte in partes:
+            subpartes = [sp for sp in parte.split('-') if sp]
+            subpartes_formatadas = [
+                sp[0].upper() + sp[1:].lower() if sp else ''
+                for sp in subpartes
+            ]
+            partes_formatadas.append('-'.join(subpartes_formatadas))
+        return ' '.join(partes_formatadas)
+
     class Meta:
         model = PreCadastro
         fields = ['id', 'first_name', 'last_name', 'email', 'telefone', 'data_nascimento', 'cpf', 'status', 'criado_em', 'dia_vencimento', 'valor_mensalidade']
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        if 'first_name' in attrs:
+            attrs['first_name'] = self._formatar_nome(attrs['first_name'])
+        if 'last_name' in attrs:
+            attrs['last_name'] = self._formatar_nome(attrs['last_name'])
+        return attrs
 
 class MensalidadeSerializer(serializers.ModelSerializer):
     class Meta:

@@ -8,6 +8,7 @@ import GaleriaFotos from './pages/GaleriaFotos';
 import DashboardGerente from './pages/DashboardGerente';
 import DashboardProfessor from './pages/DashboardProfessor';
 import DashboardAluno from './pages/DashboardAluno';
+import ContratoAceite from './pages/ContratoAceite';
 import AgendamentoPage from './pages/AgendamentoPage';
 import CadastroTurmas from './pages/CadastroTurmas';
 import EsqueciMinhaSenha from './pages/EsqueciMinhaSenha';
@@ -27,7 +28,7 @@ function CadastroTurmasWrapper() {
 }
 
 // Componente para proteger rotas que requerem autenticação
-function ProtectedRoute({ children, requiredType }) {
+function ProtectedRoute({ children, requiredType, allowContractAccess = false }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -54,6 +55,16 @@ function ProtectedRoute({ children, requiredType }) {
     return <Navigate to="/login" replace />;
   }
 
+  if (user.tipo === 'aluno' && user.contrato_aceito === false) {
+    if (!allowContractAccess) {
+      return <Navigate to="/contrato" replace />;
+    }
+  }
+
+  if (allowContractAccess && user.tipo === 'aluno' && user.contrato_aceito) {
+    return <Navigate to="/dashboard/aluno" replace />;
+  }
+
   if (requiredType && user.tipo !== requiredType) {
     return <Navigate to="/" replace />;
   }
@@ -77,6 +88,14 @@ function App() {
           <Route path="/redefinir-senha/:uidb64/:token" element={<RedefinirSenha />} />
           <Route path="/ativar-conta/:uidb64/:token" element={<AtivarConta />} />
           <Route path="/agendamento" element={<AgendamentoPage />} />
+          <Route 
+            path="/contrato" 
+            element={
+              <ProtectedRoute requiredType="aluno" allowContractAccess>
+                <ContratoAceite />
+              </ProtectedRoute>
+            } 
+          />
           {/* Rotas protegidas */}
           <Route 
             path="/dashboard/gerente" 

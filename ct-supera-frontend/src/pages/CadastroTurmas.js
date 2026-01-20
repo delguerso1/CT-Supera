@@ -9,7 +9,7 @@ function CadastroTurmas({ centroId, styles }) {
     dias_semana: [],
     horario: '',
     capacidade_maxima: '',
-    professor: '',
+    professores: [],
     ct: centroId,
   });
   const [editId, setEditId] = useState(null);
@@ -132,7 +132,7 @@ function CadastroTurmas({ centroId, styles }) {
         ...formData,
         ct: Number(centroId),
         dias_semana: formData.dias_semana.map(Number), // <-- converte para int
-        professor: Number(formData.professor) || null // <-- converte para int ou null
+        professores: formData.professores.map(Number)
       };
       
       console.log("📤 Dados enviados no POST:", formDataToSend); // 👈 ADICIONE ISTO
@@ -149,7 +149,7 @@ function CadastroTurmas({ centroId, styles }) {
         dias_semana: [],
         horario: '',
         capacidade_maxima: '',
-        professor: '',
+        professores: [],
         ct: centroId,
       });
       setEditId(null);
@@ -165,7 +165,7 @@ function CadastroTurmas({ centroId, styles }) {
       dias_semana: turma.dias_semana || [],
       horario: turma.horario || '',
       capacidade_maxima: turma.capacidade_maxima || '',
-      professor: turma.professor || '',
+      professores: turma.professores || [],
       ct: turma.ct?.id || turma.ct || centroId, // ✅ Acesso seguro com fallback
     });
     setEditId(turma.id);
@@ -192,7 +192,7 @@ function CadastroTurmas({ centroId, styles }) {
       dias_semana: [],
       horario: '',
       capacidade_maxima: '',
-      professor: '',
+      professores: [],
       ct: centroId,
     });
     setEditId(null);
@@ -224,7 +224,8 @@ function CadastroTurmas({ centroId, styles }) {
     try {
       const response = await api.get(`turmas/${turmaId}/alunos/`);
       setAlunosTurma(response.data.alunos);
-      setTurmaModalNome(response.data.turma.professor_nome || 'Turma');
+      const nomes = response.data.turma.professor_nomes || [];
+      setTurmaModalNome(nomes.length ? nomes.join(', ') : 'Turma');
       setShowAlunosModal(true);
     } catch {
       setAlunosTurma([]);
@@ -266,7 +267,7 @@ function CadastroTurmas({ centroId, styles }) {
               <th style={{ padding: 12, borderBottom: '2px solid #eee', textAlign: 'center' }}>Dias</th>
               <th style={{ padding: 12, borderBottom: '2px solid #eee', textAlign: 'center' }}>Horário</th>
               <th style={{ padding: 12, borderBottom: '2px solid #eee', textAlign: 'center' }}>Capacidade</th>
-              <th style={{ padding: 12, borderBottom: '2px solid #eee', textAlign: 'center' }}>Professor</th>
+              <th style={{ padding: 12, borderBottom: '2px solid #eee', textAlign: 'center' }}>Professores</th>
               <th style={{ padding: 12, borderBottom: '2px solid #eee', textAlign: 'center' }}>Alunos</th>
               <th style={{ padding: 12, borderBottom: '2px solid #eee', textAlign: 'center' }}>Ações</th>
             </tr>
@@ -290,7 +291,11 @@ function CadastroTurmas({ centroId, styles }) {
                 </td>
                 <td style={{ padding: 12, textAlign: 'center' }}>{turma.horario}</td>
                 <td style={{ padding: 12, textAlign: 'center' }}>{turma.capacidade_maxima}</td>
-                <td style={{ padding: 12, textAlign: 'center' }}>{turma.professor_nome || turma.professor || '-'}</td>
+                <td style={{ padding: 12, textAlign: 'center' }}>
+                  {(turma.professor_nomes && turma.professor_nomes.length > 0)
+                    ? turma.professor_nomes.join(', ')
+                    : '-'}
+                </td>
                 <td style={{ padding: 12, textAlign: 'center' }}>
                   <button
                     style={{ 
@@ -476,23 +481,24 @@ function CadastroTurmas({ centroId, styles }) {
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <label style={{ fontWeight: 500, marginBottom: 2 }} htmlFor="professor">
-              Professor
+            <label style={{ fontWeight: 500, marginBottom: 2 }} htmlFor="professores">
+              Professores
             </label>
             <select
-              id="professor"
-              name="professor"
-              value={formData.professor}
+              id="professores"
+              name="professores"
+              multiple
+              value={formData.professores}
               onChange={handleChange}
               style={{
                 padding: '8px',
                 borderRadius: 4,
                 border: '1px solid #ccc',
-                fontSize: '1rem'
+                fontSize: '1rem',
+                minHeight: '120px'
               }}
               required
             >
-              <option value="">Selecione</option>
               {professores.map((prof) => (
                 <option key={prof.id} value={prof.id}>
                   {prof.first_name || prof.username}
@@ -511,7 +517,7 @@ function CadastroTurmas({ centroId, styles }) {
                   dias_semana: [],
                   horario: '',
                   capacidade_maxima: '',
-                  professor: '',
+                  professores: [],
                   ct: centroId,
                 });
                 setError('');

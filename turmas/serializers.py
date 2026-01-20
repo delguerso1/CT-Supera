@@ -10,7 +10,7 @@ class UsuarioSerializer(serializers.ModelSerializer):
         fields = ['id', 'username', 'email', 'first_name', 'telefone', 'tipo', 'foto_perfil']
 
 class TurmaSerializer(serializers.ModelSerializer):
-    professor_nome = serializers.SerializerMethodField()
+    professor_nomes = serializers.SerializerMethodField()
     dias_semana_nomes = serializers.SerializerMethodField()
     alunos_count = serializers.SerializerMethodField()
     vagas_disponiveis = serializers.SerializerMethodField()
@@ -24,27 +24,30 @@ class TurmaSerializer(serializers.ModelSerializer):
         queryset=DiaSemana.objects.all(),
         many=True
     )
-    professor = serializers.PrimaryKeyRelatedField(
+    professores = serializers.PrimaryKeyRelatedField(
         queryset=Usuario.objects.filter(tipo='professor'),
         allow_null=True,
-        required=False
+        required=False,
+        many=True
     )
 
     class Meta:
         model = Turma
         fields = [
             'id', 'ct', 'ct_nome', 'dias_semana', 'dias_semana_nomes', 'horario', 'capacidade_maxima',
-            'professor', 'professor_nome', 'alunos', 'alunos_count', 'vagas_disponiveis',
+            'professores', 'professor_nomes', 'alunos', 'alunos_count', 'vagas_disponiveis',
             'tem_vagas', 'ativo'
         ]
         depth = 1
 
-    def get_professor_nome(self, obj):
-        if obj.professor:
-            first = obj.professor.first_name or ''
-            last = obj.professor.last_name or ''
-            return f"{first} {last}".strip()
-        return ""
+    def get_professor_nomes(self, obj):
+        professores = obj.professores.all()
+        nomes = []
+        for professor in professores:
+            first = professor.first_name or ''
+            last = professor.last_name or ''
+            nomes.append(f"{first} {last}".strip())
+        return [nome for nome in nomes if nome]
 
     def get_dias_semana_nomes(self, obj):
         return [dia.nome for dia in obj.dias_semana.all()]

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import api from '../services/api';
+import api, { MEDIA_URL } from '../services/api';
 
 const styles = {
   container: {
@@ -80,6 +80,19 @@ const styles = {
     cursor: 'pointer',
     marginRight: '0.5rem',
     fontSize: '0.9rem',
+  },
+  avatar: {
+    width: '36px',
+    height: '36px',
+    borderRadius: '50%',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#e0e0e0',
+    color: '#555',
+    fontSize: '12px',
+    fontWeight: 'bold',
+    overflow: 'hidden',
   },
   editButton: {
     backgroundColor: '#2196f3',
@@ -184,6 +197,22 @@ function CadastroUsuario({ onUserChange }) {
   const [showParqModal, setShowParqModal] = useState(false);
   const [selectedParqUser, setSelectedParqUser] = useState(null);
   const [parqActionLoading, setParqActionLoading] = useState(false);
+  const [showMatriculaModal, setShowMatriculaModal] = useState(false);
+  const [matriculaPrecadastro, setMatriculaPrecadastro] = useState(null);
+  const [matriculaLoading, setMatriculaLoading] = useState(false);
+  const [matriculaForm, setMatriculaForm] = useState({
+    cpf: '',
+    dia_vencimento: '1',
+    plano: '3x',
+    valor_primeira_mensalidade: '150.00',
+    plano_familia: false,
+  });
+
+  const PLANO_VALORES = {
+    '3x': 150.00,
+    '2x': 130.00,
+    '1x': 110.00,
+  };
 
   // Defina fetchUsers usando useCallback
   const fetchUsers = useCallback(async () => {
@@ -294,34 +323,53 @@ function CadastroUsuario({ onUserChange }) {
     });
   };
 
+  const getInitials = (first, last) => {
+    const f = (first || '').trim();
+    const l = (last || '').trim();
+    const initials = `${f.charAt(0)}${l.charAt(0)}`.toUpperCase();
+    return initials || 'A';
+  };
+
   const parqQuestions = [
     {
       field: 'parq_question_1',
-      question: 'Alguma vez um médico disse que você tem um problema de coração e que só deveria fazer atividade física recomendada por um médico?'
+      question: 'Algum médico já disse que você possui algum problema de coração ou pressão arterial, e que somente deveria realizar atividade física supervisionado por profissionais de saúde?'
     },
     {
       field: 'parq_question_2',
-      question: 'Você sente dor no peito quando faz atividade física?'
+      question: 'Você sente dores no peito quando pratica atividade física?'
     },
     {
       field: 'parq_question_3',
-      question: 'No último mês, você teve dor no peito quando não estava fazendo atividade física?'
+      question: 'No último mês, você sentiu dores no peito ao praticar atividade física?'
     },
     {
       field: 'parq_question_4',
-      question: 'Você perde o equilíbrio por causa de tontura ou alguma vez perdeu a consciência?'
+      question: 'Você apresenta algum desequilíbrio devido à tontura e/ou perda momentânea da consciência?'
     },
     {
       field: 'parq_question_5',
-      question: 'Você tem algum problema ósseo ou articular que poderia piorar com a mudança de sua atividade física?'
+      question: 'Você possui algum problema ósseo ou articular, que pode ser afetado ou agravado pela atividade física?'
     },
     {
       field: 'parq_question_6',
-      question: 'Atualmente um médico está prescrevendo medicamentos para sua pressão arterial ou condição cardíaca?'
+      question: 'Você toma atualmente algum tipo de medicação de uso contínuo?'
     },
     {
       field: 'parq_question_7',
-      question: 'Você sabe de alguma outra razão pela qual não deveria fazer atividade física?'
+      question: 'Você realiza algum tipo de tratamento médico para pressão arterial ou problemas cardíacos?'
+    },
+    {
+      field: 'parq_question_8',
+      question: 'Você realiza algum tratamento médico contínuo, que possa ser afetado ou prejudicado com a atividade física?'
+    },
+    {
+      field: 'parq_question_9',
+      question: 'Você já se submeteu a algum tipo de cirurgia, que comprometa de alguma forma a atividade física?'
+    },
+    {
+      field: 'parq_question_10',
+      question: 'Sabe de alguma outra razão pela qual a atividade física possa eventualmente comprometer sua saúde?'
     }
   ];
 
@@ -545,28 +593,91 @@ function CadastroUsuario({ onUserChange }) {
   };
 
   const handleConvertPreCadastro = async (precadastroId) => {
+    const precadastro = users.find(user => user.id === precadastroId);
+    if (!precadastro) {
+      setError('Pré-cadastro não encontrado.');
+      return;
+    }
+    const planoPadrao = '3x';
+    setMatriculaPrecadastro(precadastro);
+    setMatriculaForm({
+      cpf: precadastro.cpf || '',
+      dia_vencimento: '1',
+      plano: planoPadrao,
+      valor_primeira_mensalidade: PLANO_VALORES[planoPadrao].toFixed(2),
+      plano_familia: false,
+    });
+    setError('');
+    setSuccess('');
+    setShowMatriculaModal(true);
+  };
+
+  const handleCloseMatriculaModal = () => {
+    if (matriculaLoading) return;
+    setShowMatriculaModal(false);
+    setMatriculaPrecadastro(null);
+  };
+
+  const handleMatriculaChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    if (type === 'checkbox') {
+      setMatriculaForm(prev => ({
+        ...prev,
+        [name]: checked,
+      }));
+      return;
+    }
+    if (name === 'plano') {
+      setMatriculaForm(prev => ({
+        ...prev,
+        plano: value,
+        valor_primeira_mensalidade: PLANO_VALORES[value].toFixed(2),
+      }));
+      return;
+    }
+    setMatriculaForm(prev => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  const handleConfirmMatricula = async () => {
+    if (!matriculaPrecadastro) return;
+    const precisaCpf = !matriculaPrecadastro.cpf;
+    if (precisaCpf && !matriculaForm.cpf) {
+      setError('Informe o CPF do aluno.');
+      return;
+    }
+    if (!matriculaForm.dia_vencimento) {
+      setError('Selecione o dia de vencimento.');
+      return;
+    }
+    if (!matriculaForm.plano) {
+      setError('Selecione o plano.');
+      return;
+    }
+    if (!matriculaForm.valor_primeira_mensalidade) {
+      setError('Informe o valor da primeira mensalidade.');
+      return;
+    }
     try {
-      const cpf = prompt('Digite o CPF do aluno (apenas números):');
-      if (!cpf) {
-        return; // Usuário cancelou a operação
+      setMatriculaLoading(true);
+      setError('');
+      const payload = {
+        dia_vencimento: parseInt(matriculaForm.dia_vencimento, 10),
+        plano: matriculaForm.plano,
+        valor_primeira_mensalidade: parseFloat(matriculaForm.valor_primeira_mensalidade),
+        plano_familia: Boolean(matriculaForm.plano_familia),
+      };
+      if (matriculaForm.cpf) {
+        payload.cpf = matriculaForm.cpf;
       }
-      const diaVenc = prompt('Digite o dia de vencimento da mensalidade (1-31):');
-      if (!diaVenc) {
-        return;
-      }
-      const valorMensal = prompt('Digite o valor da mensalidade (ex: 150.00):');
-      if (!valorMensal) {
-        return;
-      }
-      const response = await api.post(`usuarios/finalizar-agendamento/${precadastroId}/`, {
-        cpf: cpf,
-        dia_vencimento: diaVenc,
-        valor_mensalidade: valorMensal
-      });
+      const response = await api.post(`usuarios/finalizar-agendamento/${matriculaPrecadastro.id}/`, payload);
       if (response.data.message) {
         setSuccess('Pré-cadastro convertido em aluno com sucesso!');
+        setShowMatriculaModal(false);
+        setMatriculaPrecadastro(null);
         fetchUsers();
-        // Atualiza o dashboard se a função foi fornecida
         if (onUserChange) {
           onUserChange();
         }
@@ -574,6 +685,8 @@ function CadastroUsuario({ onUserChange }) {
     } catch (error) {
       console.error('[DEBUG] Erro ao converter pré-cadastro:', error);
       setError(error.response?.data?.error || 'Erro ao converter pré-cadastro. Tente novamente.');
+    } finally {
+      setMatriculaLoading(false);
     }
   };
 
@@ -621,6 +734,15 @@ function CadastroUsuario({ onUserChange }) {
         return !isNaN(ctId) && ctId === filtroId;
       });
     });
+  };
+
+  const totalPrimeiraMensalidade = () => {
+    const valor = parseFloat(matriculaForm.valor_primeira_mensalidade || '0');
+    if (Number.isNaN(valor)) {
+      return '0.00';
+    }
+    const desconto = matriculaForm.plano_familia ? 10 : 0;
+    return (valor - desconto + 90).toFixed(2);
   };
 
   return (
@@ -744,6 +866,7 @@ function CadastroUsuario({ onUserChange }) {
             <thead>
               <tr>
                 <th style={styles.th}>Nome</th>
+                {activeTab === 'alunos' && <th style={styles.th}>Foto</th>}
                 <th style={styles.th}>CPF</th>
                 <th style={styles.th}>E-mail</th>
                 <th style={styles.th}>Telefone</th>
@@ -760,6 +883,21 @@ function CadastroUsuario({ onUserChange }) {
                 <td style={styles.td}>
                   {`${user.first_name} ${user.last_name || ''}`.trim()}
                 </td>
+                {activeTab === 'alunos' && (
+                  <td style={styles.td}>
+                    {user.foto_perfil ? (
+                      <img
+                        src={`${MEDIA_URL}${user.foto_perfil}`}
+                        alt="Foto do aluno"
+                        style={{ ...styles.avatar, objectFit: 'cover' }}
+                      />
+                    ) : (
+                      <div style={styles.avatar}>
+                        {getInitials(user.first_name, user.last_name)}
+                      </div>
+                    )}
+                  </td>
+                )}
                 <td style={styles.td}>{user.cpf || user.username}</td>
                 <td style={styles.td}>{user.email}</td>
                 <td style={styles.td}>{user.telefone}</td>
@@ -1218,6 +1356,131 @@ function CadastroUsuario({ onUserChange }) {
                   </button>
                 </div>
               )}
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showMatriculaModal && matriculaPrecadastro && (
+        <div style={styles.modal}>
+          <div style={styles.modalContent}>
+            <h2 style={styles.title}>Matricular pré-cadastro</h2>
+            <div style={{ fontSize: '0.9rem', color: '#666' }}>
+              A matrícula adiciona R$ 90,00 à primeira mensalidade e o vencimento será em 48h.
+            </div>
+            <form style={{ ...styles.form, marginTop: '1rem' }} onSubmit={(e) => e.preventDefault()}>
+              {!matriculaPrecadastro.cpf && (
+                <div style={styles.formGroup}>
+                  <label style={styles.label} htmlFor="matricula_cpf">
+                    CPF
+                  </label>
+                  <input
+                    type="text"
+                    id="matricula_cpf"
+                    name="cpf"
+                    value={matriculaForm.cpf}
+                    onChange={handleMatriculaChange}
+                    style={styles.input}
+                    placeholder="Apenas números"
+                    required
+                  />
+                </div>
+              )}
+
+              <div style={styles.formGroup}>
+                <label style={styles.label} htmlFor="matricula_dia_vencimento">
+                  Dia de vencimento das mensalidades
+                </label>
+                <select
+                  id="matricula_dia_vencimento"
+                  name="dia_vencimento"
+                  value={matriculaForm.dia_vencimento}
+                  onChange={handleMatriculaChange}
+                  style={styles.select}
+                  required
+                >
+                  <option value="1">Dia 1</option>
+                  <option value="5">Dia 5</option>
+                  <option value="10">Dia 10</option>
+                </select>
+              </div>
+
+              <div style={styles.formGroup}>
+                <label style={styles.label} htmlFor="matricula_plano">
+                  Plano
+                </label>
+                <select
+                  id="matricula_plano"
+                  name="plano"
+                  value={matriculaForm.plano}
+                  onChange={handleMatriculaChange}
+                  style={styles.select}
+                  required
+                >
+                  <option value="3x">3 vezes na semana (R$ 150,00)</option>
+                  <option value="2x">2 vezes na semana (R$ 130,00)</option>
+                  <option value="1x">1 vez na semana (R$ 110,00)</option>
+                </select>
+              </div>
+
+              <div style={styles.formGroup}>
+                <label style={styles.label} htmlFor="matricula_valor_primeira">
+                  Valor da primeira mensalidade (sem matrícula)
+                </label>
+                <input
+                  type="number"
+                  id="matricula_valor_primeira"
+                  name="valor_primeira_mensalidade"
+                  value={matriculaForm.valor_primeira_mensalidade}
+                  onChange={handleMatriculaChange}
+                  style={styles.input}
+                  min="0"
+                  step="0.01"
+                  required
+                />
+                <div style={{ fontSize: '0.85rem', color: '#666' }}>
+                  Total com matrícula: <strong>R$ {totalPrimeiraMensalidade()}</strong>
+                </div>
+              </div>
+
+              <div style={styles.formGroup}>
+                <label style={{ ...styles.label, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <input
+                    type="checkbox"
+                    name="plano_familia"
+                    checked={matriculaForm.plano_familia}
+                    onChange={handleMatriculaChange}
+                  />
+                  Plano família (desconto de R$ 10,00 na mensalidade)
+                </label>
+              </div>
+
+              <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+                <button
+                  type="button"
+                  onClick={handleCloseMatriculaModal}
+                  style={{
+                    ...styles.button,
+                    backgroundColor: '#f5f5f5',
+                    color: '#333',
+                    flex: 1,
+                  }}
+                  disabled={matriculaLoading}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmMatricula}
+                  style={{
+                    ...styles.button,
+                    flex: 1,
+                  }}
+                  disabled={matriculaLoading}
+                >
+                  {matriculaLoading ? 'Matriculando...' : 'Confirmar matrícula'}
+                </button>
+              </div>
             </form>
           </div>
         </div>

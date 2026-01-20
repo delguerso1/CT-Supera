@@ -1030,7 +1030,11 @@ function DashboardProfessor({ user }) {
               {turmasDoCentro.map(turma => (
                 <tr key={turma.id}>
                   <td style={styles.td}>{turma.id}</td>
-                  <td style={styles.td}>{turma.professor_nome}</td>
+                  <td style={styles.td}>
+                    {(turma.professor_nomes && turma.professor_nomes.length > 0)
+                      ? turma.professor_nomes.join(', ')
+                      : '-'}
+                  </td>
                       <td style={styles.td}>
                         {Array.isArray(turma.dias_semana_nomes) 
                           ? turma.dias_semana_nomes.join(', ') 
@@ -1188,8 +1192,42 @@ function DashboardProfessor({ user }) {
                         onChange={e => handlePresencaChange(aluno.id, e.target.checked)}
                         style={styles.checkbox}
                       />
-                      <label htmlFor={`aluno-${aluno.id}`} style={styles.checkboxLabel}>
-                        {aluno.first_name} {aluno.last_name} ({aluno.username})
+                      <label
+                        htmlFor={`aluno-${aluno.id}`}
+                        style={{ ...styles.checkboxLabel, display: 'flex', alignItems: 'center', gap: '8px' }}
+                      >
+                        {aluno.foto_perfil ? (
+                          <img
+                            src={`${MEDIA_URL}${aluno.foto_perfil}`}
+                            alt="Foto do aluno"
+                            style={{
+                              width: '28px',
+                              height: '28px',
+                              borderRadius: '50%',
+                              objectFit: 'cover',
+                              backgroundColor: '#e0e0e0'
+                            }}
+                          />
+                        ) : (
+                          <span
+                            style={{
+                              width: '28px',
+                              height: '28px',
+                              borderRadius: '50%',
+                              backgroundColor: '#e0e0e0',
+                              color: '#555',
+                              fontSize: '11px',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontWeight: 'bold'
+                            }}
+                          >
+                            {(aluno.first_name || 'A').charAt(0).toUpperCase()}
+                            {(aluno.last_name || '').charAt(0).toUpperCase()}
+                          </span>
+                        )}
+                        <span>{aluno.first_name} {aluno.last_name} ({aluno.username})</span>
                       </label>
                     </div>
                   ))}

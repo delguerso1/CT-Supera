@@ -60,6 +60,19 @@ function AgendamentoPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
+  const formatarNome = (valor) => {
+    if (!valor) return '';
+    return valor
+      .toLowerCase()
+      .split(' ')
+      .filter(part => part.trim() !== '')
+      .map(part => part
+        .split('-')
+        .map(p => (p ? p.charAt(0).toUpperCase() + p.slice(1) : ''))
+        .join('-'))
+      .join(' ');
+  };
+
   // Buscar CTs ao carregar a página
   useEffect(() => {
     async function fetchCts() {
@@ -93,7 +106,11 @@ function AgendamentoPage() {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setForm(prev => ({ ...prev, [name]: value }));
+    let novoValor = value;
+    if (name === 'first_name' || name === 'last_name') {
+      novoValor = formatarNome(value);
+    }
+    setForm(prev => ({ ...prev, [name]: novoValor }));
     
     // Se mudou o CT, limpa a turma selecionada
     if (name === 'ct') {

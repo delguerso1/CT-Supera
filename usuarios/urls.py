@@ -2,7 +2,7 @@ from django.urls import path
 from .views import (
      ListarPrecadastrosAPIView, EditarExcluirPrecadastroAPIView,
     FinalizarAgendamentoAPIView, LoginAPIView, LogoutAPIView, AtivarContaAPIView,
-    ListarCriarUsuariosAPIView, EditarExcluirUsuarioAPIView, ReenviarConviteAPIView,
+    ListarCriarUsuariosAPIView, EditarExcluirUsuarioAPIView, ReenviarConviteAPIView, AceitarContratoAPIView,
     SolicitarRecuperacaoSenhaAPIView, RedefinirSenhaAPIView
 )
 
@@ -13,6 +13,7 @@ urlpatterns = [
     path('finalizar-agendamento/<int:precadastro_id>/', FinalizarAgendamentoAPIView.as_view(), name='finalizar_agendamento_api'),
     path('login/', LoginAPIView.as_view(), name='login_api'),
     path('logout/', LogoutAPIView.as_view(), name='logout_api'),
+    path('aceitar-contrato/', AceitarContratoAPIView.as_view(), name='aceitar_contrato_api'),
     path('ativar-conta/<str:uidb64>/<str:token>/', AtivarContaAPIView.as_view(), name='ativar_conta_api'),
     path('reenviar-convite/<int:usuario_id>/', ReenviarConviteAPIView.as_view(), name='reenviar_convite_api'),
     path('esqueci-senha/', SolicitarRecuperacaoSenhaAPIView.as_view(), name='solicitar_recuperacao_senha_api'),

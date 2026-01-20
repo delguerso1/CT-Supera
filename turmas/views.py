@@ -31,10 +31,10 @@ class ListaCriarTurmasAPIView(ListCreateAPIView):
         # Filtra por professor se especificado
         professor_id = self.request.query_params.get('professor')
         if professor_id:
-            queryset = queryset.filter(professor_id=professor_id)
+            queryset = queryset.filter(professores__id=professor_id)
             
         # Ordena por horário e dias da semana
-        queryset = queryset.order_by('horario')
+        queryset = queryset.order_by('horario').distinct()
         
         # Annotate com contagem de alunos ativos
         queryset = queryset.annotate(

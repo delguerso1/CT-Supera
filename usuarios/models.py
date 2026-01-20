@@ -120,15 +120,22 @@ class Usuario(AbstractUser):
     foto_perfil = models.ImageField(upload_to='fotos_perfil/', blank=True, null=True, help_text="Foto de perfil do usuário")
     
     # CAMPOS DO QUESTIONÁRIO PAR-Q (apenas para alunos)
-    parq_question_1 = models.BooleanField(default=False, help_text="PAR-Q: Alguma vez um médico disse que você tem um problema de coração e que só deveria fazer atividade física recomendada por um médico?")
-    parq_question_2 = models.BooleanField(default=False, help_text="PAR-Q: Você sente dor no peito quando faz atividade física?")
-    parq_question_3 = models.BooleanField(default=False, help_text="PAR-Q: No último mês, você teve dor no peito quando não estava fazendo atividade física?")
-    parq_question_4 = models.BooleanField(default=False, help_text="PAR-Q: Você perde o equilíbrio por causa de tontura ou alguma vez perdeu a consciência?")
-    parq_question_5 = models.BooleanField(default=False, help_text="PAR-Q: Você tem algum problema ósseo ou articular que poderia piorar com a mudança de sua atividade física?")
-    parq_question_6 = models.BooleanField(default=False, help_text="PAR-Q: Atualmente um médico está prescrevendo medicamentos para sua pressão arterial ou condição cardíaca?")
-    parq_question_7 = models.BooleanField(default=False, help_text="PAR-Q: Você sabe de alguma outra razão pela qual não deveria fazer atividade física?")
+    parq_question_1 = models.BooleanField(default=False, help_text="PAR-Q: Algum médico já disse que você possui algum problema de coração ou pressão arterial, e que somente deveria realizar atividade física supervisionado por profissionais de saúde?")
+    parq_question_2 = models.BooleanField(default=False, help_text="PAR-Q: Você sente dores no peito quando pratica atividade física?")
+    parq_question_3 = models.BooleanField(default=False, help_text="PAR-Q: No último mês, você sentiu dores no peito ao praticar atividade física?")
+    parq_question_4 = models.BooleanField(default=False, help_text="PAR-Q: Você apresenta algum desequilíbrio devido à tontura e/ou perda momentânea da consciência?")
+    parq_question_5 = models.BooleanField(default=False, help_text="PAR-Q: Você possui algum problema ósseo ou articular, que pode ser afetado ou agravado pela atividade física?")
+    parq_question_6 = models.BooleanField(default=False, help_text="PAR-Q: Você toma atualmente algum tipo de medicação de uso contínuo?")
+    parq_question_7 = models.BooleanField(default=False, help_text="PAR-Q: Você realiza algum tipo de tratamento médico para pressão arterial ou problemas cardíacos?")
+    parq_question_8 = models.BooleanField(default=False, help_text="PAR-Q: Você realiza algum tratamento médico contínuo, que possa ser afetado ou prejudicado com a atividade física?")
+    parq_question_9 = models.BooleanField(default=False, help_text="PAR-Q: Você já se submeteu a algum tipo de cirurgia, que comprometa de alguma forma a atividade física?")
+    parq_question_10 = models.BooleanField(default=False, help_text="PAR-Q: Sabe de alguma outra razão pela qual a atividade física possa eventualmente comprometer sua saúde?")
     parq_completed = models.BooleanField(default=False, help_text="Indica se o questionário PAR-Q foi preenchido")
     parq_completion_date = models.DateTimeField(null=True, blank=True, help_text="Data de preenchimento do questionário PAR-Q")
+    # ACEITE DE CONTRATO
+    contrato_aceito = models.BooleanField(default=False, help_text="Indica se o aluno aceitou o contrato")
+    contrato_aceito_em = models.DateTimeField(null=True, blank=True, help_text="Data e hora do aceite do contrato")
+    contrato_aceito_ip = models.GenericIPAddressField(null=True, blank=True, help_text="IP do aceite do contrato")
      # NOVOS CAMPOS PARA MENSALIDADE
     dia_vencimento = models.PositiveSmallIntegerField(null=True, blank=True, help_text="Dia do vencimento da mensalidade (1-31)")
     valor_mensalidade = models.DecimalField(max_digits=7, decimal_places=2, null=True, blank=True, help_text="Valor personalizado da mensalidade do aluno")
@@ -152,38 +159,53 @@ class Usuario(AbstractUser):
         questions = [
             {
                 'field': 'parq_question_1',
-                'question': 'Alguma vez um médico disse que você tem um problema de coração e que só deveria fazer atividade física recomendada por um médico?',
+                'question': 'Algum médico já disse que você possui algum problema de coração ou pressão arterial, e que somente deveria realizar atividade física supervisionado por profissionais de saúde?',
                 'value': self.parq_question_1
             },
             {
                 'field': 'parq_question_2', 
-                'question': 'Você sente dor no peito quando faz atividade física?',
+                'question': 'Você sente dores no peito quando pratica atividade física?',
                 'value': self.parq_question_2
             },
             {
                 'field': 'parq_question_3',
-                'question': 'No último mês, você teve dor no peito quando não estava fazendo atividade física?',
+                'question': 'No último mês, você sentiu dores no peito ao praticar atividade física?',
                 'value': self.parq_question_3
             },
             {
                 'field': 'parq_question_4',
-                'question': 'Você perde o equilíbrio por causa de tontura ou alguma vez perdeu a consciência?',
+                'question': 'Você apresenta algum desequilíbrio devido à tontura e/ou perda momentânea da consciência?',
                 'value': self.parq_question_4
             },
             {
                 'field': 'parq_question_5',
-                'question': 'Você tem algum problema ósseo ou articular que poderia piorar com a mudança de sua atividade física?',
+                'question': 'Você possui algum problema ósseo ou articular, que pode ser afetado ou agravado pela atividade física?',
                 'value': self.parq_question_5
             },
             {
                 'field': 'parq_question_6',
-                'question': 'Atualmente um médico está prescrevendo medicamentos para sua pressão arterial ou condição cardíaca?',
+                'question': 'Você toma atualmente algum tipo de medicação de uso contínuo?',
                 'value': self.parq_question_6
             },
             {
                 'field': 'parq_question_7',
-                'question': 'Você sabe de alguma outra razão pela qual não deveria fazer atividade física?',
+                'question': 'Você realiza algum tipo de tratamento médico para pressão arterial ou problemas cardíacos?',
                 'value': self.parq_question_7
+            },
+            {
+                'field': 'parq_question_8',
+                'question': 'Você realiza algum tratamento médico contínuo, que possa ser afetado ou prejudicado com a atividade física?',
+                'value': self.parq_question_8
+            },
+            {
+                'field': 'parq_question_9',
+                'question': 'Você já se submeteu a algum tipo de cirurgia, que comprometa de alguma forma a atividade física?',
+                'value': self.parq_question_9
+            },
+            {
+                'field': 'parq_question_10',
+                'question': 'Sabe de alguma outra razão pela qual a atividade física possa eventualmente comprometer sua saúde?',
+                'value': self.parq_question_10
             }
         ]
         return questions
@@ -196,7 +218,8 @@ class Usuario(AbstractUser):
         return any([
             self.parq_question_1, self.parq_question_2, self.parq_question_3,
             self.parq_question_4, self.parq_question_5, self.parq_question_6,
-            self.parq_question_7
+            self.parq_question_7, self.parq_question_8, self.parq_question_9,
+            self.parq_question_10
         ])
 
     def can_participate_in_activities(self):

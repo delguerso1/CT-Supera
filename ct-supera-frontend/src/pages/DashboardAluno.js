@@ -422,7 +422,10 @@ function DashboardAluno({ user }) {
     parq_question_4: false,
     parq_question_5: false,
     parq_question_6: false,
-    parq_question_7: false
+    parq_question_7: false,
+    parq_question_8: false,
+    parq_question_9: false,
+    parq_question_10: false
   });
   const [fotoPerfil, setFotoPerfil] = useState(null);
   const [fotoPreview, setFotoPreview] = useState(null);
@@ -465,7 +468,10 @@ function DashboardAluno({ user }) {
           parq_question_4: resp.data.usuario.parq_question_4 || false,
           parq_question_5: resp.data.usuario.parq_question_5 || false,
           parq_question_6: resp.data.usuario.parq_question_6 || false,
-          parq_question_7: resp.data.usuario.parq_question_7 || false
+          parq_question_7: resp.data.usuario.parq_question_7 || false,
+          parq_question_8: resp.data.usuario.parq_question_8 || false,
+          parq_question_9: resp.data.usuario.parq_question_9 || false,
+          parq_question_10: resp.data.usuario.parq_question_10 || false
         });
       } catch (err) {
         console.error('Erro ao carregar dados:', err);
@@ -501,7 +507,10 @@ function DashboardAluno({ user }) {
       parq_question_4: aluno?.parq_question_4 || false,
       parq_question_5: aluno?.parq_question_5 || false,
       parq_question_6: aluno?.parq_question_6 || false,
-      parq_question_7: aluno?.parq_question_7 || false
+      parq_question_7: aluno?.parq_question_7 || false,
+      parq_question_8: aluno?.parq_question_8 || false,
+      parq_question_9: aluno?.parq_question_9 || false,
+      parq_question_10: aluno?.parq_question_10 || false
     });
     setSuccess('');
     setErro('');
@@ -542,7 +551,8 @@ function DashboardAluno({ user }) {
   const hasParqChanges = () => {
     if (!aluno) return false;
     const parqFields = ['parq_question_1', 'parq_question_2', 'parq_question_3', 'parq_question_4',
-                       'parq_question_5', 'parq_question_6', 'parq_question_7'];
+                       'parq_question_5', 'parq_question_6', 'parq_question_7', 'parq_question_8',
+                       'parq_question_9', 'parq_question_10'];
     
     return parqFields.some(field => {
       const originalValue = aluno[field] || false;
@@ -598,13 +608,6 @@ function DashboardAluno({ user }) {
       nome_responsavel: form.nome_responsavel,
       telefone_responsavel: form.telefone_responsavel,
       telefone_emergencia: form.telefone_emergencia,
-      parq_question_1: form.parq_question_1,
-      parq_question_2: form.parq_question_2,
-      parq_question_3: form.parq_question_3,
-      parq_question_4: form.parq_question_4,
-      parq_question_5: form.parq_question_5,
-      parq_question_6: form.parq_question_6,
-      parq_question_7: form.parq_question_7,
       username: aluno.username,
       tipo: aluno.tipo,
       cpf: aluno.cpf,
@@ -628,6 +631,47 @@ function DashboardAluno({ user }) {
       setAluno(resp.data.usuario);
     } catch (err) {
       const errorMessage = err.response?.data?.parq_question_1 || err.response?.data?.detail || 'Erro ao atualizar dados.';
+      setErro(Array.isArray(errorMessage) ? errorMessage[0] : errorMessage);
+    }
+  };
+
+  const handleParqSubmit = async e => {
+    e.preventDefault();
+    setSuccess('');
+    setErro('');
+    const parqPayload = {
+      parq_question_1: form.parq_question_1,
+      parq_question_2: form.parq_question_2,
+      parq_question_3: form.parq_question_3,
+      parq_question_4: form.parq_question_4,
+      parq_question_5: form.parq_question_5,
+      parq_question_6: form.parq_question_6,
+      parq_question_7: form.parq_question_7,
+      parq_question_8: form.parq_question_8,
+      parq_question_9: form.parq_question_9,
+      parq_question_10: form.parq_question_10,
+    };
+    try {
+      const updateResponse = await api.put(`usuarios/${aluno.id}/`, parqPayload);
+      console.log('[DEBUG] Resposta do PUT usuarios (PAR-Q):', updateResponse.data);
+      setSuccess('Questionário PAR-Q atualizado com sucesso!');
+      const resp = await api.get('alunos/painel-aluno/');
+      setAluno(resp.data.usuario);
+      setForm(prev => ({
+        ...prev,
+        parq_question_1: resp.data.usuario.parq_question_1 || false,
+        parq_question_2: resp.data.usuario.parq_question_2 || false,
+        parq_question_3: resp.data.usuario.parq_question_3 || false,
+        parq_question_4: resp.data.usuario.parq_question_4 || false,
+        parq_question_5: resp.data.usuario.parq_question_5 || false,
+        parq_question_6: resp.data.usuario.parq_question_6 || false,
+        parq_question_7: resp.data.usuario.parq_question_7 || false,
+        parq_question_8: resp.data.usuario.parq_question_8 || false,
+        parq_question_9: resp.data.usuario.parq_question_9 || false,
+        parq_question_10: resp.data.usuario.parq_question_10 || false,
+      }));
+    } catch (err) {
+      const errorMessage = err.response?.data?.parq_question_1 || err.response?.data?.detail || 'Erro ao atualizar PAR-Q.';
       setErro(Array.isArray(errorMessage) ? errorMessage[0] : errorMessage);
     }
   };
@@ -1222,124 +1266,17 @@ function DashboardAluno({ user }) {
               style={styles.input}
             />
           </div>
-          {/* Questionário PAR-Q */}
-          <div style={styles.formGroup}>
-            <label style={styles.label}>
-              Questionário de Prontidão para Atividade Física (PAR-Q)
-            </label>
-            
-            {!canFillParqAgain() && (
-              <div style={{
-                padding: '12px',
-                backgroundColor: '#fff3cd',
-                borderRadius: '4px',
-                marginBottom: '15px',
-                border: '1px solid #ffc107'
-              }}>
-                <div style={{ fontWeight: 'bold', color: '#856404', marginBottom: '5px' }}>
-                  ⚠️ Questionário já preenchido
-                </div>
-                <div style={{ fontSize: '12px', color: '#856404' }}>
-                  O questionário PAR-Q só pode ser preenchido uma vez por ano. 
-                  Último preenchimento: {formatParqDate(aluno?.parq_completion_date)}
-                  {getDaysUntilCanFillParq() > 0 && (
-                    <span> - Você poderá preencher novamente em {getDaysUntilCanFillParq()} dia(s).</span>
-                  )}
-                </div>
-              </div>
-            )}
-            
-            <div style={{ fontSize: '12px', color: '#666', marginBottom: '10px' }}>
-              Responda "Sim" ou "Não" para cada pergunta abaixo
-            </div>
-            
-            {[
-              {
-                field: 'parq_question_1',
-                question: 'Alguma vez um médico disse que você tem um problema de coração e que só deveria fazer atividade física recomendada por um médico?'
-              },
-              {
-                field: 'parq_question_2',
-                question: 'Você sente dor no peito quando faz atividade física?'
-              },
-              {
-                field: 'parq_question_3',
-                question: 'No último mês, você teve dor no peito quando não estava fazendo atividade física?'
-              },
-              {
-                field: 'parq_question_4',
-                question: 'Você perde o equilíbrio por causa de tontura ou alguma vez perdeu a consciência?'
-              },
-              {
-                field: 'parq_question_5',
-                question: 'Você tem algum problema ósseo ou articular que poderia piorar com a mudança de sua atividade física?'
-              },
-              {
-                field: 'parq_question_6',
-                question: 'Atualmente um médico está prescrevendo medicamentos para sua pressão arterial ou condição cardíaca?'
-              },
-              {
-                field: 'parq_question_7',
-                question: 'Você sabe de alguma outra razão pela qual não deveria fazer atividade física?'
-              }
-            ].map((item, index) => (
-              <div key={item.field} style={{ marginBottom: '15px', padding: '12px', border: '1px solid #ddd', borderRadius: '4px' }}>
-                <div style={{ marginBottom: '8px', fontSize: '13px', lineHeight: '1.3' }}>
-                  <strong>{index + 1}.</strong> {item.question}
-                </div>
-                <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: canFillParqAgain() ? 'pointer' : 'not-allowed', opacity: canFillParqAgain() ? 1 : 0.6 }}>
-                    <input
-                      type="radio"
-                      name={item.field}
-                      value="true"
-                      checked={form[item.field] === true || form[item.field] === 'true'}
-                      onChange={handleChange}
-                      disabled={!canFillParqAgain()}
-                      style={{ margin: 0 }}
-                    />
-                    <span style={{ fontSize: '13px' }}>Sim</span>
-                  </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: canFillParqAgain() ? 'pointer' : 'not-allowed', opacity: canFillParqAgain() ? 1 : 0.6 }}>
-                    <input
-                      type="radio"
-                      name={item.field}
-                      value="false"
-                      checked={form[item.field] === false || form[item.field] === 'false' || form[item.field] === undefined || form[item.field] === null}
-                      onChange={handleChange}
-                      disabled={!canFillParqAgain()}
-                      style={{ margin: 0 }}
-                    />
-                    <span style={{ fontSize: '13px' }}>Não</span>
-                  </label>
-                </div>
-              </div>
-            ))}
-            
-            <div style={{ marginTop: '10px', padding: '8px', backgroundColor: '#f8f9fa', borderRadius: '4px', fontSize: '12px', color: '#666' }}>
-              <strong>Importante:</strong> Se você respondeu "Sim" a alguma pergunta, consulte seu médico antes de começar um programa de atividade física.
-            </div>
-            
-            <div style={{ marginTop: '20px', display: 'flex', gap: '10px' }}>
-              <button 
-                type="submit" 
-                style={{
-                  ...styles.primaryButton,
-                  opacity: (canFillParqAgain() || !hasParqChanges()) ? 1 : 0.6,
-                  cursor: (canFillParqAgain() || !hasParqChanges()) ? 'pointer' : 'not-allowed'
-                }}
-                disabled={!canFillParqAgain() && hasParqChanges()}
-              >
-                Salvar Alterações
-              </button>
-              <button
-                type="button"
-                onClick={handleCancel}
-                style={styles.secondaryButton}
-              >
-                Cancelar
-              </button>
-            </div>
+          <div style={{ marginTop: '20px', display: 'flex', gap: '10px' }}>
+            <button type="submit" style={styles.primaryButton}>
+              Salvar Alterações
+            </button>
+            <button
+              type="button"
+              onClick={handleCancel}
+              style={styles.secondaryButton}
+            >
+              Cancelar
+            </button>
           </div>
         </form>
       ) : (
@@ -1385,191 +1322,6 @@ function DashboardAluno({ user }) {
             </div>
           </div>
           
-          {/* Seção PAR-Q - Questionário de Aptidão para Atividade Física */}
-        <div style={{
-          gridColumn: '1 / -1',
-          marginTop: '20px',
-          padding: '20px',
-          backgroundColor: '#f8f9fa',
-          borderRadius: '12px',
-          border: '1px solid #e0e0e0'
-        }}>
-          <h3 style={{
-            fontSize: '18px',
-            color: '#1F6C86',
-            marginBottom: '15px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
-          }}>
-            <span>📋</span>
-            Questionário PAR-Q (Prontidão para Atividade Física)
-          </h3>
-          
-          {(() => {
-            // Debug: verificar valores
-            const hasParqCompleted = aluno?.parq_completed === true || aluno?.parq_completed === 'true';
-            const hasCompletionDate = aluno?.parq_completion_date;
-            const hasAnyParqAnswer = [1, 2, 3, 4, 5, 6, 7].some(i => {
-              const value = aluno?.[`parq_question_${i}`];
-              return value === true || value === 'true' || value === false || value === 'false';
-            });
-            
-            console.log('[DEBUG RENDER] hasParqCompleted:', hasParqCompleted, 'value:', aluno?.parq_completed);
-            console.log('[DEBUG RENDER] hasCompletionDate:', hasCompletionDate, 'value:', aluno?.parq_completion_date);
-            console.log('[DEBUG RENDER] hasAnyParqAnswer:', hasAnyParqAnswer);
-            console.log('[DEBUG RENDER] aluno object:', aluno);
-            
-            const shouldShow = hasParqCompleted || hasCompletionDate || hasAnyParqAnswer;
-            
-            if (!shouldShow) {
-              return (
-                <div style={{
-                  padding: '20px',
-                  backgroundColor: '#fff3cd',
-                  borderRadius: '8px',
-                  border: '1px solid #ffc107',
-                  textAlign: 'center'
-                }}>
-                  <span style={{ fontSize: '48px', marginBottom: '10px', display: 'block' }}>📋</span>
-                  <div style={{ fontSize: '16px', color: '#856404', marginBottom: '10px' }}>
-                    <strong>Questionário PAR-Q Pendente</strong>
-                  </div>
-                  <div style={{ fontSize: '14px', color: '#666', marginBottom: '15px' }}>
-                    Preencha o questionário PAR-Q para avaliar sua aptidão para atividade física.
-                  </div>
-                  <button
-                    onClick={handleEdit}
-                    style={{
-                      ...styles.primaryButton,
-                      backgroundColor: '#ff9800'
-                    }}
-                  >
-                    Preencher Questionário
-                  </button>
-                </div>
-              );
-            }
-            
-            return (
-              <div>
-                <div style={{
-                  backgroundColor: '#e8f5e9',
-                  padding: '15px',
-                  borderRadius: '8px',
-                  marginBottom: '15px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px',
-                  border: '1px solid #c8e6c9'
-                }}>
-                  <span style={{ fontSize: '24px' }}>✅</span>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 'bold', color: '#2e7d32', marginBottom: '6px', fontSize: '16px' }}>
-                      Questionário {hasParqCompleted || hasCompletionDate ? 'Completo' : 'Respondido'}
-                    </div>
-                    {hasCompletionDate && (
-                      <div style={{ fontSize: '14px', color: '#424242', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <span style={{ fontWeight: 'bold' }}>Preenchido em:</span>
-                        <span style={{ color: '#1F6C86' }}>{formatParqDate(aluno.parq_completion_date)}</span>
-                      </div>
-                    )}
-                    {!hasCompletionDate && (
-                      <div style={{ fontSize: '14px', color: '#666', fontStyle: 'italic' }}>
-                        Data de preenchimento não disponível
-                      </div>
-                    )}
-                  </div>
-                </div>
-              
-              {[
-                {
-                  field: 'parq_question_1',
-                  question: '1. Alguma vez um médico disse que você tem um problema de coração e que só deveria fazer atividade física recomendada por um médico?'
-                },
-                {
-                  field: 'parq_question_2',
-                  question: '2. Você sente dor no peito quando faz atividade física?'
-                },
-                {
-                  field: 'parq_question_3',
-                  question: '3. No último mês, você teve dor no peito quando não estava fazendo atividade física?'
-                },
-                {
-                  field: 'parq_question_4',
-                  question: '4. Você perde o equilíbrio por causa de tontura ou alguma vez perdeu a consciência?'
-                },
-                {
-                  field: 'parq_question_5',
-                  question: '5. Você tem algum problema ósseo ou articular que poderia piorar com a mudança de sua atividade física?'
-                },
-                {
-                  field: 'parq_question_6',
-                  question: '6. Atualmente um médico está prescrevendo medicamentos para sua pressão arterial ou condição cardíaca?'
-                },
-                {
-                  field: 'parq_question_7',
-                  question: '7. Você sabe de alguma outra razão pela qual não deveria fazer atividade física?'
-                }
-              ].map((item) => (
-                <div key={item.field} style={{
-                  padding: '10px',
-                  marginBottom: '8px',
-                  backgroundColor: 'white',
-                  borderRadius: '8px',
-                  border: '1px solid #e0e0e0',
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  gap: '10px'
-                }}>
-                  <span style={{
-                    fontSize: '18px',
-                    color: aluno?.[item.field] ? '#d32f2f' : '#4caf50'
-                  }}>
-                    {aluno?.[item.field] ? '⚠️' : '✅'}
-                  </span>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '14px', color: '#333', marginBottom: '4px' }}>
-                      {item.question}
-                    </div>
-                    <div style={{
-                      fontSize: '13px',
-                      fontWeight: 'bold',
-                      color: aluno?.[item.field] ? '#d32f2f' : '#4caf50'
-                    }}>
-                      Resposta: {aluno?.[item.field] ? 'Sim' : 'Não'}
-                    </div>
-                  </div>
-                </div>
-              ))}
-              
-              {/* Alerta se alguma resposta for Sim */}
-              {[1, 2, 3, 4, 5, 6, 7].some(i => aluno?.[`parq_question_${i}`]) && (
-                <div style={{
-                  marginTop: '15px',
-                  padding: '15px',
-                  backgroundColor: '#fff3cd',
-                  borderRadius: '8px',
-                  border: '2px solid #ffc107'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-                    <span style={{ fontSize: '24px' }}>⚠️</span>
-                    <div style={{ fontWeight: 'bold', color: '#856404', fontSize: '16px' }}>
-                      Atenção - Consulta Médica Necessária
-                    </div>
-                  </div>
-                  <div style={{ fontSize: '14px', color: '#856404' }}>
-                    Você respondeu "Sim" a pelo menos uma pergunta do PAR-Q. 
-                    É recomendado consultar um médico antes de iniciar ou intensificar 
-                    atividades físicas.
-                  </div>
-                </div>
-              )}
-              </div>
-            );
-          })()}
-        </div>
-        
           <div style={{ gridColumn: '1 / -1' }}>
             <div style={styles.buttonGroup}>
               <button
@@ -1584,6 +1336,216 @@ function DashboardAluno({ user }) {
       )}
     </div>
   );
+
+  const renderParq = () => {
+    const perguntasParq = [
+      {
+        field: 'parq_question_1',
+        question: 'Algum médico já disse que você possui algum problema de coração ou pressão arterial, e que somente deveria realizar atividade física supervisionado por profissionais de saúde?'
+      },
+      {
+        field: 'parq_question_2',
+        question: 'Você sente dores no peito quando pratica atividade física?'
+      },
+      {
+        field: 'parq_question_3',
+        question: 'No último mês, você sentiu dores no peito ao praticar atividade física?'
+      },
+      {
+        field: 'parq_question_4',
+        question: 'Você apresenta algum desequilíbrio devido à tontura e/ou perda momentânea da consciência?'
+      },
+      {
+        field: 'parq_question_5',
+        question: 'Você possui algum problema ósseo ou articular, que pode ser afetado ou agravado pela atividade física?'
+      },
+      {
+        field: 'parq_question_6',
+        question: 'Você toma atualmente algum tipo de medicação de uso contínuo?'
+      },
+      {
+        field: 'parq_question_7',
+        question: 'Você realiza algum tipo de tratamento médico para pressão arterial ou problemas cardíacos?'
+      },
+      {
+        field: 'parq_question_8',
+        question: 'Você realiza algum tratamento médico contínuo, que possa ser afetado ou prejudicado com a atividade física?'
+      },
+      {
+        field: 'parq_question_9',
+        question: 'Você já se submeteu a algum tipo de cirurgia, que comprometa de alguma forma a atividade física?'
+      },
+      {
+        field: 'parq_question_10',
+        question: 'Sabe de alguma outra razão pela qual a atividade física possa eventualmente comprometer sua saúde?'
+      }
+    ];
+
+    const hasParqCompleted = aluno?.parq_completed === true || aluno?.parq_completed === 'true';
+    const hasCompletionDate = aluno?.parq_completion_date;
+    const hasAnyParqAnswer = Array.from({ length: 10 }, (_, i) => i + 1).some(i => {
+      const value = aluno?.[`parq_question_${i}`];
+      return value === true || value === 'true' || value === false || value === 'false';
+    });
+
+    return (
+      <div>
+        <h2 style={styles.contentTitle}>
+          <span>📋</span>
+          Questionário PAR-Q
+        </h2>
+
+        <div style={{ fontSize: '14px', color: '#555', marginBottom: '16px', lineHeight: '1.5' }}>
+          Este Questionário tem por objetivo identificar a necessidade de avaliação por um médico antes do início
+          ou do aumento de nível da atividade física. Por favor, assinale "sim" ou "não" às seguintes perguntas:
+        </div>
+
+        {(hasParqCompleted || hasCompletionDate || hasAnyParqAnswer) ? (
+          <div style={{
+            backgroundColor: '#e8f5e9',
+            padding: '15px',
+            borderRadius: '8px',
+            marginBottom: '15px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            border: '1px solid #c8e6c9'
+          }}>
+            <span style={{ fontSize: '24px' }}>✅</span>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 'bold', color: '#2e7d32', marginBottom: '6px', fontSize: '16px' }}>
+                Questionário {hasParqCompleted || hasCompletionDate ? 'Completo' : 'Respondido'}
+              </div>
+              {hasCompletionDate && (
+                <div style={{ fontSize: '14px', color: '#424242', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <span style={{ fontWeight: 'bold' }}>Preenchido em:</span>
+                  <span style={{ color: '#1F6C86' }}>{formatParqDate(aluno.parq_completion_date)}</span>
+                </div>
+              )}
+              {!hasCompletionDate && (
+                <div style={{ fontSize: '14px', color: '#666', fontStyle: 'italic' }}>
+                  Data de preenchimento não disponível
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div style={{
+            padding: '20px',
+            backgroundColor: '#fff3cd',
+            borderRadius: '8px',
+            border: '1px solid #ffc107',
+            textAlign: 'center',
+            marginBottom: '15px'
+          }}>
+            <span style={{ fontSize: '36px', marginBottom: '8px', display: 'block' }}>📋</span>
+            <div style={{ fontSize: '16px', color: '#856404', marginBottom: '6px' }}>
+              <strong>Questionário PAR-Q Pendente</strong>
+            </div>
+            <div style={{ fontSize: '14px', color: '#666' }}>
+              Preencha o questionário para avaliar sua aptidão para atividade física.
+            </div>
+          </div>
+        )}
+
+        {!canFillParqAgain() && (
+          <div style={{
+            padding: '12px',
+            backgroundColor: '#fff3cd',
+            borderRadius: '4px',
+            marginBottom: '15px',
+            border: '1px solid #ffc107'
+          }}>
+            <div style={{ fontWeight: 'bold', color: '#856404', marginBottom: '5px' }}>
+              ⚠️ Questionário já preenchido
+            </div>
+            <div style={{ fontSize: '12px', color: '#856404' }}>
+              O questionário PAR-Q só pode ser preenchido uma vez por ano.
+              Último preenchimento: {formatParqDate(aluno?.parq_completion_date)}
+              {getDaysUntilCanFillParq() > 0 && (
+                <span> - Você poderá preencher novamente em {getDaysUntilCanFillParq()} dia(s).</span>
+              )}
+            </div>
+          </div>
+        )}
+
+        <form onSubmit={handleParqSubmit}>
+          {perguntasParq.map((item, index) => (
+            <div key={item.field} style={{ marginBottom: '15px', padding: '12px', border: '1px solid #ddd', borderRadius: '4px' }}>
+              <div style={{ marginBottom: '8px', fontSize: '13px', lineHeight: '1.3' }}>
+                <strong>{index + 1}.</strong> {item.question}
+              </div>
+              <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: canFillParqAgain() ? 'pointer' : 'not-allowed', opacity: canFillParqAgain() ? 1 : 0.6 }}>
+                  <input
+                    type="radio"
+                    name={item.field}
+                    value="true"
+                    checked={form[item.field] === true || form[item.field] === 'true'}
+                    onChange={handleChange}
+                    disabled={!canFillParqAgain()}
+                    style={{ margin: 0 }}
+                  />
+                  <span style={{ fontSize: '13px' }}>Sim</span>
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: canFillParqAgain() ? 'pointer' : 'not-allowed', opacity: canFillParqAgain() ? 1 : 0.6 }}>
+                  <input
+                    type="radio"
+                    name={item.field}
+                    value="false"
+                    checked={form[item.field] === false || form[item.field] === 'false' || form[item.field] === undefined || form[item.field] === null}
+                    onChange={handleChange}
+                    disabled={!canFillParqAgain()}
+                    style={{ margin: 0 }}
+                  />
+                  <span style={{ fontSize: '13px' }}>Não</span>
+                </label>
+              </div>
+            </div>
+          ))}
+
+          <div style={{ marginTop: '10px', padding: '8px', backgroundColor: '#f8f9fa', borderRadius: '4px', fontSize: '12px', color: '#666' }}>
+            <strong>Importante:</strong> Se você respondeu "Sim" a alguma pergunta, consulte seu médico antes de começar um programa de atividade física.
+          </div>
+
+          {Array.from({ length: 10 }, (_, i) => i + 1).some(i => form?.[`parq_question_${i}`]) && (
+            <div style={{
+              marginTop: '15px',
+              padding: '15px',
+              backgroundColor: '#fff3cd',
+              borderRadius: '8px',
+              border: '2px solid #ffc107'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                <span style={{ fontSize: '24px' }}>⚠️</span>
+                <div style={{ fontWeight: 'bold', color: '#856404', fontSize: '16px' }}>
+                  Atenção - Consulta Médica Necessária
+                </div>
+              </div>
+              <div style={{ fontSize: '14px', color: '#856404' }}>
+                Você respondeu "Sim" a pelo menos uma pergunta do PAR-Q.
+                É recomendado consultar um médico antes de iniciar ou intensificar atividades físicas.
+              </div>
+            </div>
+          )}
+
+          <div style={{ marginTop: '20px', display: 'flex', gap: '10px' }}>
+            <button 
+              type="submit" 
+              style={{
+                ...styles.primaryButton,
+                opacity: (canFillParqAgain() || !hasParqChanges()) ? 1 : 0.6,
+                cursor: (canFillParqAgain() || !hasParqChanges()) ? 'pointer' : 'not-allowed'
+              }}
+              disabled={!canFillParqAgain() && hasParqChanges()}
+            >
+              Salvar Questionário
+            </button>
+          </div>
+        </form>
+      </div>
+    );
+  };
 
   const renderCheckin = () => (
     <div>
@@ -1961,6 +1923,16 @@ function DashboardAluno({ user }) {
           <div
             style={{
               ...styles.menuItem,
+              ...(activeSection === 'parq' && styles.activeMenuItem)
+            }}
+            onClick={() => setActiveSection('parq')}
+          >
+            <span style={styles.menuIcon}>📋</span>
+            PAR-Q
+          </div>
+          <div
+            style={{
+              ...styles.menuItem,
               ...(activeSection === 'checkin' && styles.activeMenuItem)
             }}
             onClick={() => setActiveSection('checkin')}
@@ -2066,6 +2038,7 @@ function DashboardAluno({ user }) {
         <div className="dashboard-content-area" style={styles.contentArea}>
           {activeSection === 'dashboard' && renderDashboard()}
           {activeSection === 'perfil' && renderMeuPerfil()}
+          {activeSection === 'parq' && renderParq()}
           {activeSection === 'checkin' && renderCheckin()}
           {activeSection === 'pagamentos' && renderPagamentos()}
         </div>
