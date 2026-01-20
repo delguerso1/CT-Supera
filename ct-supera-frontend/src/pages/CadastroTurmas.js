@@ -17,6 +17,7 @@ function CadastroTurmas({ centroId, styles }) {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [centroNome, setCentroNome] = useState('');
+  const [diasCtPermitidos, setDiasCtPermitidos] = useState([]);
   const [showAddAluno, setShowAddAluno] = useState(false);
   const [showRemoveAluno, setShowRemoveAluno] = useState(false);
   const [turmaIdSelecionada, setTurmaIdSelecionada] = useState(null);
@@ -41,8 +42,10 @@ function CadastroTurmas({ centroId, styles }) {
     try {
       const response = await api.get(`cts/${centroId}/`);
       setCentroNome(response.data.nome);
+      setDiasCtPermitidos(response.data.dias_semana || []);
     } catch {
       setCentroNome('');
+      setDiasCtPermitidos([]);
     }
   };
 
@@ -430,13 +433,20 @@ function CadastroTurmas({ centroId, styles }) {
               required
             >
               {Array.isArray(diasSemana) && diasSemana.length > 0 ? (
-                diasSemana.map((dia) => (
+                diasSemana
+                  .filter((dia) => diasCtPermitidos.length === 0 || diasCtPermitidos.includes(dia.id))
+                  .map((dia) => (
                   <option key={dia.id} value={dia.id}>{dia.nome}</option>
                 ))
               ) : (
                 <option disabled>Carregando dias...</option>
               )}
             </select>
+            {diasCtPermitidos.length > 0 && (
+              <div style={{ fontSize: '0.85rem', color: '#666' }}>
+                Apenas dias de funcionamento do CT estão disponíveis.
+              </div>
+            )}
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>

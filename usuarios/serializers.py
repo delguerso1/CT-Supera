@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from usuarios.models import Usuario, PreCadastro
+from turmas.models import DiaSemana
 from financeiro.models import Mensalidade, Salario
 import re
 
@@ -27,6 +28,12 @@ class UsuarioSerializer(serializers.ModelSerializer):
     nome_completo = serializers.SerializerMethodField()
     tipo_display = serializers.SerializerMethodField()
     centros_treinamento = serializers.SerializerMethodField()
+    dias_habilitados = serializers.PrimaryKeyRelatedField(
+        queryset=DiaSemana.objects.all(),
+        many=True,
+        required=False
+    )
+    dias_habilitados_nomes = serializers.SerializerMethodField()
 
     def _formatar_nome(self, valor):
         if not valor:
@@ -49,6 +56,7 @@ class UsuarioSerializer(serializers.ModelSerializer):
             'tipo', 'tipo_display', 'nome_completo', 'telefone',
             'endereco', 'data_nascimento', 'ativo', 'is_active',
             'dia_vencimento', 'valor_mensalidade', 'cpf',
+            'plano', 'dias_habilitados', 'dias_habilitados_nomes',
             'nome_responsavel', 'telefone_responsavel', 'telefone_emergencia',
             'ficha_medica', 'salario_professor', 'pix_professor', 'foto_perfil',
             'centros_treinamento',
@@ -88,6 +96,9 @@ class UsuarioSerializer(serializers.ModelSerializer):
             return [{'id': ct['ct__id'], 'nome': ct['ct__nome']} for ct in cts]
         return []
 
+    def get_dias_habilitados_nomes(self, obj):
+        return [dia.nome for dia in obj.dias_habilitados.all()]
+
     def to_representation(self, instance):
         representation = super().to_representation(instance)
         representation['tipo'] = instance.tipo
@@ -100,6 +111,9 @@ class UsuarioSerializer(serializers.ModelSerializer):
             representation.pop('telefone_emergencia', None)
             representation.pop('dia_vencimento', None)
             representation.pop('valor_mensalidade', None)
+            representation.pop('plano', None)
+            representation.pop('dias_habilitados', None)
+            representation.pop('dias_habilitados_nomes', None)
             # Remove campos PAR-Q para professor e gerente
             for field in ['parq_question_1', 'parq_question_2', 'parq_question_3', 
                          'parq_question_4', 'parq_question_5', 'parq_question_6', 
@@ -113,11 +127,15 @@ class UsuarioSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         # Cria usuário inativo (será ativado via link)
         from usuarios.utils import enviar_convite_aluno
+        dias_habilitados = validated_data.pop('dias_habilitados', [])
         
         instance = self.Meta.model(**validated_data)
         instance.is_active = False  # Usuário inativo até ativar via link
         instance.set_unusable_password()  # Não define senha - usuário definirá via link
         instance.save()
+
+        if dias_habilitados:
+            instance.dias_habilitados.set(dias_habilitados)
         
         # Envia convite de ativação se o usuário tiver e-mail
         if instance.email:
@@ -137,6 +155,7 @@ class UsuarioSerializer(serializers.ModelSerializer):
         print(f"[DEBUG] Serializer update - validated_data: {validated_data}")
         print(f"[DEBUG] Serializer update - instance: {instance.id}")
         
+        dias_habilitados = validated_data.pop('dias_habilitados', None)
         dia_vencimento_antigo = instance.dia_vencimento
         valor_mensalidade_antigo = instance.valor_mensalidade
         password = validated_data.pop('password', None)
@@ -192,6 +211,9 @@ class UsuarioSerializer(serializers.ModelSerializer):
         if password is not None:
             instance.set_password(password)
         instance.save()
+
+        if dias_habilitados is not None:
+            instance.dias_habilitados.set(dias_habilitados)
         
         # Atualiza mensalidades pendentes se necessário
         if (
@@ -207,6 +229,25 @@ class UsuarioSerializer(serializers.ModelSerializer):
             attrs['first_name'] = self._formatar_nome(attrs['first_name'])
         if 'last_name' in attrs:
             attrs['last_name'] = self._formatar_nome(attrs['last_name'])
+        tipo = attrs.get('tipo', getattr(self.instance, 'tipo', None))
+        if tipo == 'aluno':
+            plano = attrs.get('plano', getattr(self.instance, 'plano', None))
+            dias = attrs.get('dias_habilitados', None)
+            if plano:
+                limite = Usuario(plano=plano).limite_aulas_semanais()
+                if limite:
+                    if plano in ['1x', '2x'] and dias is None:
+                        raise serializers.ValidationError({
+                            'dias_habilitados': 'Informe os dias habilitados para este plano.'
+                        })
+                    if dias is not None and len(dias) != limite:
+                        raise serializers.ValidationError({
+                            'dias_habilitados': f'O plano {plano} exige exatamente {limite} dia(s) habilitado(s).'
+                        })
+            elif dias is not None:
+                raise serializers.ValidationError({
+                    'plano': 'Informe o plano do aluno para definir os dias habilitados.'
+                })
         return attrs
 
 class PreCadastroSerializer(serializers.ModelSerializer):

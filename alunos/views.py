@@ -1,6 +1,6 @@
 from django.shortcuts import  get_object_or_404
 from financeiro.models import Mensalidade
-from datetime import date
+from datetime import date, timedelta
 from funcionarios.models import Presenca
 from turmas.models import Turma
 from rest_framework.views import APIView
@@ -68,6 +68,48 @@ class PainelAlunoAPIView(APIView):
     """API para exibir o painel do aluno."""
     permission_classes = [IsAuthenticated]
 
+    def _dia_semana_nome(self, data):
+        nomes = [
+            "Segunda-feira",
+            "Terça-feira",
+            "Quarta-feira",
+            "Quinta-feira",
+            "Sexta-feira",
+            "Sábado",
+            "Domingo"
+        ]
+        return nomes[data.weekday()]
+
+    def _validar_regras_checkin(self, aluno, turma, hoje):
+        if not aluno.plano:
+            return False, "Plano do aluno não configurado."
+
+        limite = aluno.limite_aulas_semanais()
+        if not limite:
+            return False, "Plano do aluno inválido."
+
+        if not aluno.dias_habilitados.exists():
+            return False, "Dias habilitados do aluno não configurados."
+
+        dia_nome = self._dia_semana_nome(hoje)
+        if not aluno.dias_habilitados.filter(nome=dia_nome).exists():
+            return False, "Hoje não é um dia habilitado para este aluno."
+
+        if turma and not turma.dias_semana.filter(nome=dia_nome).exists():
+            return False, "A turma do aluno não ocorre hoje."
+
+        inicio_semana = hoje - timedelta(days=hoje.weekday())
+        fim_semana = inicio_semana + timedelta(days=6)
+        checkins_semana = Presenca.objects.filter(
+            usuario=aluno,
+            data__range=(inicio_semana, fim_semana),
+            checkin_realizado=True
+        ).count()
+        if checkins_semana >= limite:
+            return False, "Limite semanal de check-ins atingido."
+
+        return True, None
+
     def get(self, request):
         usuario = request.user
         historico_aulas = Presenca.objects.filter(usuario=usuario).order_by('-data')
@@ -98,6 +140,9 @@ class PainelAlunoAPIView(APIView):
             data_vencimento__lt=hoje
         )
         pode_fazer_checkin = not (mensalidades_em_atraso.exists() or mensalidades_pendentes_vencidas.exists())
+        motivo_checkin_bloqueado = None
+        if pode_fazer_checkin:
+            pode_fazer_checkin, motivo_checkin_bloqueado = self._validar_regras_checkin(usuario, turma, hoje)
 
         return Response({
             "usuario": UsuarioSerializer(usuario).data,
@@ -109,7 +154,8 @@ class PainelAlunoAPIView(APIView):
             "status_hoje": {
                 "checkin_realizado": presenca_hoje.checkin_realizado if presenca_hoje else False,
                 "presenca_confirmada": presenca_hoje.presenca_confirmada if presenca_hoje else False,
-                "pode_fazer_checkin": pode_fazer_checkin
+                "pode_fazer_checkin": pode_fazer_checkin,
+                "motivo_checkin_bloqueado": motivo_checkin_bloqueado
             }
         })
 
@@ -153,6 +199,12 @@ class RealizarCheckinAPIView(APIView):
             return Response({
                 "error": "Você não está matriculado em nenhuma turma ativa."
             }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Regras de plano e dias habilitados
+        painel = PainelAlunoAPIView()
+        pode_checkin, motivo = painel._validar_regras_checkin(usuario, turma, hoje)
+        if not pode_checkin:
+            return Response({"error": motivo}, status=status.HTTP_403_FORBIDDEN)
 
         # Cria ou atualiza a presença com check-in realizado
         if presenca_existente:

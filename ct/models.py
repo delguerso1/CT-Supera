@@ -5,6 +5,12 @@ class CentroDeTreinamento(models.Model):
     nome = models.CharField(max_length=100, unique=True)
     endereco = models.TextField(blank=True)
     telefone = models.CharField(max_length=15, blank=True, null=True)
+    dias_semana = models.ManyToManyField(
+        'turmas.DiaSemana',
+        blank=True,
+        related_name='centros_treinamento',
+        help_text="Dias em que o CT funciona"
+    )
 
 
     def __str__(self):

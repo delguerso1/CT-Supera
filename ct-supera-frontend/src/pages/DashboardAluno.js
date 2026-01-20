@@ -406,7 +406,8 @@ function DashboardAluno({ user }) {
   const [statusHoje, setStatusHoje] = useState({
     checkin_realizado: false,
     presenca_confirmada: false,
-    pode_fazer_checkin: true
+    pode_fazer_checkin: true,
+    motivo_checkin_bloqueado: null
   });
   const [form, setForm] = useState({
     first_name: '',
@@ -452,7 +453,8 @@ function DashboardAluno({ user }) {
         setStatusHoje(resp.data.status_hoje || {
           checkin_realizado: false,
           presenca_confirmada: false,
-          pode_fazer_checkin: true
+          pode_fazer_checkin: true,
+          motivo_checkin_bloqueado: null
         });
         const parqRespondido = resp.data.usuario.parq_completed || resp.data.usuario.parq_completion_date;
         const getParqValue = (value) => (parqRespondido ? (value || false) : null);
@@ -697,7 +699,8 @@ function DashboardAluno({ user }) {
       setStatusHoje(resp.data.status_hoje || {
         checkin_realizado: false,
         presenca_confirmada: false,
-        pode_fazer_checkin: true
+        pode_fazer_checkin: true,
+        motivo_checkin_bloqueado: null
       });
     } catch (err) {
       console.error('Erro ao realizar check-in:', err);
@@ -992,9 +995,9 @@ function DashboardAluno({ user }) {
         <div style={{...styles.checkinCard, backgroundColor: '#fff3e0', borderColor: '#ff9800'}}>
           <div style={{...styles.checkinTitle, color: '#f57c00'}}>
             <span>⚠️</span>
-            Pagamento Pendente
+            Check-in bloqueado
           </div>
-          <p>Você possui pendências de pagamento. Regularize sua situação para fazer check-in.</p>
+          <p>{statusHoje.motivo_checkin_bloqueado || 'Você não pode realizar check-in hoje.'}</p>
         </div>
       )}
     </div>
@@ -1602,7 +1605,7 @@ function DashboardAluno({ user }) {
               borderRadius: 8,
               marginBottom: 8
             }}>
-              ⚠️ Você possui pendências de pagamento. Regularize sua situação para fazer check-in.
+              ⚠️ {statusHoje.motivo_checkin_bloqueado || 'Você não pode realizar check-in hoje.'}
             </div>
           )}
         </div>
@@ -1618,7 +1621,7 @@ function DashboardAluno({ user }) {
         >
           {checkinLoading ? 'Realizando check-in...' : 
            statusHoje.checkin_realizado ? 'Check-in Realizado' : 
-           !statusHoje.pode_fazer_checkin ? 'Pagamento Pendente' : 
+           !statusHoje.pode_fazer_checkin ? 'Check-in bloqueado' : 
            'Realizar Check-in'}
         </button>
       </div>

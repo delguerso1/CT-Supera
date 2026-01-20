@@ -7,15 +7,18 @@ function CadastroCentroTreinamento({ styles }) {
     nome: '',
     endereco: '',
     telefone: '',
+    dias_semana: [],
   });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [centros, setCentros] = useState([]);
   const [editId, setEditId] = useState(null);
   const [showForm, setShowForm] = useState(false);
+  const [diasSemana, setDiasSemana] = useState([]);
 
   useEffect(() => {
     fetchCentros();
+    fetchDiasSemana();
   }, []);
 
   const fetchCentros = async () => {
@@ -27,6 +30,16 @@ function CadastroCentroTreinamento({ styles }) {
     }
   };
 
+  const fetchDiasSemana = async () => {
+    try {
+      const response = await api.get('turmas/diassemana/');
+      const dias = Array.isArray(response.data) ? response.data : [];
+      setDiasSemana(dias);
+    } catch {
+      setDiasSemana([]);
+    }
+  };
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({
@@ -35,19 +48,41 @@ function CadastroCentroTreinamento({ styles }) {
     }));
   };
 
+  const handleToggleDia = (diaId) => {
+    setFormData(prev => {
+      const jaSelecionado = prev.dias_semana.includes(diaId);
+      return {
+        ...prev,
+        dias_semana: jaSelecionado
+          ? prev.dias_semana.filter(id => id !== diaId)
+          : [...prev.dias_semana, diaId],
+      };
+    });
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setSuccess('');
+    if (!formData.dias_semana.length) {
+      setError('Selecione pelo menos um dia de funcionamento.');
+      return;
+    }
     try {
       if (editId) {
-        await api.put(`cts/editar/${editId}/`, formData);
+        await api.put(`cts/editar/${editId}/`, {
+          ...formData,
+          dias_semana: formData.dias_semana.map(Number),
+        });
         setSuccess('Centro de treinamento atualizado com sucesso!');
       } else {
-        await api.post('cts/criar/', formData);
+        await api.post('cts/criar/', {
+          ...formData,
+          dias_semana: formData.dias_semana.map(Number),
+        });
         setSuccess('Centro de treinamento cadastrado com sucesso!');
       }
-      setFormData({ nome: '', endereco: '', telefone: '' });
+      setFormData({ nome: '', endereco: '', telefone: '', dias_semana: [] });
       setEditId(null);
       setShowForm(false);
       fetchCentros();
@@ -61,6 +96,7 @@ function CadastroCentroTreinamento({ styles }) {
       nome: centro.nome,
       endereco: centro.endereco,
       telefone: centro.telefone,
+      dias_semana: centro.dias_semana || [],
     });
     setEditId(centro.id);
     setShowForm(true);
@@ -81,7 +117,7 @@ function CadastroCentroTreinamento({ styles }) {
   };
 
   const handleNovoCentro = () => {
-    setFormData({ nome: '', endereco: '', telefone: '' });
+    setFormData({ nome: '', endereco: '', telefone: '', dias_semana: [] });
     setEditId(null);
     setShowForm(true);
     setError('');
@@ -121,13 +157,14 @@ function CadastroCentroTreinamento({ styles }) {
               <th style={{ padding: 10, borderBottom: '2px solid #eee', textAlign: 'left' }}>Nome</th>
               <th style={{ padding: 10, borderBottom: '2px solid #eee', textAlign: 'left' }}>Endereço</th>
               <th style={{ padding: 10, borderBottom: '2px solid #eee', textAlign: 'left' }}>Telefone</th>
+              <th style={{ padding: 10, borderBottom: '2px solid #eee', textAlign: 'left' }}>Dias</th>
               <th style={{ padding: 10, borderBottom: '2px solid #eee', textAlign: 'center' }}>Ações</th>
             </tr>
           </thead>
           <tbody>
             {centros.length === 0 && (
               <tr>
-                <td colSpan={4} style={{ color: '#888', padding: 12, textAlign: 'center' }}>
+                <td colSpan={5} style={{ color: '#888', padding: 12, textAlign: 'center' }}>
                   Nenhum centro cadastrado.
                 </td>
               </tr>
@@ -149,6 +186,9 @@ function CadastroCentroTreinamento({ styles }) {
                 </td>
                 <td style={{ padding: 10 }}>{centro.endereco}</td>
                 <td style={{ padding: 10 }}>{centro.telefone}</td>
+                <td style={{ padding: 10 }}>
+                  {centro.dias_semana_nomes?.length ? centro.dias_semana_nomes.join(', ') : '-'}
+                </td>
                 <td style={{ padding: 10, textAlign: 'center' }}>
                   <div className="centro-treinamento-actions" style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', flexWrap: 'wrap' }}>
                     <button
@@ -217,7 +257,7 @@ function CadastroCentroTreinamento({ styles }) {
             if (e.target === e.currentTarget) {
               setShowForm(false);
               setEditId(null);
-              setFormData({ nome: '', endereco: '', telefone: '' });
+              setFormData({ nome: '', endereco: '', telefone: '', dias_semana: [] });
               setError('');
               setSuccess('');
             }
@@ -322,13 +362,36 @@ function CadastroCentroTreinamento({ styles }) {
                 />
               </div>
 
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontWeight: 500, fontSize: '0.9rem', color: '#555' }}>
+                  Dias de funcionamento *
+                </label>
+                <div style={{ display: 'grid', gap: '8px' }}>
+                  {diasSemana.map(dia => (
+                    <label key={dia.id} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <input
+                        type="checkbox"
+                        checked={formData.dias_semana.includes(dia.id)}
+                        onChange={() => handleToggleDia(dia.id)}
+                      />
+                      {dia.nome}
+                    </label>
+                  ))}
+                </div>
+                {diasSemana.length === 0 && (
+                  <div style={{ fontSize: '0.85rem', color: '#999' }}>
+                    Nenhum dia da semana disponível.
+                  </div>
+                )}
+              </div>
+
               <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
                 <button
                   type="button"
                   onClick={() => {
                     setShowForm(false);
                     setEditId(null);
-                    setFormData({ nome: '', endereco: '', telefone: '' });
+                    setFormData({ nome: '', endereco: '', telefone: '', dias_semana: [] });
                     setError('');
                     setSuccess('');
                   }}

@@ -10,6 +10,7 @@ from django.contrib.auth.tokens import default_token_generator
 from django.utils.http import urlsafe_base64_decode
 from django.contrib.auth.forms import SetPasswordForm
 from usuarios.models import Usuario, PreCadastro
+from turmas.models import DiaSemana
 from usuarios.forms import DefinirSenhaForm
 from usuarios.serializers import DefinirSenhaSerializer, SolicitarRecuperacaoSenhaSerializer, RedefinirSenhaSerializer
 from financeiro.models import Mensalidade
@@ -106,6 +107,7 @@ class FinalizarAgendamentoAPIView(APIView):
         cpf = request.data.get("cpf") or precadastro.cpf
         dia_vencimento = request.data.get("dia_vencimento")
         plano = request.data.get("plano")
+        dias_habilitados_ids = request.data.get("dias_habilitados")
         valor_mensalidade = request.data.get("valor_mensalidade")
         valor_primeira_mensalidade = request.data.get("valor_primeira_mensalidade")
         plano_familia = request.data.get("plano_familia")
@@ -114,6 +116,7 @@ class FinalizarAgendamentoAPIView(APIView):
         print(f"[DEBUG] CPF: {cpf}")
         print(f"[DEBUG] Dia vencimento: {dia_vencimento}")
         print(f"[DEBUG] Plano: {plano}")
+        print(f"[DEBUG] Dias habilitados: {dias_habilitados_ids}")
         print(f"[DEBUG] Valor mensalidade: {valor_mensalidade}")
         print(f"[DEBUG] Valor primeira mensalidade: {valor_primeira_mensalidade}")
         print(f"[DEBUG] Plano família: {plano_familia}")
@@ -130,6 +133,38 @@ class FinalizarAgendamentoAPIView(APIView):
             return Response({"error": "Dia de vencimento inválido."}, status=status.HTTP_400_BAD_REQUEST)
         if dia_vencimento not in [1, 5, 10]:
             return Response({"error": "Dia de vencimento deve ser 1, 5 ou 10."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if plano not in ["3x", "2x", "1x"]:
+            return Response({"error": "Plano inválido. Use 3x, 2x ou 1x."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if dias_habilitados_ids is not None:
+            if isinstance(dias_habilitados_ids, str):
+                dias_habilitados_ids = [d.strip() for d in dias_habilitados_ids.split(",") if d.strip()]
+            if not isinstance(dias_habilitados_ids, list):
+                return Response({"error": "Dias habilitados inválidos."}, status=status.HTTP_400_BAD_REQUEST)
+            try:
+                dias_habilitados_ids = [int(dia_id) for dia_id in dias_habilitados_ids]
+            except (TypeError, ValueError):
+                return Response({"error": "Dias habilitados inválidos."}, status=status.HTTP_400_BAD_REQUEST)
+
+        limite_plano = {"3x": 3, "2x": 2, "1x": 1}[plano]
+        if plano in ["1x", "2x"]:
+            if not dias_habilitados_ids:
+                return Response({"error": "Informe os dias habilitados para o plano selecionado."}, status=status.HTTP_400_BAD_REQUEST)
+            if len(dias_habilitados_ids) != limite_plano:
+                return Response({"error": f"O plano {plano} exige exatamente {limite_plano} dia(s) habilitado(s)."}, status=status.HTTP_400_BAD_REQUEST)
+        elif dias_habilitados_ids and len(dias_habilitados_ids) != limite_plano:
+            return Response({"error": f"O plano {plano} exige exatamente {limite_plano} dia(s) habilitado(s)."}, status=status.HTTP_400_BAD_REQUEST)
+
+        dias_habilitados = None
+        if dias_habilitados_ids:
+            dias_habilitados = list(DiaSemana.objects.filter(id__in=dias_habilitados_ids))
+            if len(dias_habilitados) != len(set(dias_habilitados_ids)):
+                return Response({"error": "Um ou mais dias habilitados são inválidos."}, status=status.HTTP_400_BAD_REQUEST)
+        elif plano == "3x":
+            dias_habilitados = list(DiaSemana.objects.all())
+            if not dias_habilitados:
+                return Response({"error": "Não há dias da semana cadastrados para habilitar o plano."}, status=status.HTTP_400_BAD_REQUEST)
 
         plano_valores = {
             "3x": Decimal("150.00"),
@@ -168,7 +203,9 @@ class FinalizarAgendamentoAPIView(APIView):
             usuario_aluno = precadastro.converter_para_aluno(
                 request.user,
                 dia_vencimento=dia_vencimento,
-                valor_mensalidade=valor_mensalidade
+                valor_mensalidade=valor_mensalidade,
+                plano=plano,
+                dias_habilitados=dias_habilitados
             )
             if usuario_aluno:
                 criar_mensalidades_matricula(
@@ -425,6 +462,11 @@ class ListarCriarUsuariosAPIView(ListCreateAPIView):
 
     def create(self, request, *args, **kwargs):
         try:
+            if request.user.tipo == "gerente" and request.data.get("tipo") == "aluno":
+                return Response(
+                    {"error": "Gerentes devem criar alunos via pré-cadastro e matrícula."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
             serializer = self.get_serializer(data=request.data)
             serializer.is_valid(raise_exception=True)
             instance = serializer.save()

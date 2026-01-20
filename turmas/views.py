@@ -10,6 +10,25 @@ from .serializers import TurmaSerializer, UsuarioSerializer, DiaSemanaSerializer
 from django.db import models
 
 
+def _validar_aluno_turma(aluno, turma):
+    if not aluno.plano:
+        return False, "Aluno sem plano configurado."
+    limite = aluno.limite_aulas_semanais()
+    if not limite:
+        return False, "Plano do aluno inválido."
+    if not aluno.dias_habilitados.exists():
+        return False, "Dias habilitados do aluno não configurados."
+
+    dias_turma = set(turma.dias_semana.values_list('id', flat=True))
+    dias_aluno = set(aluno.dias_habilitados.values_list('id', flat=True))
+    if len(dias_turma) > limite:
+        return False, f"Turma exige {len(dias_turma)} dia(s), acima do plano {aluno.plano}."
+    if not dias_turma.issubset(dias_aluno):
+        return False, "Dias da turma não estão dentro dos dias habilitados do aluno."
+
+    return True, None
+
+
 class ListaCriarTurmasAPIView(ListCreateAPIView):
     """API para listar e criar turmas."""
     queryset = Turma.objects.all()
@@ -96,6 +115,22 @@ class AdicionarAlunoAPIView(APIView):
         alunos = Usuario.objects.filter(id__in=alunos_ids, tipo="aluno", ativo=True)
         if not alunos.exists():
             return Response({"error": "Nenhum aluno válido foi encontrado."}, status=status.HTTP_400_BAD_REQUEST)
+
+        alunos_invalidos = []
+        for aluno in alunos:
+            ok, motivo = _validar_aluno_turma(aluno, turma)
+            if not ok:
+                alunos_invalidos.append({
+                    "id": aluno.id,
+                    "nome": f"{aluno.first_name} {aluno.last_name}".strip(),
+                    "motivo": motivo
+                })
+
+        if alunos_invalidos:
+            return Response(
+                {"error": "Há alunos que não podem ser adicionados à turma.", "alunos_invalidos": alunos_invalidos},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         turma.alunos.add(*alunos)
         return Response({"message": "Alunos adicionados com sucesso!"}, status=status.HTTP_200_OK)

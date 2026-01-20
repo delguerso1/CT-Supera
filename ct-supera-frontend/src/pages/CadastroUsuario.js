@@ -194,6 +194,7 @@ function CadastroUsuario({ onUserChange }) {
   const [salarioProfessor, setSalarioProfessor] = useState('');
   const [pixProfessor, setPixProfessor] = useState('');
   const [centrosTreinamento, setCentrosTreinamento] = useState([]);
+  const [diasSemana, setDiasSemana] = useState([]);
   const [filtroCtSelecionado, setFiltroCtSelecionado] = useState('');
   const [showParqModal, setShowParqModal] = useState(false);
   const [selectedParqUser, setSelectedParqUser] = useState(null);
@@ -207,6 +208,7 @@ function CadastroUsuario({ onUserChange }) {
     plano: '3x',
     valor_primeira_mensalidade: '150.00',
     plano_familia: false,
+    dias_habilitados: [],
   });
 
   const PLANO_VALORES = {
@@ -215,7 +217,30 @@ function CadastroUsuario({ onUserChange }) {
     '1x': 110.00,
   };
 
+  const PLANO_LIMITES = {
+    '3x': 3,
+    '2x': 2,
+    '1x': 1,
+  };
+
   // Defina fetchUsers usando useCallback
+  const fetchAllPages = async (initialUrl) => {
+    let resultados = [];
+    let nextUrl = initialUrl;
+    while (nextUrl) {
+      const response = await api.get(nextUrl);
+      const data = response.data;
+      if (data && data.results) {
+        resultados = resultados.concat(data.results);
+        nextUrl = data.next ? data.next.replace(api.defaults.baseURL, '') : null;
+      } else {
+        resultados = data;
+        nextUrl = null;
+      }
+    }
+    return resultados;
+  };
+
   const fetchUsers = useCallback(async () => {
     try {
       setLoading(true);
@@ -225,13 +250,9 @@ function CadastroUsuario({ onUserChange }) {
 
       if (activeTab === 'precadastros') {
         console.log('[DEBUG] Buscando pré-cadastros...');
-        const response = await api.get('usuarios/precadastros/');
-        console.log('[DEBUG] Resposta pré-cadastros:', response.data);
-        if (response.data && response.data.results) {
-          setUsers(response.data.results);
-        } else {
-          setUsers(response.data);
-        }
+        const resultados = await fetchAllPages('usuarios/precadastros/');
+        console.log('[DEBUG] Total pré-cadastros:', Array.isArray(resultados) ? resultados.length : 0);
+        setUsers(resultados);
       } else {
         console.log('[DEBUG] Buscando usuários...');
         const tipoMap = {
@@ -241,17 +262,13 @@ function CadastroUsuario({ onUserChange }) {
         };
         const tipoEsperado = tipoMap[activeTab];
         console.log('[DEBUG] Tipo esperado:', tipoEsperado);
-        
-        const response = await api.get(`usuarios/?tipo=${tipoEsperado}`);
-        console.log('[DEBUG] Resposta completa:', response);
-        console.log('[DEBUG] Dados recebidos:', response.data);
-        
-        if (response.data && response.data.results) {
-          setUsers(response.data.results);
-        } else if (Array.isArray(response.data)) {
-          setUsers(response.data);
+
+        const resultados = await fetchAllPages(`usuarios/?tipo=${tipoEsperado}`);
+        console.log('[DEBUG] Total usuários:', Array.isArray(resultados) ? resultados.length : 0);
+        if (Array.isArray(resultados)) {
+          setUsers(resultados);
         } else {
-          console.error('[DEBUG] Formato de resposta inválido:', response.data);
+          console.error('[DEBUG] Formato de resposta inválido:', resultados);
           setError('Formato de resposta inválido do servidor');
         }
       }
@@ -286,6 +303,21 @@ function CadastroUsuario({ onUserChange }) {
       }
     };
     fetchCentros();
+  }, []);
+
+  // Buscar dias da semana para matrícula
+  useEffect(() => {
+    const fetchDiasSemana = async () => {
+      try {
+        const response = await api.get('turmas/diassemana/');
+        const dias = Array.isArray(response.data) ? response.data : [];
+        setDiasSemana(dias);
+      } catch (error) {
+        console.error('[DEBUG] Erro ao carregar dias da semana:', error);
+        setDiasSemana([]);
+      }
+    };
+    fetchDiasSemana();
   }, []);
 
   const calcularIdade = (dataNascimento) => {
@@ -577,6 +609,13 @@ function CadastroUsuario({ onUserChange }) {
     // setMensalidade(null);
     // setValorMensalidade('');
     
+    // Bloqueia criação direta de aluno
+    if (activeTab === 'alunos') {
+      setError('Crie um pré-cadastro e finalize a matrícula para gerar o aluno.');
+      setSuccess('');
+      return;
+    }
+
     // Define o tipo baseado na aba ativa
     let tipoUsuario = 'aluno'; // padrão
     if (activeTab === 'professores') {
@@ -625,6 +664,7 @@ function CadastroUsuario({ onUserChange }) {
       plano: planoPadrao,
       valor_primeira_mensalidade: PLANO_VALORES[planoPadrao].toFixed(2),
       plano_familia: false,
+      dias_habilitados: [],
     });
     setError('');
     setSuccess('');
@@ -647,10 +687,12 @@ function CadastroUsuario({ onUserChange }) {
       return;
     }
     if (name === 'plano') {
+      const limite = PLANO_LIMITES[value] || 0;
       setMatriculaForm(prev => ({
         ...prev,
         plano: value,
         valor_primeira_mensalidade: PLANO_VALORES[value].toFixed(2),
+        dias_habilitados: prev.dias_habilitados.slice(0, limite),
       }));
       return;
     }
@@ -658,6 +700,27 @@ function CadastroUsuario({ onUserChange }) {
       ...prev,
       [name]: value,
     }));
+  };
+
+  const handleToggleDia = (diaId) => {
+    const limite = PLANO_LIMITES[matriculaForm.plano] || 0;
+    setMatriculaForm(prev => {
+      const jaSelecionado = prev.dias_habilitados.includes(diaId);
+      if (jaSelecionado) {
+        return {
+          ...prev,
+          dias_habilitados: prev.dias_habilitados.filter(id => id !== diaId),
+        };
+      }
+      if (prev.dias_habilitados.length >= limite) {
+        setError(`O plano ${prev.plano} permite apenas ${limite} dia(s).`);
+        return prev;
+      }
+      return {
+        ...prev,
+        dias_habilitados: [...prev.dias_habilitados, diaId],
+      };
+    });
   };
 
   const handleConfirmMatricula = async () => {
@@ -679,6 +742,11 @@ function CadastroUsuario({ onUserChange }) {
       setError('Informe o valor da primeira mensalidade.');
       return;
     }
+    const limitePlano = PLANO_LIMITES[matriculaForm.plano] || 0;
+    if (['1x', '2x'].includes(matriculaForm.plano) && matriculaForm.dias_habilitados.length !== limitePlano) {
+      setError(`Selecione exatamente ${limitePlano} dia(s) para o plano escolhido.`);
+      return;
+    }
     try {
       setMatriculaLoading(true);
       setError('');
@@ -688,6 +756,9 @@ function CadastroUsuario({ onUserChange }) {
         valor_primeira_mensalidade: parseFloat(matriculaForm.valor_primeira_mensalidade),
         plano_familia: Boolean(matriculaForm.plano_familia),
       };
+      if (matriculaForm.dias_habilitados.length > 0) {
+        payload.dias_habilitados = matriculaForm.dias_habilitados;
+      }
       if (matriculaForm.cpf) {
         payload.cpf = matriculaForm.cpf;
       }
@@ -1468,6 +1539,31 @@ function CadastroUsuario({ onUserChange }) {
                   <option value="1x">1 vez na semana (R$ 110,00)</option>
                 </select>
               </div>
+
+              {['1x', '2x'].includes(matriculaForm.plano) && (
+                <div style={styles.formGroup}>
+                  <label style={styles.label}>
+                    Dias habilitados ({matriculaForm.dias_habilitados.length}/{PLANO_LIMITES[matriculaForm.plano] || 0})
+                  </label>
+                  <div style={{ display: 'grid', gap: '8px' }}>
+                    {diasSemana.map(dia => (
+                      <label key={dia.id} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <input
+                          type="checkbox"
+                          checked={matriculaForm.dias_habilitados.includes(dia.id)}
+                          onChange={() => handleToggleDia(dia.id)}
+                        />
+                        {dia.nome}
+                      </label>
+                    ))}
+                  </div>
+                  {diasSemana.length === 0 && (
+                    <div style={{ fontSize: '0.85rem', color: '#999' }}>
+                      Nenhum dia da semana disponível.
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div style={styles.formGroup}>
                 <label style={styles.label} htmlFor="matricula_valor_primeira">

@@ -73,6 +73,31 @@ class TurmaSerializer(serializers.ModelSerializer):
             # Converte para o formato que o modelo espera
         return super().to_internal_value(data)
 
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        dias_semana = attrs.get('dias_semana')
+        ct = attrs.get('ct')
+
+        if dias_semana is None and self.instance:
+            dias_semana = self.instance.dias_semana.all()
+        if ct is None and self.instance:
+            ct = self.instance.ct
+
+        if not dias_semana:
+            raise serializers.ValidationError({
+                'dias_semana': 'Informe os dias da semana da turma.'
+            })
+
+        if ct and ct.dias_semana.exists():
+            dias_turma_ids = {dia.id for dia in dias_semana}
+            dias_ct_ids = set(ct.dias_semana.values_list('id', flat=True))
+            if not dias_turma_ids.issubset(dias_ct_ids):
+                raise serializers.ValidationError({
+                    'dias_semana': 'Os dias da turma devem estar dentro dos dias de funcionamento do CT.'
+                })
+
+        return attrs
+
 class DiaSemanaSerializer(serializers.ModelSerializer):
     class Meta:
         model = DiaSemana

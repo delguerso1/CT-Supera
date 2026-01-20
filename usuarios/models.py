@@ -38,7 +38,7 @@ class PreCadastro(models.Model):
     def __str__(self):
         return f"{self.first_name} {self.last_name or ''}".strip()
 
-    def converter_para_aluno(self, usuario, dia_vencimento=None, valor_mensalidade=None):
+    def converter_para_aluno(self, usuario, dia_vencimento=None, valor_mensalidade=None, plano=None, dias_habilitados=None):
         """Transforma o PreCadastro diretamente em um Usuario (Aluno). Apenas professores ou gerentes podem finalizar."""
         if usuario.tipo not in ['professor', 'gerente']:
             raise PermissionDenied("⚠️ Apenas professores e gerentes podem finalizar o agendamento.")
@@ -80,10 +80,13 @@ class PreCadastro(models.Model):
                 telefone_emergencia=telefone_emergencia,
                 dia_vencimento=dia_vencimento,
                 valor_mensalidade=valor_mensalidade,
+                plano=plano,
             )
             usuario_aluno.is_active = False  # Usuário inativo até ativar via link
             usuario_aluno.set_unusable_password()  # Não define senha válida
             usuario_aluno.save()
+            if dias_habilitados:
+                usuario_aluno.dias_habilitados.set(dias_habilitados)
             self.usuario = usuario_aluno
             self.status = 'matriculado'  # Atualiza o status para matriculado
             self.save()
@@ -104,6 +107,12 @@ class Usuario(AbstractUser):
         ('gerente', 'Gerente'),
         ('professor', 'Professor'),
         ('aluno', 'Aluno'),
+    ]
+
+    PLANO_CHOICES = [
+        ('3x', '3 vezes na semana'),
+        ('2x', '2 vezes na semana'),
+        ('1x', '1 vez na semana'),
     ]
     
     username = models.CharField(max_length=14, unique=True, blank=False, null=False)  # 🔹 CPF sem formatação
@@ -144,12 +153,25 @@ class Usuario(AbstractUser):
     salario_professor = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, help_text="Salário do professor")
     pix_professor = models.CharField(max_length=255, null=True, blank=True, help_text="Chave PIX do professor para pagamentos")
 
+    # CAMPOS DO PLANO (apenas para alunos)
+    plano = models.CharField(max_length=2, choices=PLANO_CHOICES, null=True, blank=True, help_text="Plano semanal do aluno")
+    dias_habilitados = models.ManyToManyField('turmas.DiaSemana', blank=True, related_name='alunos_habilitados')
+
     def is_gerente(self):
         return self.tipo == "gerente"
     def is_professor(self):
         return self.tipo == "professor"
     def is_aluno(self):
         return self.tipo == "aluno"
+
+    def limite_aulas_semanais(self):
+        """Retorna o limite de aulas semanais de acordo com o plano."""
+        plano_limites = {
+            '3x': 3,
+            '2x': 2,
+            '1x': 1,
+        }
+        return plano_limites.get(self.plano)
 
     def get_parq_questions(self):
         """Retorna as perguntas do PAR-Q para o usuário."""
