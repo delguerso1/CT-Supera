@@ -187,7 +187,8 @@ const styles = {
     display: 'flex',
     gap: '12px',
     marginTop: '20px',
-    flexWrap: 'wrap'
+    flexWrap: 'nowrap',
+    overflowX: 'auto'
   },
   primaryButton: {
     backgroundColor: '#1F6C86',

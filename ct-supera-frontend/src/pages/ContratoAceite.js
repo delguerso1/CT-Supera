@@ -98,7 +98,7 @@ function ContratoAceite() {
         localStorage.setItem('user', JSON.stringify(response.data.user));
       }
       setSuccess('Contrato aceito com sucesso! Redirecionando...');
-      setTimeout(() => navigate('/dashboard/aluno'), 800);
+      navigate('/dashboard/aluno', { replace: true });
     } catch (err) {
       const message = err.response?.data?.error || 'Erro ao registrar aceite. Tente novamente.';
       setError(message);

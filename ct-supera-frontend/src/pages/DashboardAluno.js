@@ -203,7 +203,8 @@ const styles = {
     display: 'flex',
     gap: '12px',
     marginTop: '20px',
-    flexWrap: 'wrap'
+    flexWrap: 'nowrap',
+    overflowX: 'auto'
   },
   primaryButton: {
     backgroundColor: '#1F6C86',
@@ -453,6 +454,8 @@ function DashboardAluno({ user }) {
           presenca_confirmada: false,
           pode_fazer_checkin: true
         });
+        const parqRespondido = resp.data.usuario.parq_completed || resp.data.usuario.parq_completion_date;
+        const getParqValue = (value) => (parqRespondido ? (value || false) : null);
         setForm({
           first_name: resp.data.usuario.first_name || '',
           last_name: resp.data.usuario.last_name || '',
@@ -463,16 +466,16 @@ function DashboardAluno({ user }) {
           nome_responsavel: resp.data.usuario.nome_responsavel || '',
           telefone_responsavel: resp.data.usuario.telefone_responsavel || '',
           telefone_emergencia: resp.data.usuario.telefone_emergencia || '',
-          parq_question_1: resp.data.usuario.parq_question_1 || false,
-          parq_question_2: resp.data.usuario.parq_question_2 || false,
-          parq_question_3: resp.data.usuario.parq_question_3 || false,
-          parq_question_4: resp.data.usuario.parq_question_4 || false,
-          parq_question_5: resp.data.usuario.parq_question_5 || false,
-          parq_question_6: resp.data.usuario.parq_question_6 || false,
-          parq_question_7: resp.data.usuario.parq_question_7 || false,
-          parq_question_8: resp.data.usuario.parq_question_8 || false,
-          parq_question_9: resp.data.usuario.parq_question_9 || false,
-          parq_question_10: resp.data.usuario.parq_question_10 || false
+          parq_question_1: getParqValue(resp.data.usuario.parq_question_1),
+          parq_question_2: getParqValue(resp.data.usuario.parq_question_2),
+          parq_question_3: getParqValue(resp.data.usuario.parq_question_3),
+          parq_question_4: getParqValue(resp.data.usuario.parq_question_4),
+          parq_question_5: getParqValue(resp.data.usuario.parq_question_5),
+          parq_question_6: getParqValue(resp.data.usuario.parq_question_6),
+          parq_question_7: getParqValue(resp.data.usuario.parq_question_7),
+          parq_question_8: getParqValue(resp.data.usuario.parq_question_8),
+          parq_question_9: getParqValue(resp.data.usuario.parq_question_9),
+          parq_question_10: getParqValue(resp.data.usuario.parq_question_10)
         });
       } catch (err) {
         console.error('Erro ao carregar dados:', err);
@@ -492,6 +495,8 @@ function DashboardAluno({ user }) {
 
   const handleCancel = () => {
     setEditMode(false);
+    const parqRespondido = aluno?.parq_completed || aluno?.parq_completion_date;
+    const getParqValue = (value) => (parqRespondido ? (value || false) : null);
     setForm({
       first_name: aluno?.first_name || '',
       last_name: aluno?.last_name || '',
@@ -502,16 +507,16 @@ function DashboardAluno({ user }) {
       nome_responsavel: aluno?.nome_responsavel || '',
       telefone_responsavel: aluno?.telefone_responsavel || '',
       telefone_emergencia: aluno?.telefone_emergencia || '',
-      parq_question_1: aluno?.parq_question_1 || false,
-      parq_question_2: aluno?.parq_question_2 || false,
-      parq_question_3: aluno?.parq_question_3 || false,
-      parq_question_4: aluno?.parq_question_4 || false,
-      parq_question_5: aluno?.parq_question_5 || false,
-      parq_question_6: aluno?.parq_question_6 || false,
-      parq_question_7: aluno?.parq_question_7 || false,
-      parq_question_8: aluno?.parq_question_8 || false,
-      parq_question_9: aluno?.parq_question_9 || false,
-      parq_question_10: aluno?.parq_question_10 || false
+      parq_question_1: getParqValue(aluno?.parq_question_1),
+      parq_question_2: getParqValue(aluno?.parq_question_2),
+      parq_question_3: getParqValue(aluno?.parq_question_3),
+      parq_question_4: getParqValue(aluno?.parq_question_4),
+      parq_question_5: getParqValue(aluno?.parq_question_5),
+      parq_question_6: getParqValue(aluno?.parq_question_6),
+      parq_question_7: getParqValue(aluno?.parq_question_7),
+      parq_question_8: getParqValue(aluno?.parq_question_8),
+      parq_question_9: getParqValue(aluno?.parq_question_9),
+      parq_question_10: getParqValue(aluno?.parq_question_10)
     });
     setSuccess('');
     setErro('');
@@ -1384,10 +1389,7 @@ function DashboardAluno({ user }) {
 
     const hasParqCompleted = aluno?.parq_completed === true || aluno?.parq_completed === 'true';
     const hasCompletionDate = aluno?.parq_completion_date;
-    const hasAnyParqAnswer = Array.from({ length: 10 }, (_, i) => i + 1).some(i => {
-      const value = aluno?.[`parq_question_${i}`];
-      return value === true || value === 'true' || value === false || value === 'false';
-    });
+    const hasParqResposta = hasParqCompleted || hasCompletionDate;
 
     return (
       <div>
@@ -1401,7 +1403,7 @@ function DashboardAluno({ user }) {
           ou do aumento de nível da atividade física. Por favor, assinale "sim" ou "não" às seguintes perguntas:
         </div>
 
-        {(hasParqCompleted || hasCompletionDate || hasAnyParqAnswer) ? (
+        {hasParqResposta ? (
           <div style={{
             backgroundColor: '#e8f5e9',
             padding: '15px',
@@ -1494,7 +1496,7 @@ function DashboardAluno({ user }) {
                     type="radio"
                     name={item.field}
                     value="false"
-                    checked={form[item.field] === false || form[item.field] === 'false' || form[item.field] === undefined || form[item.field] === null}
+                    checked={form[item.field] === false || form[item.field] === 'false'}
                     onChange={handleChange}
                     disabled={!canFillParqAgain()}
                     style={{ margin: 0 }}

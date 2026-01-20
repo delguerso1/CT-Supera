@@ -74,12 +74,13 @@ const styles = {
     color: '#666',
   },
   actionButton: {
-    padding: '0.35rem 0.7rem',
+    padding: '0.3rem 0.6rem',
     borderRadius: '4px',
     border: 'none',
     cursor: 'pointer',
     marginRight: '0.5rem',
-    fontSize: '0.8rem',
+    fontSize: '0.75rem',
+    whiteSpace: 'nowrap',
   },
   avatar: {
     width: '36px',
@@ -321,6 +322,16 @@ function CadastroUsuario({ onUserChange }) {
       hour: '2-digit',
       minute: '2-digit'
     });
+  };
+
+  const getFotoUrl = (foto) => {
+    if (!foto) return '';
+    if (foto.startsWith('http://') || foto.startsWith('https://')) {
+      return foto;
+    }
+    const base = MEDIA_URL.endsWith('/') ? MEDIA_URL.slice(0, -1) : MEDIA_URL;
+    const path = foto.startsWith('/') ? foto : `/${foto}`;
+    return `${base}${path}`;
   };
 
   const getInitials = (first, last) => {
@@ -886,11 +897,25 @@ function CadastroUsuario({ onUserChange }) {
                 {activeTab === 'alunos' && (
                   <td style={styles.td}>
                     {user.foto_perfil ? (
-                      <img
-                        src={`${MEDIA_URL}${user.foto_perfil}`}
-                        alt="Foto do aluno"
-                        style={{ ...styles.avatar, objectFit: 'cover' }}
-                      />
+                      <div style={{ display: 'inline-flex', alignItems: 'center' }}>
+                        <img
+                          src={getFotoUrl(user.foto_perfil)}
+                          alt="Foto do aluno"
+                          style={{ ...styles.avatar, objectFit: 'cover' }}
+                          onLoad={(e) => {
+                            const fallback = e.currentTarget.nextSibling;
+                            if (fallback && fallback.style) {
+                              fallback.style.display = 'none';
+                            }
+                          }}
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                          }}
+                        />
+                        <div style={styles.avatar}>
+                          {getInitials(user.first_name, user.last_name)}
+                        </div>
+                      </div>
                     ) : (
                       <div style={styles.avatar}>
                         {getInitials(user.first_name, user.last_name)}
@@ -979,7 +1004,7 @@ function CadastroUsuario({ onUserChange }) {
                   <td style={styles.td}>{user.status || '-'}</td>
                 )}
                 <td style={styles.td}>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                  <div style={{ display: 'flex', flexWrap: 'nowrap', gap: '0.35rem', overflowX: 'auto' }}>
                     <button
                       style={{ ...styles.actionButton, ...styles.editButton }}
                       onClick={() => handleEdit(user)}
@@ -1261,18 +1286,19 @@ function CadastroUsuario({ onUserChange }) {
                     <label style={styles.label} htmlFor="diaVencimento">
                       Dia de Vencimento da Mensalidade
                     </label>
-                    <input
-                      type="number"
+                    <select
                       id="diaVencimento"
                       name="diaVencimento"
                       value={diaVencimento}
                       onChange={e => setDiaVencimento(e.target.value)}
-                      style={styles.input}
-                      min="1"
-                      max="31"
-                      placeholder="Ex: 10"
+                      style={styles.select}
                       required={activeTab !== 'precadastros'}
-                    />
+                    >
+                      <option value="">Selecione</option>
+                      <option value="1">Dia 1</option>
+                      <option value="5">Dia 5</option>
+                      <option value="10">Dia 10</option>
+                    </select>
                   </div>
                   <div style={styles.formGroup}>
                     <label style={styles.label} htmlFor="valorMensalidadeNovo">
