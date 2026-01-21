@@ -230,6 +230,13 @@ class UsuarioSerializer(serializers.ModelSerializer):
         if 'last_name' in attrs:
             attrs['last_name'] = self._formatar_nome(attrs['last_name'])
         tipo = attrs.get('tipo', getattr(self.instance, 'tipo', None))
+        cpf = attrs.get('cpf', getattr(self.instance, 'cpf', None))
+        if not cpf:
+            raise serializers.ValidationError({
+                'cpf': 'CPF é obrigatório para este tipo de usuário.'
+            })
+        if 'username' not in attrs:
+            attrs['username'] = re.sub(r'\D', '', str(cpf))
         if tipo == 'aluno' and ('plano' in attrs or 'dias_habilitados' in attrs):
             plano = attrs.get('plano', getattr(self.instance, 'plano', None))
             dias = attrs.get('dias_habilitados', None)

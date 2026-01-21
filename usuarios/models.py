@@ -324,6 +324,7 @@ class Usuario(AbstractUser):
                 elif idade >= 18 and not self.telefone_emergencia:
                     raise ValidationError({"telefone_emergencia": "Alunos maiores de idade devem ter um telefone de emergência."})
 
+
     def save(self, *args, **kwargs):
         """Remove pontos do CPF e define `username` baseado nele."""
         self.cpf = self.cpf.replace(".", "").replace("-", "")  # 🔹 Remove pontos e traços ao salvar
