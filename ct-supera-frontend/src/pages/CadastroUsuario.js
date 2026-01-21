@@ -740,7 +740,7 @@ function CadastroUsuario({ onUserChange }) {
 
   const handleConfirmMatricula = async () => {
     if (!matriculaPrecadastro) return;
-    const precisaCpf = !matriculaPrecadastro.cpf;
+    const precisaCpf = !matriculaPrecadastro.cpf && !matriculaForm.ja_aluno;
     if (precisaCpf && !matriculaForm.cpf) {
       setError('Informe o CPF do aluno.');
       return;
@@ -784,7 +784,7 @@ function CadastroUsuario({ onUserChange }) {
       } else {
         payload.valor_mensalidade = parseFloat(matriculaForm.valor_mensalidade);
       }
-      if (matriculaForm.cpf) {
+      if (!matriculaForm.ja_aluno && matriculaForm.cpf) {
         payload.cpf = matriculaForm.cpf;
       }
       const response = await api.post(`usuarios/finalizar-agendamento/${matriculaPrecadastro.id}/`, payload);
@@ -1529,7 +1529,7 @@ function CadastroUsuario({ onUserChange }) {
                 </select>
               </div>
 
-              {!matriculaPrecadastro.cpf && (
+              {!matriculaForm.ja_aluno && !matriculaPrecadastro.cpf && (
                 <div style={styles.formGroup}>
                   <label style={styles.label} htmlFor="matricula_cpf">
                     CPF

@@ -19,7 +19,7 @@ from decimal import Decimal, InvalidOperation
 from .serializers import UsuarioSerializer, PreCadastroSerializer, MensalidadeSerializer, SalarioSerializer
 from datetime import date, timedelta
 from django.core.mail import send_mail
-from django.db import transaction, models
+from django.db import transaction
 import logging
 from calendar import monthrange
 
@@ -129,8 +129,6 @@ class FinalizarAgendamentoAPIView(APIView):
 
     def post(self, request, precadastro_id):
         precadastro = get_object_or_404(PreCadastro, id=precadastro_id)
-        if precadastro.usuario:
-            return Response({"error": "Este pré-cadastro já foi convertido em aluno."}, status=status.HTTP_400_BAD_REQUEST)
 
         cpf = request.data.get("cpf") or precadastro.cpf
         dia_vencimento = request.data.get("dia_vencimento")
@@ -142,7 +140,6 @@ class FinalizarAgendamentoAPIView(APIView):
         plano_familia = request.data.get("plano_familia")
         
         print(f"[DEBUG] Finalizando agendamento - PreCadastro ID: {precadastro_id}")
-        print(f"[DEBUG] CPF: {cpf}")
         print(f"[DEBUG] Dia vencimento: {dia_vencimento}")
         print(f"[DEBUG] Já é aluno: {ja_aluno}")
         print(f"[DEBUG] Plano: {plano}")
@@ -152,10 +149,18 @@ class FinalizarAgendamentoAPIView(APIView):
         print(f"[DEBUG] Plano família: {plano_familia}")
         print(f"[DEBUG] Data nascimento do pré-cadastro: {precadastro.data_nascimento}")
 
-        if cpf:
-            cpf = "".join([c for c in str(cpf) if c.isdigit()])
-        if not cpf or len(cpf) != 11:
-            return Response({"error": "CPF inválido ou não fornecido."}, status=status.HTTP_400_BAD_REQUEST)
+        ja_aluno_bool = bool(ja_aluno)
+        if isinstance(ja_aluno, str):
+            ja_aluno_bool = ja_aluno.strip().lower() in ["true", "1", "sim", "yes"]
+
+        if precadastro.usuario and not ja_aluno_bool:
+            return Response({"error": "Este pré-cadastro já foi convertido em aluno."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not ja_aluno_bool:
+            if cpf:
+                cpf = "".join([c for c in str(cpf) if c.isdigit()])
+            if not cpf or len(cpf) != 11:
+                return Response({"error": "CPF inválido ou não fornecido."}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             dia_vencimento = int(dia_vencimento)
@@ -163,10 +168,6 @@ class FinalizarAgendamentoAPIView(APIView):
             return Response({"error": "Dia de vencimento inválido."}, status=status.HTTP_400_BAD_REQUEST)
         if dia_vencimento not in [1, 5, 10]:
             return Response({"error": "Dia de vencimento deve ser 1, 5 ou 10."}, status=status.HTTP_400_BAD_REQUEST)
-
-        ja_aluno_bool = bool(ja_aluno)
-        if isinstance(ja_aluno, str):
-            ja_aluno_bool = ja_aluno.strip().lower() in ["true", "1", "sim", "yes"]
 
         if ja_aluno_bool:
             try:
@@ -184,14 +185,9 @@ class FinalizarAgendamentoAPIView(APIView):
             if valor_mensalidade <= 0:
                 return Response({"error": "Valor da mensalidade deve ser maior que zero."}, status=status.HTTP_400_BAD_REQUEST)
 
-            if not cpf:
-                return Response({"error": "Informe o CPF do aluno."}, status=status.HTTP_400_BAD_REQUEST)
-
-            aluno = Usuario.objects.filter(tipo="aluno").filter(
-                models.Q(cpf=cpf) | models.Q(username=cpf)
-            ).first()
+            aluno = precadastro.usuario
             if not aluno:
-                return Response({"error": "Aluno não encontrado para o CPF informado."}, status=status.HTTP_404_NOT_FOUND)
+                return Response({"error": "Pré-cadastro precisa estar vinculado a um aluno existente."}, status=status.HTTP_400_BAD_REQUEST)
 
             aluno.dia_vencimento = dia_vencimento
             aluno.valor_mensalidade = valor_mensalidade
