@@ -8,11 +8,15 @@ import {
   Mensalidade, 
   HistoricoPagamentos, 
   PainelAluno,
+  Despesa,
+  Salario,
+  FinanceiroDashboard,
   PixPayment,
   BoletoPayment,
   CheckoutPayment,
   VerificarCheckinResponse,
   RegistrarPresencaResponse,
+  HistoricoAulasProfessorResponse,
   PreCadastro,
   PainelGerente,
   CentroTreinamento,
@@ -325,13 +329,42 @@ export const financeiroService = {
     await api.delete(`financeiro/mensalidades/${id}/`);
   },
 
-  getDashboardStats: async (): Promise<any> => {
-    const response = await api.get('financeiro/dashboard/');
+  getDashboardStats: async (params?: any): Promise<FinanceiroDashboard> => {
+    const response = await api.get('financeiro/dashboard/', { params });
     return response.data;
   },
 
   getRelatorioFinanceiro: async (params?: any): Promise<any> => {
     const response = await api.get('financeiro/relatorio/', { params });
+    return response.data;
+  },
+
+  getDespesas: async (params?: any): Promise<Despesa[]> => {
+    const response = await api.get('financeiro/despesas/', { params });
+    return response.data.results || response.data.despesas || response.data;
+  },
+
+  criarDespesa: async (data: Partial<Despesa>): Promise<Despesa> => {
+    const response = await api.post('financeiro/despesas/', data);
+    return response.data;
+  },
+
+  atualizarDespesa: async (id: number, data: Partial<Despesa>): Promise<Despesa> => {
+    const response = await api.put(`financeiro/despesas/${id}/`, data);
+    return response.data;
+  },
+
+  excluirDespesa: async (id: number): Promise<void> => {
+    await api.delete(`financeiro/despesas/${id}/`);
+  },
+
+  getSalarios: async (params?: any): Promise<Salario[]> => {
+    const response = await api.get('financeiro/salarios/', { params });
+    return response.data.results || response.data.salarios || response.data;
+  },
+
+  marcarSalarioPago: async (id: number): Promise<Salario> => {
+    const response = await api.patch(`financeiro/salarios/${id}/`, { status: 'pago' });
     return response.data;
   },
 };
@@ -366,6 +399,11 @@ export const funcionarioService = {
     const response = await api.post(`funcionarios/converter-precadastro/${precadastroId}/`);
     return response.data;
   },
+
+  getHistoricoAulasProfessor: async (): Promise<HistoricoAulasProfessorResponse> => {
+    const response = await api.get('funcionarios/historico-aulas-professor/');
+    return response.data;
+  },
 };
 
 export const usuarioService = {
@@ -396,6 +434,38 @@ export const usuarioService = {
 
   excluirUsuario: async (id: number): Promise<void> => {
     await api.delete(`usuarios/${id}/`);
+  },
+
+  resetParq: async (id: number): Promise<User> => {
+    const response = await api.patch(`usuarios/${id}/`, {
+      parq_completed: false,
+      parq_completion_date: null,
+    });
+    return response.data;
+  },
+
+  listarPrecadastros: async (): Promise<PreCadastro[]> => {
+    const response = await api.get('usuarios/precadastros/');
+    return response.data.results || response.data;
+  },
+
+  criarPrecadastro: async (data: Partial<PreCadastro>): Promise<PreCadastro> => {
+    const response = await api.post('usuarios/precadastros/', data);
+    return response.data;
+  },
+
+  atualizarPrecadastro: async (id: number, data: Partial<PreCadastro>): Promise<PreCadastro> => {
+    const response = await api.put(`usuarios/precadastros/${id}/`, data);
+    return response.data;
+  },
+
+  excluirPrecadastro: async (id: number): Promise<void> => {
+    await api.delete(`usuarios/precadastros/${id}/`);
+  },
+
+  finalizarAgendamento: async (precadastroId: number, data: any): Promise<{ message: string }> => {
+    const response = await api.post(`usuarios/finalizar-agendamento/${precadastroId}/`, data);
+    return response.data;
   },
 };
 

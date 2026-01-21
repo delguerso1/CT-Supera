@@ -9,8 +9,25 @@ export interface User {
   telefone?: string;
   endereco?: string;
   data_nascimento?: string;
+  nome_responsavel?: string;
+  telefone_responsavel?: string;
+  telefone_emergencia?: string;
   ficha_medica?: string;
   foto_perfil?: string;
+  parq_question_1?: boolean;
+  parq_question_2?: boolean;
+  parq_question_3?: boolean;
+  parq_question_4?: boolean;
+  parq_question_5?: boolean;
+  parq_question_6?: boolean;
+  parq_question_7?: boolean;
+  parq_question_8?: boolean;
+  parq_question_9?: boolean;
+  parq_question_10?: boolean;
+  parq_completed?: boolean;
+  parq_completion_date?: string;
+  contrato_aceito?: boolean;
+  contrato_aceito_em?: string;
   salario_professor?: number;
   pix_professor?: string;
   dia_vencimento?: number;
@@ -73,6 +90,23 @@ export interface Mensalidade {
   data_pagamento?: string;
 }
 
+export interface Despesa {
+  id: number;
+  descricao: string;
+  valor: number;
+  data: string;
+}
+
+export interface Salario {
+  id: number;
+  professor: number | User;
+  valor: number;
+  status: 'pendente' | 'pago';
+  data_pagamento?: string;
+  mes?: number;
+  ano?: number;
+}
+
 export interface HistoricoPagamentos {
   mensalidades_vencidas: Mensalidade[];
   mensalidades_vincendas: Mensalidade[];
@@ -90,6 +124,7 @@ export interface PainelAluno {
     checkin_realizado: boolean;
     presenca_confirmada: boolean;
     pode_fazer_checkin: boolean;
+    motivo_checkin_bloqueado?: string | null;
   };
 }
 
@@ -162,6 +197,15 @@ export interface RegistrarPresencaResponse {
   alunos_sem_checkin?: string[];
 }
 
+export interface HistoricoAulasProfessorItem {
+  turma: Turma;
+  datas: string[];
+}
+
+export interface HistoricoAulasProfessorResponse {
+  historico: HistoricoAulasProfessorItem[];
+}
+
 export interface DashboardStats {
   alunosAtivos: number;
   professores: number;
@@ -198,12 +242,23 @@ export interface PainelGerente {
   first_name: string;
   last_name: string;
   email: string;
+  cpf?: string;
+  username?: string;
   telefone?: string;
   endereco?: string;
   data_nascimento?: string;
   foto_perfil?: string;
   ativo: boolean;
   id: number;
+}
+
+export interface FinanceiroDashboard {
+  total_pago: number;
+  total_despesas: number;
+  total_salarios: number;
+  total_salarios_pagos: number;
+  saldo_final: number;
+  meses?: number[];
 }
 
 export interface Activity {

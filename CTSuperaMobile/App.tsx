@@ -21,6 +21,7 @@ import GerenciarTurmasScreen from './src/screens/GerenciarTurmasScreen';
 import GerenciarCTsScreen from './src/screens/GerenciarCTsScreen';
 import GerenciarSuperaNewsScreen from './src/screens/GerenciarSuperaNewsScreen';
 import GerenciarGaleriaScreen from './src/screens/GerenciarGaleriaScreen';
+import GerenciarUsuariosScreen from './src/screens/GerenciarUsuariosScreen';
 import LoadingScreen from './src/components/LoadingScreen';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 
@@ -47,6 +48,9 @@ const AlunoTabs = () => {
             case 'Pagamentos':
               iconName = 'payment';
               break;
+            case 'Parq':
+              iconName = 'assignment';
+              break;
             default:
               iconName = 'dashboard';
           }
@@ -60,6 +64,7 @@ const AlunoTabs = () => {
     >
       <Tab.Screen name="Dashboard" component={DashboardAlunoScreen} />
       <Tab.Screen name="Perfil" component={DashboardAlunoScreen} />
+      <Tab.Screen name="Parq" component={DashboardAlunoScreen} options={{ tabBarLabel: 'PAR-Q' }} />
       <Tab.Screen name="Checkin" component={DashboardAlunoScreen} />
       <Tab.Screen name="Pagamentos" component={DashboardAlunoScreen} />
     </Tab.Navigator>
@@ -83,6 +88,9 @@ const ProfessorTabs = () => {
             case 'Presença':
               iconName = 'checklist';
               break;
+            case 'Histórico':
+              iconName = 'history';
+              break;
             case 'Perfil':
               iconName = 'person';
               break;
@@ -100,6 +108,7 @@ const ProfessorTabs = () => {
       <Tab.Screen name="Dashboard" component={DashboardProfessorScreen} />
       <Tab.Screen name="Turmas" component={DashboardProfessorScreen} />
       <Tab.Screen name="Presença" component={DashboardProfessorScreen} />
+      <Tab.Screen name="Histórico" component={DashboardProfessorScreen} />
       <Tab.Screen name="Perfil" component={DashboardProfessorScreen} />
     </Tab.Navigator>
   );
@@ -120,6 +129,9 @@ const GerenteTabs = () => {
               iconName = 'account-balance-wallet';
               break;
             case 'Alunos':
+              iconName = 'people';
+              break;
+            case 'Usuários':
               iconName = 'people';
               break;
             case 'Turmas':
@@ -150,7 +162,7 @@ const GerenteTabs = () => {
     >
       <Tab.Screen name="Dashboard" component={DashboardGerenteScreen} />
       <Tab.Screen name="Financeiro" component={DashboardGerenteScreen} />
-      <Tab.Screen name="Alunos" component={DashboardGerenteScreen} />
+      <Tab.Screen name="Usuários" component={GerenciarUsuariosScreen} />
       <Tab.Screen name="Turmas" component={GerenciarTurmasScreen} />
       <Tab.Screen name="CTs" component={GerenciarCTsScreen} />
       <Tab.Screen name="News" component={GerenciarSuperaNewsScreen} />

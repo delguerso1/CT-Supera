@@ -1,5 +1,17 @@
+import { Platform } from 'react-native';
+
+const devBaseUrl = Platform.OS === 'android'
+  ? 'http://10.0.2.2:8000/api/'
+  : 'http://localhost:8000/api/';
+
+const prodBaseUrl = 'https://ctsupera.com.br/api/';
+
+const envBaseUrl = typeof process !== 'undefined' && process.env && process.env.API_BASE_URL
+  ? process.env.API_BASE_URL
+  : undefined;
+
 export const CONFIG = {
-  API_BASE_URL: 'http://10.0.2.2:8000/api/',
+  API_BASE_URL: envBaseUrl || (__DEV__ ? devBaseUrl : prodBaseUrl),
   APP_NAME: 'CT Supera',
   VERSION: '1.0.0',
   

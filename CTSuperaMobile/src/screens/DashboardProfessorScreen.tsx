@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { useAuth } from '../utils/AuthContext';
 import { funcionarioService, turmaService, presencaService } from '../services/api';
-import { User, Turma, AlunoPresenca, VerificarCheckinResponse } from '../types';
+import { User, Turma, AlunoPresenca, VerificarCheckinResponse, HistoricoAulasProfessorItem } from '../types';
 import { NavigationProps } from '../types';
 import CONFIG from '../config';
 
@@ -22,12 +22,14 @@ const DashboardProfessorScreen: React.FC<NavigationProps> = ({ navigation, route
   const [professor, setProfessor] = useState<User | null>(null);
   const [turmas, setTurmas] = useState<Turma[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeSection, setActiveSection] = useState<'dashboard' | 'turmas' | 'presenca' | 'perfil'>('dashboard');
+  const [activeSection, setActiveSection] = useState<'dashboard' | 'turmas' | 'presenca' | 'historico' | 'perfil'>('dashboard');
   const [selectedTurma, setSelectedTurma] = useState<Turma | null>(null);
   const [checkinData, setCheckinData] = useState<VerificarCheckinResponse | null>(null);
   const [presencasSelecionadas, setPresencasSelecionadas] = useState<{ [key: number]: boolean }>({});
   const [loadingCheckin, setLoadingCheckin] = useState(false);
   const [loadingPresenca, setLoadingPresenca] = useState(false);
+  const [historicoAulas, setHistoricoAulas] = useState<HistoricoAulasProfessorItem[]>([]);
+  const [loadingHistorico, setLoadingHistorico] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -38,9 +40,19 @@ const DashboardProfessorScreen: React.FC<NavigationProps> = ({ navigation, route
   // Detectar seção ativa baseada na rota
   useEffect(() => {
     if (route?.name) {
-      setActiveSection(route.name.toLowerCase() as any);
+      const normalized = route.name
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
+      setActiveSection(normalized as any);
     }
   }, [route?.name]);
+
+  useEffect(() => {
+    if (activeSection === 'historico') {
+      loadHistoricoAulas();
+    }
+  }, [activeSection]);
 
   const loadProfessorData = async () => {
     try {
@@ -70,9 +82,28 @@ const DashboardProfessorScreen: React.FC<NavigationProps> = ({ navigation, route
     );
   };
 
+  const formatDate = (value?: string) => {
+    if (!value) return '-';
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return value;
+    return parsed.toLocaleDateString('pt-BR');
+  };
+
   const getInitials = (name: string) => {
     if (!name) return '?';
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+  };
+
+  const loadHistoricoAulas = async () => {
+    try {
+      setLoadingHistorico(true);
+      const response = await funcionarioService.getHistoricoAulasProfessor();
+      setHistoricoAulas(response.historico || []);
+    } catch (error: any) {
+      Alert.alert('Erro', error.response?.data?.error || 'Erro ao carregar histórico de aulas.');
+    } finally {
+      setLoadingHistorico(false);
+    }
   };
 
   const renderDashboard = () => (
@@ -414,6 +445,47 @@ const DashboardProfessorScreen: React.FC<NavigationProps> = ({ navigation, route
     );
   };
 
+  const renderHistorico = () => (
+    <ScrollView style={styles.content}>
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Histórico de Aulas</Text>
+        {loadingHistorico ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#1a237e" />
+            <Text style={styles.loadingText}>Carregando histórico...</Text>
+          </View>
+        ) : historicoAulas.length === 0 ? (
+          <Text style={styles.noData}>Nenhuma aula registrada.</Text>
+        ) : (
+          historicoAulas.map((item, index) => (
+            <View key={`${item.turma.id || index}`} style={styles.historicoCard}>
+              <Text style={styles.historicoTurmaTitle}>
+                {item.turma.ct_nome || `Turma ${item.turma.id}`}
+              </Text>
+              <Text style={styles.historicoTurmaInfo}>
+                Horário: {item.turma.horario}
+              </Text>
+              <Text style={styles.historicoTurmaInfo}>
+                Dias: {item.turma.dias_semana_nomes?.join(', ') || '-'}
+              </Text>
+              <View style={styles.historicoDates}>
+                {item.datas.length === 0 ? (
+                  <Text style={styles.noData}>Nenhuma data disponível.</Text>
+                ) : (
+                  item.datas.map((data, idx) => (
+                    <View key={`${item.turma.id}-${idx}`} style={styles.historicoDateBadge}>
+                      <Text style={styles.historicoDateText}>{formatDate(data)}</Text>
+                    </View>
+                  ))
+                )}
+              </View>
+            </View>
+          ))
+        )}
+      </View>
+    </ScrollView>
+  );
+
   const renderPerfil = () => {
     if (!professor) return null;
     const baseUrl = CONFIG.API_BASE_URL.replace('/api/', '');
@@ -545,6 +617,14 @@ const DashboardProfessorScreen: React.FC<NavigationProps> = ({ navigation, route
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
+          style={[styles.tab, activeSection === 'historico' && styles.activeTab]}
+          onPress={() => setActiveSection('historico')}
+        >
+          <Text style={[styles.tabText, activeSection === 'historico' && styles.activeTabText]}>
+            Histórico
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
           style={[styles.tab, activeSection === 'perfil' && styles.activeTab]}
           onPress={() => setActiveSection('perfil')}
         >
@@ -558,6 +638,7 @@ const DashboardProfessorScreen: React.FC<NavigationProps> = ({ navigation, route
       {activeSection === 'dashboard' && renderDashboard()}
       {activeSection === 'turmas' && renderTurmas()}
       {activeSection === 'presenca' && renderPresenca()}
+      {activeSection === 'historico' && renderHistorico()}
       {activeSection === 'perfil' && renderPerfil()}
     </SafeAreaView>
   );
@@ -737,6 +818,41 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
     marginBottom: 16,
+  },
+  historicoCard: {
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
+  },
+  historicoTurmaTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 6,
+  },
+  historicoTurmaInfo: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 4,
+  },
+  historicoDates: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 8,
+  },
+  historicoDateBadge: {
+    backgroundColor: '#e3f2fd',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  historicoDateText: {
+    fontSize: 12,
+    color: '#1a237e',
+    fontWeight: '600',
   },
   turmaCard: {
     backgroundColor: '#f8f9fa',
