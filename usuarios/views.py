@@ -25,7 +25,13 @@ from calendar import monthrange
 
 logger = logging.getLogger(__name__)
 
-def criar_mensalidades_matricula(aluno, valor_mensalidade, valor_primeira_mensalidade=None, dia_vencimento=None):
+def criar_mensalidades_matricula(
+    aluno,
+    valor_mensalidade,
+    valor_primeira_mensalidade=None,
+    dia_vencimento=None,
+    incluir_matricula=True
+):
     if not aluno:
         return
 
@@ -38,12 +44,13 @@ def criar_mensalidades_matricula(aluno, valor_mensalidade, valor_primeira_mensal
 
     hoje = timezone.now().date()
     data_primeiro_vencimento = hoje + timedelta(days=2)
-    valor_matricula = Decimal("90.00")
+    valor_matricula = Decimal("90.00") if incluir_matricula else Decimal("0.00")
+    observacoes = "Inclui R$ 90,00 de matrícula." if incluir_matricula else "Mensalidade inicial sem matrícula."
     Mensalidade.objects.create(
         aluno=aluno,
         valor=valor_primeira_mensalidade + valor_matricula,
         data_vencimento=data_primeiro_vencimento,
-        observacoes="Inclui R$ 90,00 de matrícula."
+        observacoes=observacoes
     )
 
     dia_venc = dia_vencimento or aluno.dia_vencimento or data_primeiro_vencimento.day
@@ -156,11 +163,10 @@ class FinalizarAgendamentoAPIView(APIView):
         if precadastro.usuario and not ja_aluno_bool:
             return Response({"error": "Este pré-cadastro já foi convertido em aluno."}, status=status.HTTP_400_BAD_REQUEST)
 
-        if not ja_aluno_bool:
-            if cpf:
-                cpf = "".join([c for c in str(cpf) if c.isdigit()])
-            if not cpf or len(cpf) != 11:
-                return Response({"error": "CPF inválido ou não fornecido."}, status=status.HTTP_400_BAD_REQUEST)
+        if cpf:
+            cpf = "".join([c for c in str(cpf) if c.isdigit()])
+        if not cpf or len(cpf) != 11:
+            return Response({"error": "CPF inválido ou não fornecido."}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             dia_vencimento = int(dia_vencimento)
@@ -168,39 +174,6 @@ class FinalizarAgendamentoAPIView(APIView):
             return Response({"error": "Dia de vencimento inválido."}, status=status.HTTP_400_BAD_REQUEST)
         if dia_vencimento not in [1, 5, 10]:
             return Response({"error": "Dia de vencimento deve ser 1, 5 ou 10."}, status=status.HTTP_400_BAD_REQUEST)
-
-        if ja_aluno_bool:
-            try:
-                valor_mensalidade = Decimal(str(valor_mensalidade))
-            except (InvalidOperation, TypeError):
-                return Response({"error": "Valor da mensalidade inválido."}, status=status.HTTP_400_BAD_REQUEST)
-
-            plano_familia_bool = bool(plano_familia)
-            if isinstance(plano_familia, str):
-                plano_familia_bool = plano_familia.strip().lower() in ["true", "1", "sim", "yes"]
-
-            if plano_familia_bool:
-                valor_mensalidade = valor_mensalidade - Decimal("10.00")
-
-            if valor_mensalidade <= 0:
-                return Response({"error": "Valor da mensalidade deve ser maior que zero."}, status=status.HTTP_400_BAD_REQUEST)
-
-            aluno = precadastro.usuario
-            if not aluno:
-                return Response({"error": "Pré-cadastro precisa estar vinculado a um aluno existente."}, status=status.HTTP_400_BAD_REQUEST)
-
-            aluno.dia_vencimento = dia_vencimento
-            aluno.valor_mensalidade = valor_mensalidade
-            aluno.save()
-            aluno.atualizar_mensalidades_pendentes()
-            criar_mensalidade_proximo_mes(aluno, valor_mensalidade, dia_vencimento)
-
-            precadastro.cpf = cpf
-            precadastro.usuario = aluno
-            precadastro.status = 'matriculado'
-            precadastro.save()
-
-            return Response({"message": "Mensalidade criada para o próximo mês com sucesso!"}, status=status.HTTP_200_OK)
 
         if plano not in ["3x", "2x", "1x"]:
             return Response({"error": "Plano inválido. Use 3x, 2x ou 1x."}, status=status.HTTP_400_BAD_REQUEST)
@@ -239,31 +212,59 @@ class FinalizarAgendamentoAPIView(APIView):
             "2x": Decimal("130.00"),
             "1x": Decimal("110.00"),
         }
-        try:
-            if valor_mensalidade is not None:
-                valor_mensalidade = Decimal(str(valor_mensalidade))
-            elif plano in plano_valores:
-                valor_mensalidade = plano_valores[plano]
-            else:
-                return Response({"error": "Plano inválido ou valor da mensalidade não informado."}, status=status.HTTP_400_BAD_REQUEST)
-            if valor_primeira_mensalidade is not None:
-                valor_primeira_mensalidade = Decimal(str(valor_primeira_mensalidade))
-            else:
-                valor_primeira_mensalidade = valor_mensalidade
-        except (InvalidOperation, TypeError):
-            return Response({"error": "Valores de mensalidade inválidos."}, status=status.HTTP_400_BAD_REQUEST)
 
         plano_familia_bool = bool(plano_familia)
         if isinstance(plano_familia, str):
             plano_familia_bool = plano_familia.strip().lower() in ["true", "1", "sim", "yes"]
 
-        if plano_familia_bool:
-            desconto_familia = Decimal("10.00")
-            valor_mensalidade = valor_mensalidade - desconto_familia
-            valor_primeira_mensalidade = valor_primeira_mensalidade - desconto_familia
+        desconto_familia = Decimal("10.00") if plano_familia_bool else Decimal("0.00")
 
-        if valor_mensalidade <= 0 or valor_primeira_mensalidade <= 0:
+        try:
+            valor_mensalidade = plano_valores[plano] - desconto_familia
+            if not ja_aluno_bool:
+                if valor_primeira_mensalidade is not None:
+                    valor_primeira_mensalidade = Decimal(str(valor_primeira_mensalidade)) - desconto_familia
+                else:
+                    valor_primeira_mensalidade = valor_mensalidade
+        except (InvalidOperation, TypeError, KeyError):
+            return Response({"error": "Valores de mensalidade inválidos."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if valor_mensalidade <= 0 or (not ja_aluno_bool and valor_primeira_mensalidade <= 0):
             return Response({"error": "Valores de mensalidade devem ser maiores que zero."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if ja_aluno_bool:
+            precadastro.cpf = cpf
+            precadastro.save()
+
+            aluno = precadastro.usuario
+            if aluno:
+                aluno.dia_vencimento = dia_vencimento
+                aluno.valor_mensalidade = valor_mensalidade
+                aluno.plano = plano
+                aluno.save()
+                if dias_habilitados is not None:
+                    aluno.dias_habilitados.set(dias_habilitados)
+                aluno.atualizar_mensalidades_pendentes()
+                criar_mensalidade_proximo_mes(aluno, valor_mensalidade, dia_vencimento)
+
+                precadastro.status = 'matriculado'
+                precadastro.save()
+
+                return Response({"message": "Pré-cadastro convertido em aluno com sucesso!"}, status=status.HTTP_200_OK)
+
+            try:
+                usuario_aluno = precadastro.converter_para_aluno(
+                    request.user,
+                    dia_vencimento=dia_vencimento,
+                    valor_mensalidade=valor_mensalidade,
+                    plano=plano,
+                    dias_habilitados=dias_habilitados
+                )
+                if usuario_aluno:
+                    criar_mensalidade_proximo_mes(usuario_aluno, valor_mensalidade, dia_vencimento)
+                return Response({"message": "Pré-cadastro convertido em aluno com sucesso!"}, status=status.HTTP_200_OK)
+            except Exception as e:
+                return Response({"error": f"Erro ao finalizar agendamento: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
 
         precadastro.cpf = cpf
         precadastro.save()

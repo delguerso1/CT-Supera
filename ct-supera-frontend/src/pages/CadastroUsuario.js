@@ -740,7 +740,7 @@ function CadastroUsuario({ onUserChange }) {
 
   const handleConfirmMatricula = async () => {
     if (!matriculaPrecadastro) return;
-    const precisaCpf = !matriculaPrecadastro.cpf && !matriculaForm.ja_aluno;
+    const precisaCpf = !matriculaPrecadastro.cpf;
     if (precisaCpf && !matriculaForm.cpf) {
       setError('Informe o CPF do aluno.');
       return;
@@ -749,22 +749,17 @@ function CadastroUsuario({ onUserChange }) {
       setError('Selecione o dia de vencimento.');
       return;
     }
-    if (!matriculaForm.ja_aluno) {
-      if (!matriculaForm.plano) {
-        setError('Selecione o plano.');
-        return;
-      }
-      if (!matriculaForm.valor_primeira_mensalidade) {
-        setError('Informe o valor da primeira mensalidade.');
-        return;
-      }
-      const limitePlano = PLANO_LIMITES[matriculaForm.plano] || 0;
-      if (['1x', '2x'].includes(matriculaForm.plano) && matriculaForm.dias_habilitados.length !== limitePlano) {
-        setError(`Selecione exatamente ${limitePlano} dia(s) para o plano escolhido.`);
-        return;
-      }
-    } else if (!matriculaForm.valor_mensalidade) {
-      setError('Informe o valor da mensalidade.');
+    if (!matriculaForm.plano) {
+      setError('Selecione o plano.');
+      return;
+    }
+    if (!matriculaForm.ja_aluno && !matriculaForm.valor_primeira_mensalidade) {
+      setError('Informe o valor da primeira mensalidade.');
+      return;
+    }
+    const limitePlano = PLANO_LIMITES[matriculaForm.plano] || 0;
+    if (['1x', '2x'].includes(matriculaForm.plano) && matriculaForm.dias_habilitados.length !== limitePlano) {
+      setError(`Selecione exatamente ${limitePlano} dia(s) para o plano escolhido.`);
       return;
     }
     try {
@@ -775,16 +770,14 @@ function CadastroUsuario({ onUserChange }) {
         plano_familia: Boolean(matriculaForm.plano_familia),
         ja_aluno: Boolean(matriculaForm.ja_aluno),
       };
+      payload.plano = matriculaForm.plano;
       if (!matriculaForm.ja_aluno) {
-        payload.plano = matriculaForm.plano;
         payload.valor_primeira_mensalidade = parseFloat(matriculaForm.valor_primeira_mensalidade);
-        if (matriculaForm.dias_habilitados.length > 0) {
-          payload.dias_habilitados = matriculaForm.dias_habilitados;
-        }
-      } else {
-        payload.valor_mensalidade = parseFloat(matriculaForm.valor_mensalidade);
       }
-      if (!matriculaForm.ja_aluno && matriculaForm.cpf) {
+      if (matriculaForm.dias_habilitados.length > 0) {
+        payload.dias_habilitados = matriculaForm.dias_habilitados;
+      }
+      if (matriculaForm.cpf) {
         payload.cpf = matriculaForm.cpf;
       }
       const response = await api.post(`usuarios/finalizar-agendamento/${matriculaPrecadastro.id}/`, payload);
@@ -1529,7 +1522,7 @@ function CadastroUsuario({ onUserChange }) {
                 </select>
               </div>
 
-              {!matriculaForm.ja_aluno && !matriculaPrecadastro.cpf && (
+              {!matriculaPrecadastro.cpf && (
                 <div style={styles.formGroup}>
                   <label style={styles.label} htmlFor="matricula_cpf">
                     CPF
@@ -1565,27 +1558,25 @@ function CadastroUsuario({ onUserChange }) {
                 </select>
               </div>
 
-              {!matriculaForm.ja_aluno && (
-                <div style={styles.formGroup}>
-                  <label style={styles.label} htmlFor="matricula_plano">
-                    Plano
-                  </label>
-                  <select
-                    id="matricula_plano"
-                    name="plano"
-                    value={matriculaForm.plano}
-                    onChange={handleMatriculaChange}
-                    style={styles.select}
-                    required
-                  >
-                    <option value="3x">3 vezes na semana (R$ 150,00)</option>
-                    <option value="2x">2 vezes na semana (R$ 130,00)</option>
-                    <option value="1x">1 vez na semana (R$ 110,00)</option>
-                  </select>
-                </div>
-              )}
+              <div style={styles.formGroup}>
+                <label style={styles.label} htmlFor="matricula_plano">
+                  Plano
+                </label>
+                <select
+                  id="matricula_plano"
+                  name="plano"
+                  value={matriculaForm.plano}
+                  onChange={handleMatriculaChange}
+                  style={styles.select}
+                  required
+                >
+                  <option value="3x">3 vezes na semana (R$ 150,00)</option>
+                  <option value="2x">2 vezes na semana (R$ 130,00)</option>
+                  <option value="1x">1 vez na semana (R$ 110,00)</option>
+                </select>
+              </div>
 
-              {!matriculaForm.ja_aluno && ['1x', '2x'].includes(matriculaForm.plano) && (
+              {['1x', '2x'].includes(matriculaForm.plano) && (
                 <div style={styles.formGroup}>
                   <label style={styles.label}>
                     Dias habilitados ({matriculaForm.dias_habilitados.length}/{PLANO_LIMITES[matriculaForm.plano] || 0})
@@ -1610,7 +1601,7 @@ function CadastroUsuario({ onUserChange }) {
                 </div>
               )}
 
-              {!matriculaForm.ja_aluno ? (
+              {!matriculaForm.ja_aluno && (
                 <div style={styles.formGroup}>
                   <label style={styles.label} htmlFor="matricula_valor_primeira">
                     Valor da primeira mensalidade (sem matrícula)
@@ -1629,23 +1620,6 @@ function CadastroUsuario({ onUserChange }) {
                   <div style={{ fontSize: '0.85rem', color: '#666' }}>
                     Total com matrícula: <strong>R$ {totalPrimeiraMensalidade()}</strong>
                   </div>
-                </div>
-              ) : (
-                <div style={styles.formGroup}>
-                  <label style={styles.label} htmlFor="matricula_valor_mensalidade">
-                    Valor da mensalidade
-                  </label>
-                  <input
-                    type="number"
-                    id="matricula_valor_mensalidade"
-                    name="valor_mensalidade"
-                    value={matriculaForm.valor_mensalidade}
-                    onChange={handleMatriculaChange}
-                    style={styles.input}
-                    min="0"
-                    step="0.01"
-                    required
-                  />
                 </div>
               )}
 
