@@ -206,6 +206,13 @@ const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }
 
   const formatDate = (value?: string) => {
     if (!value) return '-';
+    const parts = String(value).split('-');
+    if (parts.length === 3 && parts.every(part => part.length > 0)) {
+      const [year, month, day] = parts.map(Number);
+      if (!Number.isNaN(year) && !Number.isNaN(month) && !Number.isNaN(day)) {
+        return new Date(year, month - 1, day).toLocaleDateString('pt-BR');
+      }
+    }
     const parsed = new Date(value);
     if (Number.isNaN(parsed.getTime())) return value;
     return parsed.toLocaleDateString('pt-BR');
@@ -648,11 +655,11 @@ const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }
                   </View>
                 </View>
                 <Text style={styles.mensalidadeDate}>
-                  Vencimento: {new Date(mensalidade.data_vencimento).toLocaleDateString('pt-BR')}
+                  Vencimento: {formatDate(mensalidade.data_vencimento)}
                 </Text>
                 {mensalidade.data_pagamento && (
                   <Text style={styles.mensalidadeDate}>
-                    Pago em: {new Date(mensalidade.data_pagamento).toLocaleDateString('pt-BR')}
+                    Pago em: {formatDate(mensalidade.data_pagamento)}
                   </Text>
                 )}
               </View>

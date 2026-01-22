@@ -782,7 +782,7 @@ function CadastroUsuario({ onUserChange }) {
       }
       const response = await api.post(`usuarios/finalizar-agendamento/${matriculaPrecadastro.id}/`, payload);
       if (response.data.message) {
-        setSuccess('Pré-cadastro convertido em aluno com sucesso!');
+        setSuccess('Pré-cadastro convertido em aluno com sucesso! Um e-mail será enviado para ativação de senha.');
         setShowMatriculaModal(false);
         setMatriculaPrecadastro(null);
         fetchUsers();
@@ -1504,6 +1504,18 @@ function CadastroUsuario({ onUserChange }) {
             <h2 style={styles.title}>Matricular pré-cadastro</h2>
             <div style={{ fontSize: '0.9rem', color: '#666' }}>
               A matrícula adiciona R$ 90,00 à primeira mensalidade e o vencimento será em 48h.
+            </div>
+            <div style={{
+              backgroundColor: '#e3f2fd',
+              padding: '0.75rem',
+              borderRadius: '4px',
+              border: '1px solid #2196f3',
+              color: '#1976d2',
+              fontSize: '0.9rem',
+              marginTop: '0.75rem'
+            }}>
+              <strong>📧 Ativação de senha</strong><br />
+              Após a matrícula, um e-mail será enviado para ativação de senha do aluno.
             </div>
             <form style={{ ...styles.form, marginTop: '1rem' }} onSubmit={(e) => e.preventDefault()}>
               <div style={styles.formGroup}>

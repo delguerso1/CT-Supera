@@ -115,8 +115,12 @@ function ControleFinanceiro({ user, onDataChange }) {
 
   function formatDate(dateStr) {
     if (!dateStr) return '';
-    const d = new Date(dateStr);
-    return d.toLocaleDateString('pt-BR');
+    const parts = String(dateStr).split('-');
+    if (parts.length !== 3) {
+      return new Date(dateStr).toLocaleDateString('pt-BR');
+    }
+    const [year, month, day] = parts.map(Number);
+    return new Date(year, month - 1, day).toLocaleDateString('pt-BR');
   }
 
   function formatCurrency(value) {
