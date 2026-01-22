@@ -14,8 +14,8 @@ import {
   Modal,
 } from 'react-native';
 import { useAuth } from '../utils/AuthContext';
-import { funcionarioService, financeiroService, usuarioService, userService } from '../services/api';
-import { User, PainelGerente, Mensalidade, PreCadastro, Despesa, Salario, FinanceiroDashboard } from '../types';
+import { funcionarioService, financeiroService, turmaService, usuarioService, userService } from '../services/api';
+import { User, PainelGerente, Mensalidade, PreCadastro, Despesa, Salario, FinanceiroDashboard, Turma } from '../types';
 import { NavigationProps } from '../types';
 import CONFIG from '../config';
 import { launchImageLibrary, ImagePickerResponse, MediaType } from 'react-native-image-picker';
@@ -28,6 +28,9 @@ const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }
   const [salarios, setSalarios] = useState<Salario[]>([]);
   const [dashboardFinanceiro, setDashboardFinanceiro] = useState<FinanceiroDashboard | null>(null);
   const [alunos, setAlunos] = useState<User[]>([]);
+  const [turmas, setTurmas] = useState<Turma[]>([]);
+  const [filtroTurmaId, setFiltroTurmaId] = useState<number | null>(null);
+  const [showTurmaModal, setShowTurmaModal] = useState(false);
   const [precadastros, setPrecadastros] = useState<PreCadastro[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -72,12 +75,13 @@ const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }
 
   useEffect(() => {
     if (activeSection === 'alunos' && user) {
+      loadTurmas();
       loadAlunos();
     }
     if (activeSection === 'financeiro' && user) {
       loadFinanceiroData();
     }
-  }, [activeSection, user, mes, ano]);
+  }, [activeSection, user, mes, ano, filtroTurmaId]);
 
   const loadGerenteData = async () => {
     try {
@@ -156,10 +160,22 @@ const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }
 
   const loadAlunos = async () => {
     try {
-      const alunosData = await usuarioService.listarAlunos();
+      const alunosData = await usuarioService.listarAlunos(
+        filtroTurmaId ? { turma: filtroTurmaId } : undefined
+      );
       setAlunos(alunosData);
     } catch (error: any) {
       console.error('Erro ao carregar alunos:', error);
+    }
+  };
+
+  const loadTurmas = async () => {
+    try {
+      const turmasData = await turmaService.getTurmas();
+      setTurmas(turmasData);
+    } catch (error: any) {
+      console.error('Erro ao carregar turmas:', error);
+      setTurmas([]);
     }
   };
 
@@ -175,7 +191,10 @@ const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }
   const onRefresh = async () => {
     setRefreshing(true);
     await loadGerenteData();
-    if (activeSection === 'alunos') await loadAlunos();
+    if (activeSection === 'alunos') {
+      await loadTurmas();
+      await loadAlunos();
+    }
     if (activeSection === 'financeiro') await loadFinanceiroData();
     setRefreshing(false);
   };
@@ -771,6 +790,7 @@ const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }
   const renderAlunos = () => {
     const alunosAtivos = alunos.filter(a => a.ativo).length;
     const alunosInativos = alunos.filter(a => !a.ativo).length;
+    const turmaSelecionada = turmas.find(turma => turma.id === filtroTurmaId);
 
     return (
       <ScrollView
@@ -779,6 +799,30 @@ const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Filtro por Turma</Text>
+          <View style={styles.filterRow}>
+            <Text style={styles.filterLabel}>
+              {turmaSelecionada
+                ? `Turma ${turmaSelecionada.id} - ${turmaSelecionada.ct_nome || 'CT'} - ${turmaSelecionada.horario}`
+                : 'Todas as turmas'}
+            </Text>
+            <TouchableOpacity
+              style={styles.filterButton}
+              onPress={() => setShowTurmaModal(true)}
+            >
+              <Text style={styles.filterButtonText}>Selecionar turma</Text>
+            </TouchableOpacity>
+          </View>
+          {filtroTurmaId && (
+            <TouchableOpacity
+              style={styles.clearFilterButton}
+              onPress={() => setFiltroTurmaId(null)}
+            >
+              <Text style={styles.clearFilterText}>Limpar filtro</Text>
+            </TouchableOpacity>
+          )}
+        </View>
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Estatísticas</Text>
           <View style={styles.statsGrid}>
@@ -1240,6 +1284,47 @@ const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }
                 </Text>
               </TouchableOpacity>
             </View>
+          </View>
+        </View>
+      </Modal>
+      <Modal visible={showTurmaModal} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Selecionar turma</Text>
+            <ScrollView style={{ maxHeight: 320 }}>
+              <TouchableOpacity
+                style={styles.modalOption}
+                onPress={() => {
+                  setFiltroTurmaId(null);
+                  setShowTurmaModal(false);
+                }}
+              >
+                <Text style={styles.modalOptionText}>Todas as turmas</Text>
+              </TouchableOpacity>
+              {turmas.map(turma => (
+                <TouchableOpacity
+                  key={turma.id}
+                  style={styles.modalOption}
+                  onPress={() => {
+                    setFiltroTurmaId(turma.id ?? null);
+                    setShowTurmaModal(false);
+                  }}
+                >
+                  <Text style={styles.modalOptionText}>
+                    Turma {turma.id} - {turma.ct_nome || 'CT'} - {turma.horario}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+              {turmas.length === 0 && (
+                <Text style={styles.noData}>Nenhuma turma cadastrada.</Text>
+              )}
+            </ScrollView>
+            <TouchableOpacity
+              style={[styles.actionButton, styles.cancelButton, styles.inlineButton]}
+              onPress={() => setShowTurmaModal(false)}
+            >
+              <Text style={styles.actionButtonText}>Fechar</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -1731,6 +1816,51 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
     marginBottom: 12,
+  },
+  modalOption: {
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  modalOptionText: {
+    fontSize: 14,
+    color: '#333',
+  },
+  filterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    flexWrap: 'wrap',
+  },
+  filterLabel: {
+    flex: 1,
+    color: '#333',
+    fontSize: 14,
+  },
+  filterButton: {
+    backgroundColor: '#1a237e',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+  },
+  filterButtonText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  clearFilterButton: {
+    marginTop: 8,
+    alignSelf: 'flex-start',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 6,
+    backgroundColor: '#f5f5f5',
+  },
+  clearFilterText: {
+    color: '#666',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
   input: {
     borderWidth: 1,

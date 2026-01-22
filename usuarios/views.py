@@ -522,6 +522,9 @@ class ListarCriarUsuariosAPIView(ListCreateAPIView):
         tipo = self.request.query_params.get('tipo', None)
         if tipo:
             queryset = queryset.filter(tipo=tipo)
+        turma_id = self.request.query_params.get('turma', None)
+        if turma_id:
+            queryset = queryset.filter(turmas_aluno__id=turma_id).distinct()
         return queryset
 
     def list(self, request, *args, **kwargs):

@@ -194,8 +194,10 @@ function CadastroUsuario({ onUserChange }) {
   const [salarioProfessor, setSalarioProfessor] = useState('');
   const [pixProfessor, setPixProfessor] = useState('');
   const [centrosTreinamento, setCentrosTreinamento] = useState([]);
+  const [turmas, setTurmas] = useState([]);
   const [diasSemana, setDiasSemana] = useState([]);
   const [filtroCtSelecionado, setFiltroCtSelecionado] = useState('');
+  const [filtroTurmaSelecionada, setFiltroTurmaSelecionada] = useState('');
   const [showParqModal, setShowParqModal] = useState(false);
   const [selectedParqUser, setSelectedParqUser] = useState(null);
   const [parqActionLoading, setParqActionLoading] = useState(false);
@@ -265,7 +267,11 @@ function CadastroUsuario({ onUserChange }) {
         const tipoEsperado = tipoMap[activeTab];
         console.log('[DEBUG] Tipo esperado:', tipoEsperado);
 
-        const resultados = await fetchAllPages(`usuarios/?tipo=${tipoEsperado}`);
+        let url = `usuarios/?tipo=${tipoEsperado}`;
+        if (activeTab === 'alunos' && filtroTurmaSelecionada) {
+          url += `&turma=${filtroTurmaSelecionada}`;
+        }
+        const resultados = await fetchAllPages(url);
         console.log('[DEBUG] Total usuários:', Array.isArray(resultados) ? resultados.length : 0);
         if (Array.isArray(resultados)) {
           setUsers(resultados);
@@ -282,7 +288,7 @@ function CadastroUsuario({ onUserChange }) {
     } finally {
       setLoading(false);
     }
-  }, [activeTab]); // Inclua todas as dependências usadas dentro de fetchUsers
+  }, [activeTab, filtroTurmaSelecionada]); // Inclua todas as dependências usadas dentro de fetchUsers
 
   // useEffect depende de fetchUsers e activeTab
   useEffect(() => {
@@ -306,6 +312,22 @@ function CadastroUsuario({ onUserChange }) {
     };
     fetchCentros();
   }, []);
+
+  // Buscar turmas para o filtro
+  useEffect(() => {
+    if (activeTab !== 'alunos') return;
+    const fetchTurmas = async () => {
+      try {
+        const response = await api.get('turmas/');
+        const turmasData = Array.isArray(response.data) ? response.data : (response.data.results || []);
+        setTurmas(turmasData);
+      } catch (error) {
+        console.error('[DEBUG] Erro ao carregar turmas:', error);
+        setTurmas([]);
+      }
+    };
+    fetchTurmas();
+  }, [activeTab]);
 
   // Buscar dias da semana para matrícula
   useEffect(() => {
@@ -782,7 +804,7 @@ function CadastroUsuario({ onUserChange }) {
       }
       const response = await api.post(`usuarios/finalizar-agendamento/${matriculaPrecadastro.id}/`, payload);
       if (response.data.message) {
-        setSuccess('Pré-cadastro convertido em aluno com sucesso! Um e-mail será enviado para ativação de senha.');
+        setSuccess('Obrigado por se cadastrar! Um e-mail será enviado para ativação de senha.');
         setShowMatriculaModal(false);
         setMatriculaPrecadastro(null);
         fetchUsers();
@@ -912,7 +934,7 @@ function CadastroUsuario({ onUserChange }) {
         </button>
       </div>
 
-      {/* Filtro por CT - apenas para alunos */}
+      {/* Filtros por CT e Turma - apenas para alunos */}
       {activeTab === 'alunos' && (
         <div style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
           <label style={{ fontWeight: '500', color: '#333' }}>
@@ -958,6 +980,51 @@ function CadastroUsuario({ onUserChange }) {
               borderRadius: '4px'
             }}>
               Nenhum Centro de Treinamento cadastrado ainda
+            </span>
+          )}
+          <label style={{ fontWeight: '500', color: '#333' }}>
+            Filtrar por Turma:
+          </label>
+          {Array.isArray(turmas) && turmas.length > 0 ? (
+            <>
+              <select
+                value={filtroTurmaSelecionada}
+                onChange={(e) => setFiltroTurmaSelecionada(e.target.value)}
+                style={{
+                  ...styles.select,
+                  minWidth: '250px',
+                }}
+              >
+                <option value="">Todas as turmas</option>
+                {turmas.map(turma => (
+                  <option key={turma.id} value={turma.id}>
+                    Turma {turma.id} - {turma.ct_nome || 'CT'} - {turma.horario}
+                  </option>
+                ))}
+              </select>
+              {filtroTurmaSelecionada && (
+                <button
+                  onClick={() => setFiltroTurmaSelecionada('')}
+                  style={{
+                    ...styles.actionButton,
+                    backgroundColor: '#757575',
+                    padding: '0.5rem 1rem',
+                  }}
+                >
+                  Limpar Turma
+                </button>
+              )}
+            </>
+          ) : (
+            <span style={{ 
+              color: '#999', 
+              fontSize: '14px',
+              fontStyle: 'italic',
+              padding: '0.5rem',
+              backgroundColor: '#f5f5f5',
+              borderRadius: '4px'
+            }}>
+              Nenhuma turma cadastrada ainda
             </span>
           )}
         </div>
