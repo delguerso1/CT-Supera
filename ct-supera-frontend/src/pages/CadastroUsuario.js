@@ -857,7 +857,7 @@ function CadastroUsuario({ onUserChange }) {
       return;
     }
     const limitePlano = PLANO_LIMITES[matriculaForm.plano] || 0;
-    if (['1x', '2x'].includes(matriculaForm.plano) && matriculaForm.dias_habilitados.length !== limitePlano) {
+    if (matriculaForm.dias_habilitados.length > 0 && matriculaForm.dias_habilitados.length !== limitePlano) {
       setError(`Selecione exatamente ${limitePlano} dia(s) para o plano escolhido.`);
       return;
     }
@@ -1430,7 +1430,7 @@ function CadastroUsuario({ onUserChange }) {
                   value={formData.endereco}
                   onChange={handleChange}
                   style={styles.input}
-                  required={activeTab !== 'precadastros'}
+                  required={formData.tipo === 'aluno' && !editingUser}
                 />
               </div>
 
@@ -1797,30 +1797,28 @@ function CadastroUsuario({ onUserChange }) {
                 </select>
               </div>
 
-              {['1x', '2x'].includes(matriculaForm.plano) && (
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>
-                    Dias habilitados ({matriculaForm.dias_habilitados.length}/{PLANO_LIMITES[matriculaForm.plano] || 0})
-                  </label>
-                  <div style={{ display: 'grid', gap: '8px' }}>
-                    {diasSemana.map(dia => (
-                      <label key={dia.id} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <input
-                          type="checkbox"
-                          checked={matriculaForm.dias_habilitados.includes(dia.id)}
-                          onChange={() => handleToggleDia(dia.id)}
-                        />
-                        {dia.nome}
-                      </label>
-                    ))}
-                  </div>
-                  {diasSemana.length === 0 && (
-                    <div style={{ fontSize: '0.85rem', color: '#999' }}>
-                      Nenhum dia da semana disponível.
-                    </div>
-                  )}
+              <div style={styles.formGroup}>
+                <label style={styles.label}>
+                  Dias habilitados ({matriculaForm.dias_habilitados.length}/{PLANO_LIMITES[matriculaForm.plano] || 0})
+                </label>
+                <div style={{ display: 'grid', gap: '8px' }}>
+                  {diasSemana.map(dia => (
+                    <label key={dia.id} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <input
+                        type="checkbox"
+                        checked={matriculaForm.dias_habilitados.includes(dia.id)}
+                        onChange={() => handleToggleDia(dia.id)}
+                      />
+                      {dia.nome}
+                    </label>
+                  ))}
                 </div>
-              )}
+                {diasSemana.length === 0 && (
+                  <div style={{ fontSize: '0.85rem', color: '#999' }}>
+                    Nenhum dia da semana disponível.
+                  </div>
+                )}
+              </div>
 
               {!matriculaForm.ja_aluno && (
                 <div style={styles.formGroup}>
