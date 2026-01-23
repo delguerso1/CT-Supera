@@ -45,6 +45,9 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
   const [valorMensalidade, setValorMensalidade] = useState('');
   const [salarioProfessor, setSalarioProfessor] = useState('');
   const [pixProfessor, setPixProfessor] = useState('');
+  const [planoAluno, setPlanoAluno] = useState<'3x' | '2x' | '1x'>('3x');
+  const [diasHabilitadosAluno, setDiasHabilitadosAluno] = useState<number[]>([]);
+  const [planoFamiliaAluno, setPlanoFamiliaAluno] = useState(false);
   const [showMatriculaModal, setShowMatriculaModal] = useState(false);
   const [matriculaPrecadastro, setMatriculaPrecadastro] = useState<PreCadastro | null>(null);
   const [diasSemana, setDiasSemana] = useState<Array<{ id: number; nome: string }>>([]);
@@ -104,11 +107,19 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
     setValorMensalidade('');
     setSalarioProfessor('');
     setPixProfessor('');
+    setPlanoAluno('3x');
+    setDiasHabilitadosAluno([]);
+    setPlanoFamiliaAluno(false);
   };
 
   const handleNewUser = () => {
     resetForm();
     setEditingUser(null);
+    if (activeTab === 'alunos' && !diasSemana.length) {
+      turmaService.getDiasSemana().then(setDiasSemana).catch(() => {
+        Alert.alert('Erro', 'Erro ao carregar dias da semana.');
+      });
+    }
     setShowForm(true);
   };
 
@@ -130,6 +141,13 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
     if ((target as any).tipo === 'aluno') {
       setDiaVencimento(String((target as any).dia_vencimento || ''));
       setValorMensalidade(String((target as any).valor_mensalidade || ''));
+      setPlanoAluno(((target as any).plano as '3x' | '2x' | '1x') || '3x');
+      setDiasHabilitadosAluno(Array.isArray((target as any).dias_habilitados) ? (target as any).dias_habilitados : []);
+      if (!diasSemana.length) {
+        turmaService.getDiasSemana().then(setDiasSemana).catch(() => {
+          Alert.alert('Erro', 'Erro ao carregar dias da semana.');
+        });
+      }
     }
     if ((target as any).tipo === 'professor') {
       setSalarioProfessor(String((target as any).salario_professor || ''));
@@ -158,6 +176,8 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
       payload.telefone_responsavel = formData.telefone_responsavel;
       payload.telefone_emergencia = formData.telefone_emergencia;
       payload.ficha_medica = formData.ficha_medica;
+      payload.plano = planoAluno;
+      payload.dias_habilitados = diasHabilitadosAluno;
       if (diaVencimento) payload.dia_vencimento = Number(diaVencimento);
       if (valorMensalidade) payload.valor_mensalidade = Number(valorMensalidade);
     }
@@ -277,6 +297,36 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
       }
       return { ...prev, dias_habilitados: [...prev.dias_habilitados, diaId] };
     });
+  };
+
+  const handleToggleDiaAluno = (diaId: number) => {
+    const limite = planoAluno === '3x' ? 3 : planoAluno === '2x' ? 2 : 1;
+    const jaSelecionado = diasHabilitadosAluno.includes(diaId);
+    if (jaSelecionado) {
+      setDiasHabilitadosAluno(diasHabilitadosAluno.filter(id => id !== diaId));
+      return;
+    }
+    if (diasHabilitadosAluno.length >= limite) {
+      Alert.alert('Atenção', `O plano ${planoAluno} permite ${limite} dia(s).`);
+      return;
+    }
+    setDiasHabilitadosAluno([...diasHabilitadosAluno, diaId]);
+  };
+
+  const handleChangePlanoAluno = (plano: '3x' | '2x' | '1x') => {
+    setPlanoAluno(plano);
+    const limite = plano === '3x' ? 3 : plano === '2x' ? 2 : 1;
+    setDiasHabilitadosAluno(prev => (prev.length > limite ? prev.slice(0, limite) : prev));
+  };
+
+  const handleTogglePlanoFamilia = (value: boolean) => {
+    setPlanoFamiliaAluno(value);
+    if (!valorMensalidade) return;
+    const valorAtual = Number(valorMensalidade);
+    if (Number.isNaN(valorAtual)) return;
+    const ajuste = value ? -10 : 10;
+    const novoValor = Math.max(0, valorAtual + ajuste);
+    setValorMensalidade(novoValor.toFixed(2));
   };
 
   const handleFinalizarMatricula = async () => {
@@ -512,6 +562,52 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
                     value={valorMensalidade}
                     onChangeText={setValorMensalidade}
                   />
+                  <Text style={styles.sectionTitle}>Plano</Text>
+                  <View style={styles.planOptions}>
+                    {(['3x', '2x', '1x'] as const).map((plano) => (
+                      <TouchableOpacity
+                        key={plano}
+                        style={[
+                          styles.planOption,
+                          planoAluno === plano && styles.planOptionSelected,
+                        ]}
+                        onPress={() => handleChangePlanoAluno(plano)}
+                      >
+                        <Text
+                          style={[
+                            styles.planOptionText,
+                            planoAluno === plano && styles.planOptionTextSelected,
+                          ]}
+                        >
+                          {plano}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                  <View style={styles.switchRow}>
+                    <Text style={styles.switchLabel}>Plano família</Text>
+                    <Switch
+                      value={planoFamiliaAluno}
+                      onValueChange={handleTogglePlanoFamilia}
+                    />
+                  </View>
+                  <Text style={styles.sectionTitle}>Dias habilitados</Text>
+                  {diasSemana.length === 0 ? (
+                    <Text style={styles.noData}>Nenhum dia disponível.</Text>
+                  ) : (
+                    diasSemana.map((dia) => (
+                      <TouchableOpacity
+                        key={dia.id}
+                        style={styles.dayItem}
+                        onPress={() => handleToggleDiaAluno(dia.id)}
+                      >
+                        <Text style={styles.dayText}>{dia.nome}</Text>
+                        <Text style={styles.daySelected}>
+                          {diasHabilitadosAluno.includes(dia.id) ? '✓' : ''}
+                        </Text>
+                      </TouchableOpacity>
+                    ))
+                  )}
                 </>
               )}
 
@@ -791,6 +887,31 @@ const styles = StyleSheet.create({
     color: '#333',
     marginTop: 8,
     marginBottom: 8,
+  },
+  planOptions: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 12,
+  },
+  planOption: {
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    backgroundColor: '#fff',
+  },
+  planOptionSelected: {
+    backgroundColor: '#1a237e',
+    borderColor: '#1a237e',
+  },
+  planOptionText: {
+    color: '#333',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  planOptionTextSelected: {
+    color: '#fff',
   },
   dayItem: {
     flexDirection: 'row',
