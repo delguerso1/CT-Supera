@@ -193,6 +193,9 @@ function CadastroUsuario({ onUserChange }) {
   const [valorMensalidadeNovo, setValorMensalidadeNovo] = useState('');
   const [salarioProfessor, setSalarioProfessor] = useState('');
   const [pixProfessor, setPixProfessor] = useState('');
+  const [planoAluno, setPlanoAluno] = useState('3x');
+  const [diasHabilitadosAluno, setDiasHabilitadosAluno] = useState([]);
+  const [planoFamiliaAluno, setPlanoFamiliaAluno] = useState(false);
   const [centrosTreinamento, setCentrosTreinamento] = useState([]);
   const [turmas, setTurmas] = useState([]);
   const [diasSemana, setDiasSemana] = useState([]);
@@ -201,6 +204,8 @@ function CadastroUsuario({ onUserChange }) {
   const [showParqModal, setShowParqModal] = useState(false);
   const [selectedParqUser, setSelectedParqUser] = useState(null);
   const [parqActionLoading, setParqActionLoading] = useState(false);
+  const [showAlunoInfoModal, setShowAlunoInfoModal] = useState(false);
+  const [selectedAlunoInfo, setSelectedAlunoInfo] = useState(null);
   const [showMatriculaModal, setShowMatriculaModal] = useState(false);
   const [matriculaPrecadastro, setMatriculaPrecadastro] = useState(null);
   const [matriculaLoading, setMatriculaLoading] = useState(false);
@@ -397,6 +402,34 @@ function CadastroUsuario({ onUserChange }) {
     return initials || 'A';
   };
 
+  const formatPlano = (plano) => {
+    const planos = {
+      '3x': '3 vezes na semana',
+      '2x': '2 vezes na semana',
+      '1x': '1 vez na semana',
+    };
+    if (!plano) return 'Não definido';
+    return planos[plano] || plano;
+  };
+
+  const formatValor = (valor) => {
+    if (valor === null || valor === undefined || valor === '') return 'Não definido';
+    const numero = Number(valor);
+    if (Number.isNaN(numero)) return String(valor);
+    return `R$ ${numero.toFixed(2).replace('.', ',')}`;
+  };
+
+  const handleMostrarInfoAluno = (user) => {
+    if (!user || user.tipo !== 'aluno') return;
+    setSelectedAlunoInfo(user);
+    setShowAlunoInfoModal(true);
+  };
+
+  const handleCloseAlunoInfoModal = () => {
+    setShowAlunoInfoModal(false);
+    setSelectedAlunoInfo(null);
+  };
+
   const parqQuestions = [
     {
       field: 'parq_question_1',
@@ -518,6 +551,8 @@ function CadastroUsuario({ onUserChange }) {
       if (formData.telefone_emergencia) dados.telefone_emergencia = formData.telefone_emergencia;
       if (formData.nome_responsavel) dados.nome_responsavel = formData.nome_responsavel;
       if (formData.ficha_medica) dados.ficha_medica = formData.ficha_medica;
+      if (planoAluno) dados.plano = planoAluno;
+      if (diasHabilitadosAluno.length > 0) dados.dias_habilitados = diasHabilitadosAluno;
       if (diaVencimento) dados.dia_vencimento = parseInt(diaVencimento);
       if (valorMensalidadeNovo) dados.valor_mensalidade = parseFloat(valorMensalidadeNovo);
     }
@@ -561,7 +596,7 @@ function CadastroUsuario({ onUserChange }) {
 
   const handleEdit = async (user) => {
     setEditingUser(user);
-          setFormData({
+    setFormData({
         first_name: user.first_name || '',
         last_name: user.last_name || '',
         cpf: user.cpf || user.username,
@@ -580,6 +615,14 @@ function CadastroUsuario({ onUserChange }) {
     if (user.tipo === 'professor') {
       setSalarioProfessor(user.salario_professor || '');
       setPixProfessor(user.pix_professor || '');
+    }
+
+    if (user.tipo === 'aluno') {
+      setDiaVencimento(user.dia_vencimento ? String(user.dia_vencimento) : '');
+      setValorMensalidadeNovo(user.valor_mensalidade ? String(user.valor_mensalidade) : '');
+      setPlanoAluno(user.plano || '3x');
+      setDiasHabilitadosAluno(Array.isArray(user.dias_habilitados) ? user.dias_habilitados : []);
+      setPlanoFamiliaAluno(false);
     }
     
     setShowModal(true);
@@ -670,6 +713,9 @@ function CadastroUsuario({ onUserChange }) {
     setPixProfessor('');
     setDiaVencimento('');
     setValorMensalidadeNovo('');
+    setPlanoAluno('3x');
+    setDiasHabilitadosAluno([]);
+    setPlanoFamiliaAluno(false);
     
     setShowModal(true);
   };
@@ -758,6 +804,37 @@ function CadastroUsuario({ onUserChange }) {
         dias_habilitados: [...prev.dias_habilitados, diaId],
       };
     });
+  };
+
+  const handleToggleDiaAluno = (diaId) => {
+    const limite = PLANO_LIMITES[planoAluno] || 0;
+    setDiasHabilitadosAluno(prev => {
+      const jaSelecionado = prev.includes(diaId);
+      if (jaSelecionado) {
+        return prev.filter(id => id !== diaId);
+      }
+      if (prev.length >= limite) {
+        setError(`O plano ${planoAluno} permite apenas ${limite} dia(s).`);
+        return prev;
+      }
+      return [...prev, diaId];
+    });
+  };
+
+  const handlePlanoAlunoChange = (value) => {
+    const limite = PLANO_LIMITES[value] || 0;
+    setPlanoAluno(value);
+    setDiasHabilitadosAluno(prev => prev.slice(0, limite));
+  };
+
+  const handleTogglePlanoFamilia = (value) => {
+    setPlanoFamiliaAluno(value);
+    if (!valorMensalidadeNovo) return;
+    const valorAtual = parseFloat(valorMensalidadeNovo);
+    if (Number.isNaN(valorAtual)) return;
+    const ajuste = value ? -10 : 10;
+    const novoValor = Math.max(0, valorAtual + ajuste);
+    setValorMensalidadeNovo(novoValor.toFixed(2));
   };
 
   const handleConfirmMatricula = async () => {
@@ -1058,7 +1135,23 @@ function CadastroUsuario({ onUserChange }) {
             {getFilteredUsers().map(user => (
               <tr key={user.id}>
                 <td style={styles.td}>
-                  {`${user.first_name} ${user.last_name || ''}`.trim()}
+                  <button
+                    type="button"
+                    onClick={() => handleMostrarInfoAluno(user)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      padding: 0,
+                      margin: 0,
+                      color: '#1F6C86',
+                      cursor: 'pointer',
+                      textDecoration: 'underline',
+                      font: 'inherit',
+                    }}
+                    title="Ver informações do aluno"
+                  >
+                    {`${user.first_name} ${user.last_name || ''}`.trim()}
+                  </button>
                 </td>
                 {activeTab === 'alunos' && (
                   <td style={styles.td}>
@@ -1493,6 +1586,55 @@ function CadastroUsuario({ onUserChange }) {
                       required={activeTab !== 'precadastros'}
                     />
                   </div>
+                  <div style={styles.formGroup}>
+                    <label style={styles.label} htmlFor="planoAluno">
+                      Plano
+                    </label>
+                    <select
+                      id="planoAluno"
+                      name="planoAluno"
+                      value={planoAluno}
+                      onChange={(e) => handlePlanoAlunoChange(e.target.value)}
+                      style={styles.select}
+                      required={activeTab !== 'precadastros'}
+                    >
+                      <option value="3x">3 vezes na semana</option>
+                      <option value="2x">2 vezes na semana</option>
+                      <option value="1x">1 vez na semana</option>
+                    </select>
+                  </div>
+                  <div style={styles.formGroup}>
+                    <label style={styles.label}>
+                      Dias habilitados ({diasHabilitadosAluno.length}/{PLANO_LIMITES[planoAluno] || 0})
+                    </label>
+                    <div style={{ display: 'grid', gap: '8px' }}>
+                      {diasSemana.map(dia => (
+                        <label key={dia.id} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <input
+                            type="checkbox"
+                            checked={diasHabilitadosAluno.includes(dia.id)}
+                            onChange={() => handleToggleDiaAluno(dia.id)}
+                          />
+                          {dia.nome}
+                        </label>
+                      ))}
+                    </div>
+                    {diasSemana.length === 0 && (
+                      <div style={{ fontSize: '0.85rem', color: '#999' }}>
+                        Nenhum dia da semana disponível.
+                      </div>
+                    )}
+                  </div>
+                  <div style={styles.formGroup}>
+                    <label style={{ ...styles.label, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <input
+                        type="checkbox"
+                        checked={planoFamiliaAluno}
+                        onChange={(e) => handleTogglePlanoFamilia(e.target.checked)}
+                      />
+                      Plano família (desconto de R$ 10,00 na mensalidade)
+                    </label>
+                  </div>
                 </>
               )}
 
@@ -1741,6 +1883,48 @@ function CadastroUsuario({ onUserChange }) {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {showAlunoInfoModal && selectedAlunoInfo && (
+        <div style={styles.modal}>
+          <div style={{ ...styles.modalContent, width: '420px' }}>
+            <h2 style={styles.title}>
+              Informações do aluno
+            </h2>
+            <div style={{ display: 'grid', gap: '10px', color: '#444', fontSize: '0.95rem' }}>
+              <div>
+                <strong>Nome:</strong>{' '}
+                {`${selectedAlunoInfo.first_name} ${selectedAlunoInfo.last_name || ''}`.trim()}
+              </div>
+              <div>
+                <strong>Plano:</strong> {formatPlano(selectedAlunoInfo.plano)}
+              </div>
+              <div>
+                <strong>Valor mensalidade:</strong> {formatValor(selectedAlunoInfo.valor_mensalidade)}
+              </div>
+              <div>
+                <strong>Dias habilitados:</strong>{' '}
+                {Array.isArray(selectedAlunoInfo.dias_habilitados_nomes) && selectedAlunoInfo.dias_habilitados_nomes.length > 0
+                  ? selectedAlunoInfo.dias_habilitados_nomes.join(', ')
+                  : Array.isArray(selectedAlunoInfo.dias_habilitados) && selectedAlunoInfo.dias_habilitados.length > 0
+                    ? selectedAlunoInfo.dias_habilitados.join(', ')
+                    : 'Não configurado'}
+              </div>
+              <div>
+                <strong>Plano família:</strong> desconto de R$ 10,00
+              </div>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>
+              <button
+                type="button"
+                style={{ ...styles.button, backgroundColor: '#f5f5f5', color: '#333' }}
+                onClick={handleCloseAlunoInfoModal}
+              >
+                Fechar
+              </button>
+            </div>
           </div>
         </div>
       )}
