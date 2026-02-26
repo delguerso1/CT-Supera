@@ -148,6 +148,30 @@ class PagarSalarioAPIView(APIView):
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+
+class BaixarMensalidadeAPIView(APIView):
+    """API para o gerente dar baixa em mensalidade (pagamento em dinheiro, transferência, etc.)."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        if request.user.tipo != 'gerente':
+            return Response({'error': 'Apenas gerentes podem dar baixa em mensalidades.'}, status=status.HTTP_403_FORBIDDEN)
+
+        mensalidade = get_object_or_404(Mensalidade, pk=pk)
+        if mensalidade.status == 'pago':
+            return Response({'error': 'Esta mensalidade já foi paga.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        mensalidade.status = 'pago'
+        mensalidade.save()
+        Mensalidade.criar_proxima_mensalidade(mensalidade)
+
+        serializer = MensalidadeSerializer(mensalidade)
+        return Response({
+            'message': 'Mensalidade dada baixa com sucesso!',
+            'mensalidade': serializer.data
+        }, status=status.HTTP_200_OK)
+
+
 class DashboardFinanceiroAPIView(APIView):
     """API para o painel financeiro com totais do mês."""
     permission_classes = [IsAuthenticated]
@@ -798,6 +822,75 @@ class CriarPagamentoBancarioAPIView(APIView):
             logger.error(f"Erro ao criar pagamento bancário: {str(e)}")
             return Response({
                 'error': f'Erro ao criar pagamento bancário: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class ConsultarCheckoutStatusAPIView(APIView):
+    """
+    Consulta o status do checkout de pagamento bancário (cartão) via C6 Bank
+    URL: /api/financeiro/checkout/status/<transacao_id>/
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, transacao_id):
+        try:
+            transacao = get_object_or_404(TransacaoC6Bank, id=transacao_id, tipo='cartao')
+
+            if request.user.tipo == 'aluno' and transacao.mensalidade.aluno != request.user:
+                return Response({
+                    'error': 'Você não tem permissão para consultar este pagamento.'
+                }, status=status.HTTP_403_FORBIDDEN)
+
+            if not transacao.txid:
+                return Response({
+                    'error': 'Checkout não possui ID válido.'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            checkout_data = c6_client.get_checkout(transacao.txid)
+            status_checkout = str(checkout_data.get('status', '')).upper()
+
+            transacao.resposta_api = checkout_data
+            if checkout_data.get('url'):
+                transacao.payment_url = checkout_data.get('url')
+
+            if status_checkout in ['PAID', 'APPROVED', 'AUTHORIZED', 'CONFIRMED', 'SUCCEEDED']:
+                if transacao.status != 'aprovado':
+                    transacao.status = 'aprovado'
+                    transacao.data_aprovacao = timezone.now()
+                    transacao.save()
+
+                mensalidade = transacao.mensalidade
+                if mensalidade.status != 'pago':
+                    mensalidade.status = 'pago'
+                    mensalidade.save()
+                    proxima = Mensalidade.criar_proxima_mensalidade(mensalidade)
+                    if proxima:
+                        logger.info(
+                            "Mensalidade %s criada para %s/%s após pagamento",
+                            proxima.id,
+                            str(proxima.data_vencimento.month).zfill(2),
+                            proxima.data_vencimento.year
+                        )
+            elif status_checkout in ['CANCELLED', 'CANCELED']:
+                transacao.status = 'cancelado'
+                transacao.data_cancelamento = timezone.now()
+                transacao.save()
+            elif status_checkout in ['EXPIRED']:
+                transacao.status = 'expirado'
+                transacao.save()
+            else:
+                transacao.save()
+
+            return Response({
+                'status': transacao.status,
+                'checkout': checkout_data,
+                'transacao': TransacaoC6BankSerializer(transacao).data
+            })
+
+        except Exception as e:
+            logger.error(f"Erro ao consultar checkout: {str(e)}")
+            return Response({
+                'error': f'Erro ao consultar checkout: {str(e)}'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 

@@ -14,8 +14,19 @@ import {
   Modal,
 } from 'react-native';
 import { useAuth } from '../utils/AuthContext';
-import { funcionarioService, financeiroService, turmaService, usuarioService, userService } from '../services/api';
-import { User, PainelGerente, Mensalidade, PreCadastro, Despesa, Salario, FinanceiroDashboard, Turma } from '../types';
+import { funcionarioService, financeiroService, turmaService, usuarioService, userService, presencaService } from '../services/api';
+import {
+  User,
+  PainelGerente,
+  Mensalidade,
+  PreCadastro,
+  Despesa,
+  Salario,
+  FinanceiroDashboard,
+  Turma,
+  PresencaRelatorioResponse,
+  PresencaRelatorioItem
+} from '../types';
 import { NavigationProps } from '../types';
 import CONFIG from '../config';
 import { launchImageLibrary, ImagePickerResponse, MediaType } from 'react-native-image-picker';
@@ -38,6 +49,17 @@ const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }
   const [activeSection, setActiveSection] = useState<'dashboard' | 'financeiro' | 'alunos' | 'relatorios' | 'perfil'>('dashboard');
   const [mes, setMes] = useState(new Date().getMonth() + 1);
   const [ano, setAno] = useState(new Date().getFullYear());
+  const [presencaRelatorio, setPresencaRelatorio] = useState<PresencaRelatorioResponse | null>(null);
+  const [loadingPresencaRelatorio, setLoadingPresencaRelatorio] = useState(false);
+  const [loadingRelatorios, setLoadingRelatorios] = useState(false);
+  const [filtroPresencaInicio, setFiltroPresencaInicio] = useState('');
+  const [filtroPresencaFim, setFiltroPresencaFim] = useState('');
+  const [filtroPresencaTurmaId, setFiltroPresencaTurmaId] = useState<number | null>(null);
+  const [filtroPresencaBusca, setFiltroPresencaBusca] = useState('');
+  const [showPresencaTurmaModal, setShowPresencaTurmaModal] = useState(false);
+  const [corrigindoPresenca, setCorrigindoPresenca] = useState<{ [key: number]: boolean }>({});
+  const [filtroAlunoBusca, setFiltroAlunoBusca] = useState('');
+  const [filtroTurmaBusca, setFiltroTurmaBusca] = useState('');
   const [showDespesaModal, setShowDespesaModal] = useState(false);
   const [editDespesa, setEditDespesa] = useState<Despesa | null>(null);
   const [savingDespesa, setSavingDespesa] = useState(false);
@@ -80,6 +102,9 @@ const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }
     }
     if (activeSection === 'financeiro' && user) {
       loadFinanceiroData();
+    }
+    if (activeSection === 'relatorios' && user) {
+      loadRelatoriosData();
     }
   }, [activeSection, user, mes, ano, filtroTurmaId]);
 
@@ -188,6 +213,15 @@ const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }
     }
   };
 
+  const loadRelatoriosData = async () => {
+    try {
+      setLoadingRelatorios(true);
+      await Promise.all([loadTurmas(), loadAlunos()]);
+    } finally {
+      setLoadingRelatorios(false);
+    }
+  };
+
   const onRefresh = async () => {
     setRefreshing(true);
     await loadGerenteData();
@@ -196,6 +230,7 @@ const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }
       await loadAlunos();
     }
     if (activeSection === 'financeiro') await loadFinanceiroData();
+    if (activeSection === 'relatorios') await loadRelatoriosData();
     setRefreshing(false);
   };
 
@@ -236,6 +271,13 @@ const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }
     if (Number.isNaN(parsed.getTime())) return value;
     return parsed.toLocaleDateString('pt-BR');
   };
+
+  const normalizeSearch = (value: string) =>
+    value
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim();
 
   const getProfessorNome = (professor: number | User) => {
     if (typeof professor === 'object') {
@@ -353,6 +395,30 @@ const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }
               Alert.alert('Sucesso', 'Salário marcado como pago.');
             } catch (error: any) {
               Alert.alert('Erro', error.response?.data?.error || 'Erro ao atualizar salário.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleDarBaixaMensalidade = (mensalidade: Mensalidade) => {
+    if (mensalidade.status === 'pago') return;
+    Alert.alert(
+      'Dar baixa na mensalidade',
+      'O pagamento foi recebido em dinheiro ou outra forma?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Confirmar',
+          onPress: async () => {
+            try {
+              await financeiroService.darBaixaMensalidade(mensalidade.id);
+              await loadMensalidades();
+              await loadDashboardFinanceiro();
+              Alert.alert('Sucesso', 'Mensalidade dada baixa com sucesso!');
+            } catch (error: any) {
+              Alert.alert('Erro', error.response?.data?.error || 'Erro ao dar baixa na mensalidade.');
             }
           },
         },
@@ -680,6 +746,14 @@ const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }
                   <Text style={styles.mensalidadeDate}>
                     Pago em: {formatDate(mensalidade.data_pagamento)}
                   </Text>
+                )}
+                {(mensalidade.status === 'pendente' || mensalidade.status === 'atrasado') && (
+                  <TouchableOpacity
+                    style={[styles.actionButton, styles.payButton, { marginTop: 8 }]}
+                    onPress={() => handleDarBaixaMensalidade(mensalidade)}
+                  >
+                    <Text style={styles.actionButtonText}>Dar baixa</Text>
+                  </TouchableOpacity>
                 )}
               </View>
             ))
@@ -1089,59 +1163,307 @@ const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }
     }
   };
 
-  const renderRelatorios = () => (
-    <ScrollView style={styles.content}>
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Relatórios Disponíveis</Text>
-        
-        <TouchableOpacity
-          style={styles.reportCard}
-          onPress={handleGerarRelatorioFinanceiro}
-        >
-          <Text style={styles.reportTitle}>Relatório Financeiro</Text>
-          <Text style={styles.reportDescription}>
-            Relatório detalhado de receitas e despesas
-          </Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity
-          style={styles.reportCard}
-          onPress={() => {
-            Alert.alert('Em Desenvolvimento', 'Esta funcionalidade será implementada em breve.');
-          }}
-        >
-          <Text style={styles.reportTitle}>Relatório de Presença</Text>
-          <Text style={styles.reportDescription}>
-            Estatísticas de presença por turma
-          </Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity
-          style={styles.reportCard}
-          onPress={() => {
-            Alert.alert('Em Desenvolvimento', 'Esta funcionalidade será implementada em breve.');
-          }}
-        >
-          <Text style={styles.reportTitle}>Relatório de Alunos</Text>
-          <Text style={styles.reportDescription}>
-            Dados demográficos e performance dos alunos
-          </Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity
-          style={styles.reportCard}
-          onPress={() => {
-            Alert.alert('Em Desenvolvimento', 'Esta funcionalidade será implementada em breve.');
-          }}
-        >
-          <Text style={styles.reportTitle}>Relatório de Turmas</Text>
-          <Text style={styles.reportDescription}>
-            Análise de ocupação e performance das turmas
-          </Text>
-        </TouchableOpacity>
-      </View>
-    </ScrollView>
-  );
+  const handleGerarRelatorioPresenca = async () => {
+    try {
+      setLoadingPresencaRelatorio(true);
+      const params: any = {};
+      if (filtroPresencaInicio) params.data_inicio = filtroPresencaInicio;
+      if (filtroPresencaFim) params.data_fim = filtroPresencaFim;
+      if (filtroPresencaTurmaId) params.turma_id = filtroPresencaTurmaId;
+      const response = await presencaService.gerarRelatorioPresenca(params);
+      setPresencaRelatorio(response);
+    } catch (error: any) {
+      Alert.alert('Erro', error.response?.data?.error || 'Erro ao gerar relatório de presença.');
+    } finally {
+      setLoadingPresencaRelatorio(false);
+    }
+  };
+
+  const atualizarItemRelatorio = (itemAtualizado: PresencaRelatorioItem) => {
+    setPresencaRelatorio(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        presencas: prev.presencas.map(item =>
+          item.id === itemAtualizado.id ? itemAtualizado : item
+        ),
+      };
+    });
+  };
+
+  const handleCorrigirPresenca = async (item: PresencaRelatorioItem, confirmar: boolean) => {
+    if (corrigindoPresenca[item.id]) return;
+
+    const executar = async (payload: { checkin_realizado?: boolean; presenca_confirmada?: boolean }) => {
+      try {
+        setCorrigindoPresenca(prev => ({ ...prev, [item.id]: true }));
+        const atualizado = await presencaService.corrigirPresenca(item.id, payload);
+        atualizarItemRelatorio(atualizado);
+      } catch (error: any) {
+        Alert.alert('Erro', error.response?.data?.error || 'Erro ao corrigir presença.');
+      } finally {
+        setCorrigindoPresenca(prev => ({ ...prev, [item.id]: false }));
+      }
+    };
+
+    if (confirmar && !item.checkin_realizado) {
+      Alert.alert(
+        'Confirmar presença',
+        'Este aluno não realizou check-in. Deseja marcar o check-in junto com a presença?',
+        [
+          { text: 'Cancelar', style: 'cancel' },
+          {
+            text: 'Confirmar',
+            onPress: () => executar({ checkin_realizado: true, presenca_confirmada: true }),
+          },
+        ]
+      );
+      return;
+    }
+
+    await executar({ presenca_confirmada: confirmar });
+  };
+
+  const renderRelatorios = () => {
+    const buscaNormalizada = normalizeSearch(filtroPresencaBusca);
+    const presencasFiltradas =
+      presencaRelatorio?.presencas.filter(item =>
+        normalizeSearch(item.aluno_nome).includes(buscaNormalizada)
+      ) || [];
+    const alunosFiltrados = alunos.filter(aluno =>
+      normalizeSearch(`${aluno.first_name} ${aluno.last_name}`.trim()).includes(
+        normalizeSearch(filtroAlunoBusca)
+      )
+    );
+    const turmasFiltradas = turmas.filter(turma =>
+      normalizeSearch(
+        `${turma.ct_nome || ''} ${turma.horario || ''} ${turma.dias_semana_nomes?.join(' ') || ''}`
+      ).includes(normalizeSearch(filtroTurmaBusca))
+    );
+    const alunosAtivos = alunos.filter(aluno => aluno.ativo).length;
+    const alunosInativos = alunos.filter(aluno => !aluno.ativo).length;
+
+    return (
+      <ScrollView style={styles.content}>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Relatórios Disponíveis</Text>
+
+          <TouchableOpacity
+            style={styles.reportCard}
+            onPress={handleGerarRelatorioFinanceiro}
+          >
+            <Text style={styles.reportTitle}>Relatório Financeiro</Text>
+            <Text style={styles.reportDescription}>
+              Relatório detalhado de receitas e despesas
+            </Text>
+          </TouchableOpacity>
+
+          <View style={styles.reportCard}>
+            <Text style={styles.reportTitle}>Relatório de Presença</Text>
+            <Text style={styles.reportDescription}>
+              Estatísticas e correção de presenças registradas
+            </Text>
+
+            <View style={styles.reportFilters}>
+              <TextInput
+                style={styles.input}
+                placeholder="Data inicial (AAAA-MM-DD)"
+                value={filtroPresencaInicio}
+                onChangeText={setFiltroPresencaInicio}
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="Data final (AAAA-MM-DD)"
+                value={filtroPresencaFim}
+                onChangeText={setFiltroPresencaFim}
+              />
+              <TouchableOpacity
+                style={styles.filterButton}
+                onPress={() => setShowPresencaTurmaModal(true)}
+              >
+                <Text style={styles.filterButtonText}>
+                  {filtroPresencaTurmaId
+                    ? `Turma ${filtroPresencaTurmaId}`
+                    : 'Selecionar turma'}
+                </Text>
+              </TouchableOpacity>
+              {filtroPresencaTurmaId && (
+                <TouchableOpacity
+                  style={styles.clearFilterButton}
+                  onPress={() => setFiltroPresencaTurmaId(null)}
+                >
+                  <Text style={styles.clearFilterText}>Limpar turma</Text>
+                </TouchableOpacity>
+              )}
+              <TextInput
+                style={styles.input}
+                placeholder="Buscar aluno"
+                value={filtroPresencaBusca}
+                onChangeText={setFiltroPresencaBusca}
+              />
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={handleGerarRelatorioPresenca}
+              >
+                {loadingPresencaRelatorio ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.actionButtonText}>Gerar relatório</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+
+            {presencaRelatorio && (
+              <View style={styles.reportSummary}>
+                <Text style={styles.reportSummaryText}>
+                  Registros: {presencaRelatorio.total_registros}
+                </Text>
+                <Text style={styles.reportSummaryText}>
+                  Check-ins: {presencaRelatorio.total_checkins}
+                </Text>
+                <Text style={styles.reportSummaryText}>
+                  Confirmadas: {presencaRelatorio.total_confirmadas}
+                </Text>
+              </View>
+            )}
+
+            {presencaRelatorio && presencasFiltradas.length === 0 && (
+              <Text style={styles.noData}>Nenhum registro encontrado.</Text>
+            )}
+
+            {presencasFiltradas.map(item => (
+              <View key={item.id} style={styles.presencaCard}>
+                <View style={styles.presencaHeader}>
+                  <Text style={styles.presencaAluno}>{item.aluno_nome}</Text>
+                  <Text style={styles.presencaData}>{formatDate(item.data)}</Text>
+                </View>
+                <Text style={styles.presencaTurma}>Turma: {item.turma_nome}</Text>
+                <View style={styles.presencaStatusRow}>
+                  <View style={styles.presencaStatusItem}>
+                    <Text style={styles.presencaStatusLabel}>Check-in</Text>
+                    <Text style={[
+                      styles.presencaStatusValue,
+                      { color: item.checkin_realizado ? '#4caf50' : '#f44336' }
+                    ]}>
+                      {item.checkin_realizado ? 'Sim' : 'Não'}
+                    </Text>
+                  </View>
+                  <View style={styles.presencaStatusItem}>
+                    <Text style={styles.presencaStatusLabel}>Presença</Text>
+                    <Text style={[
+                      styles.presencaStatusValue,
+                      { color: item.presenca_confirmada ? '#4caf50' : '#f44336' }
+                    ]}>
+                      {item.presenca_confirmada ? 'Confirmada' : 'Pendente'}
+                    </Text>
+                  </View>
+                </View>
+                <TouchableOpacity
+                  style={[
+                    styles.corrigirButton,
+                    item.presenca_confirmada && styles.corrigirButtonOutline
+                  ]}
+                  onPress={() => handleCorrigirPresenca(item, !item.presenca_confirmada)}
+                  disabled={corrigindoPresenca[item.id]}
+                >
+                  <Text style={[
+                    styles.corrigirButtonText,
+                    item.presenca_confirmada && styles.corrigirButtonOutlineText
+                  ]}>
+                    {corrigindoPresenca[item.id]
+                      ? 'Atualizando...'
+                      : item.presenca_confirmada
+                        ? 'Desfazer Presença'
+                        : 'Confirmar Presença'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
+
+          <View style={styles.reportCard}>
+            <Text style={styles.reportTitle}>Relatório de Alunos</Text>
+            <Text style={styles.reportDescription}>
+              Resumo de alunos ativos e inativos
+            </Text>
+            {loadingRelatorios && (
+              <View style={styles.loadingInline}>
+                <ActivityIndicator size="small" color="#1a237e" />
+                <Text style={styles.loadingInlineText}>Carregando alunos...</Text>
+              </View>
+            )}
+            <View style={styles.reportSummary}>
+              <Text style={styles.reportSummaryText}>Total: {alunos.length}</Text>
+              <Text style={styles.reportSummaryText}>Ativos: {alunosAtivos}</Text>
+              <Text style={styles.reportSummaryText}>Inativos: {alunosInativos}</Text>
+            </View>
+            <TextInput
+              style={styles.input}
+              placeholder="Buscar aluno"
+              value={filtroAlunoBusca}
+              onChangeText={setFiltroAlunoBusca}
+            />
+            {alunosFiltrados.length === 0 ? (
+              <Text style={styles.noData}>Nenhum aluno encontrado.</Text>
+            ) : (
+              alunosFiltrados.slice(0, 20).map(aluno => (
+                <View key={aluno.id} style={styles.reportListItem}>
+                  <Text style={styles.reportListTitle}>
+                    {aluno.first_name} {aluno.last_name}
+                  </Text>
+                  <Text style={styles.reportListSubtitle}>
+                    {aluno.ativo ? 'Ativo' : 'Inativo'} • {aluno.email}
+                  </Text>
+                </View>
+              ))
+            )}
+          </View>
+
+          <View style={styles.reportCard}>
+            <Text style={styles.reportTitle}>Relatório de Turmas</Text>
+            <Text style={styles.reportDescription}>
+              Resumo de turmas cadastradas e ocupação
+            </Text>
+            {loadingRelatorios && (
+              <View style={styles.loadingInline}>
+                <ActivityIndicator size="small" color="#1a237e" />
+                <Text style={styles.loadingInlineText}>Carregando turmas...</Text>
+              </View>
+            )}
+            <View style={styles.reportSummary}>
+              <Text style={styles.reportSummaryText}>Total: {turmas.length}</Text>
+              <Text style={styles.reportSummaryText}>
+                Ativas: {turmas.filter(turma => turma.ativo).length}
+              </Text>
+              <Text style={styles.reportSummaryText}>
+                Inativas: {turmas.filter(turma => !turma.ativo).length}
+              </Text>
+            </View>
+            <TextInput
+              style={styles.input}
+              placeholder="Buscar turma"
+              value={filtroTurmaBusca}
+              onChangeText={setFiltroTurmaBusca}
+            />
+            {turmasFiltradas.length === 0 ? (
+              <Text style={styles.noData}>Nenhuma turma encontrada.</Text>
+            ) : (
+              turmasFiltradas.slice(0, 20).map(turma => (
+                <View key={turma.id} style={styles.reportListItem}>
+                  <Text style={styles.reportListTitle}>
+                    Turma {turma.id} • {turma.ct_nome || 'CT'}
+                  </Text>
+                  <Text style={styles.reportListSubtitle}>
+                    {turma.horario} • {turma.alunos_count || 0} alunos • {turma.ativo ? 'Ativa' : 'Inativa'}
+                  </Text>
+                </View>
+              ))
+            )}
+          </View>
+        </View>
+      </ScrollView>
+    );
+  };
 
   if (loading) {
     return (
@@ -1322,6 +1644,47 @@ const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }
             <TouchableOpacity
               style={[styles.actionButton, styles.cancelButton, styles.inlineButton]}
               onPress={() => setShowTurmaModal(false)}
+            >
+              <Text style={styles.actionButtonText}>Fechar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+      <Modal visible={showPresencaTurmaModal} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Selecionar turma</Text>
+            <ScrollView style={{ maxHeight: 320 }}>
+              <TouchableOpacity
+                style={styles.modalOption}
+                onPress={() => {
+                  setFiltroPresencaTurmaId(null);
+                  setShowPresencaTurmaModal(false);
+                }}
+              >
+                <Text style={styles.modalOptionText}>Todas as turmas</Text>
+              </TouchableOpacity>
+              {turmas.map(turma => (
+                <TouchableOpacity
+                  key={turma.id}
+                  style={styles.modalOption}
+                  onPress={() => {
+                    setFiltroPresencaTurmaId(turma.id ?? null);
+                    setShowPresencaTurmaModal(false);
+                  }}
+                >
+                  <Text style={styles.modalOptionText}>
+                    Turma {turma.id} - {turma.ct_nome || 'CT'} - {turma.horario}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+              {turmas.length === 0 && (
+                <Text style={styles.noData}>Nenhuma turma cadastrada.</Text>
+              )}
+            </ScrollView>
+            <TouchableOpacity
+              style={[styles.actionButton, styles.cancelButton, styles.inlineButton]}
+              onPress={() => setShowPresencaTurmaModal(false)}
             >
               <Text style={styles.actionButtonText}>Fechar</Text>
             </TouchableOpacity>
@@ -1900,6 +2263,100 @@ const styles = StyleSheet.create({
   reportDescription: {
     fontSize: 14,
     color: '#666',
+  },
+  reportFilters: {
+    marginTop: 12,
+  },
+  reportSummary: {
+    marginTop: 12,
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+  },
+  reportSummaryText: {
+    fontSize: 12,
+    color: '#555',
+    marginBottom: 4,
+  },
+  reportListItem: {
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  reportListTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  reportListSubtitle: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 2,
+  },
+  presencaCard: {
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: '#eee',
+  },
+  presencaHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  presencaAluno: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#333',
+    flex: 1,
+    marginRight: 8,
+  },
+  presencaData: {
+    fontSize: 12,
+    color: '#666',
+  },
+  presencaTurma: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 8,
+  },
+  presencaStatusRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  presencaStatusItem: {
+    flex: 1,
+  },
+  presencaStatusLabel: {
+    fontSize: 12,
+    color: '#666',
+  },
+  presencaStatusValue: {
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  corrigirButton: {
+    backgroundColor: '#1a237e',
+    borderRadius: 6,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  corrigirButtonOutline: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#1a237e',
+  },
+  corrigirButtonText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  corrigirButtonOutlineText: {
+    color: '#1a237e',
   },
   loadingContainer: {
     flex: 1,

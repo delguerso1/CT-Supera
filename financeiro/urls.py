@@ -1,6 +1,7 @@
 from django.urls import path
 from .views import (
     MensalidadeListCreateView, MensalidadeRetrieveUpdateDestroyView,
+    BaixarMensalidadeAPIView,
     DespesaListCreateView, DespesaRetrieveUpdateDestroyView,
     SalarioListCreateView, SalarioRetrieveUpdateDestroyView,
     PagarSalarioAPIView, DashboardFinanceiroAPIView, RelatorioFinanceiroAPIView, 
@@ -8,7 +9,7 @@ from .views import (
     # Integração C6 Bank
     C6BankTestConnectionAPIView, C6BankCreatePixPaymentAPIView, C6BankCheckPaymentStatusAPIView,
     C6BankTransactionListAPIView, C6BankTransactionDetailAPIView, C6BankWebhookAPIView,
-    CriarPagamentoBancarioAPIView,
+    CriarPagamentoBancarioAPIView, ConsultarCheckoutStatusAPIView,
     # API Bank Slip - Boletos
     GerarBoletoAPIView, ConsultarBoletoAPIView, AlterarBoletoAPIView,
     CancelarBoletoAPIView, DownloadBoletoPDFAPIView,
@@ -20,6 +21,7 @@ urlpatterns = [
     # Mensalidades API
     path('mensalidades/', MensalidadeListCreateView.as_view(), name='mensalidade_list_create'),
     path('mensalidades/<int:pk>/', MensalidadeRetrieveUpdateDestroyView.as_view(), name='mensalidade_detail'),
+    path('mensalidades/<int:pk>/dar-baixa/', BaixarMensalidadeAPIView.as_view(), name='mensalidade_dar_baixa'),
     path('mensalidades/<int:pk>/gerar-pix/', GerarPixAPIView.as_view(), name='gerar_pix'),
     path('mensalidades/<int:pk>/status-pix/', ConsultarStatusPixAPIView.as_view(), name='status_pix'),
     path('mensalidades/<int:pk>/gerar-boleto/', GerarBoletoAPIView.as_view(), name='gerar_boleto'),
@@ -46,6 +48,7 @@ urlpatterns = [
     
     # Pagamento Bancário (Cartão) - Checkout C6 Bank
     path('pagamento-bancario/gerar/<int:mensalidade_id>/', CriarPagamentoBancarioAPIView.as_view(), name='criar_pagamento_bancario'),
+    path('checkout/status/<int:transacao_id>/', ConsultarCheckoutStatusAPIView.as_view(), name='consultar_checkout_status'),
     
     # ========================================
     # INTEGRAÇÃO C6 BANK

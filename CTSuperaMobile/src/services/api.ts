@@ -16,6 +16,8 @@ import {
   CheckoutPayment,
   VerificarCheckinResponse,
   RegistrarPresencaResponse,
+  PresencaRelatorioResponse,
+  PresencaRelatorioItem,
   HistoricoAulasProfessorResponse,
   PreCadastro,
   PainelGerente,
@@ -302,6 +304,19 @@ export const presencaService = {
     });
     return response.data;
   },
+
+  gerarRelatorioPresenca: async (params?: any): Promise<PresencaRelatorioResponse> => {
+    const response = await api.get('funcionarios/relatorio-presenca/', { params });
+    return response.data;
+  },
+
+  corrigirPresenca: async (
+    presencaId: number,
+    data: Partial<Pick<PresencaRelatorioItem, 'checkin_realizado' | 'presenca_confirmada'>>
+  ): Promise<PresencaRelatorioItem> => {
+    const response = await api.patch(`funcionarios/corrigir-presenca/${presencaId}/`, data);
+    return response.data;
+  },
 };
 
 export const financeiroService = {
@@ -327,6 +342,11 @@ export const financeiroService = {
 
   excluirMensalidade: async (id: number): Promise<void> => {
     await api.delete(`financeiro/mensalidades/${id}/`);
+  },
+
+  darBaixaMensalidade: async (id: number): Promise<Mensalidade> => {
+    const response = await api.post(`financeiro/mensalidades/${id}/dar-baixa/`);
+    return response.data.mensalidade;
   },
 
   getDashboardStats: async (params?: any): Promise<FinanceiroDashboard> => {
@@ -529,6 +549,11 @@ export const pagamentoService = {
 
   criarCheckout: async (mensalidadeId: number): Promise<CheckoutPayment> => {
     const response = await api.post(`financeiro/pagamento-bancario/gerar/${mensalidadeId}/`);
+    return response.data;
+  },
+
+  consultarCheckout: async (transacaoId: number): Promise<any> => {
+    const response = await api.get(`financeiro/checkout/status/${transacaoId}/`);
     return response.data;
   },
 };

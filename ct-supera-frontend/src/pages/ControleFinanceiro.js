@@ -177,6 +177,20 @@ function ControleFinanceiro({ user, onDataChange }) {
     }
   };
 
+  // Função para dar baixa em mensalidade (pagamento em dinheiro, transferência, etc.)
+  const handleDarBaixaMensalidade = async (mensalidadeId) => {
+    if (window.confirm('Dar baixa nesta mensalidade? O pagamento foi recebido em dinheiro ou outra forma?')) {
+      try {
+        await api.post(`financeiro/mensalidades/${mensalidadeId}/dar-baixa/`);
+        fetchMensalidades();
+        fetchDashboard();
+        if (onDataChange) onDataChange();
+      } catch (err) {
+        alert(err.response?.data?.error || 'Erro ao dar baixa na mensalidade.');
+      }
+    }
+  };
+
   // Função para marcar salário como pago
   const handlePagarSalario = async (salarioId) => {
     if (window.confirm('Deseja marcar este salário como pago?')) {
@@ -273,12 +287,13 @@ function ControleFinanceiro({ user, onDataChange }) {
               <th style={{ padding: 10, textAlign: 'right' }}>Valor</th>
               <th style={{ padding: 10, textAlign: 'center' }}>Vencimento</th>
               <th style={{ padding: 10, textAlign: 'center' }}>Status</th>
+              <th style={{ padding: 10, textAlign: 'center' }}>Ações</th>
             </tr>
           </thead>
           <tbody>
             {mensalidadesPaginadas.length === 0 && (
               <tr>
-                <td colSpan={4} style={{ color: '#888', textAlign: 'center', padding: 16 }}>Nenhuma mensalidade encontrada.</td>
+                <td colSpan={5} style={{ color: '#888', textAlign: 'center', padding: 16 }}>Nenhuma mensalidade encontrada.</td>
               </tr>
             )}
             {mensalidadesPaginadas.map(m => (
@@ -291,6 +306,25 @@ function ControleFinanceiro({ user, onDataChange }) {
                 <td style={{ padding: 10, textAlign: 'right' }}>{formatCurrency(m.valor)}</td>
                 <td style={{ padding: 10, textAlign: 'center' }}>{formatDate(m.data_vencimento)}</td>
                 <td style={{ padding: 10, textAlign: 'center' }}>{formatStatus(m.status)}</td>
+                <td style={{ padding: 10, textAlign: 'center' }}>
+                  {(m.status === 'pendente' || m.status === 'atrasado') && (
+                    <button
+                      onClick={() => handleDarBaixaMensalidade(m.id)}
+                      style={{
+                        background: '#2e7d32',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: 4,
+                        padding: '4px 10px',
+                        fontSize: '12px',
+                        cursor: 'pointer'
+                      }}
+                      title="Registrar pagamento em dinheiro ou outra forma"
+                    >
+                      Dar baixa
+                    </button>
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>
