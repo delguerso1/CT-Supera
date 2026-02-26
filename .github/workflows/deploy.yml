@@ -30,6 +30,13 @@ jobs:
         run: |
           python manage.py makemigrations --check --dry-run
 
+      - name: Verificar configuração Django
+        env:
+          DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
+          DJANGO_SETTINGS_MODULE: app.settings
+        run: |
+          python manage.py check
+
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
