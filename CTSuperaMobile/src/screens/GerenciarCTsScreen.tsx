@@ -10,6 +10,7 @@ import {
   SafeAreaView,
   TextInput,
   Modal,
+  Switch,
 } from 'react-native';
 import { useAuth } from '../utils/AuthContext';
 import { ctService } from '../services/api';
@@ -27,6 +28,7 @@ const GerenciarCTsScreen: React.FC<NavigationProps> = ({ navigation }) => {
     nome: '',
     endereco: '',
     telefone: '',
+    sem_financeiro: false,
   });
 
   useEffect(() => {
@@ -52,6 +54,7 @@ const GerenciarCTsScreen: React.FC<NavigationProps> = ({ navigation }) => {
       nome: '',
       endereco: '',
       telefone: '',
+      sem_financeiro: false,
     });
     setCtSelecionado(null);
     setShowForm(true);
@@ -63,6 +66,7 @@ const GerenciarCTsScreen: React.FC<NavigationProps> = ({ navigation }) => {
       nome: ct.nome,
       endereco: ct.endereco || '',
       telefone: ct.telefone || '',
+      sem_financeiro: ct.sem_financeiro ?? false,
     });
     setCtSelecionado(ct);
     setShowForm(true);
@@ -103,6 +107,7 @@ const GerenciarCTsScreen: React.FC<NavigationProps> = ({ navigation }) => {
         nome: formData.nome.trim(),
         endereco: formData.endereco?.trim() || '',
         telefone: formData.telefone?.trim() || '',
+        sem_financeiro: formData.sem_financeiro ?? false,
       };
 
       if (ctSelecionado?.id) {
@@ -167,6 +172,9 @@ const GerenciarCTsScreen: React.FC<NavigationProps> = ({ navigation }) => {
               <View style={styles.ctHeader}>
                 <View style={styles.ctInfo}>
                   <Text style={styles.ctNome}>{ct.nome}</Text>
+                  {ct.sem_financeiro && (
+                    <Text style={styles.ctDetail}>💰 Sem financeiro</Text>
+                  )}
                   {ct.endereco && (
                     <Text style={styles.ctDetail}>📍 {ct.endereco}</Text>
                   )}
@@ -232,6 +240,22 @@ const GerenciarCTsScreen: React.FC<NavigationProps> = ({ navigation }) => {
                 keyboardType="phone-pad"
                 editable={!saving}
               />
+
+              <View style={styles.switchRow}>
+                <Text style={styles.label}>Sem Financeiro</Text>
+                <Switch
+                  value={formData.sem_financeiro}
+                  onValueChange={(value) => setFormData({ ...formData, sem_financeiro: value })}
+                  trackColor={{ false: '#ccc', true: '#1a237e' }}
+                  thumbColor={formData.sem_financeiro ? '#fff' : '#f4f3f4'}
+                  disabled={saving}
+                />
+              </View>
+              <Text style={styles.hint}>
+                {formData.sem_financeiro
+                  ? 'Alunos deste CT não terão mensalidades criadas.'
+                  : 'Alunos deste CT terão mensalidades criadas ao serem vinculados à turma.'}
+              </Text>
 
               <View style={styles.modalActions}>
                 <TouchableOpacity
@@ -361,6 +385,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     marginBottom: 4,
+  },
+  switchRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  hint: {
+    fontSize: 12,
+    color: '#888',
+    marginTop: 4,
   },
   ctActions: {
     flexDirection: 'row',

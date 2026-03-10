@@ -5,6 +5,10 @@ class CentroDeTreinamento(models.Model):
     nome = models.CharField(max_length=100, unique=True)
     endereco = models.TextField(blank=True)
     telefone = models.CharField(max_length=15, blank=True, null=True)
+    sem_financeiro = models.BooleanField(
+        default=False,
+        help_text="Se ativo, alunos vinculados a este CT não terão mensalidades criadas."
+    )
     dias_semana = models.ManyToManyField(
         'turmas.DiaSemana',
         blank=True,

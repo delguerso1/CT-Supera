@@ -8,6 +8,7 @@ from usuarios.models import Usuario
 from .models import Turma, DiaSemana
 from .serializers import TurmaSerializer, UsuarioSerializer, DiaSemanaSerializer
 from django.db import models
+from financeiro.services import criar_mensalidade_ao_vincular_turma
 
 
 def _validar_aluno_turma(aluno, turma):
@@ -131,6 +132,8 @@ class AdicionarAlunoAPIView(APIView):
             )
 
         turma.alunos.add(*alunos)
+        for aluno in alunos:
+            criar_mensalidade_ao_vincular_turma(aluno, turma)
         return Response({"message": "Alunos adicionados com sucesso!"}, status=status.HTTP_200_OK)
 
 

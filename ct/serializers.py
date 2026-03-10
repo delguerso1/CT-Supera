@@ -12,7 +12,7 @@ class CentroDeTreinamentoSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CentroDeTreinamento
-        fields = ['id', 'nome', 'endereco', 'telefone', 'dias_semana', 'dias_semana_nomes']
+        fields = ['id', 'nome', 'endereco', 'telefone', 'sem_financeiro', 'dias_semana', 'dias_semana_nomes']
 
     def get_dias_semana_nomes(self, obj):
         return [dia.nome for dia in obj.dias_semana.all()]

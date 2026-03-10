@@ -7,6 +7,7 @@ function CadastroCentroTreinamento({ styles }) {
     nome: '',
     endereco: '',
     telefone: '',
+    sem_financeiro: false,
     dias_semana: [],
   });
   const [error, setError] = useState('');
@@ -60,6 +61,10 @@ function CadastroCentroTreinamento({ styles }) {
     });
   };
 
+  const handleToggleSemFinanceiro = () => {
+    setFormData(prev => ({ ...prev, sem_financeiro: !prev.sem_financeiro }));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -72,17 +77,19 @@ function CadastroCentroTreinamento({ styles }) {
       if (editId) {
         await api.put(`cts/editar/${editId}/`, {
           ...formData,
+          sem_financeiro: formData.sem_financeiro,
           dias_semana: formData.dias_semana.map(Number),
         });
         setSuccess('Centro de treinamento atualizado com sucesso!');
       } else {
         await api.post('cts/criar/', {
           ...formData,
+          sem_financeiro: formData.sem_financeiro,
           dias_semana: formData.dias_semana.map(Number),
         });
         setSuccess('Centro de treinamento cadastrado com sucesso!');
       }
-      setFormData({ nome: '', endereco: '', telefone: '', dias_semana: [] });
+      setFormData({ nome: '', endereco: '', telefone: '', sem_financeiro: false, dias_semana: [] });
       setEditId(null);
       setShowForm(false);
       fetchCentros();
@@ -96,6 +103,7 @@ function CadastroCentroTreinamento({ styles }) {
       nome: centro.nome,
       endereco: centro.endereco,
       telefone: centro.telefone,
+      sem_financeiro: centro.sem_financeiro || false,
       dias_semana: centro.dias_semana || [],
     });
     setEditId(centro.id);
@@ -117,7 +125,7 @@ function CadastroCentroTreinamento({ styles }) {
   };
 
   const handleNovoCentro = () => {
-    setFormData({ nome: '', endereco: '', telefone: '', dias_semana: [] });
+    setFormData({ nome: '', endereco: '', telefone: '', sem_financeiro: false, dias_semana: [] });
     setEditId(null);
     setShowForm(true);
     setError('');
@@ -158,13 +166,14 @@ function CadastroCentroTreinamento({ styles }) {
               <th style={{ padding: 10, borderBottom: '2px solid #eee', textAlign: 'left' }}>Endereço</th>
               <th style={{ padding: 10, borderBottom: '2px solid #eee', textAlign: 'left' }}>Telefone</th>
               <th style={{ padding: 10, borderBottom: '2px solid #eee', textAlign: 'left' }}>Dias</th>
+              <th style={{ padding: 10, borderBottom: '2px solid #eee', textAlign: 'center' }}>Financeiro</th>
               <th style={{ padding: 10, borderBottom: '2px solid #eee', textAlign: 'center' }}>Ações</th>
             </tr>
           </thead>
           <tbody>
             {centros.length === 0 && (
               <tr>
-                <td colSpan={5} style={{ color: '#888', padding: 12, textAlign: 'center' }}>
+                <td colSpan={6} style={{ color: '#888', padding: 12, textAlign: 'center' }}>
                   Nenhum centro cadastrado.
                 </td>
               </tr>
@@ -188,6 +197,9 @@ function CadastroCentroTreinamento({ styles }) {
                 <td style={{ padding: 10 }}>{centro.telefone}</td>
                 <td style={{ padding: 10 }}>
                   {centro.dias_semana_nomes?.length ? centro.dias_semana_nomes.join(', ') : '-'}
+                </td>
+                <td style={{ padding: 10, textAlign: 'center' }}>
+                  {centro.sem_financeiro ? 'Sem' : 'Sim'}
                 </td>
                 <td style={{ padding: 10, textAlign: 'center' }}>
                   <div className="centro-treinamento-actions" style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', flexWrap: 'wrap' }}>
@@ -257,7 +269,7 @@ function CadastroCentroTreinamento({ styles }) {
             if (e.target === e.currentTarget) {
               setShowForm(false);
               setEditId(null);
-              setFormData({ nome: '', endereco: '', telefone: '', dias_semana: [] });
+              setFormData({ nome: '', endereco: '', telefone: '', sem_financeiro: false, dias_semana: [] });
               setError('');
               setSuccess('');
             }
@@ -364,6 +376,34 @@ function CadastroCentroTreinamento({ styles }) {
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 <label style={{ fontWeight: 500, fontSize: '0.9rem', color: '#555' }}>
+                  Financeiro
+                </label>
+                <button
+                  type="button"
+                  onClick={handleToggleSemFinanceiro}
+                  style={{
+                    padding: '10px 16px',
+                    borderRadius: '4px',
+                    border: `2px solid ${formData.sem_financeiro ? '#1F6C86' : '#ccc'}`,
+                    backgroundColor: formData.sem_financeiro ? '#e3f2fd' : '#fff',
+                    color: formData.sem_financeiro ? '#1F6C86' : '#666',
+                    fontSize: '0.95rem',
+                    cursor: 'pointer',
+                    fontWeight: 500,
+                    width: '100%',
+                  }}
+                >
+                  {formData.sem_financeiro ? '✓ Sem Financeiro (ativado)' : 'Sem Financeiro'}
+                </button>
+                <span style={{ fontSize: '0.8rem', color: '#888' }}>
+                  {formData.sem_financeiro
+                    ? 'Alunos deste CT não terão mensalidades criadas.'
+                    : 'Clique para ativar: alunos deste CT não terão mensalidades.'}
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontWeight: 500, fontSize: '0.9rem', color: '#555' }}>
                   Dias de funcionamento *
                 </label>
                 <div style={{ display: 'grid', gap: '8px' }}>
@@ -391,7 +431,7 @@ function CadastroCentroTreinamento({ styles }) {
                   onClick={() => {
                     setShowForm(false);
                     setEditId(null);
-                    setFormData({ nome: '', endereco: '', telefone: '', dias_semana: [] });
+                    setFormData({ nome: '', endereco: '', telefone: '', sem_financeiro: false, dias_semana: [] });
                     setError('');
                     setSuccess('');
                   }}

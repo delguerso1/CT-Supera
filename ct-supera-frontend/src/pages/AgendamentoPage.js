@@ -106,16 +106,11 @@ function AgendamentoPage() {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    let novoValor = value;
-    if (name === 'first_name' || name === 'last_name') {
-      novoValor = formatarNome(value);
-    }
-    setForm(prev => ({ ...prev, [name]: novoValor }));
-    
-    // Se mudou o CT, limpa a turma selecionada
+    let update = { [name]: value };
     if (name === 'ct') {
-      setForm(prev => ({ ...prev, turma: '' }));
+      update.turma = '';
     }
+    setForm(prev => ({ ...prev, ...update }));
   };
 
   function formatTelefone(value) {
@@ -138,8 +133,8 @@ function AgendamentoPage() {
     }
 
     const dados = {
-      first_name: form.first_name,
-      last_name: form.last_name,
+      first_name: formatarNome(form.first_name),
+      last_name: formatarNome(form.last_name),
       email: form.email,
       telefone: form.telefone,
       data_nascimento: form.data_nascimento,

@@ -32,6 +32,9 @@ export interface User {
   pix_professor?: string;
   dia_vencimento?: number;
   valor_mensalidade?: number;
+  plano?: string | null;
+  dias_habilitados?: number[];
+  dias_habilitados_nomes?: string[];
 }
 
 export interface Turma {
@@ -54,6 +57,7 @@ export interface CentroTreinamento {
   nome: string;
   endereco?: string;
   telefone?: string;
+  sem_financeiro?: boolean;
 }
 
 export interface SuperaNews {
@@ -149,21 +153,31 @@ export interface BoletoPayment {
     id: number;
     valor: string;
     status: string;
-    codigo_barras: string;
-    linha_digitavel: string;
-    data_vencimento: string;
-    pdf_url?: string;
+    boleto_codigo?: string;
+    boleto_url?: string;
+    data_vencimento?: string;
+  };
+  boleto?: {
+    id?: string;
+    digitable_line?: string;
+    bar_code?: string;
   };
 }
 
 export interface CheckoutPayment {
-  message: string;
-  checkout: {
-    id: string;
-    valor: string;
-    status: string;
-    payment_url: string;
-    expires_at: string;
+  message?: string;
+  payment_url?: string;
+  transacao?: {
+    id: number;
+    status?: string;
+    payment_url?: string;
+    data_expiracao?: string;
+  };
+  checkout?: {
+    id?: string;
+    status?: string;
+    payment_url?: string;
+    expires_at?: string;
   };
 }
 
@@ -195,6 +209,24 @@ export interface RegistrarPresencaResponse {
   message: string;
   warning?: string;
   alunos_sem_checkin?: string[];
+}
+
+export interface PresencaRelatorioItem {
+  id: number;
+  aluno_id: number;
+  aluno_nome: string;
+  turma_id: number;
+  turma_nome: string;
+  data: string;
+  checkin_realizado: boolean;
+  presenca_confirmada: boolean;
+}
+
+export interface PresencaRelatorioResponse {
+  total_registros: number;
+  total_checkins: number;
+  total_confirmadas: number;
+  presencas: PresencaRelatorioItem[];
 }
 
 export interface HistoricoAulasProfessorItem {
