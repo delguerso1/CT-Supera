@@ -12,4 +12,4 @@ fi
 
 cd "$ROOT_DIR"
 
-$PYTHON_BIN manage.py gerar_mensalidades
+DJANGO_SETTINGS_MODULE="${DJANGO_SETTINGS_MODULE:-app.settings_hostinger}" $PYTHON_BIN manage.py gerar_mensalidades

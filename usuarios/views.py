@@ -504,51 +504,27 @@ class EditarExcluirUsuarioAPIView(RetrieveUpdateDestroyAPIView):
         """Método personalizado para lidar com upload de fotos e atualização de dados."""
         try:
             instance = self.get_object()
-            print(f"[DEBUG] Atualizando usuário ID: {instance.id}")
-            print(f"[DEBUG] Dados recebidos: {request.data}")
-            print(f"[DEBUG] Arquivos recebidos: {request.FILES}")
             
-            # Se há arquivos (foto), usa FormData
+            # Se há arquivos (foto), monta um dict manualmente para evitar
+            # "cannot pickle 'BufferedRandom' instances" (request.data.copy() com
+            # TemporaryUploadedFile em arquivos > 2.5MB causa esse erro)
             if request.FILES:
-                print(f"[DEBUG] Processando upload de arquivo")
-                # Para upload de arquivo, precisamos incluir todos os dados existentes
-                data = request.data.copy()
-                
-                # Adiciona campos obrigatórios se não estiverem presentes
-                if 'username' not in data:
-                    data['username'] = instance.username
-                if 'tipo' not in data:
-                    data['tipo'] = instance.tipo
-                if 'cpf' not in data:
-                    data['cpf'] = instance.cpf
-                if 'ativo' not in data:
-                    data['ativo'] = instance.ativo
-                if 'email' not in data:
-                    data['email'] = instance.email
-                if 'first_name' not in data:
-                    data['first_name'] = instance.first_name
-                if 'last_name' not in data:
-                    data['last_name'] = instance.last_name
-                
-                # Adiciona outros campos se existirem no usuário
-                if hasattr(instance, 'telefone') and 'telefone' not in data:
-                    data['telefone'] = instance.telefone
-                if hasattr(instance, 'endereco') and 'endereco' not in data:
-                    data['endereco'] = instance.endereco
-                if hasattr(instance, 'data_nascimento') and 'data_nascimento' not in data:
-                    data['data_nascimento'] = instance.data_nascimento
-                if hasattr(instance, 'nome_responsavel') and 'nome_responsavel' not in data:
-                    data['nome_responsavel'] = instance.nome_responsavel
-                if hasattr(instance, 'telefone_responsavel') and 'telefone_responsavel' not in data:
-                    data['telefone_responsavel'] = instance.telefone_responsavel
-                if hasattr(instance, 'telefone_emergencia') and 'telefone_emergencia' not in data:
-                    data['telefone_emergencia'] = instance.telefone_emergencia
-                if hasattr(instance, 'ficha_medica') and 'ficha_medica' not in data:
-                    data['ficha_medica'] = instance.ficha_medica
-                if hasattr(instance, 'dia_vencimento') and 'dia_vencimento' not in data:
-                    data['dia_vencimento'] = instance.dia_vencimento
-                if hasattr(instance, 'valor_mensalidade') and 'valor_mensalidade' not in data:
-                    data['valor_mensalidade'] = instance.valor_mensalidade
+                data = {
+                    'username': request.data.get('username') or instance.username,
+                    'tipo': request.data.get('tipo') or instance.tipo,
+                    'cpf': request.data.get('cpf') or instance.cpf,
+                    'ativo': request.data.get('ativo', instance.ativo),
+                    'email': request.data.get('email') or instance.email,
+                    'first_name': request.data.get('first_name') or instance.first_name,
+                    'last_name': request.data.get('last_name') or instance.last_name,
+                    'foto_perfil': request.FILES.get('foto_perfil'),
+                }
+                # Campos opcionais
+                for field in ('telefone', 'endereco', 'data_nascimento', 'nome_responsavel',
+                             'telefone_responsavel', 'telefone_emergencia', 'ficha_medica',
+                             'dia_vencimento', 'valor_mensalidade'):
+                    if hasattr(instance, field):
+                        data[field] = request.data.get(field, getattr(instance, field))
                 
                 serializer = self.get_serializer(instance, data=data, partial=True)
             else:

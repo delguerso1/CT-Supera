@@ -22,7 +22,8 @@ from app.views import StatusAPIView, serve_frontend
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('status/', StatusAPIView.as_view(), name='status_api'),  # Endpoint de status
+    path('status/', StatusAPIView.as_view(), name='status_api'),
+    path('api/status/', StatusAPIView.as_view(), name='status_api_alt'),  # Health check (nginx /api/)
     path('api/alunos/', include('alunos.urls')),
     path('api/turmas/', include('turmas.urls')),
     path('api/funcionarios/', include('funcionarios.urls')),

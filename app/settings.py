@@ -242,6 +242,10 @@ CSRF_COOKIE_SECURE = False  # Desativado para desenvolvimento
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
+# Upload de fotos: 10MB para evitar TemporaryUploadedFile (BufferedRandom) que causa
+# "cannot pickle 'BufferedRandom' instances" em arquivos > 2.5MB (padrão Django)
+FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10MB
+
 # Desativa a verificação CSRF para a API
 CSRF_COOKIE_SECURE = False
 CSRF_USE_SESSIONS = False

@@ -20,6 +20,10 @@ STATUS_CHOICES = [
 class Mensalidade(models.Model):
     aluno = models.ForeignKey(Usuario, on_delete=models.CASCADE, limit_choices_to={"tipo": "aluno"}, related_name="mensalidades")
     valor = models.DecimalField(max_digits=7, decimal_places=2, default=150.00)  # 🔹 Valor padrão da mensalidade
+    valor_pago = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True,
+        help_text="Valor efetivamente recebido (com multa/juros quando aplicável). Se nulo, considera-se o valor base."
+    )
     data_inicio = models.DateField(auto_now_add=True)  # 🔹 Define data de início automática
     data_vencimento = models.DateField()
     data_pagamento = models.DateTimeField(null=True, blank=True)

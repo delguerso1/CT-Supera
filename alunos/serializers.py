@@ -22,12 +22,17 @@ class UsuarioSerializer(serializers.ModelSerializer):
 
 class MensalidadeSerializer(serializers.ModelSerializer):
     valor = serializers.DecimalField(max_digits=10, decimal_places=2, coerce_to_string=False)
+    valor_efetivo = serializers.SerializerMethodField()
     data_vencimento = serializers.DateField(format="%Y-%m-%d")
     data_pagamento = serializers.SerializerMethodField()
     
     class Meta:
         model = Mensalidade
-        fields = ['id', 'aluno', 'valor', 'data_vencimento', 'data_pagamento', 'status']
+        fields = ['id', 'aluno', 'valor', 'valor_efetivo', 'valor_pago', 'data_vencimento', 'data_pagamento', 'status']
+
+    def get_valor_efetivo(self, obj):
+        """Valor a exibir: valor_pago (com multa/juros) se houver, senão valor base."""
+        return obj.valor_pago if obj.valor_pago is not None else obj.valor
 
     def get_data_pagamento(self, obj):
         if not obj.data_pagamento:

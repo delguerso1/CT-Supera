@@ -1726,7 +1726,7 @@ function DashboardAluno({ user }) {
                       {formatMonthYear(mensalidade.data_vencimento)}
                     </td>
                     <td style={styles.td}>
-                      {formatCurrency(mensalidade.valor)}
+                      {formatCurrency(mensalidade.valor_efetivo ?? mensalidade.valor)}
                     </td>
                     <td style={styles.td}>
                       {formatDateOnly(mensalidade.data_vencimento)}
@@ -1809,7 +1809,7 @@ function DashboardAluno({ user }) {
                       {formatMonthYear(mensalidade.data_vencimento)}
                   </td>
                   <td style={styles.td}>
-                    {formatCurrency(mensalidade.valor)}
+                    {formatCurrency(mensalidade.valor_efetivo ?? mensalidade.valor)}
                   </td>
                   <td style={styles.td}>
                       {formatDateOnly(mensalidade.data_vencimento)}

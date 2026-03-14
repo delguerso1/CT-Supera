@@ -16,7 +16,7 @@ function ControleFinanceiro({ user, onDataChange }) {
   const [ano, setAno] = useState(new Date().getFullYear());
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState('');
-  const [mensalidadeBusca, setMensalidadeBusca] = useState('');
+  const [turmaFiltro, setTurmaFiltro] = useState('');
   const [mensalidadeStatus, setMensalidadeStatus] = useState('');
   const [pagina, setPagina] = useState(1);
   const [showDespesaModal, setShowDespesaModal] = useState(false);
@@ -25,6 +25,7 @@ function ControleFinanceiro({ user, onDataChange }) {
   const [editingUser] = useState(null);
   const [formData] = useState({});
   const [alunos, setAlunos] = useState([]);
+  const [turmas, setTurmas] = useState([]);
   const itensPorPagina = 10;
 
   useEffect(() => {
@@ -33,8 +34,14 @@ function ControleFinanceiro({ user, onDataChange }) {
     fetchDespesas();
     fetchSalarios();
     fetchAlunos();
+    fetchTurmas();
     // eslint-disable-next-line
   }, [mes, ano]);
+
+  useEffect(() => {
+    fetchMensalidades();
+    // eslint-disable-next-line
+  }, [turmaFiltro]);
 
   const fetchDashboard = async () => {
     setLoading(true);
@@ -50,7 +57,9 @@ function ControleFinanceiro({ user, onDataChange }) {
 
   const fetchMensalidades = async () => {
     try {
-      const { data } = await api.get('financeiro/mensalidades/', { params: { mes, ano } });
+      const params = { mes, ano };
+      if (turmaFiltro) params.turma = turmaFiltro;
+      const { data } = await api.get('financeiro/mensalidades/', { params });
       setMensalidades(Array.isArray(data) ? data : data.results || data.mensalidades || []);
     } catch {
       setErro('Erro ao carregar mensalidades.');
@@ -84,14 +93,17 @@ function ControleFinanceiro({ user, onDataChange }) {
     }
   };
 
-  // Filtro e busca
+  const fetchTurmas = async () => {
+    try {
+      const { data } = await api.get('turmas/');
+      setTurmas(Array.isArray(data) ? data : data.results || []);
+    } catch {
+      setErro('Erro ao carregar turmas.');
+    }
+  };
+
+  // Filtro por status (turma já é filtrada na API)
   const mensalidadesFiltradas = mensalidades
-    .filter(m => {
-      const nome = typeof m.aluno === 'object'
-        ? `${m.aluno.first_name} ${m.aluno.last_name}`.toLowerCase()
-        : String(m.aluno).toLowerCase();
-      return nome.includes(mensalidadeBusca.toLowerCase());
-    })
     .filter(m => !mensalidadeStatus || m.status === mensalidadeStatus);
 
   // Paginação
@@ -261,13 +273,23 @@ function ControleFinanceiro({ user, onDataChange }) {
 
       <h3 style={{ color: '#1F6C86', marginTop: 32 }}>Mensalidades</h3>
       <div className="controle-financeiro-busca" style={{ marginBottom: 12, display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center' }}>
-        <input
-          type="text"
-          placeholder="Buscar aluno..."
-          value={mensalidadeBusca}
-          onChange={e => { setMensalidadeBusca(e.target.value); setPagina(1); }}
-          style={{ padding: '0.75rem', borderRadius: 4, border: '1px solid #ccc', minWidth: 180, flex: '1 1 auto', minHeight: '44px', fontSize: '16px' }}
-        />
+        <select
+          value={turmaFiltro}
+          onChange={e => { setTurmaFiltro(e.target.value); setPagina(1); }}
+          style={{ padding: '0.75rem', borderRadius: 4, border: '1px solid #ccc', minHeight: '44px', fontSize: '16px', flex: '1 1 auto', minWidth: 200 }}
+        >
+          <option value="">Todas as turmas</option>
+          {turmas.filter(t => t.ativo !== false).map(t => {
+            const dias = (t.dias_semana_nomes || []).join(', ');
+            const horario = t.horario ? String(t.horario).slice(0, 5) : '';
+            const label = t.ct_nome ? `${t.ct_nome}${dias ? ` (${dias})` : ''}${horario ? ` - ${horario}` : ''}` : `Turma ${t.id}`;
+            return (
+              <option key={t.id} value={t.id}>
+                {label}
+              </option>
+            );
+          })}
+        </select>
         <select
           value={mensalidadeStatus}
           onChange={e => { setMensalidadeStatus(e.target.value); setPagina(1); }}
@@ -303,7 +325,7 @@ function ControleFinanceiro({ user, onDataChange }) {
                     ? `${m.aluno.first_name} ${m.aluno.last_name}`.trim()
                     : getNomeAluno(m.aluno)}
                 </td>
-                <td style={{ padding: 10, textAlign: 'right' }}>{formatCurrency(m.valor)}</td>
+                <td style={{ padding: 10, textAlign: 'right' }}>{formatCurrency(m.valor_efetivo ?? m.valor)}</td>
                 <td style={{ padding: 10, textAlign: 'center' }}>{formatDate(m.data_vencimento)}</td>
                 <td style={{ padding: 10, textAlign: 'center' }}>{formatStatus(m.status)}</td>
                 <td style={{ padding: 10, textAlign: 'center' }}>

@@ -64,11 +64,11 @@ jobs:
             tar -xzf backups/$backup_file
             
             echo "🔄 Reiniciando serviço..."
-            systemctl restart ctsupera
+            sudo systemctl restart ctsupera
             sleep 3
             
             echo "✅ Rollback concluído!"
-            systemctl status ctsupera --no-pager -l | head -15
+            sudo systemctl status ctsupera --no-pager -l | head -15
           EOF
 
       - name: Verificar aplicação

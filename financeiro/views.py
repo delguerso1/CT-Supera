@@ -4,6 +4,7 @@ from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIV
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from django.db.models import Sum
+from django.db.models.functions import Coalesce
 from django.utils import timezone
 from .models import Mensalidade, Despesa, Salario, TransacaoC6Bank
 from .serializers import MensalidadeSerializer, DespesaSerializer, SalarioSerializer, TransacaoC6BankSerializer
@@ -89,6 +90,9 @@ class MensalidadeListCreateView(ListCreateAPIView):
         aluno_id = self.request.query_params.get('aluno')
         if aluno_id:
             queryset = queryset.filter(aluno_id=aluno_id)
+        turma_id = self.request.query_params.get('turma')
+        if turma_id:
+            queryset = queryset.filter(aluno__turmas_aluno=turma_id)
         mes = self.request.query_params.get('mes')
         ano = self.request.query_params.get('ano')
         if mes and ano:
@@ -161,6 +165,20 @@ class BaixarMensalidadeAPIView(APIView):
         if mensalidade.status == 'pago':
             return Response({'error': 'Esta mensalidade já foi paga.'}, status=status.HTTP_400_BAD_REQUEST)
 
+        # Valor efetivamente recebido: pode vir no body ou calcular multa/juros se atrasada
+        valor_pago = request.data.get('valor_pago')
+        if valor_pago is not None:
+            try:
+                mensalidade.valor_pago = Decimal(str(valor_pago))
+            except (ValueError, TypeError):
+                pass
+        else:
+            # Se atrasada e não informou valor, usa o total com multa e mora
+            calculo = calcular_multa_mora(mensalidade)
+            if calculo['esta_atrasada']:
+                mensalidade.valor_pago = Decimal(str(calculo['valor_total']))
+            # Se não atrasada, valor_pago fica None (usa valor base no controle)
+
         mensalidade.status = 'pago'
         mensalidade.save()
         Mensalidade.criar_proxima_mensalidade(mensalidade)
@@ -191,7 +209,10 @@ class DashboardFinanceiroAPIView(APIView):
         despesas = Despesa.objects.filter(data__month=mes, data__year=ano)
         salarios = Salario.objects.filter(data_pagamento__month=mes, data_pagamento__year=ano)
 
-        total_pago = mensalidades.filter(status="pago").aggregate(Sum("valor"))["valor__sum"] or 0
+        # Usa valor_pago quando houver (pagamento com multa/juros), senão valor base
+        total_pago = mensalidades.filter(status="pago").aggregate(
+            total=Sum(Coalesce("valor_pago", "valor"))
+        )["total"] or 0
         total_despesas = despesas.aggregate(Sum("valor"))["valor__sum"] or 0
         total_salarios = salarios.aggregate(Sum("valor"))["valor__sum"] or 0
         total_salarios_pagos = salarios.filter(status="pago").aggregate(Sum("valor"))["valor__sum"] or 0
@@ -442,9 +463,10 @@ class ConsultarStatusPixPorTransacaoAPIView(APIView):
                         transacao.resposta_api = status_response
                         transacao.save()
                         
-                        # Atualiza o status da mensalidade
+                        # Atualiza o status da mensalidade e valor efetivamente recebido
                         mensalidade = transacao.mensalidade
                         mensalidade.status = 'pago'
+                        mensalidade.valor_pago = transacao.valor  # Valor com multa/juros
                         mensalidade.save()
                         proxima = Mensalidade.criar_proxima_mensalidade(mensalidade)
                         if proxima:
@@ -533,8 +555,9 @@ class ConsultarStatusPixAPIView(APIView):
                         transacao.resposta_api = status_response
                         transacao.save()
                         
-                        # Atualiza o status da mensalidade
+                        # Atualiza o status da mensalidade e valor efetivamente recebido
                         mensalidade.status = 'pago'
+                        mensalidade.valor_pago = transacao.valor  # Valor com multa/juros
                         mensalidade.save()
                         proxima = Mensalidade.criar_proxima_mensalidade(mensalidade)
                         if proxima:
@@ -862,6 +885,7 @@ class ConsultarCheckoutStatusAPIView(APIView):
                 mensalidade = transacao.mensalidade
                 if mensalidade.status != 'pago':
                     mensalidade.status = 'pago'
+                    mensalidade.valor_pago = transacao.valor  # Valor com multa/juros
                     mensalidade.save()
                     proxima = Mensalidade.criar_proxima_mensalidade(mensalidade)
                     if proxima:
@@ -1028,10 +1052,12 @@ class C6BankWebhookAPIView(APIView):
             
             transacao.save()
             
-            # Atualiza o status da mensalidade
+            # Atualiza o status da mensalidade e o valor efetivamente recebido
             mensalidade = transacao.mensalidade
             if mensalidade.status != 'pago':
                 mensalidade.status = 'pago'
+                # Registra o valor efetivamente pago (com multa/juros) - transação já tem o total correto
+                mensalidade.valor_pago = transacao.valor
                 mensalidade.save()
                 proxima = Mensalidade.criar_proxima_mensalidade(mensalidade)
                 if proxima:
@@ -1569,9 +1595,10 @@ class ConsultarBoletoAPIView(APIView):
                         transacao.resposta_api = boleto_data
                         transacao.save()
                         
-                        # Atualiza o status da mensalidade
+                        # Atualiza o status da mensalidade e valor efetivamente recebido
                         mensalidade = transacao.mensalidade
                         mensalidade.status = 'pago'
+                        mensalidade.valor_pago = transacao.valor  # Valor com multa/juros
                         mensalidade.save()
                         proxima = Mensalidade.criar_proxima_mensalidade(mensalidade)
                         if proxima:
