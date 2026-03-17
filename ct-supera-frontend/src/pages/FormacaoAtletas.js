@@ -84,14 +84,23 @@ function FormacaoAtletas() {
       });
     } catch (err) {
       const data = err.response?.data;
-      const message =
-        data?.error ||
-        data?.detail ||
-        data?.email ||
-        data?.cpf ||
-        data?.telefone ||
-        'Erro ao enviar cadastro. Verifique os dados e tente novamente.';
-      setError(Array.isArray(message) ? message[0] : message);
+      let message = data?.error || data?.detail;
+
+      if (!message && data && typeof data === 'object') {
+        for (const v of Object.values(data)) {
+          const msg = Array.isArray(v) ? v[0] : v;
+          if (msg && typeof msg === 'string') {
+            message = msg;
+            break;
+          }
+        }
+      }
+
+      setError(
+        message
+          ? (Array.isArray(message) ? message[0] : message)
+          : 'Erro ao enviar cadastro. Verifique os dados e tente novamente.'
+      );
     } finally {
       setLoading(false);
     }

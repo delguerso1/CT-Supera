@@ -81,13 +81,6 @@ class PainelAlunoAPIView(APIView):
         return nomes[data.weekday()]
 
     def _validar_regras_checkin(self, aluno, turma, hoje):
-        if not aluno.plano:
-            return False, "Plano do aluno não configurado."
-
-        limite = aluno.limite_aulas_semanais()
-        if not limite:
-            return False, "Plano do aluno inválido."
-
         if not aluno.dias_habilitados.exists():
             return False, "Dias habilitados do aluno não configurados."
 
@@ -98,6 +91,7 @@ class PainelAlunoAPIView(APIView):
         if turma and not turma.dias_semana.filter(nome=dia_nome).exists():
             return False, "A turma do aluno não ocorre hoje."
 
+        limite = aluno.dias_habilitados.count()
         inicio_semana = hoje - timedelta(days=hoje.weekday())
         fim_semana = inicio_semana + timedelta(days=6)
         checkins_semana = Presenca.objects.filter(

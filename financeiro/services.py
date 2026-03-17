@@ -24,19 +24,21 @@ def _aluno_tem_ct_com_financeiro(aluno):
     ).exists()
 
 
-def criar_mensalidade_ao_vincular_turma(aluno, turma):
+def criar_mensalidade_ao_vincular_turma(aluno, turma, valor_primeira_mensalidade=None, dia_vencimento_primeira=None):
     """
     Cria mensalidade quando aluno é vinculado a uma turma, se:
     - O CT da turma não tem sem_financeiro
     - O aluno ainda não possui mensalidade (evita duplicação)
+    - valor_primeira_mensalidade: valor opcional (matrícula + uniforme + mensalidade)
+    - dia_vencimento_primeira: dia do mês (1-31) para vencimento da primeira mensalidade
     """
     if turma.ct.sem_financeiro:
         return
     if Mensalidade.objects.filter(aluno=aluno).exists():
         return  # Já possui mensalidade, não duplicar
 
-    valor = aluno.valor_mensalidade or Decimal("150.00")
-    dia_venc = aluno.dia_vencimento or 10
+    valor = valor_primeira_mensalidade or aluno.valor_mensalidade or Decimal("150.00")
+    dia_venc = dia_vencimento_primeira if dia_vencimento_primeira is not None else (aluno.dia_vencimento or 10)
     try:
         dia_venc = int(dia_venc)
     except (TypeError, ValueError):
@@ -44,7 +46,7 @@ def criar_mensalidade_ao_vincular_turma(aluno, turma):
 
     hoje = timezone.now().date()
     ultimo_dia = monthrange(hoje.year, hoje.month)[1]
-    dia_venc = min(dia_venc, ultimo_dia)
+    dia_venc = min(max(1, dia_venc), ultimo_dia)
     data_vencimento = hoje.replace(day=dia_venc)
 
     if data_vencimento < hoje:

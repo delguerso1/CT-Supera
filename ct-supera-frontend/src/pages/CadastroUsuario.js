@@ -193,9 +193,7 @@ function CadastroUsuario({ onUserChange }) {
   const [valorMensalidadeNovo, setValorMensalidadeNovo] = useState('');
   const [salarioProfessor, setSalarioProfessor] = useState('');
   const [pixProfessor, setPixProfessor] = useState('');
-  const [planoAluno, setPlanoAluno] = useState('3x');
   const [diasHabilitadosAluno, setDiasHabilitadosAluno] = useState([]);
-  const [planoFamiliaAluno, setPlanoFamiliaAluno] = useState(false);
   const [centrosTreinamento, setCentrosTreinamento] = useState([]);
   const [turmas, setTurmas] = useState([]);
   const [diasSemana, setDiasSemana] = useState([]);
@@ -213,24 +211,12 @@ function CadastroUsuario({ onUserChange }) {
     cpf: '',
     dia_vencimento: '1',
     ja_aluno: false,
-    plano: '3x',
-    valor_primeira_mensalidade: '150.00',
-    plano_familia: false,
     valor_mensalidade: '',
+    valor_matricula: '',
+    valor_uniforme: '',
+    dia_vencimento_primeira: '',
     dias_habilitados: [],
   });
-
-  const PLANO_VALORES = {
-    '3x': 150.00,
-    '2x': 130.00,
-    '1x': 110.00,
-  };
-
-  const PLANO_LIMITES = {
-    '3x': 3,
-    '2x': 2,
-    '1x': 1,
-  };
 
   // Defina fetchUsers usando useCallback
   const fetchAllPages = async (initialUrl) => {
@@ -402,16 +388,6 @@ function CadastroUsuario({ onUserChange }) {
     return initials || 'A';
   };
 
-  const formatPlano = (plano) => {
-    const planos = {
-      '3x': '3 vezes na semana',
-      '2x': '2 vezes na semana',
-      '1x': '1 vez na semana',
-    };
-    if (!plano) return 'Não definido';
-    return planos[plano] || plano;
-  };
-
   const formatValor = (valor) => {
     if (valor === null || valor === undefined || valor === '') return 'Não definido';
     const numero = Number(valor);
@@ -551,7 +527,6 @@ function CadastroUsuario({ onUserChange }) {
       if (formData.telefone_emergencia) dados.telefone_emergencia = formData.telefone_emergencia;
       if (formData.nome_responsavel) dados.nome_responsavel = formData.nome_responsavel;
       if (formData.ficha_medica) dados.ficha_medica = formData.ficha_medica;
-      if (planoAluno) dados.plano = planoAluno;
       if (diasHabilitadosAluno.length > 0) dados.dias_habilitados = diasHabilitadosAluno;
       if (diaVencimento) dados.dia_vencimento = parseInt(diaVencimento);
       if (valorMensalidadeNovo) dados.valor_mensalidade = parseFloat(valorMensalidadeNovo);
@@ -620,9 +595,7 @@ function CadastroUsuario({ onUserChange }) {
     if (user.tipo === 'aluno') {
       setDiaVencimento(user.dia_vencimento ? String(user.dia_vencimento) : '');
       setValorMensalidadeNovo(user.valor_mensalidade ? String(user.valor_mensalidade) : '');
-      setPlanoAluno(user.plano || '3x');
       setDiasHabilitadosAluno(Array.isArray(user.dias_habilitados) ? user.dias_habilitados : []);
-      setPlanoFamiliaAluno(false);
     }
     
     setShowModal(true);
@@ -713,9 +686,7 @@ function CadastroUsuario({ onUserChange }) {
     setPixProfessor('');
     setDiaVencimento('');
     setValorMensalidadeNovo('');
-    setPlanoAluno('3x');
     setDiasHabilitadosAluno([]);
-    setPlanoFamiliaAluno(false);
     
     setShowModal(true);
   };
@@ -726,16 +697,15 @@ function CadastroUsuario({ onUserChange }) {
       setError('Pré-cadastro não encontrado.');
       return;
     }
-    const planoPadrao = '3x';
     setMatriculaPrecadastro(precadastro);
     setMatriculaForm({
       cpf: precadastro.cpf || '',
       dia_vencimento: '1',
       ja_aluno: false,
-      plano: planoPadrao,
-      valor_primeira_mensalidade: PLANO_VALORES[planoPadrao].toFixed(2),
-      plano_familia: false,
       valor_mensalidade: '',
+      valor_matricula: '',
+      valor_uniforme: '',
+      dia_vencimento_primeira: '',
       dias_habilitados: [],
     });
     setError('');
@@ -759,23 +729,10 @@ function CadastroUsuario({ onUserChange }) {
       return;
     }
     if (name === 'ja_aluno') {
-      const jaAluno = value === 'true';
       setMatriculaForm(prev => ({
         ...prev,
-        ja_aluno: jaAluno,
+        ja_aluno: value === 'true',
         dias_habilitados: [],
-        plano: prev.plano || '3x',
-        valor_primeira_mensalidade: PLANO_VALORES[prev.plano || '3x'].toFixed(2),
-      }));
-      return;
-    }
-    if (name === 'plano') {
-      const limite = PLANO_LIMITES[value] || 0;
-      setMatriculaForm(prev => ({
-        ...prev,
-        plano: value,
-        valor_primeira_mensalidade: PLANO_VALORES[value].toFixed(2),
-        dias_habilitados: prev.dias_habilitados.slice(0, limite),
       }));
       return;
     }
@@ -786,55 +743,21 @@ function CadastroUsuario({ onUserChange }) {
   };
 
   const handleToggleDia = (diaId) => {
-    const limite = PLANO_LIMITES[matriculaForm.plano] || 0;
     setMatriculaForm(prev => {
       const jaSelecionado = prev.dias_habilitados.includes(diaId);
       if (jaSelecionado) {
-        return {
-          ...prev,
-          dias_habilitados: prev.dias_habilitados.filter(id => id !== diaId),
-        };
+        return { ...prev, dias_habilitados: prev.dias_habilitados.filter(id => id !== diaId) };
       }
-      if (prev.dias_habilitados.length >= limite) {
-        setError(`O plano ${prev.plano} permite apenas ${limite} dia(s).`);
-        return prev;
-      }
-      return {
-        ...prev,
-        dias_habilitados: [...prev.dias_habilitados, diaId],
-      };
+      return { ...prev, dias_habilitados: [...prev.dias_habilitados, diaId] };
     });
   };
 
   const handleToggleDiaAluno = (diaId) => {
-    const limite = PLANO_LIMITES[planoAluno] || 0;
     setDiasHabilitadosAluno(prev => {
       const jaSelecionado = prev.includes(diaId);
-      if (jaSelecionado) {
-        return prev.filter(id => id !== diaId);
-      }
-      if (prev.length >= limite) {
-        setError(`O plano ${planoAluno} permite apenas ${limite} dia(s).`);
-        return prev;
-      }
+      if (jaSelecionado) return prev.filter(id => id !== diaId);
       return [...prev, diaId];
     });
-  };
-
-  const handlePlanoAlunoChange = (value) => {
-    const limite = PLANO_LIMITES[value] || 0;
-    setPlanoAluno(value);
-    setDiasHabilitadosAluno(prev => prev.slice(0, limite));
-  };
-
-  const handleTogglePlanoFamilia = (value) => {
-    setPlanoFamiliaAluno(value);
-    if (!valorMensalidadeNovo) return;
-    const valorAtual = parseFloat(valorMensalidadeNovo);
-    if (Number.isNaN(valorAtual)) return;
-    const ajuste = value ? -10 : 10;
-    const novoValor = Math.max(0, valorAtual + ajuste);
-    setValorMensalidadeNovo(novoValor.toFixed(2));
   };
 
   const handleConfirmMatricula = async () => {
@@ -848,17 +771,28 @@ function CadastroUsuario({ onUserChange }) {
       setError('Selecione o dia de vencimento.');
       return;
     }
-    if (!matriculaForm.plano) {
-      setError('Selecione o plano.');
+    const valorMensalidade = parseFloat(matriculaForm.valor_mensalidade);
+    if (!matriculaForm.valor_mensalidade || Number.isNaN(valorMensalidade) || valorMensalidade <= 0) {
+      setError('Informe o valor da mensalidade.');
       return;
     }
-    if (!matriculaForm.ja_aluno && !matriculaForm.valor_primeira_mensalidade) {
-      setError('Informe o valor da primeira mensalidade.');
-      return;
+    if (!matriculaForm.ja_aluno) {
+      const vm = parseFloat(matriculaForm.valor_mensalidade);
+      const vMat = parseFloat(matriculaForm.valor_matricula || 0);
+      const vUnif = parseFloat(matriculaForm.valor_uniforme || 0);
+      const total = vm + vMat + vUnif;
+      if (Number.isNaN(total) || total <= 0) {
+        setError('Informe os valores da matrícula, uniforme e mensalidade.');
+        return;
+      }
+      const diaPrimeira = parseInt(matriculaForm.dia_vencimento_primeira, 10);
+      if (!matriculaForm.dia_vencimento_primeira || Number.isNaN(diaPrimeira) || diaPrimeira < 1 || diaPrimeira > 31) {
+        setError('Informe o dia de vencimento da primeira mensalidade (1 a 31).');
+        return;
+      }
     }
-    const limitePlano = PLANO_LIMITES[matriculaForm.plano] || 0;
-    if (matriculaForm.dias_habilitados.length > 0 && matriculaForm.dias_habilitados.length !== limitePlano) {
-      setError(`Selecione exatamente ${limitePlano} dia(s) para o plano escolhido.`);
+    if (!matriculaForm.dias_habilitados || matriculaForm.dias_habilitados.length === 0) {
+      setError('Selecione pelo menos um dia habilitado para treino.');
       return;
     }
     try {
@@ -866,15 +800,14 @@ function CadastroUsuario({ onUserChange }) {
       setError('');
       const payload = {
         dia_vencimento: parseInt(matriculaForm.dia_vencimento, 10),
-        plano_familia: Boolean(matriculaForm.plano_familia),
         ja_aluno: Boolean(matriculaForm.ja_aluno),
+        valor_mensalidade: valorMensalidade,
+        dias_habilitados: matriculaForm.dias_habilitados,
       };
-      payload.plano = matriculaForm.plano;
       if (!matriculaForm.ja_aluno) {
-        payload.valor_primeira_mensalidade = parseFloat(matriculaForm.valor_primeira_mensalidade);
-      }
-      if (matriculaForm.dias_habilitados.length > 0) {
-        payload.dias_habilitados = matriculaForm.dias_habilitados;
+        payload.valor_matricula = parseFloat(matriculaForm.valor_matricula || 0);
+        payload.valor_uniforme = parseFloat(matriculaForm.valor_uniforme || 0);
+        payload.dia_vencimento_primeira = parseInt(matriculaForm.dia_vencimento_primeira, 10);
       }
       if (matriculaForm.cpf) {
         payload.cpf = matriculaForm.cpf;
@@ -941,15 +874,6 @@ function CadastroUsuario({ onUserChange }) {
         return !isNaN(ctId) && ctId === filtroId;
       });
     });
-  };
-
-  const totalPrimeiraMensalidade = () => {
-    const valor = parseFloat(matriculaForm.valor_primeira_mensalidade || '0');
-    if (Number.isNaN(valor)) {
-      return '0.00';
-    }
-    const desconto = matriculaForm.plano_familia ? 10 : 0;
-    return (valor - desconto + 90).toFixed(2);
   };
 
   return (
@@ -1587,25 +1511,8 @@ function CadastroUsuario({ onUserChange }) {
                     />
                   </div>
                   <div style={styles.formGroup}>
-                    <label style={styles.label} htmlFor="planoAluno">
-                      Plano
-                    </label>
-                    <select
-                      id="planoAluno"
-                      name="planoAluno"
-                      value={planoAluno}
-                      onChange={(e) => handlePlanoAlunoChange(e.target.value)}
-                      style={styles.select}
-                      required={activeTab !== 'precadastros'}
-                    >
-                      <option value="3x">3 vezes na semana</option>
-                      <option value="2x">2 vezes na semana</option>
-                      <option value="1x">1 vez na semana</option>
-                    </select>
-                  </div>
-                  <div style={styles.formGroup}>
                     <label style={styles.label}>
-                      Dias habilitados ({diasHabilitadosAluno.length}/{PLANO_LIMITES[planoAluno] || 0})
+                      Dias habilitados para treino ({diasHabilitadosAluno.length})
                     </label>
                     <div style={{ display: 'grid', gap: '8px' }}>
                       {diasSemana.map(dia => (
@@ -1624,16 +1531,6 @@ function CadastroUsuario({ onUserChange }) {
                         Nenhum dia da semana disponível.
                       </div>
                     )}
-                  </div>
-                  <div style={styles.formGroup}>
-                    <label style={{ ...styles.label, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <input
-                        type="checkbox"
-                        checked={planoFamiliaAluno}
-                        onChange={(e) => handleTogglePlanoFamilia(e.target.checked)}
-                      />
-                      Plano família (desconto de R$ 10,00 na mensalidade)
-                    </label>
                   </div>
                 </>
               )}
@@ -1779,27 +1676,105 @@ function CadastroUsuario({ onUserChange }) {
                 </select>
               </div>
 
-              <div style={styles.formGroup}>
-                <label style={styles.label} htmlFor="matricula_plano">
-                  Plano
-                </label>
-                <select
-                  id="matricula_plano"
-                  name="plano"
-                  value={matriculaForm.plano}
-                  onChange={handleMatriculaChange}
-                  style={styles.select}
-                  required
-                >
-                  <option value="3x">3 vezes na semana (R$ 150,00)</option>
-                  <option value="2x">2 vezes na semana (R$ 130,00)</option>
-                  <option value="1x">1 vez na semana (R$ 110,00)</option>
-                </select>
-              </div>
+              {!matriculaForm.ja_aluno && (
+                <>
+                  <div style={styles.formGroup}>
+                    <label style={styles.label} htmlFor="matricula_valor_matricula">
+                      Valor da matrícula (R$)
+                    </label>
+                    <input
+                      type="number"
+                      id="matricula_valor_matricula"
+                      name="valor_matricula"
+                      value={matriculaForm.valor_matricula}
+                      onChange={handleMatriculaChange}
+                      style={styles.input}
+                      min="0"
+                      step="0.01"
+                      placeholder="Ex: 90.00"
+                    />
+                  </div>
+                  <div style={styles.formGroup}>
+                    <label style={styles.label} htmlFor="matricula_valor_uniforme">
+                      Valor do uniforme (R$)
+                    </label>
+                    <input
+                      type="number"
+                      id="matricula_valor_uniforme"
+                      name="valor_uniforme"
+                      value={matriculaForm.valor_uniforme}
+                      onChange={handleMatriculaChange}
+                      style={styles.input}
+                      min="0"
+                      step="0.01"
+                      placeholder="Ex: 80.00"
+                    />
+                  </div>
+                  <div style={styles.formGroup}>
+                    <label style={styles.label} htmlFor="matricula_valor_mensalidade">
+                      Valor da mensalidade do mês (R$)
+                    </label>
+                    <input
+                      type="number"
+                      id="matricula_valor_mensalidade"
+                      name="valor_mensalidade"
+                      value={matriculaForm.valor_mensalidade}
+                      onChange={handleMatriculaChange}
+                      style={styles.input}
+                      min="0"
+                      step="0.01"
+                      placeholder="Ex: 150.00"
+                      required={!matriculaForm.ja_aluno}
+                    />
+                  </div>
+                  <div style={{ fontSize: '0.95rem', color: '#1F6C86', fontWeight: 600, marginBottom: '0.5rem' }}>
+                    Total primeira mensalidade: R$ {
+                      (parseFloat(matriculaForm.valor_matricula || 0) + parseFloat(matriculaForm.valor_uniforme || 0) + parseFloat(matriculaForm.valor_mensalidade || 0)).toFixed(2).replace('.', ',')
+                    }
+                  </div>
+                  <div style={styles.formGroup}>
+                    <label style={styles.label} htmlFor="matricula_dia_vencimento_primeira">
+                      Dia de vencimento da primeira mensalidade
+                    </label>
+                    <input
+                      type="number"
+                      id="matricula_dia_vencimento_primeira"
+                      name="dia_vencimento_primeira"
+                      value={matriculaForm.dia_vencimento_primeira}
+                      onChange={handleMatriculaChange}
+                      style={styles.input}
+                      min="1"
+                      max="31"
+                      placeholder="Ex: 15 (dia 1 a 31)"
+                      required={!matriculaForm.ja_aluno}
+                    />
+                  </div>
+                </>
+              )}
+
+              {matriculaForm.ja_aluno && (
+                <div style={styles.formGroup}>
+                  <label style={styles.label} htmlFor="matricula_valor_mensalidade">
+                    Valor da mensalidade (R$)
+                  </label>
+                  <input
+                    type="number"
+                    id="matricula_valor_mensalidade"
+                    name="valor_mensalidade"
+                    value={matriculaForm.valor_mensalidade}
+                    onChange={handleMatriculaChange}
+                    style={styles.input}
+                    min="0"
+                    step="0.01"
+                    placeholder="Ex: 150.00"
+                    required
+                  />
+                </div>
+              )}
 
               <div style={styles.formGroup}>
                 <label style={styles.label}>
-                  Dias habilitados ({matriculaForm.dias_habilitados.length}/{PLANO_LIMITES[matriculaForm.plano] || 0})
+                  Dias habilitados para treino ({matriculaForm.dias_habilitados.length})
                 </label>
                 <div style={{ display: 'grid', gap: '8px' }}>
                   {diasSemana.map(dia => (
@@ -1818,40 +1793,6 @@ function CadastroUsuario({ onUserChange }) {
                     Nenhum dia da semana disponível.
                   </div>
                 )}
-              </div>
-
-              {!matriculaForm.ja_aluno && (
-                <div style={styles.formGroup}>
-                  <label style={styles.label} htmlFor="matricula_valor_primeira">
-                    Valor da primeira mensalidade (sem matrícula)
-                  </label>
-                  <input
-                    type="number"
-                    id="matricula_valor_primeira"
-                    name="valor_primeira_mensalidade"
-                    value={matriculaForm.valor_primeira_mensalidade}
-                    onChange={handleMatriculaChange}
-                    style={styles.input}
-                    min="0"
-                    step="0.01"
-                    required
-                  />
-                  <div style={{ fontSize: '0.85rem', color: '#666' }}>
-                    Total com matrícula: <strong>R$ {totalPrimeiraMensalidade()}</strong>
-                  </div>
-                </div>
-              )}
-
-              <div style={styles.formGroup}>
-                <label style={{ ...styles.label, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <input
-                    type="checkbox"
-                    name="plano_familia"
-                    checked={matriculaForm.plano_familia}
-                    onChange={handleMatriculaChange}
-                  />
-                  Plano família (desconto de R$ 10,00 na mensalidade)
-                </label>
               </div>
 
               <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
@@ -1897,9 +1838,6 @@ function CadastroUsuario({ onUserChange }) {
                 {`${selectedAlunoInfo.first_name} ${selectedAlunoInfo.last_name || ''}`.trim()}
               </div>
               <div>
-                <strong>Plano:</strong> {formatPlano(selectedAlunoInfo.plano)}
-              </div>
-              <div>
                 <strong>Valor mensalidade:</strong> {formatValor(selectedAlunoInfo.valor_mensalidade)}
               </div>
               <div>
@@ -1909,9 +1847,6 @@ function CadastroUsuario({ onUserChange }) {
                   : Array.isArray(selectedAlunoInfo.dias_habilitados) && selectedAlunoInfo.dias_habilitados.length > 0
                     ? selectedAlunoInfo.dias_habilitados.join(', ')
                     : 'Não configurado'}
-              </div>
-              <div>
-                <strong>Plano família:</strong> desconto de R$ 10,00
               </div>
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>

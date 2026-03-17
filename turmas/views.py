@@ -12,11 +12,6 @@ from financeiro.services import criar_mensalidade_ao_vincular_turma
 
 
 def _validar_aluno_turma(aluno, turma):
-    if not aluno.plano:
-        return False, "Aluno sem plano configurado."
-    limite = aluno.limite_aulas_semanais()
-    if not limite:
-        return False, "Plano do aluno inválido."
     if not aluno.dias_habilitados.exists():
         return False, "Dias habilitados do aluno não configurados."
 

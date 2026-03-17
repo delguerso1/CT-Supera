@@ -215,6 +215,24 @@ const GerenciarTurmasScreen: React.FC<NavigationProps> = ({ navigation }) => {
     }
   };
 
+  const formatValor = (valor?: number | null) => {
+    if (valor === null || valor === undefined) return 'Não definido';
+    const valorNumero = Number(valor);
+    if (Number.isNaN(valorNumero)) return String(valor);
+    return `R$ ${valorNumero.toFixed(2).replace('.', ',')}`;
+  };
+
+  const handleMostrarInfoAluno = (aluno: User) => {
+    const dias = aluno.dias_habilitados_nomes?.length
+      ? aluno.dias_habilitados_nomes.join(', ')
+      : 'Não configurado';
+    const mensagem = [
+      `Valor mensalidade: ${formatValor(aluno.valor_mensalidade)}`,
+      `Dias habilitados: ${dias}`,
+    ].join('\n');
+    Alert.alert('Informações do aluno', mensagem);
+  };
+
   if (user?.tipo !== 'gerente') {
     return (
       <SafeAreaView style={styles.container}>
@@ -456,9 +474,11 @@ const GerenciarTurmasScreen: React.FC<NavigationProps> = ({ navigation }) => {
                   onPress={() => toggleAluno(aluno.id)}
                 >
                   <View style={styles.alunoInfo}>
-                    <Text style={styles.alunoNome}>
-                      {aluno.first_name} {aluno.last_name}
-                    </Text>
+                    <TouchableOpacity onPress={() => handleMostrarInfoAluno(aluno)} activeOpacity={0.7}>
+                      <Text style={styles.alunoNome}>
+                        {aluno.first_name} {aluno.last_name}
+                      </Text>
+                    </TouchableOpacity>
                     <Text style={styles.alunoEmail}>{aluno.email}</Text>
                   </View>
                   <View

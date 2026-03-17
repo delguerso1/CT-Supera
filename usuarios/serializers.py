@@ -237,24 +237,6 @@ class UsuarioSerializer(serializers.ModelSerializer):
             })
         if 'username' not in attrs:
             attrs['username'] = re.sub(r'\D', '', str(cpf))
-        if tipo == 'aluno' and ('plano' in attrs or 'dias_habilitados' in attrs):
-            plano = attrs.get('plano', getattr(self.instance, 'plano', None))
-            dias = attrs.get('dias_habilitados', None)
-            if plano:
-                limite = Usuario(plano=plano).limite_aulas_semanais()
-                if limite:
-                    if plano in ['1x', '2x'] and dias is None:
-                        raise serializers.ValidationError({
-                            'dias_habilitados': 'Informe os dias habilitados para este plano.'
-                        })
-                    if dias is not None and len(dias) != limite:
-                        raise serializers.ValidationError({
-                            'dias_habilitados': f'O plano {plano} exige exatamente {limite} dia(s) habilitado(s).'
-                        })
-            elif dias is not None:
-                raise serializers.ValidationError({
-                    'plano': 'Informe o plano do aluno para definir os dias habilitados.'
-                })
         return attrs
 
 class PreCadastroSerializer(serializers.ModelSerializer):

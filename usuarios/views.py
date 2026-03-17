@@ -56,20 +56,18 @@ class FinalizarAgendamentoAPIView(APIView):
         cpf = request.data.get("cpf") or precadastro.cpf
         dia_vencimento = request.data.get("dia_vencimento")
         ja_aluno = request.data.get("ja_aluno")
-        plano = request.data.get("plano")
         dias_habilitados_ids = request.data.get("dias_habilitados")
         valor_mensalidade = request.data.get("valor_mensalidade")
-        valor_primeira_mensalidade = request.data.get("valor_primeira_mensalidade")
-        plano_familia = request.data.get("plano_familia")
+        valor_matricula = request.data.get("valor_matricula")
+        valor_uniforme = request.data.get("valor_uniforme")
+        dia_vencimento_primeira = request.data.get("dia_vencimento_primeira")
         
         print(f"[DEBUG] Finalizando agendamento - PreCadastro ID: {precadastro_id}")
         print(f"[DEBUG] Dia vencimento: {dia_vencimento}")
         print(f"[DEBUG] Já é aluno: {ja_aluno}")
-        print(f"[DEBUG] Plano: {plano}")
         print(f"[DEBUG] Dias habilitados: {dias_habilitados_ids}")
         print(f"[DEBUG] Valor mensalidade: {valor_mensalidade}")
-        print(f"[DEBUG] Valor primeira mensalidade: {valor_primeira_mensalidade}")
-        print(f"[DEBUG] Plano família: {plano_familia}")
+        print(f"[DEBUG] Valor matrícula: {valor_matricula}, uniforme: {valor_uniforme}, dia venc. primeira: {dia_vencimento_primeira}")
         print(f"[DEBUG] Data nascimento do pré-cadastro: {precadastro.data_nascimento}")
 
         ja_aluno_bool = bool(ja_aluno)
@@ -91,62 +89,48 @@ class FinalizarAgendamentoAPIView(APIView):
         if dia_vencimento not in [1, 5, 10]:
             return Response({"error": "Dia de vencimento deve ser 1, 5 ou 10."}, status=status.HTTP_400_BAD_REQUEST)
 
-        if plano not in ["3x", "2x", "1x"]:
-            return Response({"error": "Plano inválido. Use 3x, 2x ou 1x."}, status=status.HTTP_400_BAD_REQUEST)
+        if not dias_habilitados_ids:
+            return Response({"error": "Selecione pelo menos um dia habilitado para treino."}, status=status.HTTP_400_BAD_REQUEST)
+        if isinstance(dias_habilitados_ids, str):
+            dias_habilitados_ids = [d.strip() for d in dias_habilitados_ids.split(",") if d.strip()]
+        if not isinstance(dias_habilitados_ids, list):
+            return Response({"error": "Dias habilitados inválidos."}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            dias_habilitados_ids = [int(dia_id) for dia_id in dias_habilitados_ids]
+        except (TypeError, ValueError):
+            return Response({"error": "Dias habilitados inválidos."}, status=status.HTTP_400_BAD_REQUEST)
 
-        if dias_habilitados_ids is not None:
-            if isinstance(dias_habilitados_ids, str):
-                dias_habilitados_ids = [d.strip() for d in dias_habilitados_ids.split(",") if d.strip()]
-            if not isinstance(dias_habilitados_ids, list):
-                return Response({"error": "Dias habilitados inválidos."}, status=status.HTTP_400_BAD_REQUEST)
-            try:
-                dias_habilitados_ids = [int(dia_id) for dia_id in dias_habilitados_ids]
-            except (TypeError, ValueError):
-                return Response({"error": "Dias habilitados inválidos."}, status=status.HTTP_400_BAD_REQUEST)
-
-        limite_plano = {"3x": 3, "2x": 2, "1x": 1}[plano]
-        if plano in ["1x", "2x"]:
-            if not dias_habilitados_ids:
-                return Response({"error": "Informe os dias habilitados para o plano selecionado."}, status=status.HTTP_400_BAD_REQUEST)
-            if len(dias_habilitados_ids) != limite_plano:
-                return Response({"error": f"O plano {plano} exige exatamente {limite_plano} dia(s) habilitado(s)."}, status=status.HTTP_400_BAD_REQUEST)
-        elif dias_habilitados_ids and len(dias_habilitados_ids) != limite_plano:
-            return Response({"error": f"O plano {plano} exige exatamente {limite_plano} dia(s) habilitado(s)."}, status=status.HTTP_400_BAD_REQUEST)
-
-        dias_habilitados = None
-        if dias_habilitados_ids:
-            dias_habilitados = list(DiaSemana.objects.filter(id__in=dias_habilitados_ids))
-            if len(dias_habilitados) != len(set(dias_habilitados_ids)):
-                return Response({"error": "Um ou mais dias habilitados são inválidos."}, status=status.HTTP_400_BAD_REQUEST)
-        elif plano == "3x":
-            dias_habilitados = list(DiaSemana.objects.all())
-            if not dias_habilitados:
-                return Response({"error": "Não há dias da semana cadastrados para habilitar o plano."}, status=status.HTTP_400_BAD_REQUEST)
-
-        plano_valores = {
-            "3x": Decimal("150.00"),
-            "2x": Decimal("130.00"),
-            "1x": Decimal("110.00"),
-        }
-
-        plano_familia_bool = bool(plano_familia)
-        if isinstance(plano_familia, str):
-            plano_familia_bool = plano_familia.strip().lower() in ["true", "1", "sim", "yes"]
-
-        desconto_familia = Decimal("10.00") if plano_familia_bool else Decimal("0.00")
+        dias_habilitados = list(DiaSemana.objects.filter(id__in=dias_habilitados_ids))
+        if len(dias_habilitados) != len(set(dias_habilitados_ids)):
+            return Response({"error": "Um ou mais dias habilitados são inválidos."}, status=status.HTTP_400_BAD_REQUEST)
+        if not dias_habilitados:
+            return Response({"error": "Não há dias da semana cadastrados."}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            valor_mensalidade = plano_valores[plano] - desconto_familia
-            if not ja_aluno_bool:
-                if valor_primeira_mensalidade is not None:
-                    valor_primeira_mensalidade = Decimal(str(valor_primeira_mensalidade)) - desconto_familia
-                else:
-                    valor_primeira_mensalidade = valor_mensalidade
-        except (InvalidOperation, TypeError, KeyError):
-            return Response({"error": "Valores de mensalidade inválidos."}, status=status.HTTP_400_BAD_REQUEST)
+            valor_mensalidade = Decimal(str(valor_mensalidade))
+        except (InvalidOperation, TypeError, ValueError):
+            return Response({"error": "Informe um valor de mensalidade válido."}, status=status.HTTP_400_BAD_REQUEST)
+        if valor_mensalidade <= 0:
+            return Response({"error": "O valor da mensalidade deve ser maior que zero."}, status=status.HTTP_400_BAD_REQUEST)
 
-        if valor_mensalidade <= 0 or (not ja_aluno_bool and valor_primeira_mensalidade <= 0):
-            return Response({"error": "Valores de mensalidade devem ser maiores que zero."}, status=status.HTTP_400_BAD_REQUEST)
+        valor_primeira_mensalidade = None
+        dia_vencimento_primeira = None
+        if not ja_aluno_bool:
+            try:
+                valor_matricula_dec = Decimal(str(valor_matricula or 0))
+                valor_uniforme_dec = Decimal(str(valor_uniforme or 0))
+            except (InvalidOperation, TypeError, ValueError):
+                valor_matricula_dec = Decimal("0")
+                valor_uniforme_dec = Decimal("0")
+            valor_primeira_mensalidade = valor_matricula_dec + valor_uniforme_dec + valor_mensalidade
+            if valor_primeira_mensalidade <= 0:
+                return Response({"error": "A soma (matrícula + uniforme + mensalidade) deve ser maior que zero."}, status=status.HTTP_400_BAD_REQUEST)
+            try:
+                dia_vencimento_primeira = int(dia_vencimento_primeira or dia_vencimento)
+            except (TypeError, ValueError):
+                dia_vencimento_primeira = int(dia_vencimento)
+            if dia_vencimento_primeira < 1 or dia_vencimento_primeira > 31:
+                return Response({"error": "Dia do vencimento da primeira mensalidade deve ser entre 1 e 31."}, status=status.HTTP_400_BAD_REQUEST)
 
         if ja_aluno_bool:
             precadastro.cpf = cpf
@@ -156,7 +140,6 @@ class FinalizarAgendamentoAPIView(APIView):
             if aluno:
                 aluno.dia_vencimento = dia_vencimento
                 aluno.valor_mensalidade = valor_mensalidade
-                aluno.plano = plano
                 aluno.save()
                 if dias_habilitados is not None:
                     aluno.dias_habilitados.set(dias_habilitados)
@@ -176,13 +159,15 @@ class FinalizarAgendamentoAPIView(APIView):
                     request.user,
                     dia_vencimento=dia_vencimento,
                     valor_mensalidade=valor_mensalidade,
-                    plano=plano,
+                    plano=None,
                     dias_habilitados=dias_habilitados
                 )
                 if usuario_aluno and precadastro.turma:
                     precadastro.turma.alunos.add(usuario_aluno)
                     from financeiro.services import criar_mensalidade_ao_vincular_turma
-                    criar_mensalidade_ao_vincular_turma(usuario_aluno, precadastro.turma)
+                    val_primeira = valor_primeira_mensalidade if not ja_aluno_bool else None
+                    dia_venc_primeira = dia_vencimento_primeira if not ja_aluno_bool else None
+                    criar_mensalidade_ao_vincular_turma(usuario_aluno, precadastro.turma, valor_primeira_mensalidade=val_primeira, dia_vencimento_primeira=dia_venc_primeira)
                 return Response({"message": "Pré-cadastro convertido em aluno com sucesso!"}, status=status.HTTP_200_OK)
             except Exception as e:
                 return Response({"error": f"Erro ao finalizar agendamento: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
@@ -194,13 +179,13 @@ class FinalizarAgendamentoAPIView(APIView):
                 request.user,
                 dia_vencimento=dia_vencimento,
                 valor_mensalidade=valor_mensalidade,
-                plano=plano,
+                plano=None,
                 dias_habilitados=dias_habilitados
             )
             if usuario_aluno and precadastro.turma:
                 precadastro.turma.alunos.add(usuario_aluno)
                 from financeiro.services import criar_mensalidade_ao_vincular_turma
-                criar_mensalidade_ao_vincular_turma(usuario_aluno, precadastro.turma)
+                criar_mensalidade_ao_vincular_turma(usuario_aluno, precadastro.turma, valor_primeira_mensalidade=valor_primeira_mensalidade, dia_vencimento_primeira=dia_vencimento_primeira)
             return Response({"message": "Pré-cadastro convertido em aluno com sucesso!"}, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({"error": f"Erro ao finalizar agendamento: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
@@ -212,15 +197,23 @@ class LoginAPIView(APIView):
 
     def post(self, request):
         try:
-            cpf = request.data.get("cpf", "").replace(".", "").replace("-", "").strip()
-            password = request.data.get("password", "").strip()
-            
-            print(f"[DEBUG] Dados recebidos - CPF: {cpf}, Senha: {'*' * len(password)}")
-            print(f"[DEBUG] Headers da requisição: {request.headers}")
-            print(f"[DEBUG] Dados da requisição: {request.data}")
-            
+            # Aceita dados de request.data (JSON) ou request.POST (form)
+            data = dict(request.data) if request.data else dict(request.POST)
+            # Fallback: tenta parsear o body como JSON manualmente (para casos de Content-Type incorreto)
+            if not data and request.body:
+                import json
+                try:
+                    data = json.loads(request.body.decode('utf-8'))
+                except Exception:
+                    pass
+            cpf_raw = data.get("cpf") or data.get("username") or ""
+            cpf = str(cpf_raw).replace(".", "").replace("-", "").replace(" ", "").strip()
+            password = str(data.get("password") or "").strip()
+
             if not cpf or not password:
-                print("[DEBUG] CPF ou senha não fornecidos")
+                body_preview = request.body[:200].decode('utf-8', errors='replace') if request.body else '(vazio)'
+                print(f"[DEBUG] Login 400 - data={data}, Content-Type={request.content_type}, body={body_preview}")
+                logger.warning(f"Login 400: cpf ou senha vazios. data={data}, Content-Type={request.content_type}")
                 return Response(
                     {"error": "CPF e senha são obrigatórios."}, 
                     status=status.HTTP_400_BAD_REQUEST

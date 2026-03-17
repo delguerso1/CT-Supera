@@ -45,9 +45,7 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
   const [valorMensalidade, setValorMensalidade] = useState('');
   const [salarioProfessor, setSalarioProfessor] = useState('');
   const [pixProfessor, setPixProfessor] = useState('');
-  const [planoAluno, setPlanoAluno] = useState<'3x' | '2x' | '1x'>('3x');
   const [diasHabilitadosAluno, setDiasHabilitadosAluno] = useState<number[]>([]);
-  const [planoFamiliaAluno, setPlanoFamiliaAluno] = useState(false);
   const [showMatriculaModal, setShowMatriculaModal] = useState(false);
   const [matriculaPrecadastro, setMatriculaPrecadastro] = useState<PreCadastro | null>(null);
   const [diasSemana, setDiasSemana] = useState<Array<{ id: number; nome: string }>>([]);
@@ -55,10 +53,10 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
     cpf: '',
     dia_vencimento: '1',
     ja_aluno: false,
-    plano: '3x',
-    valor_primeira_mensalidade: '150.00',
-    plano_familia: false,
     valor_mensalidade: '',
+    valor_matricula: '',
+    valor_uniforme: '',
+    dia_vencimento_primeira: '',
     dias_habilitados: [] as number[],
   });
 
@@ -107,9 +105,7 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
     setValorMensalidade('');
     setSalarioProfessor('');
     setPixProfessor('');
-    setPlanoAluno('3x');
     setDiasHabilitadosAluno([]);
-    setPlanoFamiliaAluno(false);
   };
 
   const handleNewUser = () => {
@@ -141,7 +137,6 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
     if ((target as any).tipo === 'aluno') {
       setDiaVencimento(String((target as any).dia_vencimento || ''));
       setValorMensalidade(String((target as any).valor_mensalidade || ''));
-      setPlanoAluno(((target as any).plano as '3x' | '2x' | '1x') || '3x');
       setDiasHabilitadosAluno(Array.isArray((target as any).dias_habilitados) ? (target as any).dias_habilitados : []);
       if (!diasSemana.length) {
         turmaService.getDiasSemana().then(setDiasSemana).catch(() => {
@@ -176,7 +171,6 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
       payload.telefone_responsavel = formData.telefone_responsavel;
       payload.telefone_emergencia = formData.telefone_emergencia;
       payload.ficha_medica = formData.ficha_medica;
-      payload.plano = planoAluno;
       payload.dias_habilitados = diasHabilitadosAluno;
       if (diaVencimento) payload.dia_vencimento = Number(diaVencimento);
       if (valorMensalidade) payload.valor_mensalidade = Number(valorMensalidade);
@@ -272,10 +266,10 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
         cpf: precadastro.cpf || '',
         dia_vencimento: '1',
         ja_aluno: false,
-        plano: '3x',
-        valor_primeira_mensalidade: '150.00',
-        plano_familia: false,
         valor_mensalidade: '',
+        valor_matricula: '',
+        valor_uniforme: '',
+        dia_vencimento_primeira: '',
         dias_habilitados: [],
       });
       setShowMatriculaModal(true);
@@ -286,62 +280,61 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
 
   const handleToggleDia = (diaId: number) => {
     setMatriculaForm(prev => {
-      const limite = prev.plano === '3x' ? 3 : prev.plano === '2x' ? 2 : 1;
       const jaSelecionado = prev.dias_habilitados.includes(diaId);
       if (jaSelecionado) {
         return { ...prev, dias_habilitados: prev.dias_habilitados.filter(id => id !== diaId) };
-      }
-      if (prev.dias_habilitados.length >= limite) {
-        Alert.alert('Atenção', `O plano ${prev.plano} permite ${limite} dia(s).`);
-        return prev;
       }
       return { ...prev, dias_habilitados: [...prev.dias_habilitados, diaId] };
     });
   };
 
   const handleToggleDiaAluno = (diaId: number) => {
-    const limite = planoAluno === '3x' ? 3 : planoAluno === '2x' ? 2 : 1;
     const jaSelecionado = diasHabilitadosAluno.includes(diaId);
     if (jaSelecionado) {
       setDiasHabilitadosAluno(diasHabilitadosAluno.filter(id => id !== diaId));
       return;
     }
-    if (diasHabilitadosAluno.length >= limite) {
-      Alert.alert('Atenção', `O plano ${planoAluno} permite ${limite} dia(s).`);
-      return;
-    }
     setDiasHabilitadosAluno([...diasHabilitadosAluno, diaId]);
-  };
-
-  const handleChangePlanoAluno = (plano: '3x' | '2x' | '1x') => {
-    setPlanoAluno(plano);
-    const limite = plano === '3x' ? 3 : plano === '2x' ? 2 : 1;
-    setDiasHabilitadosAluno(prev => (prev.length > limite ? prev.slice(0, limite) : prev));
-  };
-
-  const handleTogglePlanoFamilia = (value: boolean) => {
-    setPlanoFamiliaAluno(value);
-    if (!valorMensalidade) return;
-    const valorAtual = Number(valorMensalidade);
-    if (Number.isNaN(valorAtual)) return;
-    const ajuste = value ? -10 : 10;
-    const novoValor = Math.max(0, valorAtual + ajuste);
-    setValorMensalidade(novoValor.toFixed(2));
   };
 
   const handleFinalizarMatricula = async () => {
     if (!matriculaPrecadastro) return;
+    const valorMensalidade = Number(matriculaForm.valor_mensalidade);
+    if (!matriculaForm.valor_mensalidade || Number.isNaN(valorMensalidade) || valorMensalidade <= 0) {
+      Alert.alert('Atenção', 'Informe o valor da mensalidade.');
+      return;
+    }
+    if (!matriculaForm.ja_aluno) {
+      const vMat = Number(matriculaForm.valor_matricula || 0);
+      const vUnif = Number(matriculaForm.valor_uniforme || 0);
+      const total = valorMensalidade + vMat + vUnif;
+      if (Number.isNaN(total) || total <= 0) {
+        Alert.alert('Atenção', 'Informe os valores da matrícula, uniforme e mensalidade.');
+        return;
+      }
+      const diaPrimeira = Number(matriculaForm.dia_vencimento_primeira);
+      if (!matriculaForm.dia_vencimento_primeira || Number.isNaN(diaPrimeira) || diaPrimeira < 1 || diaPrimeira > 31) {
+        Alert.alert('Atenção', 'Informe o dia de vencimento da primeira mensalidade (1 a 31).');
+        return;
+      }
+    }
+    if (!matriculaForm.dias_habilitados || matriculaForm.dias_habilitados.length === 0) {
+      Alert.alert('Atenção', 'Selecione pelo menos um dia habilitado para treino.');
+      return;
+    }
     try {
-      const payload = {
+      const payload: any = {
         cpf: matriculaForm.cpf,
         dia_vencimento: Number(matriculaForm.dia_vencimento),
         ja_aluno: matriculaForm.ja_aluno,
-        plano: matriculaForm.plano,
-        valor_primeira_mensalidade: Number(matriculaForm.valor_primeira_mensalidade || 0),
-        plano_familia: matriculaForm.plano_familia,
-        valor_mensalidade: matriculaForm.valor_mensalidade ? Number(matriculaForm.valor_mensalidade) : undefined,
+        valor_mensalidade,
         dias_habilitados: matriculaForm.dias_habilitados,
       };
+      if (!matriculaForm.ja_aluno) {
+        payload.valor_matricula = Number(matriculaForm.valor_matricula || 0);
+        payload.valor_uniforme = Number(matriculaForm.valor_uniforme || 0);
+        payload.dia_vencimento_primeira = Number(matriculaForm.dia_vencimento_primeira);
+      }
       await usuarioService.finalizarAgendamento(matriculaPrecadastro.id, payload);
       setShowMatriculaModal(false);
       await fetchUsers();
@@ -562,36 +555,7 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
                     value={valorMensalidade}
                     onChangeText={setValorMensalidade}
                   />
-                  <Text style={styles.sectionTitle}>Plano</Text>
-                  <View style={styles.planOptions}>
-                    {(['3x', '2x', '1x'] as const).map((plano) => (
-                      <TouchableOpacity
-                        key={plano}
-                        style={[
-                          styles.planOption,
-                          planoAluno === plano && styles.planOptionSelected,
-                        ]}
-                        onPress={() => handleChangePlanoAluno(plano)}
-                      >
-                        <Text
-                          style={[
-                            styles.planOptionText,
-                            planoAluno === plano && styles.planOptionTextSelected,
-                          ]}
-                        >
-                          {plano}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                  <View style={styles.switchRow}>
-                    <Text style={styles.switchLabel}>Plano família</Text>
-                    <Switch
-                      value={planoFamiliaAluno}
-                      onValueChange={handleTogglePlanoFamilia}
-                    />
-                  </View>
-                  <Text style={styles.sectionTitle}>Dias habilitados</Text>
+                  <Text style={styles.sectionTitle}>Dias habilitados para treino</Text>
                   {diasSemana.length === 0 ? (
                     <Text style={styles.noData}>Nenhum dia disponível.</Text>
                   ) : (
@@ -658,58 +622,78 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
               />
               <TextInput
                 style={styles.input}
-                placeholder="Dia de vencimento (1, 5, 10)"
+                placeholder="Dia de vencimento (1, 5 ou 10)"
                 keyboardType="numeric"
                 value={matriculaForm.dia_vencimento}
                 onChangeText={(value) => setMatriculaForm(prev => ({ ...prev, dia_vencimento: value }))}
               />
-              <TextInput
-                style={styles.input}
-                placeholder="Plano (3x, 2x, 1x)"
-                value={matriculaForm.plano}
-                onChangeText={(value) => setMatriculaForm(prev => ({ ...prev, plano: value }))}
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="Valor da primeira mensalidade"
-                keyboardType="numeric"
-                value={matriculaForm.valor_primeira_mensalidade}
-                onChangeText={(value) => setMatriculaForm(prev => ({ ...prev, valor_primeira_mensalidade: value }))}
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="Valor mensalidade"
-                keyboardType="numeric"
-                value={matriculaForm.valor_mensalidade}
-                onChangeText={(value) => setMatriculaForm(prev => ({ ...prev, valor_mensalidade: value }))}
-              />
               <View style={styles.switchRow}>
-                <Text style={styles.switchLabel}>Já é aluno</Text>
+                <Text style={styles.switchLabel}>Já é aluno? (recredenciamento)</Text>
                 <Switch
                   value={matriculaForm.ja_aluno}
                   onValueChange={(value) => setMatriculaForm(prev => ({ ...prev, ja_aluno: value }))}
                 />
               </View>
-              <View style={styles.switchRow}>
-                <Text style={styles.switchLabel}>Plano família</Text>
-                <Switch
-                  value={matriculaForm.plano_familia}
-                  onValueChange={(value) => setMatriculaForm(prev => ({ ...prev, plano_familia: value }))}
+              {matriculaForm.ja_aluno ? (
+                <TextInput
+                  style={styles.input}
+                  placeholder="Valor da mensalidade (R$)"
+                  keyboardType="numeric"
+                  value={matriculaForm.valor_mensalidade}
+                  onChangeText={(value) => setMatriculaForm(prev => ({ ...prev, valor_mensalidade: value }))}
                 />
-              </View>
-              <Text style={styles.sectionTitle}>Dias habilitados</Text>
-              {diasSemana.map((dia) => (
-                <TouchableOpacity
-                  key={dia.id}
-                  style={styles.dayItem}
-                  onPress={() => handleToggleDia(dia.id)}
-                >
-                  <Text style={styles.dayText}>{dia.nome}</Text>
-                  <Text style={styles.daySelected}>
-                    {matriculaForm.dias_habilitados.includes(dia.id) ? '✓' : ''}
+              ) : (
+                <>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Valor da matrícula (R$)"
+                    keyboardType="numeric"
+                    value={matriculaForm.valor_matricula}
+                    onChangeText={(value) => setMatriculaForm(prev => ({ ...prev, valor_matricula: value }))}
+                  />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Valor do uniforme (R$)"
+                    keyboardType="numeric"
+                    value={matriculaForm.valor_uniforme}
+                    onChangeText={(value) => setMatriculaForm(prev => ({ ...prev, valor_uniforme: value }))}
+                  />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Valor da mensalidade do mês (R$)"
+                    keyboardType="numeric"
+                    value={matriculaForm.valor_mensalidade}
+                    onChangeText={(value) => setMatriculaForm(prev => ({ ...prev, valor_mensalidade: value }))}
+                  />
+                  <Text style={styles.sectionTitle}>
+                    Total: R$ {(Number(matriculaForm.valor_matricula || 0) + Number(matriculaForm.valor_uniforme || 0) + Number(matriculaForm.valor_mensalidade || 0)).toFixed(2)}
                   </Text>
-                </TouchableOpacity>
-              ))}
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Dia venc. 1ª mensalidade (1-31)"
+                    keyboardType="numeric"
+                    value={matriculaForm.dia_vencimento_primeira}
+                    onChangeText={(value) => setMatriculaForm(prev => ({ ...prev, dia_vencimento_primeira: value }))}
+                  />
+                </>
+              )}
+              <Text style={styles.sectionTitle}>Dias habilitados para treino</Text>
+              {diasSemana.length === 0 ? (
+                <Text style={styles.noData}>Nenhum dia disponível.</Text>
+              ) : (
+                diasSemana.map((dia) => (
+                  <TouchableOpacity
+                    key={dia.id}
+                    style={styles.dayItem}
+                    onPress={() => handleToggleDia(dia.id)}
+                  >
+                    <Text style={styles.dayText}>{dia.nome}</Text>
+                    <Text style={styles.daySelected}>
+                      {matriculaForm.dias_habilitados.includes(dia.id) ? '✓' : ''}
+                    </Text>
+                  </TouchableOpacity>
+                ))
+              )}
             </ScrollView>
             <View style={styles.modalActions}>
               <TouchableOpacity
