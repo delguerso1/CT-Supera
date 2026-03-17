@@ -138,6 +138,7 @@ class Usuario(AbstractUser):
     ]
     
     username = models.CharField(max_length=14, unique=True, blank=False, null=False)  # 🔹 CPF sem formatação
+    email = models.EmailField(max_length=255, unique=False, blank=False, null=False, help_text='Pode repetir para menores (email do responsável)')
     tipo = models.CharField(max_length=20, choices=TIPO_USUARIO_CHOICES)
     telefone = models.CharField(max_length=20, blank=True, null=True)
     cpf = models.CharField(max_length=11, unique=True, blank=False, null=False)

@@ -23,6 +23,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='usuario',
             name='email',
-            field=models.EmailField(blank=False, max_length=255, null=False),
+            field=models.EmailField(blank=False, help_text='Pode repetir para menores (email do responsável)', max_length=255, null=False, unique=False),
         ),
     ]
