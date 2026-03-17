@@ -136,7 +136,9 @@ function CadastroTurmas({ centroId, styles }) {
         ct: Number(centroId),
         dias_semana: formData.dias_semana.map(Number),
         professores: formData.professores.map(Number),
-        faixa_etaria: formData.faixa_etaria || 'adultos'
+        aceita_kids: Boolean(formData.aceita_kids),
+        aceita_teen: Boolean(formData.aceita_teen),
+        aceita_adultos: formData.aceita_adultos !== false
       };
       
       console.log("📤 Dados enviados no POST:", formDataToSend); // 👈 ADICIONE ISTO
@@ -153,7 +155,9 @@ function CadastroTurmas({ centroId, styles }) {
         dias_semana: [],
         horario: '',
         capacidade_maxima: '',
-        faixa_etaria: 'adultos',
+        aceita_kids: false,
+        aceita_teen: false,
+        aceita_adultos: true,
         professores: [],
         ct: centroId,
       });
@@ -170,7 +174,9 @@ function CadastroTurmas({ centroId, styles }) {
       dias_semana: turma.dias_semana || [],
       horario: turma.horario || '',
       capacidade_maxima: turma.capacidade_maxima || '',
-      faixa_etaria: turma.faixa_etaria || 'adultos',
+      aceita_kids: Boolean(turma.aceita_kids),
+      aceita_teen: Boolean(turma.aceita_teen),
+      aceita_adultos: turma.aceita_adultos !== false,
       professores: turma.professores || [],
       ct: turma.ct?.id || turma.ct || centroId,
     });
@@ -198,7 +204,9 @@ function CadastroTurmas({ centroId, styles }) {
       dias_semana: [],
       horario: '',
       capacidade_maxima: '',
-      faixa_etaria: 'adultos',
+      aceita_kids: false,
+      aceita_teen: false,
+      aceita_adultos: true,
       professores: [],
       ct: centroId,
     });
@@ -299,7 +307,7 @@ function CadastroTurmas({ centroId, styles }) {
                 </td>
                 <td style={{ padding: 12, textAlign: 'center' }}>{turma.horario}</td>
                 <td style={{ padding: 12, textAlign: 'center' }}>
-                  {turma.faixa_etaria === 'kids' ? 'Kids' : turma.faixa_etaria === 'teen' ? 'Teen' : turma.faixa_etaria === 'adultos' ? 'Adultos' : '-'}
+                  {[turma.aceita_kids && 'Kids', turma.aceita_teen && 'Teen', turma.aceita_adultos && 'Adultos'].filter(Boolean).join(', ') || '-'}
                 </td>
                 <td style={{ padding: 12, textAlign: 'center' }}>{turma.capacidade_maxima}</td>
                 <td style={{ padding: 12, textAlign: 'center' }}>
@@ -498,27 +506,38 @@ function CadastroTurmas({ centroId, styles }) {
             />
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            <label style={{ fontWeight: 500, marginBottom: 2 }} htmlFor="faixa_etaria">
-              Faixa Etária
-            </label>
-            <select
-              id="faixa_etaria"
-              name="faixa_etaria"
-              value={formData.faixa_etaria || 'adultos'}
-              onChange={handleChange}
-              style={{
-                padding: '8px',
-                borderRadius: 4,
-                border: '1px solid #ccc',
-                fontSize: '1rem'
-              }}
-              required
-            >
-              <option value="kids">Kids (crianças até 12 anos)</option>
-              <option value="teen">Teen (adolescentes até 18 anos)</option>
-              <option value="adultos">Adultos (maiores de 18 anos)</option>
-            </select>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <label style={{ fontWeight: 500, marginBottom: 2 }}>Faixas Etárias Aceitas</label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  name="aceita_kids"
+                  checked={Boolean(formData.aceita_kids)}
+                  onChange={(e) => setFormData(prev => ({ ...prev, aceita_kids: e.target.checked }))}
+                />
+                Kids (crianças até 12 anos)
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  name="aceita_teen"
+                  checked={Boolean(formData.aceita_teen)}
+                  onChange={(e) => setFormData(prev => ({ ...prev, aceita_teen: e.target.checked }))}
+                />
+                Teen (adolescentes até 18 anos)
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  name="aceita_adultos"
+                  checked={formData.aceita_adultos !== false}
+                  onChange={(e) => setFormData(prev => ({ ...prev, aceita_adultos: e.target.checked }))}
+                />
+                Adultos (maiores de 18 anos)
+              </label>
+            </div>
+            <span style={{ fontSize: '0.85rem', color: '#666' }}>Marque todas que se aplicam.</span>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -558,7 +577,9 @@ function CadastroTurmas({ centroId, styles }) {
                   dias_semana: [],
                   horario: '',
                   capacidade_maxima: '',
-                  faixa_etaria: 'adultos',
+                  aceita_kids: false,
+        aceita_teen: false,
+        aceita_adultos: true,
                   professores: [],
                   ct: centroId,
                 });

@@ -79,7 +79,9 @@ const GerenciarTurmasScreen: React.FC<NavigationProps> = ({ navigation }) => {
       horario: '',
       dias_semana: [],
       capacidade_maxima: 0,
-      faixa_etaria: 'adultos',
+      aceita_kids: false,
+      aceita_teen: false,
+      aceita_adultos: true,
       professor: null,
       ativo: true,
     });
@@ -132,6 +134,10 @@ const GerenciarTurmasScreen: React.FC<NavigationProps> = ({ navigation }) => {
       Alert.alert('Erro', 'Por favor, preencha todos os campos obrigatórios.');
       return;
     }
+    if (!formData.aceita_kids && !formData.aceita_teen && formData.aceita_adultos !== true) {
+      Alert.alert('Erro', 'Selecione pelo menos uma faixa etária (Kids, Teen ou Adultos).');
+      return;
+    }
 
     try {
       setSaving(true);
@@ -140,7 +146,9 @@ const GerenciarTurmasScreen: React.FC<NavigationProps> = ({ navigation }) => {
         horario: formData.horario,
         dias_semana: formData.dias_semana,
         capacidade_maxima: formData.capacidade_maxima,
-        faixa_etaria: formData.faixa_etaria || 'adultos',
+        aceita_kids: Boolean(formData.aceita_kids),
+        aceita_teen: Boolean(formData.aceita_teen),
+        aceita_adultos: formData.aceita_adultos !== false,
         professor: formData.professor || null,
         ativo: formData.ativo !== false,
       };
@@ -388,32 +396,33 @@ const GerenciarTurmasScreen: React.FC<NavigationProps> = ({ navigation }) => {
                 editable={!saving}
               />
 
-              <Text style={styles.label}>Faixa Etária *</Text>
-              <View style={styles.pickerContainer}>
+              <Text style={styles.label}>Faixas Etárias Aceitas *</Text>
+              <View style={{ gap: 8 }}>
                 {[
-                  { value: 'kids' as const, label: 'Kids (até 12 anos)' },
-                  { value: 'teen' as const, label: 'Teen (até 18 anos)' },
-                  { value: 'adultos' as const, label: 'Adultos (>18 anos)' },
+                  { key: 'aceita_kids' as const, label: 'Kids (até 12 anos)' },
+                  { key: 'aceita_teen' as const, label: 'Teen (até 18 anos)' },
+                  { key: 'aceita_adultos' as const, label: 'Adultos (>18 anos)' },
                 ].map((opt) => (
                   <TouchableOpacity
-                    key={opt.value}
+                    key={opt.key}
                     style={[
                       styles.pickerOption,
-                      formData.faixa_etaria === opt.value && styles.pickerOptionSelected,
+                      formData[opt.key] && styles.pickerOptionSelected,
                     ]}
-                    onPress={() => setFormData({ ...formData, faixa_etaria: opt.value })}
+                    onPress={() => setFormData({ ...formData, [opt.key]: !formData[opt.key] })}
                   >
                     <Text
                       style={[
                         styles.pickerOptionText,
-                        formData.faixa_etaria === opt.value && styles.pickerOptionTextSelected,
+                        formData[opt.key] && styles.pickerOptionTextSelected,
                       ]}
                     >
-                      {opt.label}
+                      {formData[opt.key] ? '☑ ' : '☐ '}{opt.label}
                     </Text>
                   </TouchableOpacity>
                 ))}
               </View>
+              <Text style={{ fontSize: 12, color: '#666', marginTop: 4 }}>Toque para marcar/desmarcar. Selecione ao menos uma.</Text>
 
               <Text style={styles.label}>Professor</Text>
               <View style={styles.pickerContainer}>

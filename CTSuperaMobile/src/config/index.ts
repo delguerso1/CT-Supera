@@ -1,5 +1,8 @@
 import { Platform } from 'react-native';
 
+// Emulador Android: 10.0.2.2 = localhost do host
+// Dispositivo físico: use o IP da sua máquina (ex: 192.168.1.100)
+// Django deve rodar com: python manage.py runserver 0.0.0.0:8000
 const devBaseUrl = Platform.OS === 'android'
   ? 'http://10.0.2.2:8000/api/'
   : 'http://localhost:8000/api/';

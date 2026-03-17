@@ -35,8 +35,8 @@ class TurmaSerializer(serializers.ModelSerializer):
         model = Turma
         fields = [
             'id', 'ct', 'ct_nome', 'dias_semana', 'dias_semana_nomes', 'horario', 'capacidade_maxima',
-            'faixa_etaria', 'professores', 'professor_nomes', 'alunos', 'alunos_count', 'vagas_disponiveis',
-            'tem_vagas', 'ativo'
+            'aceita_kids', 'aceita_teen', 'aceita_adultos', 'professores', 'professor_nomes',
+            'alunos', 'alunos_count', 'vagas_disponiveis', 'tem_vagas', 'ativo'
         ]
         depth = 1
 
@@ -86,6 +86,14 @@ class TurmaSerializer(serializers.ModelSerializer):
         if not dias_semana:
             raise serializers.ValidationError({
                 'dias_semana': 'Informe os dias da semana da turma.'
+            })
+
+        aceita_kids = attrs.get('aceita_kids', getattr(self.instance, 'aceita_kids', False) if self.instance else False)
+        aceita_teen = attrs.get('aceita_teen', getattr(self.instance, 'aceita_teen', False) if self.instance else False)
+        aceita_adultos = attrs.get('aceita_adultos', getattr(self.instance, 'aceita_adultos', True) if self.instance else True)
+        if not (aceita_kids or aceita_teen or aceita_adultos):
+            raise serializers.ValidationError({
+                'aceita_kids': 'Selecione pelo menos uma faixa etária (Kids, Teen ou Adultos).'
             })
 
         if ct and ct.dias_semana.exists():

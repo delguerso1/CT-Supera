@@ -10,6 +10,7 @@ import {
   SafeAreaView,
   Image,
   Switch,
+  TextInput,
 } from 'react-native';
 import { useAuth } from '../utils/AuthContext';
 import { funcionarioService, turmaService, presencaService } from '../services/api';
@@ -30,6 +31,7 @@ const DashboardProfessorScreen: React.FC<NavigationProps> = ({ navigation, route
   const [loadingPresenca, setLoadingPresenca] = useState(false);
   const [historicoAulas, setHistoricoAulas] = useState<HistoricoAulasProfessorItem[]>([]);
   const [loadingHistorico, setLoadingHistorico] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     if (user) {
@@ -214,15 +216,16 @@ const DashboardProfessorScreen: React.FC<NavigationProps> = ({ navigation, route
     try {
       setLoadingCheckin(true);
       setSelectedTurma(turma);
+      setSearchQuery('');
       const data = await presencaService.verificarCheckin(turma.id);
       setCheckinData(data);
       
-      // Inicializa as presenças selecionadas apenas com alunos que fizeram check-in
+      // Inicializa as presenças selecionadas com confirmadas e pendentes
       const inicialPresencas: { [key: number]: boolean } = {};
       data.alunos.forEach(aluno => {
-        if (aluno.checkin_realizado && !aluno.presenca_confirmada) {
+        if (aluno.presenca_confirmada) {
           inicialPresencas[aluno.id] = true;
-        } else if (aluno.presenca_confirmada) {
+        } else if (aluno.pode_confirmar_presenca) {
           inicialPresencas[aluno.id] = true;
         }
       });
@@ -241,15 +244,57 @@ const DashboardProfessorScreen: React.FC<NavigationProps> = ({ navigation, route
     }));
   };
 
-  const handleRegistrarPresenca = async () => {
-    if (!selectedTurma) return;
+  const normalizeSearch = (value: string) =>
+    value
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim();
 
-    const alunosIds = Object.keys(presencasSelecionadas)
-      .filter(id => presencasSelecionadas[parseInt(id)])
-      .map(id => id.toString());
+  const getSelectedCount = (alunos: AlunoPresenca[]) =>
+    alunos.filter(
+      aluno =>
+        !aluno.presenca_confirmada &&
+        aluno.pode_confirmar_presenca &&
+        presencasSelecionadas[aluno.id]
+    ).length;
+
+  const clearSelections = () => {
+    if (!checkinData) return;
+    const cleared: { [key: number]: boolean } = {};
+    checkinData.alunos.forEach(aluno => {
+      if (aluno.presenca_confirmada) {
+        cleared[aluno.id] = true;
+      }
+    });
+    setPresencasSelecionadas(cleared);
+  };
+
+  const selectAllPendentes = () => {
+    if (!checkinData) return;
+    const selecionadas: { [key: number]: boolean } = {};
+    checkinData.alunos.forEach(aluno => {
+      if (aluno.presenca_confirmada || aluno.pode_confirmar_presenca) {
+        selecionadas[aluno.id] = true;
+      }
+    });
+    setPresencasSelecionadas(selecionadas);
+  };
+
+  const handleRegistrarPresenca = async () => {
+    if (!selectedTurma || !checkinData) return;
+
+    const alunosIds = checkinData.alunos
+      .filter(
+        aluno =>
+          !aluno.presenca_confirmada &&
+          aluno.pode_confirmar_presenca &&
+          presencasSelecionadas[aluno.id]
+      )
+      .map(aluno => aluno.id.toString());
 
     if (alunosIds.length === 0) {
-      Alert.alert('Atenção', 'Selecione pelo menos um aluno para registrar presença.');
+      Alert.alert('Atenção', 'Selecione pelo menos um aluno com check-in pendente.');
       return;
     }
 
@@ -339,8 +384,13 @@ const DashboardProfessorScreen: React.FC<NavigationProps> = ({ navigation, route
       );
     }
 
-    const alunosComCheckin = checkinData.alunos.filter(a => a.checkin_realizado);
-    const alunosSemCheckin = checkinData.alunos.filter(a => !a.checkin_realizado);
+    const searchNormalized = normalizeSearch(searchQuery);
+    const alunosFiltrados = checkinData.alunos.filter(aluno =>
+      normalizeSearch(aluno.nome).includes(searchNormalized)
+    );
+    const alunosComCheckin = alunosFiltrados.filter(a => a.checkin_realizado);
+    const alunosSemCheckin = alunosFiltrados.filter(a => !a.checkin_realizado);
+    const selectedCount = getSelectedCount(alunosComCheckin);
 
     return (
       <ScrollView style={styles.content}>
@@ -365,6 +415,24 @@ const DashboardProfessorScreen: React.FC<NavigationProps> = ({ navigation, route
             </TouchableOpacity>
           </View>
 
+          <View style={styles.searchContainer}>
+            <TextInput
+              style={styles.searchInput}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholder="Buscar aluno por nome"
+              placeholderTextColor="#999"
+            />
+            <View style={styles.searchActions}>
+              <TouchableOpacity style={styles.searchButton} onPress={selectAllPendentes}>
+                <Text style={styles.searchButtonText}>Selecionar Pendentes</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.searchButtonOutline} onPress={clearSelections}>
+                <Text style={styles.searchButtonOutlineText}>Limpar Seleção</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
           {alunosComCheckin.length > 0 && (
             <View style={styles.alunosSection}>
               <Text style={styles.alunosSectionTitle}>
@@ -384,7 +452,7 @@ const DashboardProfessorScreen: React.FC<NavigationProps> = ({ navigation, route
                   <Switch
                     value={presencasSelecionadas[aluno.id] || false}
                     onValueChange={() => togglePresenca(aluno.id)}
-                    disabled={aluno.presenca_confirmada}
+                    disabled={aluno.presenca_confirmada || !aluno.pode_confirmar_presenca}
                     trackColor={{ false: '#ccc', true: '#4caf50' }}
                     thumbColor={presencasSelecionadas[aluno.id] ? '#fff' : '#f4f3f4'}
                   />
@@ -436,7 +504,7 @@ const DashboardProfessorScreen: React.FC<NavigationProps> = ({ navigation, route
               <ActivityIndicator color="#fff" />
             ) : (
               <Text style={styles.registrarButtonText}>
-                Registrar Presença ({Object.values(presencasSelecionadas).filter(Boolean).length})
+                Registrar Presença ({selectedCount})
               </Text>
             )}
           </TouchableOpacity>
@@ -975,6 +1043,51 @@ const styles = StyleSheet.create({
     color: '#1a237e',
     fontSize: 14,
     fontWeight: '600',
+  },
+  searchContainer: {
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  searchInput: {
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: '#fff',
+    color: '#333',
+  },
+  searchActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 10,
+  },
+  searchButton: {
+    flex: 1,
+    backgroundColor: '#1a237e',
+    borderRadius: 8,
+    paddingVertical: 10,
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  searchButtonText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  searchButtonOutline: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#1a237e',
+    borderRadius: 8,
+    paddingVertical: 10,
+    alignItems: 'center',
+    marginLeft: 8,
+  },
+  searchButtonOutlineText: {
+    color: '#1a237e',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
   alunosSection: {
     marginTop: 16,

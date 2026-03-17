@@ -21,20 +21,26 @@ const LoginScreen: React.FC<NavigationProps> = ({ navigation }) => {
   const { login } = useAuth();
 
   const handleLogin = async () => {
-    if (!username.trim() || !password.trim()) {
+    const cpf = username.trim();
+    if (!cpf || !password.trim()) {
       Alert.alert('Erro', 'Por favor, preencha todos os campos.');
+      return;
+    }
+    if (cpf.length !== 11) {
+      Alert.alert('Erro', 'O CPF deve ter exatamente 11 dígitos.');
       return;
     }
 
     try {
       setLoading(true);
-      await login(username.trim(), password);
+      await login(cpf, password);
       // A navegação será feita automaticamente pelo AuthProvider
     } catch (error: any) {
-      Alert.alert(
-        'Erro no Login',
-        error.response?.data?.error || 'Erro ao fazer login. Verifique suas credenciais.'
-      );
+      const msg = error.response?.data?.error
+        || (error.code === 'ECONNABORTED' ? 'Erro de conexão. Verifique se o servidor está rodando e a URL da API.' : null)
+        || (error.message?.includes('Network') ? 'Erro de rede. Verifique se o Django está rodando e acessível em 10.0.2.2:8000' : null)
+        || (error.message || 'Erro ao fazer login. Verifique CPF e senha.');
+      Alert.alert('Erro no Login', msg);
     } finally {
       setLoading(false);
     }
@@ -54,12 +60,14 @@ const LoginScreen: React.FC<NavigationProps> = ({ navigation }) => {
           </View>
 
           <View style={styles.form}>
-            <Text style={styles.label}>Usuário</Text>
+            <Text style={styles.label}>CPF (login)</Text>
             <TextInput
               style={styles.input}
               value={username}
-              onChangeText={setUsername}
-              placeholder="Digite seu usuário"
+              onChangeText={(t) => setUsername(t.replace(/\D/g, '').slice(0, 11))}
+              placeholder="Apenas números (11 dígitos)"
+              keyboardType="numeric"
+              maxLength={11}
               autoCapitalize="none"
               autoCorrect={false}
               editable={!loading}

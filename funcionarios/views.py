@@ -10,10 +10,11 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
 from django.core.mail import send_mail
-from django.db.models import Count, Sum
+from django.db.models import Count, Sum, Q
 from django.utils import timezone
 from datetime import datetime, timedelta
 import logging
+from django.utils.dateparse import parse_date
 
 logger = logging.getLogger(__name__)
 
@@ -97,6 +98,101 @@ class RegistrarPresencaAPIView(APIView):
             return Response({
                 "message": f"Presenças registradas com sucesso! ({presencas_registradas} alunos)"
             }, status=status.HTTP_200_OK)
+
+
+def _serialize_presenca(presenca: Presenca):
+    return {
+        "id": presenca.id,
+        "aluno_id": presenca.usuario.id,
+        "aluno_nome": presenca.usuario.get_full_name() or presenca.usuario.username,
+        "turma_id": presenca.turma.id,
+        "turma_nome": str(presenca.turma),
+        "data": presenca.data.isoformat(),
+        "checkin_realizado": presenca.checkin_realizado,
+        "presenca_confirmada": presenca.presenca_confirmada,
+    }
+
+
+class RelatorioPresencaAPIView(APIView):
+    """API para relatório de presença (gerente)."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if request.user.tipo != "gerente":
+            return Response({"error": "Permissão negada."}, status=status.HTTP_403_FORBIDDEN)
+
+        data_inicio = request.query_params.get("data_inicio")
+        data_fim = request.query_params.get("data_fim")
+        turma_id = request.query_params.get("turma_id")
+        aluno_id = request.query_params.get("aluno_id")
+        aluno_nome = request.query_params.get("aluno_nome")
+
+        qs = Presenca.objects.select_related("usuario", "turma").order_by("-data", "usuario__first_name")
+
+        if data_inicio:
+            parsed_inicio = parse_date(data_inicio)
+            if not parsed_inicio:
+                return Response({"error": "Data inicial inválida."}, status=status.HTTP_400_BAD_REQUEST)
+            qs = qs.filter(data__gte=parsed_inicio)
+        if data_fim:
+            parsed_fim = parse_date(data_fim)
+            if not parsed_fim:
+                return Response({"error": "Data final inválida."}, status=status.HTTP_400_BAD_REQUEST)
+            qs = qs.filter(data__lte=parsed_fim)
+        if turma_id:
+            qs = qs.filter(turma_id=turma_id)
+        if aluno_id:
+            qs = qs.filter(usuario_id=aluno_id)
+        if aluno_nome:
+            qs = qs.filter(
+                Q(usuario__first_name__icontains=aluno_nome) |
+                Q(usuario__last_name__icontains=aluno_nome) |
+                Q(usuario__username__icontains=aluno_nome)
+            )
+
+        total_registros = qs.count()
+        total_checkins = qs.filter(checkin_realizado=True).count()
+        total_confirmadas = qs.filter(presenca_confirmada=True).count()
+
+        return Response({
+            "total_registros": total_registros,
+            "total_checkins": total_checkins,
+            "total_confirmadas": total_confirmadas,
+            "presencas": [_serialize_presenca(item) for item in qs]
+        }, status=status.HTTP_200_OK)
+
+
+class CorrigirPresencaAPIView(APIView):
+    """API para correção de presença (gerente)."""
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, presenca_id):
+        if request.user.tipo != "gerente":
+            return Response({"error": "Permissão negada."}, status=status.HTTP_403_FORBIDDEN)
+
+        presenca = get_object_or_404(Presenca, id=presenca_id)
+        checkin_realizado = request.data.get("checkin_realizado", None)
+        presenca_confirmada = request.data.get("presenca_confirmada", None)
+
+        if checkin_realizado is None and presenca_confirmada is None:
+            return Response({"error": "Nenhum campo para atualizar."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if checkin_realizado is not None:
+            presenca.checkin_realizado = bool(checkin_realizado)
+            if not presenca.checkin_realizado:
+                presenca.presenca_confirmada = False
+
+        if presenca_confirmada is not None:
+            confirmar = bool(presenca_confirmada)
+            if confirmar and not presenca.checkin_realizado:
+                return Response(
+                    {"error": "Não é possível confirmar presença sem check-in."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            presenca.presenca_confirmada = confirmar
+
+        presenca.save()
+        return Response(_serialize_presenca(presenca), status=status.HTTP_200_OK)
 
 
 class PainelProfessorAPIView(APIView):

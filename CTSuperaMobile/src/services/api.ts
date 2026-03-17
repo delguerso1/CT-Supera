@@ -30,6 +30,10 @@ import CONFIG from '../config';
 const api = axios.create({
   baseURL: CONFIG.API_BASE_URL,
   timeout: CONFIG.TIMEOUTS.API_REQUEST,
+  headers: {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+  },
 });
 
 // Interceptor para adicionar token em todas as requisições
@@ -64,6 +68,10 @@ api.interceptors.response.use(
 
 export const authService = {
   login: async (username: string, password: string): Promise<LoginResponse> => {
+    if (__DEV__) {
+      console.log('[Login] API URL:', api.defaults.baseURL);
+      console.log('[Login] Enviando CPF:', username?.length ? `${username.slice(0, 3)}***` : '(vazio)');
+    }
     const response = await api.post('usuarios/login/', { cpf: username, password });
     return response.data;
   },

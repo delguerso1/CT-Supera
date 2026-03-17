@@ -47,7 +47,9 @@ export interface Turma {
   dias_semana: number[] | string[];
   dias_semana_nomes?: string[];
   capacidade_maxima: number;
-  faixa_etaria?: 'kids' | 'teen' | 'adultos';
+  aceita_kids?: boolean;
+  aceita_teen?: boolean;
+  aceita_adultos?: boolean;
   alunos_count?: number;
   ativo?: boolean;
   alunos?: User[];

@@ -725,7 +725,7 @@ const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }
                       {mensalidade.aluno_nome || `Aluno #${mensalidade.aluno}`}
                     </Text>
                     <Text style={styles.mensalidadeValue}>
-                      {formatCurrency(mensalidade.valor)}
+                      {formatCurrency(mensalidade.valor_efetivo ?? mensalidade.valor)}
                     </Text>
                   </View>
                   <View style={[

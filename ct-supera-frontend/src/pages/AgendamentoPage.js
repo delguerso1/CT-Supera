@@ -85,7 +85,15 @@ function AgendamentoPage() {
   const idadeUsuario = calcularIdade(form.data_nascimento);
   const faixaUsuario = obterFaixaEtaria(idadeUsuario);
   const turmasFiltradas = Array.isArray(turmas)
-    ? (faixaUsuario ? turmas.filter((t) => t && (t.faixa_etaria || 'adultos') === faixaUsuario) : [])
+    ? (faixaUsuario
+        ? turmas.filter((t) => {
+            if (!t) return false;
+            if (faixaUsuario === 'kids') return t.aceita_kids;
+            if (faixaUsuario === 'teen') return t.aceita_teen;
+            if (faixaUsuario === 'adultos') return t.aceita_adultos !== false;
+            return false;
+          })
+        : [])
     : [];
 
   const formatarNome = (valor) => {
