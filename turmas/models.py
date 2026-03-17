@@ -9,10 +9,21 @@ class DiaSemana(models.Model):
         return self.nome
 
 class Turma(models.Model):
+    FAIXA_ETARIA_CHOICES = [
+        ('kids', 'Kids (até 12 anos)'),
+        ('teen', 'Teen (até 18 anos)'),
+        ('adultos', 'Adultos (maiores de 18 anos)'),
+    ]
     ct = models.ForeignKey(CentroDeTreinamento, on_delete=models.CASCADE)  
     dias_semana = models.ManyToManyField(DiaSemana)  # 🔹 Agora aceita vários dias!
     horario = models.TimeField()
     capacidade_maxima = models.PositiveIntegerField(default=0)
+    faixa_etaria = models.CharField(
+        max_length=20,
+        choices=FAIXA_ETARIA_CHOICES,
+        default='adultos',
+        help_text='Kids: até 12 anos | Teen: até 18 anos | Adultos: maiores de 18'
+    )
     professores = models.ManyToManyField(
         Usuario,
         blank=True,

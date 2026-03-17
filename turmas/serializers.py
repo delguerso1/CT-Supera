@@ -35,7 +35,7 @@ class TurmaSerializer(serializers.ModelSerializer):
         model = Turma
         fields = [
             'id', 'ct', 'ct_nome', 'dias_semana', 'dias_semana_nomes', 'horario', 'capacidade_maxima',
-            'professores', 'professor_nomes', 'alunos', 'alunos_count', 'vagas_disponiveis',
+            'faixa_etaria', 'professores', 'professor_nomes', 'alunos', 'alunos_count', 'vagas_disponiveis',
             'tem_vagas', 'ativo'
         ]
         depth = 1

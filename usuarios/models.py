@@ -20,6 +20,12 @@ class PreCadastro(models.Model):
         ('cancelado', 'Cancelado'),
     ]
 
+    ORIGEM_CHOICES = [
+        ('aula_experimental', 'Aula experimental'),
+        ('ex_aluno', 'Já foi aluno'),
+        ('formulario', 'Cadastro web'),
+    ]
+
     first_name = models.CharField(max_length=100, blank=False, null=False)
     last_name = models.CharField(max_length=100, blank=True, null=True)
     cpf = models.CharField(max_length=11, unique=True, blank=True, null=True)
@@ -34,6 +40,7 @@ class PreCadastro(models.Model):
     turma = models.ForeignKey('turmas.Turma', on_delete=models.CASCADE, blank=True, null=True)
     usuario = models.OneToOneField('usuarios.Usuario', on_delete=models.SET_NULL, null=True, blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pendente')
+    origem = models.CharField(max_length=20, choices=ORIGEM_CHOICES, blank=True, null=True, help_text="Origem do pré-cadastro: aula experimental, ex-aluno ou formulário")
 
     def __str__(self):
         return f"{self.first_name} {self.last_name or ''}".strip()

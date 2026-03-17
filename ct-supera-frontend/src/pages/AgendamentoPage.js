@@ -60,6 +60,34 @@ function AgendamentoPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
+  // Calcula a idade em anos completos a partir da data de nascimento
+  const calcularIdade = (dataNascimento) => {
+    if (!dataNascimento) return null;
+    const hoje = new Date();
+    const nascimento = new Date(dataNascimento);
+    let idade = hoje.getFullYear() - nascimento.getFullYear();
+    const m = hoje.getMonth() - nascimento.getMonth();
+    if (m < 0 || (m === 0 && hoje.getDate() < nascimento.getDate())) {
+      idade--;
+    }
+    return idade;
+  };
+
+  // Retorna a faixa etária com base na idade: kids (até 12), teen (13-18), adultos (>18)
+  const obterFaixaEtaria = (idade) => {
+    if (idade === null || idade === undefined) return null;
+    if (idade <= 12) return 'kids';
+    if (idade <= 18) return 'teen';
+    return 'adultos';
+  };
+
+  // Turmas filtradas pela faixa etária do usuário (baseada na data de nascimento)
+  const idadeUsuario = calcularIdade(form.data_nascimento);
+  const faixaUsuario = obterFaixaEtaria(idadeUsuario);
+  const turmasFiltradas = Array.isArray(turmas)
+    ? (faixaUsuario ? turmas.filter((t) => t && (t.faixa_etaria || 'adultos') === faixaUsuario) : [])
+    : [];
+
   const formatarNome = (valor) => {
     if (!valor) return '';
     return valor
@@ -110,6 +138,9 @@ function AgendamentoPage() {
     if (name === 'ct') {
       update.turma = '';
     }
+    if (name === 'data_nascimento') {
+      update.turma = ''; // Reseta a turma pois a lista disponível muda
+    }
     setForm(prev => ({ ...prev, ...update }));
   };
 
@@ -126,7 +157,7 @@ function AgendamentoPage() {
     setSuccess('');
 
     // Validação da turma selecionada
-    const turmaSelecionada = turmas.find(t => t.id === parseInt(form.turma));
+    const turmaSelecionada = turmasFiltradas.find(t => t.id === parseInt(form.turma));
     if (turmaSelecionada && !turmaSelecionada.tem_vagas) {
       setError('Esta turma não possui mais vagas disponíveis.');
       return;
@@ -138,7 +169,8 @@ function AgendamentoPage() {
       email: form.email,
       telefone: form.telefone,
       data_nascimento: form.data_nascimento,
-      turma: form.turma || undefined
+      turma: form.turma || undefined,
+      origem: 'aula_experimental'
     };
     if (form.cpf && form.cpf.trim() !== '') {
       dados.cpf = form.cpf;
@@ -256,22 +288,28 @@ function AgendamentoPage() {
             value={form.turma}
             onChange={handleChange}
             required
-            disabled={!form.ct}
+            disabled={!form.ct || !form.data_nascimento}
           >
-            <option value="">Selecione a Turma</option>
-            {Array.isArray(turmas) && turmas.map(turma => {
+            <option value="">
+              {!form.data_nascimento
+                ? 'Informe a data de nascimento para ver as turmas'
+                : turmasFiltradas.length === 0
+                ? 'Nenhuma turma disponível para sua faixa etária'
+                : 'Selecione a Turma'}
+            </option>
+            {turmasFiltradas.map(turma => {
               if (!turma) return null;
               const vagasInfo = turma.tem_vagas 
                 ? `(${turma.vagas_disponiveis} vaga${turma.vagas_disponiveis !== 1 ? 's' : ''} ${turma.vagas_disponiveis !== 1 ? 'disponíveis' : 'disponível'})`
                 : '(Turma lotada)';
               return (
-                <option 
-                  key={turma.id} 
+                <option
+                  key={turma.id}
                   value={turma.id}
                   disabled={!turma.tem_vagas}
                 >
-                  {ctSelecionado?.nome || 'CT não reconhecido'} - 
-                  {Array.isArray(turma.dias_semana_nomes) ? turma.dias_semana_nomes.join(', ') : ''} - 
+                  {ctSelecionado?.nome || 'CT não reconhecido'} -{' '}
+                  {Array.isArray(turma.dias_semana_nomes) ? turma.dias_semana_nomes.join(', ') : ''} -{' '}
                   {formatarHorario(turma.horario)} - {vagasInfo}
                 </option>
               );

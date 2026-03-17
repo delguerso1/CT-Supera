@@ -79,6 +79,7 @@ const GerenciarTurmasScreen: React.FC<NavigationProps> = ({ navigation }) => {
       horario: '',
       dias_semana: [],
       capacidade_maxima: 0,
+      faixa_etaria: 'adultos',
       professor: null,
       ativo: true,
     });
@@ -95,6 +96,7 @@ const GerenciarTurmasScreen: React.FC<NavigationProps> = ({ navigation }) => {
         ? turma.dias_semana.map((d: any) => typeof d === 'object' ? d.id : d)
         : [],
       capacidade_maxima: turma.capacidade_maxima,
+      faixa_etaria: turma.faixa_etaria || 'adultos',
       professor: turma.professor || null,
       ativo: turma.ativo !== false,
     });
@@ -138,6 +140,7 @@ const GerenciarTurmasScreen: React.FC<NavigationProps> = ({ navigation }) => {
         horario: formData.horario,
         dias_semana: formData.dias_semana,
         capacidade_maxima: formData.capacidade_maxima,
+        faixa_etaria: formData.faixa_etaria || 'adultos',
         professor: formData.professor || null,
         ativo: formData.ativo !== false,
       };
@@ -384,6 +387,33 @@ const GerenciarTurmasScreen: React.FC<NavigationProps> = ({ navigation }) => {
                 keyboardType="numeric"
                 editable={!saving}
               />
+
+              <Text style={styles.label}>Faixa Etária *</Text>
+              <View style={styles.pickerContainer}>
+                {[
+                  { value: 'kids' as const, label: 'Kids (até 12 anos)' },
+                  { value: 'teen' as const, label: 'Teen (até 18 anos)' },
+                  { value: 'adultos' as const, label: 'Adultos (>18 anos)' },
+                ].map((opt) => (
+                  <TouchableOpacity
+                    key={opt.value}
+                    style={[
+                      styles.pickerOption,
+                      formData.faixa_etaria === opt.value && styles.pickerOptionSelected,
+                    ]}
+                    onPress={() => setFormData({ ...formData, faixa_etaria: opt.value })}
+                  >
+                    <Text
+                      style={[
+                        styles.pickerOptionText,
+                        formData.faixa_etaria === opt.value && styles.pickerOptionTextSelected,
+                      ]}
+                    >
+                      {opt.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
 
               <Text style={styles.label}>Professor</Text>
               <View style={styles.pickerContainer}>

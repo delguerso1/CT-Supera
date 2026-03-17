@@ -350,6 +350,7 @@ class ReverterAlunoParaPreCadastroAPIView(APIView):
                 precadastro.data_nascimento = usuario.data_nascimento
                 precadastro.email = usuario.email or precadastro.email
                 precadastro.status = "pendente"
+                precadastro.origem = "ex_aluno"
                 precadastro.usuario = None
                 precadastro.save()
             else:
@@ -360,7 +361,8 @@ class ReverterAlunoParaPreCadastroAPIView(APIView):
                     telefone=usuario.telefone or "(00)00000-0000",
                     data_nascimento=usuario.data_nascimento,
                     email=usuario.email or "pendente",
-                    status="pendente"
+                    status="pendente",
+                    origem="ex_aluno"
                 )
 
             usuario.delete()

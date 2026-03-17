@@ -1192,7 +1192,9 @@ function CadastroUsuario({ onUserChange }) {
                   </td>
                 )}
                 {activeTab === 'precadastros' && (
-                  <td style={styles.td}>{user.status || '-'}</td>
+                  <td style={styles.td}>
+                    {user.status === 'matriculado' ? 'Matriculado' : user.status === 'cancelado' ? 'Cancelado' : (user.origem_display || 'Pendente')}
+                  </td>
                 )}
                 <td style={styles.td}>
                   <div style={{ display: 'flex', flexWrap: 'nowrap', gap: '0.35rem', overflowX: 'auto' }}>

@@ -47,6 +47,7 @@ export interface Turma {
   dias_semana: number[] | string[];
   dias_semana_nomes?: string[];
   capacidade_maxima: number;
+  faixa_etaria?: 'kids' | 'teen' | 'adultos';
   alunos_count?: number;
   ativo?: boolean;
   alunos?: User[];
@@ -258,6 +259,8 @@ export interface PreCadastro {
   telefone?: string;
   cpf?: string;
   status: 'pendente' | 'matriculado' | 'cancelado';
+  origem?: 'aula_experimental' | 'ex_aluno' | 'formulario';
+  origem_display?: string;
   criado_em: string;
   data_nascimento?: string;
 }

@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from usuarios.models import Usuario, PreCadastro
-from turmas.models import DiaSemana
+from turmas.models import DiaSemana, Turma
 from financeiro.models import Mensalidade, Salario
 import re
 
@@ -257,9 +257,18 @@ class PreCadastroSerializer(serializers.ModelSerializer):
             partes_formatadas.append('-'.join(subpartes_formatadas))
         return ' '.join(partes_formatadas)
 
+    turma = serializers.PrimaryKeyRelatedField(queryset=Turma.objects.filter(ativo=True), required=False, allow_null=True)
+    origem_display = serializers.SerializerMethodField()
+
+    def get_origem_display(self, obj):
+        if not obj.origem:
+            return 'Pendente'
+        labels = {'aula_experimental': 'Aula experimental', 'ex_aluno': 'Já foi aluno', 'formulario': 'Cadastro web'}
+        return labels.get(obj.origem, obj.origem)
+
     class Meta:
         model = PreCadastro
-        fields = ['id', 'first_name', 'last_name', 'email', 'telefone', 'data_nascimento', 'cpf', 'status', 'criado_em', 'dia_vencimento', 'valor_mensalidade']
+        fields = ['id', 'first_name', 'last_name', 'email', 'telefone', 'data_nascimento', 'cpf', 'status', 'origem', 'origem_display', 'criado_em', 'dia_vencimento', 'valor_mensalidade', 'turma']
 
     def validate(self, attrs):
         attrs = super().validate(attrs)

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import api from '../services/api';
 
 function FormacaoAtletas() {
@@ -8,11 +8,26 @@ function FormacaoAtletas() {
     cpf: '',
     email: '',
     telefone: '',
-    data_nascimento: ''
+    data_nascimento: '',
+    turma: ''
   });
+  const [turmas, setTurmas] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+
+  useEffect(() => {
+    const fetchTurmas = async () => {
+      try {
+        const response = await api.get('turmas/');
+        const data = response.data?.results || response.data || [];
+        setTurmas(Array.isArray(data) ? data : []);
+      } catch (err) {
+        console.error('Erro ao carregar turmas:', err);
+      }
+    };
+    fetchTurmas();
+  }, []);
 
   const formatarNome = (valor) => {
     if (!valor) return '';
@@ -72,6 +87,8 @@ function FormacaoAtletas() {
         telefone: formData.telefone,
         data_nascimento: formData.data_nascimento
       };
+      if (formData.turma) payload.turma = parseInt(formData.turma, 10);
+      payload.origem = 'formulario';
       await api.post('usuarios/precadastros/', payload);
       setSuccess('Cadastro enviado com sucesso! Em breve entraremos em contato.');
       setFormData({
@@ -80,7 +97,8 @@ function FormacaoAtletas() {
         cpf: '',
         email: '',
         telefone: '',
-        data_nascimento: ''
+        data_nascimento: '',
+        turma: ''
       });
     } catch (err) {
       const data = err.response?.data;
@@ -106,12 +124,21 @@ function FormacaoAtletas() {
     }
   };
 
+  const formatarHorario = (horario) => {
+    if (!horario) return '';
+    try {
+      const [h, m] = horario.split(':');
+      return `${h.padStart(2, '0')}:${(m || '00').padStart(2, '0')}`;
+    } catch {
+      return horario;
+    }
+  };
+
   return (
     <div style={{ padding: '2rem', maxWidth: '720px', margin: '0 auto' }}>
       <h1 style={{ color: '#1F6C86' }}>Alunos</h1>
       <p style={{ color: '#555', marginBottom: '1.5rem' }}>
-        Se você já é aluno do CT Supera, preencha o cadastro abaixo. A seleção de turma
-        será feita posteriormente pela nossa equipe.
+        Se você já é aluno do CT Supera, preencha o cadastro abaixo e selecione a turma de sua preferência.
       </p>
 
       <form onSubmit={handleSubmit} style={{ display: 'grid', gap: '1rem' }}>
@@ -174,6 +201,32 @@ function FormacaoAtletas() {
             onChange={handleChange}
             required
           />
+        </div>
+
+        <div style={{ display: 'grid', gap: '0.5rem' }}>
+          <label>Turma</label>
+          <select
+            name="turma"
+            value={formData.turma}
+            onChange={handleChange}
+            style={{
+              padding: '0.75rem',
+              borderRadius: '4px',
+              border: '1px solid #ddd',
+              fontSize: '1rem',
+              backgroundColor: '#fff'
+            }}
+          >
+            <option value="">Selecione a turma</option>
+            {turmas.filter(t => t.ativo !== false).map(turma => (
+              <option key={turma.id} value={turma.id}>
+                {turma.ct_nome || 'CT'} - {Array.isArray(turma.dias_semana_nomes) ? turma.dias_semana_nomes.join(', ') : '-'} às {formatarHorario(turma.horario)}
+              </option>
+            ))}
+          </select>
+          {turmas.length === 0 && (
+            <span style={{ fontSize: '0.85rem', color: '#999' }}>Carregando turmas...</span>
+          )}
         </div>
 
         {error && <div style={{ color: '#d32f2f' }}>{error}</div>}

@@ -164,6 +164,10 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
 
     if (activeTab !== 'precadastros') {
       payload.tipo = activeTab === 'alunos' ? 'aluno' : activeTab === 'professores' ? 'professor' : 'gerente';
+    } else {
+      payload.origem = editingUser
+        ? (editingUser as PreCadastro).origem || 'formulario'
+        : 'formulario';
     }
 
     if (payload.tipo === 'aluno') {
@@ -400,7 +404,14 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
                       {item.nome || `${item.first_name || ''} ${item.last_name || ''}`.trim() || 'Sem nome'}
                     </Text>
                     <Text style={styles.cardSubtitle}>{item.email}</Text>
-                    <Text style={styles.cardSubtitle}>Status: {item.status}</Text>
+                    <Text style={styles.cardSubtitle}>
+                      Status:{' '}
+                      {item.status === 'matriculado'
+                        ? 'Matriculado'
+                        : item.status === 'cancelado'
+                        ? 'Cancelado'
+                        : (item.origem_display || 'Pendente')}
+                    </Text>
                     <View style={styles.actionsRow}>
                       <TouchableOpacity style={styles.actionButton} onPress={() => handleEditUser(item)}>
                         <Text style={styles.actionButtonText}>Editar</Text>

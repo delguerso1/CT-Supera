@@ -134,8 +134,9 @@ function CadastroTurmas({ centroId, styles }) {
       const formDataToSend = {
         ...formData,
         ct: Number(centroId),
-        dias_semana: formData.dias_semana.map(Number), // <-- converte para int
-        professores: formData.professores.map(Number)
+        dias_semana: formData.dias_semana.map(Number),
+        professores: formData.professores.map(Number),
+        faixa_etaria: formData.faixa_etaria || 'adultos'
       };
       
       console.log("📤 Dados enviados no POST:", formDataToSend); // 👈 ADICIONE ISTO
@@ -152,6 +153,7 @@ function CadastroTurmas({ centroId, styles }) {
         dias_semana: [],
         horario: '',
         capacidade_maxima: '',
+        faixa_etaria: 'adultos',
         professores: [],
         ct: centroId,
       });
@@ -168,8 +170,9 @@ function CadastroTurmas({ centroId, styles }) {
       dias_semana: turma.dias_semana || [],
       horario: turma.horario || '',
       capacidade_maxima: turma.capacidade_maxima || '',
+      faixa_etaria: turma.faixa_etaria || 'adultos',
       professores: turma.professores || [],
-      ct: turma.ct?.id || turma.ct || centroId, // ✅ Acesso seguro com fallback
+      ct: turma.ct?.id || turma.ct || centroId,
     });
     setEditId(turma.id);
     setShowForm(true);
@@ -195,6 +198,7 @@ function CadastroTurmas({ centroId, styles }) {
       dias_semana: [],
       horario: '',
       capacidade_maxima: '',
+      faixa_etaria: 'adultos',
       professores: [],
       ct: centroId,
     });
@@ -269,6 +273,7 @@ function CadastroTurmas({ centroId, styles }) {
             <tr style={{ background: '#f5f5f5' }}>
               <th style={{ padding: 12, borderBottom: '2px solid #eee', textAlign: 'center' }}>Dias</th>
               <th style={{ padding: 12, borderBottom: '2px solid #eee', textAlign: 'center' }}>Horário</th>
+              <th style={{ padding: 12, borderBottom: '2px solid #eee', textAlign: 'center' }}>Faixa</th>
               <th style={{ padding: 12, borderBottom: '2px solid #eee', textAlign: 'center' }}>Capacidade</th>
               <th style={{ padding: 12, borderBottom: '2px solid #eee', textAlign: 'center' }}>Professores</th>
               <th style={{ padding: 12, borderBottom: '2px solid #eee', textAlign: 'center' }}>Alunos</th>
@@ -278,7 +283,7 @@ function CadastroTurmas({ centroId, styles }) {
           <tbody>
             {turmas.length === 0 && (
               <tr>
-                <td colSpan={6} style={{ color: '#888', padding: 12, textAlign: 'center' }}>
+                <td colSpan={7} style={{ color: '#888', padding: 12, textAlign: 'center' }}>
                   Nenhuma turma cadastrada.
                 </td>
               </tr>
@@ -293,6 +298,9 @@ function CadastroTurmas({ centroId, styles }) {
                   }
                 </td>
                 <td style={{ padding: 12, textAlign: 'center' }}>{turma.horario}</td>
+                <td style={{ padding: 12, textAlign: 'center' }}>
+                  {turma.faixa_etaria === 'kids' ? 'Kids' : turma.faixa_etaria === 'teen' ? 'Teen' : turma.faixa_etaria === 'adultos' ? 'Adultos' : '-'}
+                </td>
                 <td style={{ padding: 12, textAlign: 'center' }}>{turma.capacidade_maxima}</td>
                 <td style={{ padding: 12, textAlign: 'center' }}>
                   {(turma.professor_nomes && turma.professor_nomes.length > 0)
@@ -491,6 +499,29 @@ function CadastroTurmas({ centroId, styles }) {
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <label style={{ fontWeight: 500, marginBottom: 2 }} htmlFor="faixa_etaria">
+              Faixa Etária
+            </label>
+            <select
+              id="faixa_etaria"
+              name="faixa_etaria"
+              value={formData.faixa_etaria || 'adultos'}
+              onChange={handleChange}
+              style={{
+                padding: '8px',
+                borderRadius: 4,
+                border: '1px solid #ccc',
+                fontSize: '1rem'
+              }}
+              required
+            >
+              <option value="kids">Kids (crianças até 12 anos)</option>
+              <option value="teen">Teen (adolescentes até 18 anos)</option>
+              <option value="adultos">Adultos (maiores de 18 anos)</option>
+            </select>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
             <label style={{ fontWeight: 500, marginBottom: 2 }} htmlFor="professores">
               Professores
             </label>
@@ -527,6 +558,7 @@ function CadastroTurmas({ centroId, styles }) {
                   dias_semana: [],
                   horario: '',
                   capacidade_maxima: '',
+                  faixa_etaria: 'adultos',
                   professores: [],
                   ct: centroId,
                 });
