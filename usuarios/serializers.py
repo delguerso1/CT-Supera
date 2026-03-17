@@ -25,6 +25,7 @@ def validar_senha_serializer(senha):
         raise serializers.ValidationError("A senha deve conter pelo menos um caractere especial (!@#$%^&*(),.?\":{}|<>).")
 
 class UsuarioSerializer(serializers.ModelSerializer):
+    data_nascimento = serializers.DateField(format='%Y-%m-%d', required=False, allow_null=True)
     nome_completo = serializers.SerializerMethodField()
     tipo_display = serializers.SerializerMethodField()
     centros_treinamento = serializers.SerializerMethodField()
@@ -223,6 +224,15 @@ class UsuarioSerializer(serializers.ModelSerializer):
             instance.atualizar_mensalidades_pendentes()
         return instance
 
+    def _idade_em_anos_completos(self, data_nascimento):
+        if not data_nascimento:
+            return None
+        from datetime import date
+        hoje = date.today()
+        return hoje.year - data_nascimento.year - (
+            (hoje.month, hoje.day) < (data_nascimento.month, data_nascimento.day)
+        )
+
     def validate(self, attrs):
         attrs = super().validate(attrs)
         if 'first_name' in attrs:
@@ -237,6 +247,24 @@ class UsuarioSerializer(serializers.ModelSerializer):
             })
         if 'username' not in attrs:
             attrs['username'] = re.sub(r'\D', '', str(cpf))
+        email = attrs.get('email')
+        data_nascimento = attrs.get('data_nascimento')
+        if self.instance:
+            data_nascimento = data_nascimento or (self.instance.data_nascimento if self.instance else None)
+        idade = self._idade_em_anos_completos(data_nascimento) if data_nascimento else None
+        if email and tipo == 'aluno':
+            if idade is None or idade >= 18:
+                qs = Usuario.objects.filter(email=email)
+                if self.instance:
+                    qs = qs.exclude(pk=self.instance.pk)
+                if qs.exists():
+                    raise serializers.ValidationError({'email': 'Esse e-mail já está cadastrado.'})
+        elif email and tipo in ('professor', 'gerente'):
+            qs = Usuario.objects.filter(email=email)
+            if self.instance:
+                qs = qs.exclude(pk=self.instance.pk)
+            if qs.exists():
+                raise serializers.ValidationError({'email': 'Esse e-mail já está cadastrado.'})
         return attrs
 
 class PreCadastroSerializer(serializers.ModelSerializer):
@@ -270,12 +298,32 @@ class PreCadastroSerializer(serializers.ModelSerializer):
         model = PreCadastro
         fields = ['id', 'first_name', 'last_name', 'email', 'telefone', 'data_nascimento', 'cpf', 'status', 'origem', 'origem_display', 'criado_em', 'dia_vencimento', 'valor_mensalidade', 'turma']
 
+    def _idade_em_anos_completos(self, data_nascimento):
+        if not data_nascimento:
+            return None
+        from datetime import date
+        hoje = date.today()
+        return hoje.year - data_nascimento.year - (
+            (hoje.month, hoje.day) < (data_nascimento.month, data_nascimento.day)
+        )
+
     def validate(self, attrs):
         attrs = super().validate(attrs)
         if 'first_name' in attrs:
             attrs['first_name'] = self._formatar_nome(attrs['first_name'])
         if 'last_name' in attrs:
             attrs['last_name'] = self._formatar_nome(attrs['last_name'])
+        email = attrs.get('email')
+        data_nascimento = attrs.get('data_nascimento')
+        if self.instance:
+            data_nascimento = data_nascimento or (self.instance.data_nascimento if self.instance else None)
+        idade = self._idade_em_anos_completos(data_nascimento) if data_nascimento else None
+        if email and (idade is None or idade >= 18):
+            qs = PreCadastro.objects.filter(email=email)
+            if self.instance:
+                qs = qs.exclude(pk=self.instance.pk)
+            if qs.exists():
+                raise serializers.ValidationError({'email': 'Esse e-mail já está cadastrado.'})
         return attrs
 
 class MensalidadeSerializer(serializers.ModelSerializer):

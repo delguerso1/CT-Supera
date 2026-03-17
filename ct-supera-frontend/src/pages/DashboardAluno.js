@@ -490,7 +490,7 @@ function DashboardAluno({ user }) {
           email: resp.data.usuario.email || '',
           telefone: resp.data.usuario.telefone || '',
           endereco: resp.data.usuario.endereco || '',
-          data_nascimento: resp.data.usuario.data_nascimento || '',
+          data_nascimento: (resp.data.usuario.data_nascimento || '').split('T')[0] || '',
           nome_responsavel: resp.data.usuario.nome_responsavel || '',
           telefone_responsavel: resp.data.usuario.telefone_responsavel || '',
           telefone_emergencia: resp.data.usuario.telefone_emergencia || '',
@@ -531,7 +531,7 @@ function DashboardAluno({ user }) {
       email: aluno?.email || '',
       telefone: aluno?.telefone || '',
       endereco: aluno?.endereco || '',
-      data_nascimento: aluno?.data_nascimento || '',
+      data_nascimento: (aluno?.data_nascimento || '').split('T')[0] || '',
       nome_responsavel: aluno?.nome_responsavel || '',
       telefone_responsavel: aluno?.telefone_responsavel || '',
       telefone_emergencia: aluno?.telefone_emergencia || '',
@@ -638,7 +638,7 @@ function DashboardAluno({ user }) {
       email: form.email,
       telefone: form.telefone,
       endereco: form.endereco,
-      data_nascimento: form.data_nascimento,
+      data_nascimento: (form.data_nascimento || '').split('T')[0] || '',
       nome_responsavel: form.nome_responsavel,
       telefone_responsavel: form.telefone_responsavel,
       telefone_emergencia: form.telefone_emergencia,
@@ -1339,7 +1339,7 @@ function DashboardAluno({ user }) {
               <label style={styles.label}>Data de Nascimento</label>
               <div style={styles.input}>
                 {aluno?.data_nascimento
-                  ? new Date(aluno.data_nascimento).toLocaleDateString()
+                  ? formatDateOnly(aluno.data_nascimento)
                   : '-'}
               </div>
             </div>

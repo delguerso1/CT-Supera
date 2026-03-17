@@ -12,6 +12,8 @@ import {
   Linking,
   TextInput,
   Switch,
+  Modal,
+  Platform,
 } from 'react-native';
 import { useAuth } from '../utils/AuthContext';
 import { userService, alunoService, pagamentoService } from '../services/api';
@@ -19,6 +21,10 @@ import { User, PainelAluno, Mensalidade, HistoricoPagamentos } from '../types';
 import { NavigationProps } from '../types';
 import CONFIG from '../config';
 import { launchImageLibrary, ImagePickerResponse, MediaType } from 'react-native-image-picker';
+import QRCode from 'react-native-qrcode-svg';
+import Clipboard from '@react-native-clipboard/clipboard';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import RNBlobUtil from 'react-native-blob-util';
 
 const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) => {
   const { user, logout } = useAuth();
@@ -33,6 +39,30 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
   const [fotoPerfil, setFotoPerfil] = useState<any>(null);
   const [fotoPreview, setFotoPreview] = useState<string | null>(null);
   const [uploadingFoto, setUploadingFoto] = useState(false);
+  const [loadingFotoPerfil, setLoadingFotoPerfil] = useState(false);
+  const [pixModalVisible, setPixModalVisible] = useState(false);
+  const [pixData, setPixData] = useState<{
+    codigo_pix: string;
+    qr_code?: string;
+    valor?: string;
+    data_expiracao?: string;
+  } | null>(null);
+  const [boletoModalVisible, setBoletoModalVisible] = useState(false);
+  const [boletoData, setBoletoData] = useState<{
+    transacao_id: number;
+    linha_digitavel: string;
+    valor?: string;
+    data_vencimento?: string;
+  } | null>(null);
+  const [boletoStatusLoading, setBoletoStatusLoading] = useState(false);
+  const [boletoDownloading, setBoletoDownloading] = useState(false);
+  const [checkoutModalVisible, setCheckoutModalVisible] = useState(false);
+  const [checkoutData, setCheckoutData] = useState<{
+    transacao_id: number;
+    payment_url: string;
+    status?: string;
+  } | null>(null);
+  const [checkoutStatusLoading, setCheckoutStatusLoading] = useState(false);
   const [form, setForm] = useState({
     first_name: '',
     last_name: '',
@@ -93,7 +123,7 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
         email: usuario.email || '',
         telefone: usuario.telefone || '',
         endereco: usuario.endereco || '',
-        data_nascimento: usuario.data_nascimento || '',
+        data_nascimento: (usuario.data_nascimento || '').split('T')[0] || '',
         nome_responsavel: usuario.nome_responsavel || '',
         telefone_responsavel: usuario.telefone_responsavel || '',
         telefone_emergencia: usuario.telefone_emergencia || '',
@@ -143,6 +173,14 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
 
   const formatDate = (value?: string) => {
     if (!value) return '-';
+    const str = String(value).split('T')[0];
+    const parts = str.split('-');
+    if (parts.length === 3 && parts.every((p) => p.length > 0)) {
+      const [year, month, day] = parts.map(Number);
+      if (!Number.isNaN(year) && !Number.isNaN(month) && !Number.isNaN(day)) {
+        return new Date(year, month - 1, day).toLocaleDateString('pt-BR');
+      }
+    }
     const parsed = new Date(value);
     if (Number.isNaN(parsed.getTime())) return value;
     return parsed.toLocaleDateString('pt-BR');
@@ -216,7 +254,7 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
         email: usuario.email || '',
         telefone: usuario.telefone || '',
         endereco: usuario.endereco || '',
-        data_nascimento: usuario.data_nascimento || '',
+        data_nascimento: (usuario.data_nascimento || '').split('T')[0] || '',
         nome_responsavel: usuario.nome_responsavel || '',
         telefone_responsavel: usuario.telefone_responsavel || '',
         telefone_emergencia: usuario.telefone_emergencia || '',
@@ -236,7 +274,7 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
         email: form.email,
         telefone: form.telefone,
         endereco: form.endereco,
-        data_nascimento: form.data_nascimento || null,
+        data_nascimento: (form.data_nascimento || '').split('T')[0] || null,
         nome_responsavel: form.nome_responsavel || '',
         telefone_responsavel: form.telefone_responsavel || '',
         telefone_emergencia: form.telefone_emergencia || '',
@@ -258,7 +296,7 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
 
   const handleSelecionarFoto = () => {
     launchImageLibrary(
-      { mediaType: 'photo' as MediaType, quality: 0.8 },
+      { mediaType: 'photo' as MediaType, quality: 0.7, maxWidth: 1024, maxHeight: 1024 },
       (response: ImagePickerResponse) => {
         if (response.didCancel) return;
         if (response.errorMessage) {
@@ -267,6 +305,17 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
         }
         const asset = response.assets && response.assets[0];
         if (!asset?.uri) return;
+        const allowedTypes = ['image/jpeg', 'image/png'];
+        const fileSize = asset.fileSize || 0;
+        const maxSize = 5 * 1024 * 1024;
+        if (asset.type && !allowedTypes.includes(asset.type)) {
+          Alert.alert('Erro', 'Formato inválido. Use JPG ou PNG.');
+          return;
+        }
+        if (fileSize > maxSize) {
+          Alert.alert('Erro', 'Arquivo muito grande. Limite de 5MB.');
+          return;
+        }
         setFotoPerfil(asset);
         setFotoPreview(asset.uri);
       }
@@ -292,6 +341,35 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
     } finally {
       setUploadingFoto(false);
     }
+  };
+
+  const handleRemoverFoto = async () => {
+    if (!painelAluno) return;
+    Alert.alert(
+      'Remover foto',
+      'Deseja remover sua foto de perfil?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Remover',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setUploadingFoto(true);
+              await userService.updateProfile({ id: painelAluno.usuario.id, foto_perfil: null });
+              setFotoPerfil(null);
+              setFotoPreview(null);
+              await loadAlunoData();
+              Alert.alert('Sucesso', 'Foto removida com sucesso!');
+            } catch (error: any) {
+              Alert.alert('Erro', error.response?.data?.error || 'Erro ao remover foto.');
+            } finally {
+              setUploadingFoto(false);
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleCancelarFoto = () => {
@@ -429,7 +507,7 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
               <View key={mensalidade.id} style={styles.mensalidadeCard}>
                 <View style={styles.mensalidadeHeader}>
                   <Text style={styles.mensalidadeValue}>
-                    R$ {mensalidade.valor.toFixed(2)}
+                    R$ {(mensalidade.valor_efetivo ?? mensalidade.valor).toFixed(2)}
                   </Text>
                   <View style={[
                     styles.statusBadge,
@@ -505,22 +583,43 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
           <View style={styles.photoRow}>
             <View style={styles.profilePhotoLarge}>
               {fotoPreview ? (
-                <Image source={{ uri: fotoPreview }} style={styles.profileImageLarge} />
+                <Image
+                  source={{ uri: fotoPreview }}
+                  style={styles.profileImageLarge}
+                  onLoadStart={() => setLoadingFotoPerfil(true)}
+                  onLoadEnd={() => setLoadingFotoPerfil(false)}
+                />
               ) : aluno.foto_perfil ? (
                 <Image
                   source={{ uri: `${baseUrl}${aluno.foto_perfil}` }}
                   style={styles.profileImageLarge}
+                  onLoadStart={() => setLoadingFotoPerfil(true)}
+                  onLoadEnd={() => setLoadingFotoPerfil(false)}
                 />
               ) : (
                 <Text style={styles.profileInitialsLarge}>
                   {getInitials(`${aluno.first_name} ${aluno.last_name}`)}
                 </Text>
               )}
+              {loadingFotoPerfil && (
+                <View style={styles.photoLoadingOverlay}>
+                  <ActivityIndicator size="small" color="#1a237e" />
+                </View>
+              )}
             </View>
             <View style={styles.photoActions}>
               <TouchableOpacity style={styles.photoButton} onPress={handleSelecionarFoto}>
                 <Text style={styles.photoButtonText}>Selecionar Foto</Text>
               </TouchableOpacity>
+              {aluno.foto_perfil && !fotoPerfil && (
+                <TouchableOpacity
+                  style={[styles.photoButton, styles.photoRemoveButton]}
+                  onPress={handleRemoverFoto}
+                  disabled={uploadingFoto}
+                >
+                  <Text style={styles.photoButtonText}>Remover Foto</Text>
+                </TouchableOpacity>
+              )}
               {fotoPerfil && (
                 <View style={styles.photoActionRow}>
                   <TouchableOpacity
@@ -554,6 +653,8 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
               <Image
                 source={{ uri: `${baseUrl}${aluno.foto_perfil}` }}
                 style={styles.profileImage}
+                onLoadStart={() => setLoadingFotoPerfil(true)}
+                onLoadEnd={() => setLoadingFotoPerfil(false)}
               />
             ) : (
               <Text style={styles.profileInitials}>
@@ -876,7 +977,7 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
                   <View key={mensalidade.id} style={styles.mensalidadeCard}>
                     <View style={styles.mensalidadeHeader}>
                       <Text style={styles.mensalidadeValue}>
-                        R$ {mensalidade.valor.toFixed(2)}
+                        R$ {(mensalidade.valor_efetivo ?? mensalidade.valor).toFixed(2)}
                       </Text>
                       <View style={[
                         styles.statusBadge,
@@ -937,7 +1038,7 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
   const handlePagarMensalidade = (mensalidade: Mensalidade) => {
     Alert.alert(
       'Forma de Pagamento',
-      `Escolha a forma de pagamento para a mensalidade de R$ ${mensalidade.valor.toFixed(2)}`,
+      `Escolha a forma de pagamento para a mensalidade de R$ ${(mensalidade.valor_efetivo ?? mensalidade.valor).toFixed(2)}`,
       [
         { text: 'Cancelar', style: 'cancel' },
         { text: 'PIX', onPress: () => gerarPix(mensalidade) },
@@ -950,17 +1051,13 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
   const gerarPix = async (mensalidade: Mensalidade) => {
     try {
       const response = await pagamentoService.gerarPix(mensalidade.id);
-      Alert.alert(
-        'PIX Gerado',
-        'PIX gerado com sucesso! Use o código abaixo para pagar:',
-        [
-          { text: 'Copiar Código', onPress: () => {
-            // Aqui você pode implementar a cópia do código PIX
-            Alert.alert('Código PIX', response.transacao.codigo_pix);
-          }},
-          { text: 'OK' },
-        ]
-      );
+      setPixData({
+        codigo_pix: response.transacao.codigo_pix,
+        qr_code: response.transacao.qr_code,
+        valor: response.transacao.valor,
+        data_expiracao: response.transacao.data_expiracao,
+      });
+      setPixModalVisible(true);
       await loadHistoricoPagamentos();
     } catch (error: any) {
       Alert.alert('Erro', error.response?.data?.error || 'Erro ao gerar PIX.');
@@ -970,16 +1067,19 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
   const gerarBoleto = async (mensalidade: Mensalidade) => {
     try {
       const response = await pagamentoService.gerarBoleto(mensalidade.id);
-      Alert.alert(
-        'Boleto Gerado',
-        `Boleto gerado com sucesso!\nLinha digitável: ${response.transacao.linha_digitavel}`,
-        [
-          { text: 'Copiar Linha Digitável', onPress: () => {
-            Alert.alert('Linha Digitável', response.transacao.linha_digitavel);
-          }},
-          { text: 'OK' },
-        ]
-      );
+      const linhaDigitavel =
+        response.boleto?.digitable_line || response.transacao?.boleto_codigo;
+      if (!linhaDigitavel) {
+        Alert.alert('Boleto Gerado', 'Boleto criado, mas a linha digitável não foi retornada.');
+      } else {
+        setBoletoData({
+          transacao_id: response.transacao.id,
+          linha_digitavel: linhaDigitavel,
+          valor: response.transacao?.valor,
+          data_vencimento: response.transacao?.data_vencimento,
+        });
+        setBoletoModalVisible(true);
+      }
       await loadHistoricoPagamentos();
     } catch (error: any) {
       Alert.alert('Erro', error.response?.data?.error || 'Erro ao gerar boleto.');
@@ -989,21 +1089,99 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
   const criarCheckout = async (mensalidade: Mensalidade) => {
     try {
       const response = await pagamentoService.criarCheckout(mensalidade.id);
-      Alert.alert(
-        'Checkout Criado',
-        'Redirecionando para o pagamento...',
-        [
-          {
-            text: 'Abrir',
-            onPress: () => {
-              Linking.openURL(response.checkout.payment_url);
-            },
-          },
-        ]
-      );
+      const paymentUrl =
+        response.payment_url ||
+        response.checkout?.payment_url ||
+        response.transacao?.payment_url;
+      const transacaoId = response.transacao?.id;
+
+      if (!paymentUrl || !transacaoId) {
+        Alert.alert('Checkout Criado', 'Checkout gerado, mas o link não foi retornado.');
+      } else {
+        setCheckoutData({
+          transacao_id: transacaoId,
+          payment_url: paymentUrl,
+          status: response.transacao?.status || response.checkout?.status,
+        });
+        setCheckoutModalVisible(true);
+      }
       await loadHistoricoPagamentos();
     } catch (error: any) {
       Alert.alert('Erro', error.response?.data?.error || 'Erro ao criar checkout.');
+    }
+  };
+
+  const handleCopiarPix = () => {
+    if (!pixData?.codigo_pix) return;
+    Clipboard.setString(pixData.codigo_pix);
+    Alert.alert('Sucesso', 'Código PIX copiado.');
+  };
+
+  const handleCopiarLinhaDigitavel = () => {
+    if (!boletoData?.linha_digitavel) return;
+    Clipboard.setString(boletoData.linha_digitavel);
+    Alert.alert('Sucesso', 'Linha digitável copiada.');
+  };
+
+  const handleConsultarBoletoStatus = async () => {
+    if (!boletoData?.transacao_id) return;
+    try {
+      setBoletoStatusLoading(true);
+      const response = await pagamentoService.consultarBoleto(boletoData.transacao_id);
+      Alert.alert(
+        'Status do Boleto',
+        `Status: ${response.status || response.transacao?.status || 'indisponível'}`
+      );
+    } catch (error: any) {
+      Alert.alert('Erro', error.response?.data?.error || 'Erro ao consultar boleto.');
+    } finally {
+      setBoletoStatusLoading(false);
+    }
+  };
+
+  const handleDownloadBoletoPdf = async () => {
+    if (!boletoData?.transacao_id) return;
+    try {
+      setBoletoDownloading(true);
+      const token = await AsyncStorage.getItem(CONFIG.STORAGE_KEYS.TOKEN);
+      const url = `${CONFIG.API_BASE_URL}financeiro/boletos/${boletoData.transacao_id}/pdf/`;
+      const fileName = `boleto_${boletoData.transacao_id}.pdf`;
+      const path =
+        Platform.OS === 'android'
+          ? `${RNBlobUtil.fs.dirs.DownloadDir}/${fileName}`
+          : `${RNBlobUtil.fs.dirs.DocumentDir}/${fileName}`;
+
+      const response = await RNBlobUtil.config({ fileCache: true, path }).fetch(
+        'GET',
+        url,
+        token ? { Authorization: `Token ${token}` } : undefined
+      );
+
+      if (Platform.OS === 'android') {
+        RNBlobUtil.android.actionViewIntent(response.path(), 'application/pdf');
+      } else {
+        RNBlobUtil.ios.openDocument(response.path());
+      }
+    } catch (error: any) {
+      Alert.alert('Erro', error?.message || 'Erro ao baixar boleto.');
+    } finally {
+      setBoletoDownloading(false);
+    }
+  };
+
+  const handleConsultarCheckoutStatus = async () => {
+    if (!checkoutData?.transacao_id) return;
+    try {
+      setCheckoutStatusLoading(true);
+      const response = await pagamentoService.consultarCheckout(checkoutData.transacao_id);
+      const status = response.status || response.checkout?.status || response.transacao?.status;
+      Alert.alert('Status do Checkout', `Status: ${status || 'indisponível'}`);
+      await loadHistoricoPagamentos();
+      await loadAlunoData();
+    } catch (error: any) {
+      Alert.alert('Erro', error.response?.data?.error || 'Erro ao consultar checkout.');
+    } finally {
+      setCheckoutStatusLoading(false);
     }
   };
 
@@ -1032,7 +1210,7 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
               <View key={mensalidade.id} style={styles.mensalidadeCard}>
                 <View style={styles.mensalidadeHeader}>
                   <Text style={styles.mensalidadeValue}>
-                    R$ {mensalidade.valor.toFixed(2)}
+                    R$ {(mensalidade.valor_efetivo ?? mensalidade.valor).toFixed(2)}
                   </Text>
                   <View style={[
                     styles.statusBadge,
@@ -1067,7 +1245,7 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
               <View key={mensalidade.id} style={styles.mensalidadeCard}>
                 <View style={styles.mensalidadeHeader}>
                   <Text style={styles.mensalidadeValue}>
-                    R$ {mensalidade.valor.toFixed(2)}
+                    R$ {(mensalidade.valor_efetivo ?? mensalidade.valor).toFixed(2)}
                   </Text>
                   <View style={[styles.statusBadge, { backgroundColor: '#f44336' }]}>
                     <Text style={styles.statusBadgeText}>Vencida</Text>
@@ -1094,7 +1272,7 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
               <View key={mensalidade.id} style={styles.mensalidadeCard}>
                 <View style={styles.mensalidadeHeader}>
                   <Text style={styles.mensalidadeValue}>
-                    R$ {mensalidade.valor.toFixed(2)}
+                    R$ {(mensalidade.valor_efetivo ?? mensalidade.valor).toFixed(2)}
                   </Text>
                   <View style={[styles.statusBadge, { backgroundColor: '#ff9800' }]}>
                     <Text style={styles.statusBadgeText}>Pendente</Text>
@@ -1121,7 +1299,7 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
               <View key={mensalidade.id} style={styles.mensalidadeCard}>
                 <View style={styles.mensalidadeHeader}>
                   <Text style={styles.mensalidadeValue}>
-                    R$ {mensalidade.valor.toFixed(2)}
+                    R$ {(mensalidade.valor_efetivo ?? mensalidade.valor).toFixed(2)}
                   </Text>
                   <View style={[styles.statusBadge, { backgroundColor: '#4caf50' }]}>
                     <Text style={styles.statusBadgeText}>Pago</Text>
@@ -1243,6 +1421,123 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
       {activeSection === 'parq' && renderParq()}
       {activeSection === 'checkin' && renderCheckin()}
       {activeSection === 'pagamentos' && renderPagamentos()}
+
+      <Modal visible={pixModalVisible} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>PIX Gerado</Text>
+            <Text style={styles.modalSubtitle}>
+              Escaneie o QR Code ou copie o código PIX.
+            </Text>
+            <View style={styles.qrContainer}>
+              <QRCode
+                size={200}
+                value={pixData?.codigo_pix || ''}
+                backgroundColor="#fff"
+              />
+            </View>
+            {pixData?.valor && (
+              <Text style={styles.modalAmount}>Valor: R$ {pixData.valor}</Text>
+            )}
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.modalButton} onPress={handleCopiarPix}>
+                <Text style={styles.modalButtonText}>Copiar código</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalButtonSecondary]}
+                onPress={() => {
+                  setPixModalVisible(false);
+                  setPixData(null);
+                }}
+              >
+                <Text style={styles.modalButtonText}>Fechar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={boletoModalVisible} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Boleto Gerado</Text>
+            <Text style={styles.modalSubtitle}>
+              Copie a linha digitável para efetuar o pagamento.
+            </Text>
+            <Text style={styles.boletoLine}>{boletoData?.linha_digitavel}</Text>
+            {boletoData?.valor && (
+              <Text style={styles.modalAmount}>Valor: R$ {boletoData.valor}</Text>
+            )}
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={styles.modalButton} onPress={handleCopiarLinhaDigitavel}>
+                <Text style={styles.modalButtonText}>Copiar linha</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalButtonSecondary]}
+                onPress={handleConsultarBoletoStatus}
+                disabled={boletoStatusLoading}
+              >
+                <Text style={styles.modalButtonText}>
+                  {boletoStatusLoading ? 'Consultando...' : 'Consultar status'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+            <TouchableOpacity
+              style={[styles.modalButton, styles.modalButtonSecondary, styles.modalCloseButton]}
+              onPress={handleDownloadBoletoPdf}
+              disabled={boletoDownloading}
+            >
+              <Text style={styles.modalButtonText}>
+                {boletoDownloading ? 'Baixando...' : 'Baixar PDF'}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.modalButton, styles.modalButtonSecondary, styles.modalCloseButton]}
+              onPress={() => {
+                setBoletoModalVisible(false);
+                setBoletoData(null);
+              }}
+            >
+              <Text style={styles.modalButtonText}>Fechar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={checkoutModalVisible} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Checkout Criado</Text>
+            <Text style={styles.modalSubtitle}>
+              Abra o link para efetuar o pagamento e depois consulte o status.
+            </Text>
+            <TouchableOpacity
+              style={styles.modalButton}
+              onPress={() => Linking.openURL(checkoutData?.payment_url || '')}
+            >
+              <Text style={styles.modalButtonText}>Abrir pagamento</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.modalButton, styles.modalButtonSecondary, styles.modalCloseButton]}
+              onPress={handleConsultarCheckoutStatus}
+              disabled={checkoutStatusLoading}
+            >
+              <Text style={styles.modalButtonText}>
+                {checkoutStatusLoading ? 'Consultando...' : 'Consultar status'}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.modalButton, styles.modalButtonSecondary, styles.modalCloseButton]}
+              onPress={() => {
+                setCheckoutModalVisible(false);
+                setCheckoutData(null);
+              }}
+            >
+              <Text style={styles.modalButtonText}>Fechar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -1469,6 +1764,12 @@ const styles = StyleSheet.create({
     height: 120,
     borderRadius: 60,
   },
+  photoLoadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.6)',
+  },
   profileInitialsLarge: {
     fontSize: 32,
     fontWeight: 'bold',
@@ -1487,6 +1788,10 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 14,
     borderRadius: 8,
+  },
+  photoRemoveButton: {
+    backgroundColor: '#f44336',
+    marginTop: 8,
   },
   photoSaveButton: {
     backgroundColor: '#4caf50',
@@ -1769,6 +2074,71 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 14,
     fontWeight: 'bold',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    padding: 16,
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1a237e',
+    marginBottom: 8,
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 16,
+  },
+  qrContainer: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  modalAmount: {
+    fontSize: 14,
+    color: '#333',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  modalButton: {
+    flex: 1,
+    backgroundColor: '#1a237e',
+    borderRadius: 8,
+    paddingVertical: 12,
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  modalButtonSecondary: {
+    backgroundColor: '#9e9e9e',
+    marginRight: 0,
+    marginLeft: 8,
+  },
+  modalButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  boletoLine: {
+    fontSize: 12,
+    color: '#333',
+    backgroundColor: '#f8f9fa',
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  modalCloseButton: {
+    marginTop: 12,
   },
   profileAge: {
     fontSize: 14,

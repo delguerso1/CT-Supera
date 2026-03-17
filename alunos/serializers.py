@@ -5,6 +5,8 @@ from funcionarios.models import Presenca
 from turmas.models import Turma
 
 class UsuarioSerializer(serializers.ModelSerializer):
+    data_nascimento = serializers.DateField(format='%Y-%m-%d', required=False, allow_null=True)
+
     class Meta:
         model = Usuario
         fields = [

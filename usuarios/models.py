@@ -31,11 +31,10 @@ class PreCadastro(models.Model):
     cpf = models.CharField(max_length=11, unique=True, blank=True, null=True)
     telefone = models.CharField(max_length=20, validators=[RegexValidator(regex=r'^\(\d{2}\)\d{5}-\d{4}$', message="Formato inválido. Use (21)00000-0000.")], blank=False, null=False)
     data_nascimento = models.DateField(null=True, blank=False)
-    email = models.EmailField(max_length=255, unique=True, blank=False, null=False, default='pendente', error_messages={
-        'unique': "Esse e-mail já está cadastrado.",
+    email = models.EmailField(max_length=255, unique=False, blank=False, null=False, default='pendente', error_messages={
         'blank': "O campo e-mail não pode estar vazio.",
         'null': "O campo e-mail não pode ser nulo.",
-    })
+    }, help_text="Pode repetir para menores (email do responsável)")
     criado_em = models.DateTimeField(auto_now_add=True)
     turma = models.ForeignKey('turmas.Turma', on_delete=models.CASCADE, blank=True, null=True)
     usuario = models.OneToOneField('usuarios.Usuario', on_delete=models.SET_NULL, null=True, blank=True)

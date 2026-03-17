@@ -312,6 +312,17 @@ const styles = {
   }
 };
 
+function formatDateOnly(dateString) {
+  if (!dateString) return '-';
+  const str = String(dateString).split('T')[0];
+  const parts = str.split('-');
+  if (parts.length === 3) {
+    const [year, month, day] = parts.map(Number);
+    return new Date(year, month - 1, day).toLocaleDateString('pt-BR');
+  }
+  return new Date(dateString).toLocaleDateString('pt-BR');
+}
+
 function getInitials(name) {
   if (!name) return '?';
   return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
@@ -412,7 +423,7 @@ function DashboardProfessor({ user }) {
           email: painelResp.data.email || '',
           telefone: painelResp.data.telefone || '',
           endereco: painelResp.data.endereco || '',
-          data_nascimento: painelResp.data.data_nascimento || ''
+          data_nascimento: (painelResp.data.data_nascimento || '').split('T')[0] || ''
         });
       } catch (err) {
         setErro('Erro ao carregar dados do painel do professor.');
@@ -517,7 +528,7 @@ function DashboardProfessor({ user }) {
       email: professor?.email || '',
       telefone: professor?.telefone || '',
       endereco: professor?.endereco || '',
-      data_nascimento: professor?.data_nascimento || ''
+      data_nascimento: (professor?.data_nascimento || '').split('T')[0] || ''
     });
     setErro('');
     setSuccess('');
@@ -916,7 +927,7 @@ function DashboardProfessor({ user }) {
             <label style={styles.label}>Data de Nascimento</label>
             <div style={styles.input}>
               {professor?.data_nascimento
-                ? new Date(professor.data_nascimento).toLocaleDateString()
+                ? formatDateOnly(professor.data_nascimento)
                 : '-'}
             </div>
           </div>

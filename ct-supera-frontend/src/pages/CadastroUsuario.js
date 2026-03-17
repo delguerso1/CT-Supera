@@ -1356,7 +1356,7 @@ function CadastroUsuario({ onUserChange }) {
                   value={formData.endereco}
                   onChange={handleChange}
                   style={styles.input}
-                  required={formData.tipo === 'aluno' && !editingUser}
+                  required={formData.tipo === 'aluno' && !editingUser && activeTab !== 'precadastros'}
                 />
               </div>
 

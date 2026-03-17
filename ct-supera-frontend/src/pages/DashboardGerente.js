@@ -297,6 +297,17 @@ const styles = {
   }
 };
 
+function formatDateOnly(dateString) {
+  if (!dateString) return '-';
+  const str = String(dateString).split('T')[0];
+  const parts = str.split('-');
+  if (parts.length === 3) {
+    const [year, month, day] = parts.map(Number);
+    return new Date(year, month - 1, day).toLocaleDateString('pt-BR');
+  }
+  return new Date(dateString).toLocaleDateString('pt-BR');
+}
+
 function getInitials(name) {
   if (!name) return '?';
   return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
@@ -344,7 +355,7 @@ function DashboardGerente({ user }) {
         email: response.data.email || '',
         telefone: response.data.telefone || '',
         endereco: response.data.endereco || '',
-        data_nascimento: response.data.data_nascimento || ''
+        data_nascimento: (response.data.data_nascimento || '').split('T')[0] || ''
       });
     } catch (err) {
       setErro('Erro ao carregar dados do gerente.');
@@ -504,7 +515,7 @@ function DashboardGerente({ user }) {
       email: gerente?.email || '',
       telefone: gerente?.telefone || '',
       endereco: gerente?.endereco || '',
-      data_nascimento: gerente?.data_nascimento || ''
+      data_nascimento: (gerente?.data_nascimento || '').split('T')[0] || ''
     });
     setErro('');
     setSuccess('');
@@ -884,7 +895,7 @@ function DashboardGerente({ user }) {
             <label style={styles.label}>Data de Nascimento</label>
             <div style={styles.input}>
               {gerente?.data_nascimento
-                ? new Date(gerente.data_nascimento).toLocaleDateString()
+                ? formatDateOnly(gerente.data_nascimento)
                 : '-'}
             </div>
           </div>

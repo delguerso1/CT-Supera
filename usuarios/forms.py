@@ -6,6 +6,7 @@ from django.core.exceptions import ValidationError
 import re
 from django.contrib.auth.hashers import make_password
 import datetime
+from datetime import date
 from ct.models import CentroDeTreinamento
 
 def validar_telefone(telefone):
@@ -153,8 +154,19 @@ class PreCadastroForm(forms.ModelForm):
 
     def clean_email(self):
         email = self.cleaned_data.get('email')
-        if email and Usuario.objects.filter(email=email).exists():
-            raise ValidationError("⚠️ Esse e-mail já está cadastrado no sistema.")
+        if not email:
+            return email
+        data_nascimento = self.cleaned_data.get('data_nascimento')
+        if data_nascimento:
+            hoje = date.today()
+            idade = hoje.year - data_nascimento.year - (
+                (hoje.month, hoje.day) < (data_nascimento.month, data_nascimento.day)
+            )
+            if idade >= 18 and Usuario.objects.filter(email=email).exists():
+                raise ValidationError("⚠️ Esse e-mail já está cadastrado no sistema.")
+        else:
+            if Usuario.objects.filter(email=email).exists():
+                raise ValidationError("⚠️ Esse e-mail já está cadastrado no sistema.")
         return email
 
     def clean(self):
