@@ -91,7 +91,7 @@ export interface Mensalidade {
   id: number;
   aluno: number;
   aluno_nome?: string;
-  valor: number;
+  valor: number | string;
   data_vencimento: string;
   status: 'pendente' | 'pago' | 'atrasado';
   data_pagamento?: string;
@@ -99,8 +99,9 @@ export interface Mensalidade {
 
 export interface Despesa {
   id: number;
+  categoria?: string;
   descricao: string;
-  valor: number;
+  valor: number | string;
   data: string;
 }
 

@@ -21,7 +21,7 @@ function ControleFinanceiro({ user, onDataChange }) {
   const [pagina, setPagina] = useState(1);
   const [showDespesaModal, setShowDespesaModal] = useState(false);
   const [editDespesa, setEditDespesa] = useState(null);
-  const [despesaForm, setDespesaForm] = useState({ descricao: '', valor: '', data: '' });
+  const [despesaForm, setDespesaForm] = useState({ categoria: 'outros', descricao: '', valor: '', data: '' });
   const [editingUser] = useState(null);
   const [formData] = useState({});
   const [alunos, setAlunos] = useState([]);
@@ -157,16 +157,23 @@ function ControleFinanceiro({ user, onDataChange }) {
   }
 
   // Função para abrir modal de nova despesa
+  const CATEGORIAS_DESPESAS = [
+    { value: 'salario', label: 'Salário de Funcionário' },
+    { value: 'aluguel', label: 'Aluguel' },
+    { value: 'materiais', label: 'Compra de Materiais' },
+    { value: 'outros', label: 'Outros' },
+  ];
+
   function handleNovaDespesa() {
     setEditDespesa(null);
-    setDespesaForm({ descricao: '', valor: '', data: '' });
+    setDespesaForm({ categoria: 'outros', descricao: '', valor: '', data: '' });
     setShowDespesaModal(true);
   }
 
   // Função para abrir modal de edição
   function handleEditarDespesa(despesa) {
     setEditDespesa(despesa);
-    setDespesaForm({ descricao: despesa.descricao, valor: despesa.valor, data: despesa.data });
+    setDespesaForm({ categoria: despesa.categoria || 'outros', descricao: despesa.descricao, valor: despesa.valor, data: despesa.data });
     setShowDespesaModal(true);
   }
 
@@ -252,8 +259,8 @@ function ControleFinanceiro({ user, onDataChange }) {
         <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           Mês:
           <select value={mes} onChange={e => setMes(Number(e.target.value))} style={{ padding: '0.5rem', borderRadius: 4, border: '1px solid #ccc', minHeight: '44px', fontSize: '16px' }}>
-            {dashboard?.meses?.map(m => (
-              <option key={m} value={m}>{m}</option>
+            {(dashboard?.meses || [1,2,3,4,5,6,7,8,9,10,11,12]).map(m => (
+              <option key={m} value={m}>{['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'][m-1]} ({m})</option>
             ))}
           </select>
         </label>
@@ -265,25 +272,25 @@ function ControleFinanceiro({ user, onDataChange }) {
       <div className="controle-financeiro-stats" style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', marginBottom: 24 }}>
         <div>
           <strong>Total Recebido:</strong>
-          <div style={{ color: '#2e7d32', fontSize: 20 }}>R$ {dashboard?.total_pago?.toFixed(2)}</div>
+          <div style={{ color: '#2e7d32', fontSize: 20 }}>R$ {(Number(dashboard?.total_pago) || 0).toFixed(2)}</div>
         </div>
         <div>
           <strong>Total Despesas:</strong>
-          <div style={{ color: '#c62828', fontSize: 20 }}>R$ {dashboard?.total_despesas?.toFixed(2)}</div>
+          <div style={{ color: '#c62828', fontSize: 20 }}>R$ {(Number(dashboard?.total_despesas) || 0).toFixed(2)}</div>
         </div>
         <div>
           <strong>Total Salários:</strong>
           <div style={{ color: '#1976d2', fontSize: 20 }}>
-            R$ {dashboard?.total_salarios?.toFixed(2)}
+            R$ {(Number(dashboard?.total_salarios) || 0).toFixed(2)}
             <span style={{ color: '#2e7d32', fontSize: 14, marginLeft: 8 }}>
-              (Pagos: R$ {dashboard?.total_salarios_pagos?.toFixed(2)})
+              (Pagos: R$ {(Number(dashboard?.total_salarios_pagos) || 0).toFixed(2)})
             </span>
           </div>
         </div>
         <div>
           <strong>Saldo Final:</strong>
-          <div style={{ color: dashboard?.saldo_final >= 0 ? '#2e7d32' : '#c62828', fontSize: 20 }}>
-            R$ {dashboard?.saldo_final?.toFixed(2)}
+          <div style={{ color: (Number(dashboard?.saldo_final) || 0) >= 0 ? '#2e7d32' : '#c62828', fontSize: 20 }}>
+            R$ {(Number(dashboard?.saldo_final) || 0).toFixed(2)}
           </div>
         </div>
       </div>
@@ -397,6 +404,7 @@ function ControleFinanceiro({ user, onDataChange }) {
         <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 500 }}>
           <thead>
             <tr style={{ background: '#ffe0b2' }}>
+              <th style={{ padding: 10, textAlign: 'left' }}>Categoria</th>
               <th style={{ padding: 10, textAlign: 'left' }}>Descrição</th>
               <th style={{ padding: 10, textAlign: 'right' }}>Valor</th>
               <th style={{ padding: 10, textAlign: 'center' }}>Data</th>
@@ -406,11 +414,12 @@ function ControleFinanceiro({ user, onDataChange }) {
           <tbody>
             {despesas.length === 0 && (
               <tr>
-                <td colSpan={4} style={{ color: '#888', textAlign: 'center', padding: 16 }}>Nenhuma despesa encontrada.</td>
+                <td colSpan={5} style={{ color: '#888', textAlign: 'center', padding: 16 }}>Nenhuma despesa encontrada.</td>
               </tr>
             )}
             {despesas.map(d => (
               <tr key={d.id} style={{ borderBottom: '1px solid #eee' }}>
+                <td style={{ padding: 10 }}>{(CATEGORIAS_DESPESAS.find(c => c.value === d.categoria) || { label: d.categoria }).label}</td>
                 <td style={{ padding: 10 }}>{d.descricao}</td>
                 <td style={{ padding: 10, textAlign: 'right' }}>{formatCurrency(d.valor)}</td>
                 <td style={{ padding: 10, textAlign: 'center' }}>{formatDate(d.data)}</td>
@@ -487,6 +496,17 @@ function ControleFinanceiro({ user, onDataChange }) {
           <form onSubmit={handleSalvarDespesa} style={{ background: '#fff', padding: 24, borderRadius: 8, minWidth: 320 }}>
             <h4>{editDespesa ? 'Editar' : 'Nova'} Despesa</h4>
             <div style={{ marginBottom: 12 }}>
+              <label style={{ display: 'block', marginBottom: 4, fontSize: 12 }}>Categoria</label>
+              <select
+                value={despesaForm.categoria}
+                onChange={e => setDespesaForm(f => ({ ...f, categoria: e.target.value }))}
+                required
+                style={{ width: '100%', padding: 8, marginBottom: 8 }}
+              >
+                {CATEGORIAS_DESPESAS.map(c => (
+                  <option key={c.value} value={c.value}>{c.label}</option>
+                ))}
+              </select>
               <input
                 type="text"
                 placeholder="Descrição"

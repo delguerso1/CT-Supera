@@ -64,10 +64,17 @@ const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }
   const [editDespesa, setEditDespesa] = useState<Despesa | null>(null);
   const [savingDespesa, setSavingDespesa] = useState(false);
   const [despesaForm, setDespesaForm] = useState({
+    categoria: 'outros',
     descricao: '',
     valor: '',
     data: '',
   });
+  const CATEGORIAS_DESPESAS = [
+    { value: 'salario', label: 'Salário' },
+    { value: 'aluguel', label: 'Aluguel' },
+    { value: 'materiais', label: 'Materiais' },
+    { value: 'outros', label: 'Outros' },
+  ];
   const [editProfile, setEditProfile] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
   const [fotoPerfil, setFotoPerfil] = useState<any>(null);
@@ -250,7 +257,7 @@ const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
 
-  const formatCurrency = (value: number | undefined | null) => {
+  const formatCurrency = (value: number | string | undefined | null) => {
     const safeValue = Number(value || 0);
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
@@ -309,13 +316,14 @@ const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }
 
   const handleNovaDespesa = () => {
     setEditDespesa(null);
-    setDespesaForm({ descricao: '', valor: '', data: '' });
+    setDespesaForm({ categoria: 'outros', descricao: '', valor: '', data: '' });
     setShowDespesaModal(true);
   };
 
   const handleEditarDespesa = (despesa: Despesa) => {
     setEditDespesa(despesa);
     setDespesaForm({
+      categoria: despesa.categoria || 'outros',
       descricao: despesa.descricao,
       valor: String(despesa.valor ?? ''),
       data: despesa.data,
@@ -324,14 +332,15 @@ const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }
   };
 
   const handleSalvarDespesa = async () => {
-    if (!despesaForm.descricao.trim() || !despesaForm.valor || !despesaForm.data) {
-      Alert.alert('Erro', 'Preencha descrição, valor e data.');
+    if (!despesaForm.categoria || !despesaForm.descricao.trim() || !despesaForm.valor || !despesaForm.data) {
+      Alert.alert('Erro', 'Preencha categoria, descrição, valor e data.');
       return;
     }
 
     try {
       setSavingDespesa(true);
       const payload = {
+        categoria: despesaForm.categoria,
         descricao: despesaForm.descricao.trim(),
         valor: Number(despesaForm.valor),
         data: despesaForm.data,
@@ -598,13 +607,13 @@ const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }
   const renderFinanceiro = () => {
     const totalPendente = mensalidades
       .filter(m => m.status === 'pendente')
-      .reduce((total, m) => total + m.valor, 0);
+      .reduce((total, m) => total + Number(m.valor || 0), 0);
     const totalAtrasado = mensalidades
       .filter(m => m.status === 'atrasado')
-      .reduce((total, m) => total + m.valor, 0);
+      .reduce((total, m) => total + Number(m.valor || 0), 0);
     const totalPago = mensalidades
       .filter(m => m.status === 'pago')
-      .reduce((total, m) => total + m.valor, 0);
+      .reduce((total, m) => total + Number(m.valor || 0), 0);
 
     return (
       <ScrollView
@@ -1579,6 +1588,26 @@ const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }
             <Text style={styles.modalTitle}>
               {editDespesa ? 'Editar despesa' : 'Nova despesa'}
             </Text>
+            <Text style={styles.inputLabel}>Categoria</Text>
+            <View style={styles.pickerContainer}>
+              {CATEGORIAS_DESPESAS.map(c => (
+                <TouchableOpacity
+                  key={c.value}
+                  style={[
+                    styles.pickerOption,
+                    despesaForm.categoria === c.value && styles.pickerOptionSelected,
+                  ]}
+                  onPress={() => setDespesaForm(prev => ({ ...prev, categoria: c.value }))}
+                >
+                  <Text style={[
+                    styles.pickerOptionText,
+                    despesaForm.categoria === c.value && styles.pickerOptionTextSelected,
+                  ]}>
+                    {c.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
             <TextInput
               style={styles.input}
               placeholder="Descrição"
@@ -2245,6 +2274,36 @@ const styles = StyleSheet.create({
     color: '#333',
     marginBottom: 12,
     backgroundColor: '#fff',
+  },
+  inputLabel: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 4,
+  },
+  pickerContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 12,
+  },
+  pickerOption: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    backgroundColor: '#fff',
+  },
+  pickerOptionSelected: {
+    backgroundColor: '#1a237e',
+    borderColor: '#1a237e',
+  },
+  pickerOptionText: {
+    color: '#333',
+    fontSize: 14,
+  },
+  pickerOptionTextSelected: {
+    color: '#fff',
   },
   modalActions: {
     flexDirection: 'row',

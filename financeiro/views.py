@@ -89,14 +89,26 @@ class MensalidadeListCreateView(ListCreateAPIView):
         queryset = Mensalidade.objects.all()
         aluno_id = self.request.query_params.get('aluno')
         if aluno_id:
-            queryset = queryset.filter(aluno_id=aluno_id)
+            try:
+                queryset = queryset.filter(aluno_id=int(aluno_id))
+            except (TypeError, ValueError):
+                pass
         turma_id = self.request.query_params.get('turma')
         if turma_id:
-            queryset = queryset.filter(aluno__turmas_aluno=turma_id)
-        mes = self.request.query_params.get('mes')
-        ano = self.request.query_params.get('ano')
-        if mes and ano:
-            queryset = queryset.filter(data_vencimento__month=mes, data_vencimento__year=ano)
+            try:
+                queryset = queryset.filter(aluno__turmas_aluno_id=int(turma_id))
+            except (TypeError, ValueError):
+                pass
+        mes_param = self.request.query_params.get('mes')
+        ano_param = self.request.query_params.get('ano')
+        if mes_param and ano_param:
+            try:
+                mes = int(mes_param)
+                ano = int(ano_param)
+                if 1 <= mes <= 12 and ano >= 2000:
+                    queryset = queryset.filter(data_vencimento__month=mes, data_vencimento__year=ano)
+            except (TypeError, ValueError):
+                pass
         return queryset.order_by('-data_vencimento', '-id')
 
 class MensalidadeRetrieveUpdateDestroyView(RetrieveUpdateDestroyAPIView):
@@ -109,10 +121,16 @@ class DespesaListCreateView(ListCreateAPIView):
 
     def get_queryset(self):
         queryset = Despesa.objects.all()
-        mes = self.request.query_params.get('mes')
-        ano = self.request.query_params.get('ano')
-        if mes and ano:
-            queryset = queryset.filter(data__month=mes, data__year=ano)
+        mes_param = self.request.query_params.get('mes')
+        ano_param = self.request.query_params.get('ano')
+        if mes_param and ano_param:
+            try:
+                mes = int(mes_param)
+                ano = int(ano_param)
+                if 1 <= mes <= 12 and ano >= 2000:
+                    queryset = queryset.filter(data__month=mes, data__year=ano)
+            except (TypeError, ValueError):
+                pass
         return queryset.order_by('-data', '-id')
 
 class DespesaRetrieveUpdateDestroyView(RetrieveUpdateDestroyAPIView):
@@ -125,10 +143,16 @@ class SalarioListCreateView(ListCreateAPIView):
 
     def get_queryset(self):
         queryset = Salario.objects.all()
-        mes = self.request.query_params.get('mes')
-        ano = self.request.query_params.get('ano')
-        if mes and ano:
-            queryset = queryset.filter(data_pagamento__month=mes, data_pagamento__year=ano)
+        mes_param = self.request.query_params.get('mes')
+        ano_param = self.request.query_params.get('ano')
+        if mes_param and ano_param:
+            try:
+                mes = int(mes_param)
+                ano = int(ano_param)
+                if 1 <= mes <= 12 and ano >= 2000:
+                    queryset = queryset.filter(data_pagamento__month=mes, data_pagamento__year=ano)
+            except (TypeError, ValueError):
+                pass
         return queryset.order_by('-data_pagamento', '-id')
 
 class SalarioRetrieveUpdateDestroyView(RetrieveUpdateDestroyAPIView):
@@ -136,7 +160,8 @@ class SalarioRetrieveUpdateDestroyView(RetrieveUpdateDestroyAPIView):
     serializer_class = SalarioSerializer
 
 class PagarSalarioAPIView(APIView):
-    """API para realizar o pagamento de salários dos professores."""
+    """API para realizar o pagamento de salários. Aceita POST com salario_id. Alternativa: PATCH /salarios/{id}/ com status='pago'."""
+    permission_classes = [IsAuthenticated]
 
     def post(self, request):
         try:
@@ -218,12 +243,16 @@ class DashboardFinanceiroAPIView(APIView):
         total_salarios_pagos = salarios.filter(status="pago").aggregate(Sum("valor"))["valor__sum"] or 0
         saldo_final = total_pago - total_despesas - total_salarios
 
+        # Converte para float para garantir serialização correta no JSON (evita Decimal como string)
+        def _to_float(v):
+            return float(v) if v is not None else 0.0
+
         return Response({
-            "total_pago": total_pago,
-            "total_despesas": total_despesas,
-            "total_salarios": total_salarios,
-            "total_salarios_pagos": total_salarios_pagos,
-            "saldo_final": saldo_final,
+            "total_pago": _to_float(total_pago),
+            "total_despesas": _to_float(total_despesas),
+            "total_salarios": _to_float(total_salarios),
+            "total_salarios_pagos": _to_float(total_salarios_pagos),
+            "saldo_final": _to_float(saldo_final),
             "mes_atual": mes,
             "ano_atual": ano,
             "meses": list(range(1, 13)),
@@ -231,19 +260,62 @@ class DashboardFinanceiroAPIView(APIView):
 
 
 class RelatorioFinanceiroAPIView(APIView):
-    """API para gerar relatório financeiro com mensalidades e despesas."""
+    """API para gerar relatório financeiro com mensalidades e despesas. Suporta filtros mes/ano e paginação."""
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
         if request.user.tipo != "gerente":
             return Response({"error": "Permissão negada."}, status=403)
 
-        mensalidades = Mensalidade.objects.all()
-        despesas = Despesa.objects.all()
+        mensalidades = Mensalidade.objects.all().order_by('-data_vencimento')
+        despesas = Despesa.objects.all().order_by('-data')
+
+        mes = request.query_params.get('mes')
+        ano = request.query_params.get('ano')
+        if mes is not None and ano is not None:
+            try:
+                mes_int = int(mes)
+                ano_int = int(ano)
+                if 1 <= mes_int <= 12 and ano_int >= 2000:
+                    mensalidades = mensalidades.filter(
+                        data_vencimento__month=mes_int,
+                        data_vencimento__year=ano_int
+                    )
+                    despesas = despesas.filter(
+                        data__month=mes_int,
+                        data__year=ano_int
+                    )
+            except (TypeError, ValueError):
+                pass
+
+        try:
+            page_size = min(int(request.query_params.get('page_size', 50) or 50), 200)
+        except (TypeError, ValueError):
+            page_size = 50
+        try:
+            page = max(1, int(request.query_params.get('page', 1) or 1))
+        except (TypeError, ValueError):
+            page = 1
+        offset = (page - 1) * page_size
+
+        total_mensalidades = mensalidades.count()
+        total_despesas = despesas.count()
+        mensalidades_page = mensalidades[offset:offset + page_size]
+        despesas_page = despesas[offset:offset + page_size]
+
+        total_itens = max(total_mensalidades, total_despesas)
+        total_paginas = max(1, (total_itens + page_size - 1) // page_size) if total_itens else 1
 
         return Response({
-            "mensalidades": MensalidadeSerializer(mensalidades, many=True).data,
-            "despesas": DespesaSerializer(despesas, many=True).data,
+            "mensalidades": MensalidadeSerializer(mensalidades_page, many=True).data,
+            "despesas": DespesaSerializer(despesas_page, many=True).data,
+            "paginacao": {
+                "page": page,
+                "page_size": page_size,
+                "total_mensalidades": total_mensalidades,
+                "total_despesas": total_despesas,
+                "total_paginas": total_paginas,
+            },
         })
     
 
@@ -311,8 +383,15 @@ class GerarPixAPIView(APIView):
             if calculo_multa_mora['esta_atrasada']:
                 descricao += f" (Multa: R$ {calculo_multa_mora['valor_multa']:.2f}, Mora: R$ {calculo_multa_mora['valor_mora']:.2f})"
             
-            expiracao_segundos = 1800  # 30 minutos de validade (1800 segundos)
-            
+            expiracao_minutos = request.data.get('expiracao_minutos')
+            if expiracao_minutos is not None:
+                try:
+                    expiracao_segundos = min(86400, max(60, int(expiracao_minutos) * 60))
+                except (TypeError, ValueError):
+                    expiracao_segundos = 1800
+            else:
+                expiracao_segundos = 1800  # 30 minutos de validade padrão
+
             logger.info(f"[DEBUG PIX] Gerando PIX para mensalidade {mensalidade.id}, valor original: R$ {float(mensalidade.valor):.2f}")
             if calculo_multa_mora['esta_atrasada']:
                 logger.info(f"[DEBUG PIX] Mensalidade atrasada: {calculo_multa_mora['dias_atraso']} dias")
@@ -1693,8 +1772,8 @@ class AlterarBoletoAPIView(APIView):
             
             # Atualiza a transação
             transacao.resposta_api = boleto_data
-            if amount:
-                transacao.valor = amount
+            if amount is not None:
+                transacao.valor = Decimal(str(amount))
             transacao.save()
             
             logger.info(f"Boleto {transacao.txid} alterado com sucesso")

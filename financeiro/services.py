@@ -235,9 +235,17 @@ def gerar_boleto_para_mensalidade(mensalidade):
         }
 
     aluno = mensalidade.aluno
+    # Valor base (C6 Bank aplica multa/mora automaticamente quando pago após vencimento)
     valor_mensalidade = float(mensalidade.valor)
     if valor_mensalidade < 5.00:
         raise ValueError(f'Valor da mensalidade (R$ {valor_mensalidade:.2f}) está abaixo do mínimo para boletos (R$ 5,00).')
+
+    calculo = _calcular_multa_mora(mensalidade)
+    fine = None
+    interest = None
+    if calculo['esta_atrasada']:
+        fine = {"type": "P", "value": 2.0, "dead_line": 0}
+        interest = {"type": "P", "value": 1.0, "dead_line": 0}
 
     endereco_completo = aluno.endereco or "Endereço não informado"
     street = endereco_completo[:33] if len(endereco_completo) <= 33 else endereco_completo[:33]
@@ -289,8 +297,8 @@ def gerar_boleto_para_mensalidade(mensalidade):
         due_date=due_date,
         payer=payer,
         instructions=instructions,
-        fine=None,
-        interest=None,
+        fine=fine,
+        interest=interest,
         partner_software_name="CT Supera",
         partner_software_version="1.0.0"
     )

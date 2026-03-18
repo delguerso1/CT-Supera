@@ -10,7 +10,7 @@ class SalarioSerializer(serializers.ModelSerializer):
 class DespesaSerializer(serializers.ModelSerializer):
     class Meta:
         model = Despesa
-        fields = ['id', 'descricao', 'valor', 'data']
+        fields = ['id', 'categoria', 'descricao', 'valor', 'data']
 
 class MensalidadeSerializer(serializers.ModelSerializer):
     aluno = UsuarioSerializer(read_only=True)

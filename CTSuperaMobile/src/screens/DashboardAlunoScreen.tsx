@@ -507,7 +507,7 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
               <View key={mensalidade.id} style={styles.mensalidadeCard}>
                 <View style={styles.mensalidadeHeader}>
                   <Text style={styles.mensalidadeValue}>
-                    R$ {(mensalidade.valor_efetivo ?? mensalidade.valor).toFixed(2)}
+                    R$ {Number(mensalidade.valor_efetivo ?? mensalidade.valor).toFixed(2)}
                   </Text>
                   <View style={[
                     styles.statusBadge,
@@ -977,7 +977,7 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
                   <View key={mensalidade.id} style={styles.mensalidadeCard}>
                     <View style={styles.mensalidadeHeader}>
                       <Text style={styles.mensalidadeValue}>
-                        R$ {(mensalidade.valor_efetivo ?? mensalidade.valor).toFixed(2)}
+                        R$ {Number(mensalidade.valor_efetivo ?? mensalidade.valor).toFixed(2)}
                       </Text>
                       <View style={[
                         styles.statusBadge,
@@ -1038,7 +1038,7 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
   const handlePagarMensalidade = (mensalidade: Mensalidade) => {
     Alert.alert(
       'Forma de Pagamento',
-      `Escolha a forma de pagamento para a mensalidade de R$ ${(mensalidade.valor_efetivo ?? mensalidade.valor).toFixed(2)}`,
+      `Escolha a forma de pagamento para a mensalidade de R$ ${Number(mensalidade.valor_efetivo ?? mensalidade.valor).toFixed(2)}`,
       [
         { text: 'Cancelar', style: 'cancel' },
         { text: 'PIX', onPress: () => gerarPix(mensalidade) },
@@ -1210,7 +1210,7 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
               <View key={mensalidade.id} style={styles.mensalidadeCard}>
                 <View style={styles.mensalidadeHeader}>
                   <Text style={styles.mensalidadeValue}>
-                    R$ {(mensalidade.valor_efetivo ?? mensalidade.valor).toFixed(2)}
+                    R$ {Number(mensalidade.valor_efetivo ?? mensalidade.valor).toFixed(2)}
                   </Text>
                   <View style={[
                     styles.statusBadge,
@@ -1245,7 +1245,7 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
               <View key={mensalidade.id} style={styles.mensalidadeCard}>
                 <View style={styles.mensalidadeHeader}>
                   <Text style={styles.mensalidadeValue}>
-                    R$ {(mensalidade.valor_efetivo ?? mensalidade.valor).toFixed(2)}
+                    R$ {Number(mensalidade.valor_efetivo ?? mensalidade.valor).toFixed(2)}
                   </Text>
                   <View style={[styles.statusBadge, { backgroundColor: '#f44336' }]}>
                     <Text style={styles.statusBadgeText}>Vencida</Text>
@@ -1272,7 +1272,7 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
               <View key={mensalidade.id} style={styles.mensalidadeCard}>
                 <View style={styles.mensalidadeHeader}>
                   <Text style={styles.mensalidadeValue}>
-                    R$ {(mensalidade.valor_efetivo ?? mensalidade.valor).toFixed(2)}
+                    R$ {Number(mensalidade.valor_efetivo ?? mensalidade.valor).toFixed(2)}
                   </Text>
                   <View style={[styles.statusBadge, { backgroundColor: '#ff9800' }]}>
                     <Text style={styles.statusBadgeText}>Pendente</Text>
@@ -1299,7 +1299,7 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
               <View key={mensalidade.id} style={styles.mensalidadeCard}>
                 <View style={styles.mensalidadeHeader}>
                   <Text style={styles.mensalidadeValue}>
-                    R$ {(mensalidade.valor_efetivo ?? mensalidade.valor).toFixed(2)}
+                    R$ {Number(mensalidade.valor_efetivo ?? mensalidade.valor).toFixed(2)}
                   </Text>
                   <View style={[styles.statusBadge, { backgroundColor: '#4caf50' }]}>
                     <Text style={styles.statusBadgeText}>Pago</Text>
