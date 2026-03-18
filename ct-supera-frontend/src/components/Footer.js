@@ -32,6 +32,11 @@ const styles = {
     marginTop: '1rem',
     color: '#b0bec5',
     fontSize: '0.9rem'
+  },
+  devra: {
+    marginTop: '0.5rem',
+    color: '#90caf9',
+    fontSize: '0.85rem'
   }
 };
 
@@ -47,6 +52,9 @@ function Footer() {
       </div>
       <div style={styles.copyright}>
         © {new Date().getFullYear()} CT Supera. Todos os direitos reservados.
+      </div>
+      <div style={styles.devra}>
+        Criado por <a href="https://devra.group" target="_blank" rel="noopener noreferrer" style={styles.link}>devra.group</a>
       </div>
     </footer>
   );
