@@ -291,7 +291,11 @@ class PreCadastroSerializer(serializers.ModelSerializer):
     def get_origem_display(self, obj):
         if not obj.origem:
             return 'Pendente'
-        labels = {'aula_experimental': 'Aula experimental', 'ex_aluno': 'Já foi aluno', 'formulario': 'Cadastro web'}
+        labels = {
+            'aula_experimental': 'Aula experimental',
+            'ex_aluno': 'Ex-aluno',
+            'formulario': 'Pendente',
+        }
         return labels.get(obj.origem, obj.origem)
 
     class Meta:

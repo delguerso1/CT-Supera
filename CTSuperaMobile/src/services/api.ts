@@ -327,10 +327,27 @@ export const presencaService = {
   },
 };
 
+async function fetchAllPages(initialUrl: string): Promise<any[]> {
+  let resultados: any[] = [];
+  let url: string | null = initialUrl;
+  while (url) {
+    const response = await api.get(url);
+    const data = response.data;
+    if (data?.results) {
+      resultados = resultados.concat(data.results);
+      url = data.next ? data.next.replace(api.defaults.baseURL || '', '') : null;
+    } else {
+      resultados = Array.isArray(data) ? data : [];
+      url = null;
+    }
+  }
+  return resultados;
+}
+
 export const financeiroService = {
-  getMensalidades: async (params?: any): Promise<ApiResponse<any>> => {
-    const response = await api.get('financeiro/mensalidades/', { params });
-    return response.data;
+  getMensalidades: async (params?: any): Promise<Mensalidade[]> => {
+    const query = params ? `?${new URLSearchParams(params).toString()}` : '';
+    return fetchAllPages(`financeiro/mensalidades/${query}`);
   },
 
   getMensalidadeById: async (id: number): Promise<Mensalidade> => {
@@ -368,8 +385,8 @@ export const financeiroService = {
   },
 
   getDespesas: async (params?: any): Promise<Despesa[]> => {
-    const response = await api.get('financeiro/despesas/', { params });
-    return response.data.results || response.data.despesas || response.data;
+    const query = params ? `?${new URLSearchParams(params).toString()}` : '';
+    return fetchAllPages(`financeiro/despesas/${query}`);
   },
 
   criarDespesa: async (data: Partial<Despesa>): Promise<Despesa> => {
@@ -387,8 +404,8 @@ export const financeiroService = {
   },
 
   getSalarios: async (params?: any): Promise<Salario[]> => {
-    const response = await api.get('financeiro/salarios/', { params });
-    return response.data.results || response.data.salarios || response.data;
+    const query = params ? `?${new URLSearchParams(params).toString()}` : '';
+    return fetchAllPages(`financeiro/salarios/${query}`);
   },
 
   marcarSalarioPago: async (id: number): Promise<Salario> => {

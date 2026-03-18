@@ -199,6 +199,7 @@ function CadastroUsuario({ onUserChange }) {
   const [diasSemana, setDiasSemana] = useState([]);
   const [filtroCtSelecionado, setFiltroCtSelecionado] = useState('');
   const [filtroTurmaSelecionada, setFiltroTurmaSelecionada] = useState('');
+  const [filtroOrigemPrecadastro, setFiltroOrigemPrecadastro] = useState('');
   const [filtroStatusPrecadastro, setFiltroStatusPrecadastro] = useState('');
   const [showParqModal, setShowParqModal] = useState(false);
   const [selectedParqUser, setSelectedParqUser] = useState(null);
@@ -248,9 +249,10 @@ function CadastroUsuario({ onUserChange }) {
       if (activeTab === 'precadastros') {
         console.log('[DEBUG] Buscando pré-cadastros...');
         let url = 'usuarios/precadastros/';
-        if (filtroStatusPrecadastro) {
-          url += `?status=${encodeURIComponent(filtroStatusPrecadastro)}`;
-        }
+        const params = [];
+        if (filtroStatusPrecadastro) params.push(`status=${encodeURIComponent(filtroStatusPrecadastro)}`);
+        if (filtroOrigemPrecadastro) params.push(`origem=${encodeURIComponent(filtroOrigemPrecadastro)}`);
+        if (params.length) url += `?${params.join('&')}`;
         const resultados = await fetchAllPages(url);
         console.log('[DEBUG] Total pré-cadastros:', Array.isArray(resultados) ? resultados.length : 0);
         setUsers(resultados);
@@ -285,7 +287,7 @@ function CadastroUsuario({ onUserChange }) {
     } finally {
       setLoading(false);
     }
-  }, [activeTab, filtroTurmaSelecionada, filtroStatusPrecadastro]); // Inclua todas as dependências usadas dentro de fetchUsers
+  }, [activeTab, filtroTurmaSelecionada, filtroStatusPrecadastro, filtroOrigemPrecadastro]);
 
   // useEffect depende de fetchUsers e activeTab
   useEffect(() => {
@@ -310,14 +312,13 @@ function CadastroUsuario({ onUserChange }) {
     fetchCentros();
   }, []);
 
-  // Buscar turmas para o filtro
+  // Buscar turmas (usado em filtro de alunos, matrícula e pré-cadastro)
   useEffect(() => {
-    if (activeTab !== 'alunos') return;
+    if (activeTab !== 'alunos' && activeTab !== 'precadastros') return;
     const fetchTurmas = async () => {
       try {
-        const response = await api.get('turmas/');
-        const turmasData = Array.isArray(response.data) ? response.data : (response.data.results || []);
-        setTurmas(turmasData);
+        const turmasData = await fetchAllPages('turmas/');
+        setTurmas(Array.isArray(turmasData) ? turmasData : []);
       } catch (error) {
         console.error('[DEBUG] Erro ao carregar turmas:', error);
         setTurmas([]);
@@ -986,11 +987,27 @@ function CadastroUsuario({ onUserChange }) {
         </button>
       </div>
 
-      {/* Filtro por status - apenas para pré-cadastros */}
+      {/* Filtros de pré-cadastro: por tipo (origem) e por status (ciclo de vida) */}
       {activeTab === 'precadastros' && (
         <div style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
           <label style={{ fontWeight: '500', color: '#333' }}>
-            Filtrar por status:
+            Tipo:
+          </label>
+          <select
+            value={filtroOrigemPrecadastro}
+            onChange={(e) => setFiltroOrigemPrecadastro(e.target.value)}
+            style={{
+              ...styles.select,
+              minWidth: '200px',
+            }}
+          >
+            <option value="">Todos os tipos</option>
+            <option value="pendente">Pendente (cadastro pelo gerente)</option>
+            <option value="ex_aluno">Ex-aluno</option>
+            <option value="aula_experimental">Aula experimental</option>
+          </select>
+          <label style={{ fontWeight: '500', color: '#333' }}>
+            Status:
           </label>
           <select
             value={filtroStatusPrecadastro}
@@ -1000,19 +1017,21 @@ function CadastroUsuario({ onUserChange }) {
               minWidth: '180px',
             }}
           >
-            <option value="">Pendentes</option>
+            <option value="">Aguardando matrícula</option>
+            <option value="matriculado">Matriculados</option>
             <option value="cancelado">Cancelados</option>
+            <option value="todos">Todos</option>
           </select>
-          {filtroStatusPrecadastro && (
+          {(filtroOrigemPrecadastro || filtroStatusPrecadastro) && (
             <button
-              onClick={() => setFiltroStatusPrecadastro('')}
+              onClick={() => { setFiltroOrigemPrecadastro(''); setFiltroStatusPrecadastro(''); }}
               style={{
                 ...styles.actionButton,
                 backgroundColor: '#757575',
                 padding: '0.5rem 1rem',
               }}
             >
-              Limpar Filtro
+              Limpar filtros
             </button>
           )}
         </div>
@@ -1134,6 +1153,7 @@ function CadastroUsuario({ onUserChange }) {
                 {activeTab === 'alunos' && <th style={styles.th}>Centro(s) de Treinamento</th>}
                 {activeTab === 'alunos' && <th style={styles.th}>Par-Q</th>}
                 {activeTab === 'alunos' && <th style={styles.th}>Status</th>}
+                {activeTab === 'precadastros' && <th style={styles.th}>Tipo</th>}
                 {activeTab === 'precadastros' && <th style={styles.th}>Status</th>}
                 <th style={styles.th}>Ações</th>
               </tr>
@@ -1276,7 +1296,16 @@ function CadastroUsuario({ onUserChange }) {
                 )}
                 {activeTab === 'precadastros' && (
                   <td style={styles.td}>
-                    {user.status === 'matriculado' ? 'Matriculado' : user.status === 'cancelado' ? 'Cancelado' : (user.origem_display || 'Pendente')}
+                    {user.origem_display || 'Pendente'}
+                  </td>
+                )}
+                {activeTab === 'precadastros' && (
+                  <td style={styles.td}>
+                    {user.status === 'matriculado'
+                      ? 'Matriculado'
+                      : user.status === 'cancelado'
+                        ? 'Cancelado'
+                        : 'Aguardando'}
                   </td>
                 )}
                 <td style={styles.td}>
@@ -1430,7 +1459,7 @@ function CadastroUsuario({ onUserChange }) {
                 <>
                   <div style={styles.formGroup}>
                     <label style={styles.label} htmlFor="precadastro_origem">
-                      Origem
+                      Tipo
                     </label>
                     <select
                       id="precadastro_origem"
@@ -1439,9 +1468,9 @@ function CadastroUsuario({ onUserChange }) {
                       onChange={handleChange}
                       style={styles.input}
                     >
-                      <option value="formulario">Cadastro web</option>
+                      <option value="formulario">Pendente (cadastro pelo gerente)</option>
                       <option value="aula_experimental">Aula experimental</option>
-                      <option value="ex_aluno">Já foi aluno</option>
+                      <option value="ex_aluno">Ex-aluno</option>
                     </select>
                   </div>
                   <div style={styles.formGroup}>

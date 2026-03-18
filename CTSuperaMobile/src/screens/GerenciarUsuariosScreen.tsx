@@ -430,9 +430,9 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
           <View style={styles.filterRow}>
             <Text style={styles.filterLabel}>Status:</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll}>
-              {['', 'pendente', 'matriculado', 'cancelado'].map((s) => (
+              {['', 'cancelado'].map((s) => (
                 <TouchableOpacity
-                  key={s || 'todos'}
+                  key={s || 'pendentes'}
                   style={[
                     styles.filterChip,
                     filtroStatusPrecadastro === s && styles.filterChipActive,
@@ -445,7 +445,7 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
                       filtroStatusPrecadastro === s && styles.filterChipTextActive,
                     ]}
                   >
-                    {s === '' ? 'Todos' : s === 'pendente' ? 'Pendente' : s === 'matriculado' ? 'Matriculado' : 'Cancelado'}
+                    {s === '' ? 'Pendentes' : 'Cancelados'}
                   </Text>
                 </TouchableOpacity>
               ))}

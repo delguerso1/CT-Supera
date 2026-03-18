@@ -28,6 +28,23 @@ function ControleFinanceiro({ user, onDataChange }) {
   const [turmas, setTurmas] = useState([]);
   const itensPorPagina = 10;
 
+  const fetchAllPages = async (initialUrl) => {
+    let resultados = [];
+    let nextUrl = initialUrl;
+    while (nextUrl) {
+      const response = await api.get(nextUrl);
+      const data = response.data;
+      if (data && data.results) {
+        resultados = resultados.concat(data.results);
+        nextUrl = data.next ? data.next.replace(api.defaults.baseURL, '') : null;
+      } else {
+        resultados = Array.isArray(data) ? data : [];
+        nextUrl = null;
+      }
+    }
+    return resultados;
+  };
+
   useEffect(() => {
     fetchDashboard();
     fetchMensalidades();
@@ -57,10 +74,10 @@ function ControleFinanceiro({ user, onDataChange }) {
 
   const fetchMensalidades = async () => {
     try {
-      const params = { mes, ano };
-      if (turmaFiltro) params.turma = turmaFiltro;
-      const { data } = await api.get('financeiro/mensalidades/', { params });
-      setMensalidades(Array.isArray(data) ? data : data.results || data.mensalidades || []);
+      let url = `financeiro/mensalidades/?mes=${mes}&ano=${ano}`;
+      if (turmaFiltro) url += `&turma=${turmaFiltro}`;
+      const data = await fetchAllPages(url);
+      setMensalidades(Array.isArray(data) ? data : []);
     } catch {
       setErro('Erro ao carregar mensalidades.');
     }
@@ -68,8 +85,8 @@ function ControleFinanceiro({ user, onDataChange }) {
 
   const fetchDespesas = async () => {
     try {
-      const { data } = await api.get('financeiro/despesas/', { params: { mes, ano } });
-      setDespesas(Array.isArray(data) ? data : data.results || data.despesas || []);
+      const data = await fetchAllPages(`financeiro/despesas/?mes=${mes}&ano=${ano}`);
+      setDespesas(Array.isArray(data) ? data : []);
     } catch {
       setErro('Erro ao carregar despesas.');
     }
@@ -77,8 +94,8 @@ function ControleFinanceiro({ user, onDataChange }) {
 
   const fetchSalarios = async () => {
     try {
-      const { data } = await api.get('financeiro/salarios/', { params: { mes, ano } });
-      setSalarios(Array.isArray(data) ? data : data.results || data.salarios || []);
+      const data = await fetchAllPages(`financeiro/salarios/?mes=${mes}&ano=${ano}`);
+      setSalarios(Array.isArray(data) ? data : []);
     } catch {
       setErro('Erro ao carregar salários.');
     }
@@ -86,8 +103,8 @@ function ControleFinanceiro({ user, onDataChange }) {
 
   const fetchAlunos = async () => {
     try {
-      const { data } = await api.get('usuarios/?tipo=aluno');
-      setAlunos(Array.isArray(data) ? data : data.results || []);
+      const data = await fetchAllPages('usuarios/?tipo=aluno');
+      setAlunos(Array.isArray(data) ? data : []);
     } catch {
       setErro('Erro ao carregar alunos.');
     }
@@ -95,8 +112,8 @@ function ControleFinanceiro({ user, onDataChange }) {
 
   const fetchTurmas = async () => {
     try {
-      const { data } = await api.get('turmas/');
-      setTurmas(Array.isArray(data) ? data : data.results || []);
+      const data = await fetchAllPages('turmas/');
+      setTurmas(Array.isArray(data) ? data : []);
     } catch {
       setErro('Erro ao carregar turmas.');
     }

@@ -21,9 +21,9 @@ class PreCadastro(models.Model):
     ]
 
     ORIGEM_CHOICES = [
+        ('formulario', 'Pendente'),  # Cadastro pelo gerente
         ('aula_experimental', 'Aula experimental'),
-        ('ex_aluno', 'Já foi aluno'),
-        ('formulario', 'Cadastro web'),
+        ('ex_aluno', 'Ex-aluno'),
     ]
 
     first_name = models.CharField(max_length=100, blank=False, null=False)

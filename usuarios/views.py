@@ -35,11 +35,22 @@ class ListarPrecadastrosAPIView(ListCreateAPIView):
         if self.request.method != 'GET':
             return qs
         status_param = self.request.query_params.get('status', '').strip().lower()
+        origem_param = self.request.query_params.get('origem', '').strip().lower()
+
         if status_param == 'cancelado':
             qs = qs.filter(status='cancelado')
+        elif status_param == 'matriculado':
+            qs = qs.filter(status='matriculado')
+        elif status_param == 'todos':
+            pass
         else:
-            # Padrão: apenas pendentes (nunca matriculados)
             qs = qs.filter(status='pendente')
+
+        if origem_param in ('formulario', 'ex_aluno', 'aula_experimental'):
+            qs = qs.filter(origem=origem_param)
+        elif origem_param == 'pendente':
+            qs = qs.filter(origem='formulario')
+
         return qs
 
     def get_permissions(self):
