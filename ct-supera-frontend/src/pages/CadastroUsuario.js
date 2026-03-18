@@ -549,7 +549,31 @@ function CadastroUsuario({ onUserChange }) {
 
     try {
       let response;
-      if (editingUser) {
+      if (activeTab === 'precadastros') {
+        const payloadPrecadastro = {
+          first_name: formData.first_name,
+          last_name: formData.last_name || '',
+          email: formData.email,
+          telefone: formData.telefone,
+          data_nascimento: formData.data_nascimento,
+          cpf: formData.cpf && formData.cpf.replace(/\D/g, '').length > 0 ? formData.cpf.replace(/\D/g, '') : null,
+          origem: formData.origem || (editingUser && editingUser.origem) || 'formulario',
+        };
+        const turmaId = formData.turma || (editingUser && editingUser.turma && (typeof editingUser.turma === 'object' ? editingUser.turma.id : editingUser.turma));
+        payloadPrecadastro.turma = turmaId ? parseInt(turmaId, 10) : null;
+        if (editingUser) {
+          response = await api.put(`usuarios/precadastros/${editingUser.id}/`, payloadPrecadastro);
+          setSuccess('Pré-cadastro atualizado com sucesso!');
+        } else {
+          response = await api.post('usuarios/precadastros/', payloadPrecadastro);
+          if (response.data && response.data.id) {
+            setSuccess('Pré-cadastro criado com sucesso!');
+          } else {
+            setError('Erro inesperado: resposta sem id.');
+            return;
+          }
+        }
+      } else if (editingUser) {
         response = await api.patch(`usuarios/${editingUser.id}/`, dados);
         setSuccess('Usuário atualizado com sucesso!');
       } else {
@@ -580,16 +604,18 @@ function CadastroUsuario({ onUserChange }) {
     setFormData({
         first_name: user.first_name || '',
         last_name: user.last_name || '',
-        cpf: user.cpf || user.username,
-        email: user.email,
-        tipo: user.tipo,
-        telefone: user.telefone,
-        endereco: user.endereco,
-        data_nascimento: user.data_nascimento,
+        cpf: user.cpf || user.username || '',
+        email: user.email || '',
+        tipo: user.tipo || 'aluno',
+        telefone: user.telefone || '',
+        endereco: user.endereco || '',
+        data_nascimento: user.data_nascimento || '',
         telefone_responsavel: user.telefone_responsavel || '',
         telefone_emergencia: user.telefone_emergencia || '',
         nome_responsavel: user.nome_responsavel || '',
         ficha_medica: user.ficha_medica || '',
+        turma: user.turma ? (typeof user.turma === 'object' ? user.turma.id : user.turma) : '',
+        origem: user.origem || 'formulario',
       });
     
     // Carregar campos específicos de professor
@@ -698,6 +724,8 @@ function CadastroUsuario({ onUserChange }) {
       telefone_emergencia: '',
       nome_responsavel: '',
       ficha_medica: '',
+      turma: '',
+      origem: activeTab === 'precadastros' ? 'formulario' : undefined,
     });
     
     // Limpar campos específicos
@@ -972,10 +1000,8 @@ function CadastroUsuario({ onUserChange }) {
               minWidth: '180px',
             }}
           >
-            <option value="">Todos</option>
-            <option value="pendente">Pendente</option>
-            <option value="matriculado">Matriculado</option>
-            <option value="cancelado">Cancelado</option>
+            <option value="">Pendentes</option>
+            <option value="cancelado">Cancelados</option>
           </select>
           {filtroStatusPrecadastro && (
             <button
@@ -1400,6 +1426,46 @@ function CadastroUsuario({ onUserChange }) {
                 />
               </div>
 
+              {activeTab === 'precadastros' && (
+                <>
+                  <div style={styles.formGroup}>
+                    <label style={styles.label} htmlFor="precadastro_origem">
+                      Origem
+                    </label>
+                    <select
+                      id="precadastro_origem"
+                      name="origem"
+                      value={formData.origem || 'formulario'}
+                      onChange={handleChange}
+                      style={styles.input}
+                    >
+                      <option value="formulario">Cadastro web</option>
+                      <option value="aula_experimental">Aula experimental</option>
+                      <option value="ex_aluno">Já foi aluno</option>
+                    </select>
+                  </div>
+                  <div style={styles.formGroup}>
+                    <label style={styles.label} htmlFor="precadastro_turma">
+                      Turma (opcional)
+                    </label>
+                    <select
+                      id="precadastro_turma"
+                      name="turma"
+                      value={formData.turma || ''}
+                      onChange={handleChange}
+                      style={styles.input}
+                    >
+                      <option value="">Selecione uma turma (opcional)</option>
+                      {Array.isArray(turmas) && turmas.filter(t => t.ativo !== false).map(t => (
+                        <option key={t.id} value={t.id}>
+                          {t.ct_nome || 'CT'} - {(t.dias_semana_nomes || []).join(', ')} às {t.horario || ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </>
+              )}
+
               <div style={styles.formGroup}>
                 <label style={styles.label} htmlFor="endereco">
                   Endereço
@@ -1426,7 +1492,7 @@ function CadastroUsuario({ onUserChange }) {
                   value={formData.data_nascimento}
                   onChange={handleChange}
                   style={styles.input}
-                  required={activeTab !== 'precadastros'}
+                  required
                 />
               </div>
 

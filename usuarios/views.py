@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 
 class ListarPrecadastrosAPIView(ListCreateAPIView):
-    """API para listar e criar pré-cadastros. Suporta filtro por status (?status=pendente|matriculado|cancelado)."""
+    """API para listar pré-cadastros. Por padrão retorna apenas pendentes. Suporta ?status=cancelado."""
     serializer_class = PreCadastroSerializer
 
     def get_queryset(self):
@@ -35,8 +35,11 @@ class ListarPrecadastrosAPIView(ListCreateAPIView):
         if self.request.method != 'GET':
             return qs
         status_param = self.request.query_params.get('status', '').strip().lower()
-        if status_param in ('pendente', 'matriculado', 'cancelado'):
-            qs = qs.filter(status=status_param)
+        if status_param == 'cancelado':
+            qs = qs.filter(status='cancelado')
+        else:
+            # Padrão: apenas pendentes (nunca matriculados)
+            qs = qs.filter(status='pendente')
         return qs
 
     def get_permissions(self):
