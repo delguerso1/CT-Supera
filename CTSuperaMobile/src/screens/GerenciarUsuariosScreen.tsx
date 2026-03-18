@@ -466,15 +466,20 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
               ) : (
                 precadastros.map((item) => (
                   <View key={item.id} style={styles.card}>
-                    <Text style={styles.cardTitle}>
-                      {(() => {
+                    <TouchableOpacity
+                      onPress={() => {
                         const nome = item.nome || `${item.first_name || ''} ${item.last_name || ''}`.trim() || 'Sem nome';
-                        const dataAula = item.origem === 'aula_experimental' && item.data_aula_experimental
-                          ? ` (aula ${new Date(item.data_aula_experimental + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })})`
-                          : '';
-                        return nome + dataAula;
-                      })()}
-                    </Text>
+                        let msg = `E-mail: ${item.email}\nTelefone: ${item.telefone || '-'}\nTipo: ${item.origem_display || item.origem || '-'}\nStatus: ${item.status === 'matriculado' ? 'Matriculado' : item.status === 'cancelado' ? 'Cancelado' : 'Pendente'}`;
+                        if (item.origem === 'aula_experimental' && item.data_aula_experimental) {
+                          msg += `\n\nData da aula experimental: ${new Date(item.data_aula_experimental + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}`;
+                        }
+                        Alert.alert(nome, msg, [{ text: 'OK' }]);
+                      }}
+                    >
+                      <Text style={[styles.cardTitle, { color: '#1F6C86', textDecorationLine: 'underline' }]}>
+                        {item.nome || `${item.first_name || ''} ${item.last_name || ''}`.trim() || 'Sem nome'}
+                      </Text>
+                    </TouchableOpacity>
                     <Text style={styles.cardSubtitle}>{item.email}</Text>
                     <Text style={styles.cardSubtitle}>
                       Status:{' '}

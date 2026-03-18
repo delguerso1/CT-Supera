@@ -206,6 +206,8 @@ function CadastroUsuario({ onUserChange }) {
   const [parqActionLoading, setParqActionLoading] = useState(false);
   const [showAlunoInfoModal, setShowAlunoInfoModal] = useState(false);
   const [selectedAlunoInfo, setSelectedAlunoInfo] = useState(null);
+  const [showPrecadastroInfoModal, setShowPrecadastroInfoModal] = useState(false);
+  const [selectedPrecadastroInfo, setSelectedPrecadastroInfo] = useState(null);
   const [showMatriculaModal, setShowMatriculaModal] = useState(false);
   const [matriculaPrecadastro, setMatriculaPrecadastro] = useState(null);
   const [matriculaLoading, setMatriculaLoading] = useState(false);
@@ -406,6 +408,17 @@ function CadastroUsuario({ onUserChange }) {
     if (!user || user.tipo !== 'aluno') return;
     setSelectedAlunoInfo(user);
     setShowAlunoInfoModal(true);
+  };
+
+  const handleMostrarInfoPrecadastro = (precadastro) => {
+    if (!precadastro) return;
+    setSelectedPrecadastroInfo(precadastro);
+    setShowPrecadastroInfoModal(true);
+  };
+
+  const handleClosePrecadastroInfoModal = () => {
+    setShowPrecadastroInfoModal(false);
+    setSelectedPrecadastroInfo(null);
   };
 
   const handleCloseAlunoInfoModal = () => {
@@ -1164,7 +1177,7 @@ function CadastroUsuario({ onUserChange }) {
                 <td style={styles.td}>
                   <button
                     type="button"
-                    onClick={() => handleMostrarInfoAluno(user)}
+                    onClick={() => activeTab === 'precadastros' ? handleMostrarInfoPrecadastro(user) : handleMostrarInfoAluno(user)}
                     style={{
                       background: 'none',
                       border: 'none',
@@ -1175,15 +1188,9 @@ function CadastroUsuario({ onUserChange }) {
                       textDecoration: 'underline',
                       font: 'inherit',
                     }}
-                    title="Ver informações do aluno"
+                    title={activeTab === 'precadastros' ? 'Ver informações do pré-cadastro' : 'Ver informações do aluno'}
                   >
-                    {(() => {
-                      const nome = `${user.first_name} ${user.last_name || ''}`.trim();
-                      const dataAula = user.origem === 'aula_experimental' && user.data_aula_experimental
-                        ? ` (aula ${new Date(user.data_aula_experimental + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })})`
-                        : '';
-                      return nome + dataAula;
-                    })()}
+                    {`${user.first_name} ${user.last_name || ''}`.trim()}
                   </button>
                 </td>
                 {activeTab === 'alunos' && (
@@ -2004,6 +2011,55 @@ function CadastroUsuario({ onUserChange }) {
                 type="button"
                 style={{ ...styles.button, backgroundColor: '#f5f5f5', color: '#333' }}
                 onClick={handleCloseAlunoInfoModal}
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showPrecadastroInfoModal && selectedPrecadastroInfo && (
+        <div style={styles.modal}>
+          <div style={{ ...styles.modalContent, width: '420px' }}>
+            <h2 style={styles.title}>
+              Informações do pré-cadastro
+            </h2>
+            <div style={{ display: 'grid', gap: '10px', color: '#444', fontSize: '0.95rem' }}>
+              <div>
+                <strong>Nome:</strong>{' '}
+                {`${selectedPrecadastroInfo.first_name} ${selectedPrecadastroInfo.last_name || ''}`.trim()}
+              </div>
+              <div>
+                <strong>E-mail:</strong> {selectedPrecadastroInfo.email}
+              </div>
+              <div>
+                <strong>Telefone:</strong> {selectedPrecadastroInfo.telefone || '-'}
+              </div>
+              <div>
+                <strong>Tipo:</strong> {selectedPrecadastroInfo.origem_display || selectedPrecadastroInfo.origem || '-'}
+              </div>
+              {selectedPrecadastroInfo.origem === 'aula_experimental' && selectedPrecadastroInfo.data_aula_experimental && (
+                <div>
+                  <strong>Data da aula experimental:</strong>{' '}
+                  {new Date(selectedPrecadastroInfo.data_aula_experimental + 'T12:00:00').toLocaleDateString('pt-BR', {
+                    weekday: 'long',
+                    day: '2-digit',
+                    month: 'long',
+                    year: 'numeric'
+                  })}
+                </div>
+              )}
+              <div>
+                <strong>Status:</strong>{' '}
+                {selectedPrecadastroInfo.status === 'matriculado' ? 'Matriculado' : selectedPrecadastroInfo.status === 'cancelado' ? 'Cancelado' : 'Pendente'}
+              </div>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>
+              <button
+                type="button"
+                style={{ ...styles.button, backgroundColor: '#f5f5f5', color: '#333' }}
+                onClick={handleClosePrecadastroInfoModal}
               >
                 Fechar
               </button>

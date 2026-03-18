@@ -926,16 +926,20 @@ const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }
             <Text style={styles.sectionTitle}>Pré-cadastros Pendentes ({precadastros.length})</Text>
             {precadastros.map(precadastro => (
               <View key={precadastro.id} style={styles.precadastroCard}>
-                <View style={styles.precadastroHeader}>
+                <TouchableOpacity
+                  style={styles.precadastroHeader}
+                  onPress={() => {
+                    const nome = precadastro.nome || `${precadastro.first_name || ''} ${precadastro.last_name || ''}`.trim() || 'Sem nome';
+                    let msg = `E-mail: ${precadastro.email}\nTelefone: ${precadastro.telefone || '-'}\nCadastrado em: ${new Date(precadastro.criado_em).toLocaleDateString('pt-BR')}`;
+                    if (precadastro.origem === 'aula_experimental' && precadastro.data_aula_experimental) {
+                      msg += `\n\nData da aula experimental: ${new Date(precadastro.data_aula_experimental + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}`;
+                    }
+                    Alert.alert(nome, msg, [{ text: 'OK' }]);
+                  }}
+                >
                   <View style={styles.precadastroInfo}>
-                    <Text style={styles.precadastroNome}>
-                      {(() => {
-                        const nome = precadastro.nome || `${precadastro.first_name || ''} ${precadastro.last_name || ''}`.trim() || 'Sem nome';
-                        const dataAula = precadastro.origem === 'aula_experimental' && precadastro.data_aula_experimental
-                          ? ` (aula ${new Date(precadastro.data_aula_experimental + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })})`
-                          : '';
-                        return nome + dataAula;
-                      })()}
+                    <Text style={[styles.precadastroNome, { color: '#1F6C86', textDecorationLine: 'underline' }]}>
+                      {precadastro.nome || `${precadastro.first_name || ''} ${precadastro.last_name || ''}`.trim() || 'Sem nome'}
                     </Text>
                     <Text style={styles.precadastroEmail}>{precadastro.email}</Text>
                     {precadastro.telefone && (
@@ -945,7 +949,7 @@ const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }
                   <View style={[styles.statusBadge, { backgroundColor: '#ff9800' }]}>
                     <Text style={styles.statusText}>Pendente</Text>
                   </View>
-                </View>
+                </TouchableOpacity>
                 <Text style={styles.precadastroDate}>
                   Cadastrado em: {new Date(precadastro.criado_em).toLocaleDateString('pt-BR')}
                 </Text>
