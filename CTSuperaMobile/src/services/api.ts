@@ -472,8 +472,9 @@ export const usuarioService = {
     return response.data;
   },
 
-  listarPrecadastros: async (): Promise<PreCadastro[]> => {
-    const response = await api.get('usuarios/precadastros/');
+  listarPrecadastros: async (params?: { status?: string }): Promise<PreCadastro[]> => {
+    const query = params?.status ? `?status=${encodeURIComponent(params.status)}` : '';
+    const response = await api.get(`usuarios/precadastros/${query}`);
     return response.data.results || response.data;
   },
 

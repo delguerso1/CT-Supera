@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { useAuth } from '../utils/AuthContext';
 import { usuarioService, turmaService } from '../services/api';
-import { User, PreCadastro } from '../types';
+import { User, PreCadastro, Turma } from '../types';
 import { NavigationProps } from '../types';
 
 type TabKey = 'alunos' | 'professores' | 'gerentes' | 'precadastros';
@@ -58,19 +58,24 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
     valor_uniforme: '',
     dia_vencimento_primeira: '',
     dias_habilitados: [] as number[],
+    turma: '' as string | number,
   });
+  const [turmasParaMatricula, setTurmasParaMatricula] = useState<Turma[]>([]);
+  const [filtroStatusPrecadastro, setFiltroStatusPrecadastro] = useState<string>('');
 
   useEffect(() => {
     if (user?.tipo === 'gerente') {
       fetchUsers();
     }
-  }, [activeTab, user]);
+  }, [activeTab, user, filtroStatusPrecadastro]);
 
   const fetchUsers = async () => {
     try {
       setLoading(true);
       if (activeTab === 'precadastros') {
-        const data = await usuarioService.listarPrecadastros();
+        const data = await usuarioService.listarPrecadastros(
+          filtroStatusPrecadastro ? { status: filtroStatusPrecadastro } : undefined
+        );
         setPrecadastros(data);
         setUsers([]);
       } else {
@@ -215,29 +220,51 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
   };
 
   const handleDelete = (target: User | PreCadastro) => {
-    Alert.alert(
-      'Excluir',
-      'Deseja realmente excluir este registro?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Excluir',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              if (activeTab === 'precadastros') {
-                await usuarioService.excluirPrecadastro((target as PreCadastro).id);
-              } else {
-                await usuarioService.excluirUsuario((target as User).id);
-              }
-              await fetchUsers();
-            } catch (error: any) {
-              Alert.alert('Erro', error.response?.data?.error || 'Erro ao excluir.');
-            }
+    const onConfirmDelete = async () => {
+      try {
+        if (activeTab === 'precadastros') {
+          await usuarioService.excluirPrecadastro((target as PreCadastro).id);
+        } else {
+          await usuarioService.excluirUsuario((target as User).id);
+        }
+        await fetchUsers();
+      } catch (error: any) {
+        Alert.alert('Erro', error.response?.data?.error || 'Erro ao excluir.');
+      }
+    };
+
+    if (activeTab === 'precadastros') {
+      Alert.alert(
+        'Excluir pré-cadastro',
+        'Deseja realmente excluir este pré-cadastro?',
+        [
+          { text: 'Cancelar', style: 'cancel' },
+          {
+            text: 'Excluir',
+            style: 'destructive',
+            onPress: () => {
+              Alert.alert(
+                'Confirmar exclusão',
+                'Esta ação é irreversível. Confirma a exclusão?',
+                [
+                  { text: 'Cancelar', style: 'cancel' },
+                  { text: 'Sim, excluir', style: 'destructive', onPress: onConfirmDelete },
+                ]
+              );
+            },
           },
-        },
-      ]
-    );
+        ]
+      );
+    } else {
+      Alert.alert(
+        'Excluir',
+        'Deseja realmente excluir este registro?',
+        [
+          { text: 'Cancelar', style: 'cancel' },
+          { text: 'Excluir', style: 'destructive', onPress: onConfirmDelete },
+        ]
+      );
+    }
   };
 
   const handleResetParq = (target: User) => {
@@ -263,9 +290,17 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
 
   const handleAbrirMatricula = async (precadastro: PreCadastro) => {
     try {
-      const dias = await turmaService.getDiasSemana();
+      const [dias, turmasData] = await Promise.all([
+        turmaService.getDiasSemana(),
+        turmaService.getTurmas(),
+      ]);
       setDiasSemana(dias);
+      setTurmasParaMatricula(Array.isArray(turmasData) ? turmasData : []);
       setMatriculaPrecadastro(precadastro);
+      const precadastroTurma = (precadastro as any).turma;
+      const turmaInicial = precadastroTurma
+        ? (typeof precadastroTurma === 'object' ? precadastroTurma.id : precadastroTurma)
+        : '';
       setMatriculaForm({
         cpf: precadastro.cpf || '',
         dia_vencimento: '1',
@@ -275,10 +310,11 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
         valor_uniforme: '',
         dia_vencimento_primeira: '',
         dias_habilitados: [],
+        turma: turmaInicial,
       });
       setShowMatriculaModal(true);
     } catch (error: any) {
-      Alert.alert('Erro', error.response?.data?.error || 'Erro ao carregar dias da semana.');
+      Alert.alert('Erro', error.response?.data?.error || 'Erro ao carregar dados.');
     }
   };
 
@@ -339,6 +375,9 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
         payload.valor_uniforme = Number(matriculaForm.valor_uniforme || 0);
         payload.dia_vencimento_primeira = Number(matriculaForm.dia_vencimento_primeira);
       }
+      if (matriculaForm.turma) {
+        payload.turma = Number(matriculaForm.turma);
+      }
       await usuarioService.finalizarAgendamento(matriculaPrecadastro.id, payload);
       setShowMatriculaModal(false);
       await fetchUsers();
@@ -387,6 +426,33 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
           </TouchableOpacity>
         </View>
 
+        {activeTab === 'precadastros' && (
+          <View style={styles.filterRow}>
+            <Text style={styles.filterLabel}>Status:</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll}>
+              {['', 'pendente', 'matriculado', 'cancelado'].map((s) => (
+                <TouchableOpacity
+                  key={s || 'todos'}
+                  style={[
+                    styles.filterChip,
+                    filtroStatusPrecadastro === s && styles.filterChipActive,
+                  ]}
+                  onPress={() => setFiltroStatusPrecadastro(s)}
+                >
+                  <Text
+                    style={[
+                      styles.filterChipText,
+                      filtroStatusPrecadastro === s && styles.filterChipTextActive,
+                    ]}
+                  >
+                    {s === '' ? 'Todos' : s === 'pendente' ? 'Pendente' : s === 'matriculado' ? 'Matriculado' : 'Cancelado'}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
         {loading ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#1a237e" />
@@ -410,7 +476,7 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
                         ? 'Matriculado'
                         : item.status === 'cancelado'
                         ? 'Cancelado'
-                        : (item.origem_display || 'Pendente')}
+                        : 'Pendente'}
                     </Text>
                     <View style={styles.actionsRow}>
                       <TouchableOpacity style={styles.actionButton} onPress={() => handleEditUser(item)}>
@@ -625,6 +691,26 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Matricular pré-cadastro</Text>
             <ScrollView>
+              <Text style={styles.sectionTitle}>Turma (opcional)</Text>
+              {turmasParaMatricula.filter(t => t.ativo !== false).length === 0 ? (
+                <Text style={styles.noData}>Nenhuma turma disponível.</Text>
+              ) : (
+                turmasParaMatricula.filter(t => t.ativo !== false).map((turma) => (
+                  <TouchableOpacity
+                    key={turma.id}
+                    style={[styles.dayItem, matriculaForm.turma === turma.id && styles.turmaItemSelected]}
+                    onPress={() => setMatriculaForm(prev => ({ ...prev, turma: prev.turma === turma.id ? '' : turma.id! }))}
+                  >
+                    <Text style={[styles.dayText, matriculaForm.turma === turma.id && styles.turmaItemTextSelected]}>
+                      {turma.ct_nome || 'CT'} - {(turma.dias_semana_nomes || []).join(', ')} às {turma.horario || ''}
+                    </Text>
+                    <Text style={[styles.daySelected, matriculaForm.turma === turma.id && styles.turmaItemTextSelected]}>
+                      {matriculaForm.turma === turma.id ? '✓' : ''}
+                    </Text>
+                  </TouchableOpacity>
+                ))
+              )}
+
               <TextInput
                 style={styles.input}
                 placeholder="CPF"
@@ -923,6 +1009,12 @@ const styles = StyleSheet.create({
     color: '#1a237e',
     fontWeight: 'bold',
   },
+  turmaItemSelected: {
+    backgroundColor: '#e3f2fd',
+  },
+  turmaItemTextSelected: {
+    color: '#1a237e',
+  },
   switchRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -932,6 +1024,39 @@ const styles = StyleSheet.create({
   switchLabel: {
     fontSize: 12,
     color: '#333',
+  },
+  filterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    gap: 8,
+  },
+  filterLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#333',
+  },
+  filterScroll: {
+    flex: 1,
+    maxHeight: 40,
+  },
+  filterChip: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    backgroundColor: '#e0e0e0',
+    marginRight: 8,
+  },
+  filterChipActive: {
+    backgroundColor: '#1a237e',
+  },
+  filterChipText: {
+    fontSize: 12,
+    color: '#666',
+  },
+  filterChipTextActive: {
+    color: '#fff',
+    fontWeight: '600',
   },
 });
 

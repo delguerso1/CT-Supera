@@ -199,6 +199,7 @@ function CadastroUsuario({ onUserChange }) {
   const [diasSemana, setDiasSemana] = useState([]);
   const [filtroCtSelecionado, setFiltroCtSelecionado] = useState('');
   const [filtroTurmaSelecionada, setFiltroTurmaSelecionada] = useState('');
+  const [filtroStatusPrecadastro, setFiltroStatusPrecadastro] = useState('');
   const [showParqModal, setShowParqModal] = useState(false);
   const [selectedParqUser, setSelectedParqUser] = useState(null);
   const [parqActionLoading, setParqActionLoading] = useState(false);
@@ -216,6 +217,7 @@ function CadastroUsuario({ onUserChange }) {
     valor_uniforme: '',
     dia_vencimento_primeira: '',
     dias_habilitados: [],
+    turma: '',
   });
 
   // Defina fetchUsers usando useCallback
@@ -245,7 +247,11 @@ function CadastroUsuario({ onUserChange }) {
 
       if (activeTab === 'precadastros') {
         console.log('[DEBUG] Buscando pré-cadastros...');
-        const resultados = await fetchAllPages('usuarios/precadastros/');
+        let url = 'usuarios/precadastros/';
+        if (filtroStatusPrecadastro) {
+          url += `?status=${encodeURIComponent(filtroStatusPrecadastro)}`;
+        }
+        const resultados = await fetchAllPages(url);
         console.log('[DEBUG] Total pré-cadastros:', Array.isArray(resultados) ? resultados.length : 0);
         setUsers(resultados);
       } else {
@@ -279,7 +285,7 @@ function CadastroUsuario({ onUserChange }) {
     } finally {
       setLoading(false);
     }
-  }, [activeTab, filtroTurmaSelecionada]); // Inclua todas as dependências usadas dentro de fetchUsers
+  }, [activeTab, filtroTurmaSelecionada, filtroStatusPrecadastro]); // Inclua todas as dependências usadas dentro de fetchUsers
 
   // useEffect depende de fetchUsers e activeTab
   useEffect(() => {
@@ -622,25 +628,38 @@ function CadastroUsuario({ onUserChange }) {
   };
 
   const handleDelete = async (userId) => {
-    if (window.confirm('Tem certeza que deseja excluir este registro?')) {
-      try {
-        if (activeTab === 'alunos') {
-          const response = await api.post(`usuarios/reverter-aluno/${userId}/`);
-          if (response.data?.message) {
-            setSuccess('Aluno movido para pré-cadastro com sucesso!');
-            fetchUsers();
-          }
-        } else {
-          const response = await api.delete(`usuarios/${userId}/`);
-          if (response.status === 204) {
-            setSuccess(activeTab === 'precadastros' ? 'Pré-cadastro excluído com sucesso!' : 'Usuário excluído com sucesso!');
-            fetchUsers();
-          }
+    const confirmMsg = activeTab === 'precadastros'
+      ? 'Tem certeza que deseja excluir este pré-cadastro?'
+      : 'Tem certeza que deseja excluir este registro?';
+    const confirm2Msg = 'Esta ação é irreversível. Confirma a exclusão?';
+
+    if (!window.confirm(confirmMsg)) return;
+
+    if (activeTab === 'precadastros' && !window.confirm(confirm2Msg)) return;
+
+    try {
+      if (activeTab === 'alunos') {
+        const response = await api.post(`usuarios/reverter-aluno/${userId}/`);
+        if (response.data?.message) {
+          setSuccess('Aluno movido para pré-cadastro com sucesso!');
+          fetchUsers();
         }
-      } catch (error) {
-        console.error('[DEBUG] Erro ao excluir:', error);
-        setError(error.response?.data?.error || 'Erro ao excluir. Tente novamente.');
+      } else if (activeTab === 'precadastros') {
+        const response = await api.delete(`usuarios/precadastros/${userId}/`);
+        if (response.status === 204) {
+          setSuccess('Pré-cadastro excluído com sucesso!');
+          fetchUsers();
+        }
+      } else {
+        const response = await api.delete(`usuarios/${userId}/`);
+        if (response.status === 204) {
+          setSuccess('Usuário excluído com sucesso!');
+          fetchUsers();
+        }
       }
+    } catch (error) {
+      console.error('[DEBUG] Erro ao excluir:', error);
+      setError(error.response?.data?.error || 'Erro ao excluir. Tente novamente.');
     }
   };
 
@@ -707,6 +726,7 @@ function CadastroUsuario({ onUserChange }) {
       valor_uniforme: '',
       dia_vencimento_primeira: '',
       dias_habilitados: [],
+      turma: precadastro.turma ? (typeof precadastro.turma === 'object' ? precadastro.turma.id : precadastro.turma) : '',
     });
     setError('');
     setSuccess('');
@@ -811,6 +831,9 @@ function CadastroUsuario({ onUserChange }) {
       }
       if (matriculaForm.cpf) {
         payload.cpf = matriculaForm.cpf;
+      }
+      if (matriculaForm.turma) {
+        payload.turma = parseInt(matriculaForm.turma, 10);
       }
       const response = await api.post(`usuarios/finalizar-agendamento/${matriculaPrecadastro.id}/`, payload);
       if (response.data.message) {
@@ -934,6 +957,40 @@ function CadastroUsuario({ onUserChange }) {
           Pré-cadastros
         </button>
       </div>
+
+      {/* Filtro por status - apenas para pré-cadastros */}
+      {activeTab === 'precadastros' && (
+        <div style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+          <label style={{ fontWeight: '500', color: '#333' }}>
+            Filtrar por status:
+          </label>
+          <select
+            value={filtroStatusPrecadastro}
+            onChange={(e) => setFiltroStatusPrecadastro(e.target.value)}
+            style={{
+              ...styles.select,
+              minWidth: '180px',
+            }}
+          >
+            <option value="">Todos</option>
+            <option value="pendente">Pendente</option>
+            <option value="matriculado">Matriculado</option>
+            <option value="cancelado">Cancelado</option>
+          </select>
+          {filtroStatusPrecadastro && (
+            <button
+              onClick={() => setFiltroStatusPrecadastro('')}
+              style={{
+                ...styles.actionButton,
+                backgroundColor: '#757575',
+                padding: '0.5rem 1rem',
+              }}
+            >
+              Limpar Filtro
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Filtros por CT e Turma - apenas para alunos */}
       {activeTab === 'alunos' && (
@@ -1204,14 +1261,12 @@ function CadastroUsuario({ onUserChange }) {
                     >
                       Editar
                     </button>
-                    {activeTab !== 'precadastros' && (
-                      <button
-                        style={{ ...styles.actionButton, ...styles.deleteButton }}
-                        onClick={() => handleDelete(user.id)}
-                      >
-                        Excluir
-                      </button>
-                    )}
+                    <button
+                      style={{ ...styles.actionButton, ...styles.deleteButton }}
+                      onClick={() => handleDelete(user.id)}
+                    >
+                      Excluir
+                    </button>
                     {activeTab === 'precadastros' && user.status !== 'matriculado' && (
                       <button
                         style={{ ...styles.actionButton, ...styles.editButton }}
@@ -1429,32 +1484,6 @@ function CadastroUsuario({ onUserChange }) {
                 </>
               )}
 
-              <div style={{ marginTop: '20px', display: 'flex', gap: '1rem' }}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowModal(false);
-                  }}
-                  style={{
-                    ...styles.button,
-                    backgroundColor: '#f5f5f5',
-                    color: '#333',
-                    flex: 1,
-                  }}
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  style={{
-                    ...styles.button,
-                    flex: 1,
-                  }}
-                >
-                  {editingUser ? 'Salvar' : `Cadastrar ${activeTab.slice(0, -1).charAt(0).toUpperCase() + activeTab.slice(0, -1).slice(1)}`}
-                </button>
-              </div>
-
               {/* Campo tipo de usuário - só mostra se for cadastro de gerente */}
               {activeTab === 'gerentes' && (
                 <div style={styles.formGroup}>
@@ -1574,33 +1603,31 @@ function CadastroUsuario({ onUserChange }) {
                 </>
               )}
 
-              {activeTab !== 'alunos' && (
-                <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowModal(false);
-                    }}
-                    style={{
-                      ...styles.button,
-                      backgroundColor: '#f5f5f5',
-                      color: '#333',
-                      flex: 1,
-                    }}
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    style={{
-                      ...styles.button,
-                      flex: 1,
-                    }}
-                  >
-                    {editingUser ? 'Salvar' : `Cadastrar ${activeTab.slice(0, -1).charAt(0).toUpperCase() + activeTab.slice(0, -1).slice(1)}`}
-                  </button>
-                </div>
-              )}
+              <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowModal(false);
+                  }}
+                  style={{
+                    ...styles.button,
+                    backgroundColor: '#f5f5f5',
+                    color: '#333',
+                    flex: 1,
+                  }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  style={{
+                    ...styles.button,
+                    flex: 1,
+                  }}
+                >
+                  {editingUser ? 'Salvar' : `Cadastrar ${activeTab.slice(0, -1).charAt(0).toUpperCase() + activeTab.slice(0, -1).slice(1)}`}
+                </button>
+              </div>
             </form>
           </div>
         </div>
@@ -1659,6 +1686,26 @@ function CadastroUsuario({ onUserChange }) {
                   />
                 </div>
               )}
+
+              <div style={styles.formGroup}>
+                <label style={styles.label} htmlFor="matricula_turma">
+                  Turma
+                </label>
+                <select
+                  id="matricula_turma"
+                  name="turma"
+                  value={matriculaForm.turma}
+                  onChange={handleMatriculaChange}
+                  style={styles.select}
+                >
+                  <option value="">Selecione uma turma (opcional)</option>
+                  {Array.isArray(turmas) && turmas.filter(t => t.ativo !== false).map(turma => (
+                    <option key={turma.id} value={turma.id}>
+                      {turma.ct_nome || 'CT'} - {(turma.dias_semana_nomes || []).join(', ')} às {turma.horario || ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
               <div style={styles.formGroup}>
                 <label style={styles.label} htmlFor="matricula_dia_vencimento">

@@ -10,7 +10,7 @@ from django.contrib.auth.tokens import default_token_generator
 from django.utils.http import urlsafe_base64_decode
 from django.contrib.auth.forms import SetPasswordForm
 from usuarios.models import Usuario, PreCadastro
-from turmas.models import DiaSemana
+from turmas.models import DiaSemana, Turma
 from usuarios.forms import DefinirSenhaForm
 from usuarios.serializers import DefinirSenhaSerializer, SolicitarRecuperacaoSenhaSerializer, RedefinirSenhaSerializer
 from financeiro.models import Mensalidade
@@ -27,12 +27,17 @@ logger = logging.getLogger(__name__)
 
 
 class ListarPrecadastrosAPIView(ListCreateAPIView):
-    """API para listar e criar pré-cadastros. Lista apenas pré-cadastros pendentes."""
+    """API para listar e criar pré-cadastros. Suporta filtro por status (?status=pendente|matriculado|cancelado)."""
     serializer_class = PreCadastroSerializer
 
     def get_queryset(self):
-        # Lista apenas pré-cadastros pendentes (não matriculados)
-        return PreCadastro.objects.filter(status='pendente').order_by('-criado_em')
+        qs = PreCadastro.objects.all().order_by('-criado_em')
+        if self.request.method != 'GET':
+            return qs
+        status_param = self.request.query_params.get('status', '').strip().lower()
+        if status_param in ('pendente', 'matriculado', 'cancelado'):
+            qs = qs.filter(status=status_param)
+        return qs
 
     def get_permissions(self):
         if self.request.method == 'POST':
@@ -61,6 +66,7 @@ class FinalizarAgendamentoAPIView(APIView):
         valor_matricula = request.data.get("valor_matricula")
         valor_uniforme = request.data.get("valor_uniforme")
         dia_vencimento_primeira = request.data.get("dia_vencimento_primeira")
+        turma_id = request.data.get("turma")
         
         print(f"[DEBUG] Finalizando agendamento - PreCadastro ID: {precadastro_id}")
         print(f"[DEBUG] Dia vencimento: {dia_vencimento}")
@@ -105,6 +111,18 @@ class FinalizarAgendamentoAPIView(APIView):
             return Response({"error": "Um ou mais dias habilitados são inválidos."}, status=status.HTTP_400_BAD_REQUEST)
         if not dias_habilitados:
             return Response({"error": "Não há dias da semana cadastrados."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Atualiza turma do pré-cadastro se enviada na requisição
+        if turma_id is not None:
+            try:
+                turma_id = int(turma_id)
+            except (TypeError, ValueError):
+                turma_id = None
+            if turma_id:
+                turma_obj = Turma.objects.filter(id=turma_id, ativo=True).first()
+                if turma_obj:
+                    precadastro.turma = turma_obj
+                    precadastro.save()
 
         try:
             valor_mensalidade = Decimal(str(valor_mensalidade))
