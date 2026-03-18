@@ -7,6 +7,9 @@
 # Geração automática de mensalidades (diário às 00:05)
 5 0 * * * /root/ct-supera/scripts/gerar_mensalidades.sh >> /root/ct-supera/logs/gerar_mensalidades.log 2>&1
 
+# Lembretes de aula experimental (diário às 09:00)
+0 9 * * * cd /root/ct-supera && DJANGO_SETTINGS_MODULE=app.settings_hostinger /root/ct-supera/venv/bin/python manage.py enviar_lembretes_aula_experimental
+
 # Limpeza de logs antigos (semanal)
 0 3 * * 0 find /root/ct-supera/logs -name "*.log" -mtime +30 -delete
 

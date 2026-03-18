@@ -1,14 +1,39 @@
 from django.contrib.auth import authenticate, login
 from django.contrib import messages
 from django.core.mail import send_mail
+from django.core.signing import Signer
 from django.utils.http import urlsafe_base64_encode
 from django.utils.encoding import force_bytes
 from django.contrib.auth.tokens import default_token_generator
 import logging
 from django.conf import settings
 from typing import Optional, List
+from urllib.parse import quote
 
 logger = logging.getLogger(__name__)
+
+SALT_REAGENDAR = "reagendar_aula_experimental"
+
+
+def gerar_token_reagendamento(precadastro_id: int) -> str:
+    """Gera token assinado para reagendamento de aula experimental."""
+    signer = Signer(salt=SALT_REAGENDAR)
+    return signer.sign(precadastro_id)
+
+
+def obter_precadastro_por_token(token: str):
+    """Valida token e retorna o PreCadastro ou None."""
+    from usuarios.models import PreCadastro
+    try:
+        signer = Signer(salt=SALT_REAGENDAR)
+        pk = signer.unsign(token)
+        return PreCadastro.objects.filter(
+            pk=int(pk),
+            origem='aula_experimental',
+            status='pendente',
+        ).select_related('turma', 'turma__ct').first()
+    except Exception:
+        return None
 
 
 def autenticar_usuario(request, tipo_esperado: str) -> Optional[object]:
@@ -314,6 +339,103 @@ def reenviar_convite_aluno(aluno) -> bool:
         return enviar_convite_aluno(aluno)
     except Exception as e:
         logger.error(f"Erro ao reenviar convite para {aluno.email}: {str(e)}")
+        return False
+
+
+def enviar_confirmacao_aula_experimental(precadastro) -> bool:
+    """
+    Envia e-mail de confirmação de agendamento de aula experimental.
+    """
+    if not precadastro.email or precadastro.email == 'pendente':
+        logger.warning("Pré-cadastro sem e-mail válido, não enviando confirmação.")
+        return False
+    if precadastro.origem != 'aula_experimental' or not precadastro.data_aula_experimental:
+        return False
+    try:
+        nome = f"{precadastro.first_name} {precadastro.last_name or ''}".strip() or "Visitante"
+        data_str = precadastro.data_aula_experimental.strftime("%d/%m/%Y")
+        turma_info = ""
+        if precadastro.turma:
+            ct = precadastro.turma.ct
+            ct_nome = ct.nome if ct else "CT"
+            horario = precadastro.turma.horario.strftime("%H:%M") if precadastro.turma.horario else ""
+            dias = ", ".join(d.nome for d in precadastro.turma.dias_semana.all()) if precadastro.turma.dias_semana.exists() else ""
+            turma_info = f"\n\n📍 Centro: {ct_nome}\n⏰ Horário: {horario}\n📅 Dias: {dias}"
+        frontend_url = getattr(settings, 'FRONTEND_URL', 'https://ctsupera.com.br')
+        token = gerar_token_reagendamento(precadastro.id)
+        link_reagendar = f"{frontend_url}/agendamento/reagendar?token={quote(token)}"
+
+        assunto = "Aula experimental agendada - CT Supera"
+        mensagem = f"""
+Olá {nome}!
+
+Sua aula experimental foi agendada com sucesso! 🎉
+
+📅 Data: {data_str}{turma_info}
+
+Para reagendar (até 24h antes), acesse: {link_reagendar}
+
+Qualquer dúvida, entre em contato conosco.
+"""
+        send_mail(
+            assunto,
+            mensagem.strip(),
+            settings.DEFAULT_FROM_EMAIL,
+            [precadastro.email],
+            fail_silently=True,
+        )
+        logger.info(f"Confirmação de aula experimental enviada para {precadastro.email}")
+        return True
+    except Exception as e:
+        logger.error(f"Erro ao enviar confirmação para {precadastro.email}: {e}")
+        return False
+
+
+def enviar_lembrete_aula_experimental(precadastro) -> bool:
+    """
+    Envia e-mail de lembrete de aula experimental (24h antes).
+    """
+    if not precadastro.email or precadastro.email == 'pendente':
+        return False
+    if precadastro.origem != 'aula_experimental' or not precadastro.data_aula_experimental:
+        return False
+    try:
+        nome = f"{precadastro.first_name} {precadastro.last_name or ''}".strip() or "Visitante"
+        data_str = precadastro.data_aula_experimental.strftime("%d/%m/%Y")
+        turma_info = ""
+        if precadastro.turma:
+            ct = precadastro.turma.ct
+            ct_nome = ct.nome if ct else "CT"
+            horario = precadastro.turma.horario.strftime("%H:%M") if precadastro.turma.horario else ""
+            dias = ", ".join(d.nome for d in precadastro.turma.dias_semana.all()) if precadastro.turma.dias_semana.exists() else ""
+            turma_info = f"\n\n📍 Centro: {ct_nome}\n⏰ Horário: {horario}\n📅 Dias: {dias}"
+        frontend_url = getattr(settings, 'FRONTEND_URL', 'https://ctsupera.com.br')
+        token = gerar_token_reagendamento(precadastro.id)
+        link_reagendar = f"{frontend_url}/agendamento/reagendar?token={quote(token)}"
+
+        assunto = "Lembrete: sua aula experimental amanhã - CT Supera"
+        mensagem = f"""
+Olá {nome}!
+
+Lembrete: sua aula experimental é AMANHÃ! 🎯
+
+📅 Data: {data_str}{turma_info}
+
+Para reagendar (até 24h antes), acesse: {link_reagendar}
+
+Te esperamos!
+"""
+        send_mail(
+            assunto,
+            mensagem.strip(),
+            settings.DEFAULT_FROM_EMAIL,
+            [precadastro.email],
+            fail_silently=True,
+        )
+        logger.info(f"Lembrete de aula experimental enviado para {precadastro.email}")
+        return True
+    except Exception as e:
+        logger.error(f"Erro ao enviar lembrete para {precadastro.email}: {e}")
         return False
 
 

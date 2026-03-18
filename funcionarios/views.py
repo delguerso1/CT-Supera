@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 class VerificarCheckinAlunosAPIView(APIView):
-    """API para verificar quais alunos fizeram check-in em uma turma."""
+    """API para verificar quais alunos fizeram check-in em uma turma. Inclui pré-cadastros com aula experimental no dia."""
     permission_classes = [IsAuthenticated]
 
     def get(self, request, turma_id):
@@ -29,23 +29,40 @@ class VerificarCheckinAlunosAPIView(APIView):
 
         # Busca todos os alunos da turma
         alunos = Usuario.objects.filter(tipo="aluno", ativo=True, turmas_aluno=turma)
-        
+
         status_alunos = []
-        
         for aluno in alunos:
             presenca = Presenca.objects.filter(
-                usuario=aluno, 
-                data=hoje, 
+                usuario=aluno,
+                data=hoje,
                 turma=turma
             ).first()
-            
             status_alunos.append({
-                "id": aluno.id,
+                "id": str(aluno.id),
                 "nome": f"{aluno.first_name} {aluno.last_name}",
                 "username": aluno.username,
+                "tipo": "aluno",
                 "checkin_realizado": presenca.checkin_realizado if presenca else False,
                 "presenca_confirmada": presenca.presenca_confirmada if presenca else False,
-                "pode_confirmar_presenca": presenca.checkin_realizado if presenca else False
+                "pode_confirmar_presenca": presenca.checkin_realizado if presenca else False,
+            })
+
+        # Pré-cadastros com aula experimental nesta turma e data
+        precadastros = PreCadastro.objects.filter(
+            turma=turma,
+            data_aula_experimental=hoje,
+            origem='aula_experimental',
+            status='pendente'
+        )
+        for pc in precadastros:
+            status_alunos.append({
+                "id": f"precadastro_{pc.id}",
+                "nome": f"{pc.first_name} {pc.last_name or ''}".strip(),
+                "username": pc.email,
+                "tipo": "aula_experimental",
+                "checkin_realizado": False,
+                "presenca_confirmada": pc.compareceu_aula_experimental,
+                "pode_confirmar_presenca": True,
             })
 
         return Response({
@@ -56,7 +73,7 @@ class VerificarCheckinAlunosAPIView(APIView):
 
 
 class RegistrarPresencaAPIView(APIView):
-    """API para registrar presença dos alunos em uma turma."""
+    """API para registrar presença dos alunos e comparecimento de pré-cadastros (aula experimental) em uma turma."""
     permission_classes = [IsAuthenticated]
 
     def post(self, request, turma_id):
@@ -64,24 +81,38 @@ class RegistrarPresencaAPIView(APIView):
         hoje = date.today()
 
         alunos_presentes = request.data.get('presenca', [])
-        alunos = Usuario.objects.filter(tipo="aluno", ativo=True, turmas_aluno=turma)
+        precadastros_presentes = request.data.get('precadastros', [])
+        if not isinstance(alunos_presentes, (list, tuple)):
+            alunos_presentes = list(alunos_presentes) if alunos_presentes else []
+        if not isinstance(precadastros_presentes, (list, tuple)):
+            precadastros_presentes = list(precadastros_presentes) if precadastros_presentes else []
+
+        alunos_ids = {str(x) for x in alunos_presentes if not str(x).startswith('precadastro_')}
+        precadastro_ids = []
+        for x in alunos_presentes:
+            s = str(x)
+            if s.startswith('precadastro_'):
+                try:
+                    precadastro_ids.append(int(s.replace('precadastro_', '')))
+                except ValueError:
+                    pass
+        precadastro_ids.extend(int(x) for x in precadastros_presentes if str(x).isdigit())
 
         presencas_registradas = 0
+        alunos = Usuario.objects.filter(tipo="aluno", ativo=True, turmas_aluno=turma)
 
         for aluno in alunos:
-            if str(aluno.id) in alunos_presentes:
+            if str(aluno.id) in alunos_ids:
                 presenca = Presenca.objects.filter(
-                    usuario=aluno, 
-                    data=hoje, 
+                    usuario=aluno,
+                    data=hoje,
                     turma=turma
                 ).first()
-                
                 if presenca:
                     presenca.checkin_realizado = True
                     presenca.presenca_confirmada = True
                     presenca.save()
                 else:
-                    # Professor pode registrar presença manualmente (com ou sem check-in do aluno)
                     Presenca.objects.create(
                         usuario=aluno,
                         turma=turma,
@@ -91,8 +122,22 @@ class RegistrarPresencaAPIView(APIView):
                     )
                 presencas_registradas += 1
 
+        # Marcar comparecimento de pré-cadastros (aula experimental)
+        for pc_id in set(precadastro_ids):
+            pc = PreCadastro.objects.filter(
+                id=pc_id,
+                turma=turma,
+                data_aula_experimental=hoje,
+                origem='aula_experimental',
+                status='pendente'
+            ).first()
+            if pc:
+                pc.compareceu_aula_experimental = True
+                pc.save()
+                presencas_registradas += 1
+
         return Response({
-            "message": f"Presenças registradas com sucesso! ({presencas_registradas} aluno(s))"
+            "message": f"Presenças registradas com sucesso! ({presencas_registradas} registro(s))"
         }, status=status.HTTP_200_OK)
 
 

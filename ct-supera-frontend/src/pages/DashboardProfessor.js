@@ -584,7 +584,7 @@ function DashboardProfessor({ user }) {
 
     const alunosIds = Object.keys(presencas).filter(id => presencas[id]).map(String);
     if (alunosIds.length === 0) {
-      setErro('Selecione pelo menos um aluno.');
+      setErro('Selecione pelo menos um aluno ou aula experimental.');
       return;
     }
 
@@ -1231,43 +1231,46 @@ function DashboardProfessor({ user }) {
                 <p style={styles.noData}>Carregando alunos...</p>
               ) : alunosPresenca.length > 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {alunosPresenca.map(aluno => (
-                    <div key={aluno.id} style={{
-                      ...styles.checkboxContainer,
-                      opacity: aluno.presenca_confirmada ? 0.7 : 1,
-                      backgroundColor: aluno.checkin_realizado ? '#f0f8ff' : '#fff8f0'
-                    }}>
-                      <input
-                        type="checkbox"
-                        id={`aluno-${aluno.id}`}
-                        checked={presencas[aluno.id] || false}
-                        onChange={e => handlePresencaChange(aluno.id, e.target.checked)}
-                        disabled={aluno.presenca_confirmada}
-                        style={styles.checkbox}
-                      />
-                      <label
-                        htmlFor={`aluno-${aluno.id}`}
-                        style={{
-                          ...styles.checkboxLabel,
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '8px',
-                          cursor: aluno.presenca_confirmada ? 'not-allowed' : 'pointer'
-                        }}
-                      >
-                        <span>{aluno.nome || `${aluno.first_name || ''} ${aluno.last_name || ''}`.trim()} ({aluno.username})</span>
-                        <span style={{
-                          fontSize: '11px',
-                          padding: '2px 6px',
-                          borderRadius: 3,
-                          backgroundColor: aluno.presenca_confirmada ? '#4caf50' : aluno.checkin_realizado ? '#2196f3' : '#ff9800',
-                          color: 'white'
-                        }}>
-                          {aluno.presenca_confirmada ? '✅ Confirmada' : aluno.checkin_realizado ? 'Check-in OK' : 'Sem check-in'}
-                        </span>
-                      </label>
-                    </div>
-                  ))}
+                  {alunosPresenca.map(aluno => {
+                    const isAulaExperimental = aluno.tipo === 'aula_experimental';
+                    return (
+                      <div key={aluno.id} style={{
+                        ...styles.checkboxContainer,
+                        opacity: aluno.presenca_confirmada ? 0.7 : 1,
+                        backgroundColor: isAulaExperimental ? '#fff8e1' : (aluno.checkin_realizado ? '#f0f8ff' : '#fff8f0')
+                      }}>
+                        <input
+                          type="checkbox"
+                          id={`aluno-${aluno.id}`}
+                          checked={presencas[aluno.id] || false}
+                          onChange={e => handlePresencaChange(aluno.id, e.target.checked)}
+                          disabled={aluno.presenca_confirmada}
+                          style={styles.checkbox}
+                        />
+                        <label
+                          htmlFor={`aluno-${aluno.id}`}
+                          style={{
+                            ...styles.checkboxLabel,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '8px',
+                            cursor: aluno.presenca_confirmada ? 'not-allowed' : 'pointer'
+                          }}
+                        >
+                          <span>{aluno.nome || `${aluno.first_name || ''} ${aluno.last_name || ''}`.trim()}{aluno.username ? ` (${aluno.username})` : ''}</span>
+                          <span style={{
+                            fontSize: '11px',
+                            padding: '2px 6px',
+                            borderRadius: 3,
+                            backgroundColor: aluno.presenca_confirmada ? '#4caf50' : isAulaExperimental ? '#ff9800' : (aluno.checkin_realizado ? '#2196f3' : '#ff9800'),
+                            color: 'white'
+                          }}>
+                            {aluno.presenca_confirmada ? '✅ Confirmada' : isAulaExperimental ? 'Aula experimental' : (aluno.checkin_realizado ? 'Check-in OK' : 'Sem check-in')}
+                          </span>
+                        </label>
+                      </div>
+                    );
+                  })}
                 </div>
               ) : (
                 <p style={styles.noData}>Nenhum aluno encontrado nesta turma.</p>

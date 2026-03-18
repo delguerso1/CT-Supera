@@ -9,6 +9,8 @@ from .models import Turma, DiaSemana
 from .serializers import TurmaSerializer, UsuarioSerializer, DiaSemanaSerializer
 from django.db import models
 from financeiro.services import criar_mensalidade_ao_vincular_turma
+from datetime import date
+from calendar import monthrange
 
 
 def _validar_aluno_turma(aluno, turma):
@@ -161,3 +163,36 @@ class ListaDiasSemanaAPIView(APIView):
         dias = DiaSemana.objects.all().order_by('id')
         serializer = DiaSemanaSerializer(dias, many=True)
         return Response(serializer.data)
+
+
+# Mapeamento: DiaSemana id 1=Segunda=weekday 0, 2=Terça=1, ..., 7=Domingo=6
+DIASEMANA_WEEKDAY_MAP = {
+    'Segunda-feira': 0, 'Terça-feira': 1, 'Quarta-feira': 2, 'Quinta-feira': 3,
+    'Sexta-feira': 4, 'Sábado': 5, 'Domingo': 6,
+}
+
+
+class DatasAulaExperimentalAPIView(APIView):
+    """Retorna datas disponíveis para aula experimental no mês atual (dias da turma, não no passado)."""
+    permission_classes = [AllowAny]
+
+    def get(self, request, turma_id):
+        turma = get_object_or_404(Turma, id=turma_id)
+        hoje = date.today()
+        dias_turma = turma.dias_semana.all()
+        if not dias_turma.exists():
+            return Response({"datas": []}, status=status.HTTP_200_OK)
+        weekdays_validos = set()
+        for dia in dias_turma:
+            wd = DIASEMANA_WEEKDAY_MAP.get(dia.nome)
+            if wd is not None:
+                weekdays_validos.add(wd)
+        if not weekdays_validos:
+            return Response({"datas": []}, status=status.HTTP_200_OK)
+        _, ultimo_dia = monthrange(hoje.year, hoje.month)
+        datas = []
+        for dia in range(1, ultimo_dia + 1):
+            d = date(hoje.year, hoje.month, dia)
+            if d.weekday() in weekdays_validos and d >= hoje:
+                datas.append(d.isoformat())
+        return Response({"datas": sorted(datas)}, status=status.HTTP_200_OK)

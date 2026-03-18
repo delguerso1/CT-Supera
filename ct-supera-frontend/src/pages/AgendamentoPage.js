@@ -53,10 +53,12 @@ function AgendamentoPage() {
     data_nascimento: '',
     cpf: '',
     ct: '',
-    turma: ''
+    turma: '',
+    data_aula_experimental: ''
   });
   const [cts, setCts] = useState([]);
   const [turmas, setTurmas] = useState([]);
+  const [datasDisponiveis, setDatasDisponiveis] = useState([]);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
@@ -127,7 +129,7 @@ function AgendamentoPage() {
     async function fetchTurmas() {
       if (!form.ct) {
         setTurmas([]);
-        setForm(f => ({ ...f, turma: '' }));
+        setForm(f => ({ ...f, turma: '', data_aula_experimental: '' }));
         return;
       }
       try {
@@ -136,18 +138,42 @@ function AgendamentoPage() {
       } catch {
         setTurmas([]);
       }
+      setDatasDisponiveis([]);
     }
     fetchTurmas();
   }, [form.ct]);
+
+  // Buscar datas disponíveis ao selecionar turma
+  useEffect(() => {
+    async function fetchDatas() {
+      if (!form.turma) {
+        setDatasDisponiveis([]);
+        setForm(f => ({ ...f, data_aula_experimental: '' }));
+        return;
+      }
+      try {
+        const resp = await api.get(`turmas/${form.turma}/datas-aula-experimental/`);
+        setDatasDisponiveis(resp.data.datas || []);
+      } catch {
+        setDatasDisponiveis([]);
+      }
+    }
+    fetchDatas();
+  }, [form.turma]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     let update = { [name]: value };
     if (name === 'ct') {
       update.turma = '';
+      update.data_aula_experimental = '';
     }
     if (name === 'data_nascimento') {
-      update.turma = ''; // Reseta a turma pois a lista disponível muda
+      update.turma = '';
+      update.data_aula_experimental = '';
+    }
+    if (name === 'turma') {
+      update.data_aula_experimental = '';
     }
     setForm(prev => ({ ...prev, ...update }));
   };
@@ -171,18 +197,18 @@ function AgendamentoPage() {
       return;
     }
 
+    const cpfLimpo = form.cpf ? form.cpf.replace(/\D/g, '') : '';
     const dados = {
       first_name: formatarNome(form.first_name),
       last_name: formatarNome(form.last_name),
       email: form.email,
       telefone: form.telefone,
       data_nascimento: form.data_nascimento,
+      cpf: cpfLimpo,
       turma: form.turma || undefined,
+      data_aula_experimental: form.data_aula_experimental || undefined,
       origem: 'aula_experimental'
     };
-    if (form.cpf && form.cpf.trim() !== '') {
-      dados.cpf = form.cpf;
-    }
 
     try {
       await api.post('usuarios/precadastros/', dados);
@@ -195,16 +221,20 @@ function AgendamentoPage() {
         data_nascimento: '',
         cpf: '',
         ct: '',
-        turma: ''
+        turma: '',
+        data_aula_experimental: ''
       });
     } catch (err) {
+      const data = err.response?.data || {};
       setError(
-        err.response?.data?.email?.[0] ||
-        err.response?.data?.telefone?.[0] ||
-        err.response?.data?.nome?.[0] ||
-        err.response?.data?.cpf?.[0] ||
-        err.response?.data?.data_nascimento?.[0] ||
-        err.response?.data?.turma?.[0] ||
+        data.cpf?.[0] ||
+        data.email?.[0] ||
+        data.telefone?.[0] ||
+        data.nome?.[0] ||
+        data.data_nascimento?.[0] ||
+        data.data_aula_experimental?.[0] ||
+        data.turma?.[0] ||
+        data.error ||
         'Erro ao realizar pré-cadastro.'
       );
     }
@@ -275,8 +305,9 @@ function AgendamentoPage() {
             name="cpf"
             value={form.cpf}
             onChange={handleChange}
-            placeholder="CPF (opcional)"
-            maxLength={11}
+            placeholder="CPF (obrigatório para aula experimental)"
+            maxLength={14}
+            required
           />
           <select
             style={styles.input}
@@ -322,6 +353,31 @@ function AgendamentoPage() {
                 </option>
               );
             })}
+          </select>
+          <select
+            style={styles.input}
+            name="data_aula_experimental"
+            value={form.data_aula_experimental}
+            onChange={handleChange}
+            required
+            disabled={!form.turma || datasDisponiveis.length === 0}
+          >
+            <option value="">
+              {!form.turma
+                ? 'Selecione a turma primeiro'
+                : datasDisponiveis.length === 0
+                  ? 'Nenhuma data disponível neste mês'
+                  : 'Selecione a data da aula experimental'}
+            </option>
+            {datasDisponiveis.map(d => (
+              <option key={d} value={d}>
+                {new Date(d + 'T12:00:00').toLocaleDateString('pt-BR', {
+                  weekday: 'long',
+                  day: '2-digit',
+                  month: 'long'
+                })}
+              </option>
+            ))}
           </select>
           <button type="submit" style={styles.button}>Agendar</button>
         </form>

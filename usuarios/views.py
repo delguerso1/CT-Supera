@@ -11,6 +11,8 @@ from django.utils.http import urlsafe_base64_decode
 from django.contrib.auth.forms import SetPasswordForm
 from usuarios.models import Usuario, PreCadastro
 from turmas.models import DiaSemana, Turma
+from turmas.views import DIASEMANA_WEEKDAY_MAP
+from usuarios.utils import obter_precadastro_por_token
 from usuarios.forms import DefinirSenhaForm
 from usuarios.serializers import DefinirSenhaSerializer, SolicitarRecuperacaoSenhaSerializer, RedefinirSenhaSerializer
 from financeiro.models import Mensalidade
@@ -57,12 +59,108 @@ class ListarPrecadastrosAPIView(ListCreateAPIView):
         if self.request.method == 'POST':
             return [AllowAny()]
         return [IsAuthenticated()]
-    
+
+    def perform_create(self, serializer):
+        instance = serializer.save()
+        if instance.origem == 'aula_experimental' and instance.data_aula_experimental:
+            try:
+                from usuarios.utils import enviar_confirmacao_aula_experimental
+                enviar_confirmacao_aula_experimental(instance)
+            except Exception as e:
+                logger.warning(f"Erro ao enviar e-mail de confirmação: {e}")
+
+
 class EditarExcluirPrecadastroAPIView(RetrieveUpdateDestroyAPIView):
     """API para editar, excluir ou visualizar um pré-cadastro."""
     permission_classes = [IsAuthenticated]
     queryset = PreCadastro.objects.all()
     serializer_class = PreCadastroSerializer
+
+
+class ReagendarAulaExperimentalAPIView(APIView):
+    """API para consultar info e reagendar aula experimental (token no query/body)."""
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        token = request.query_params.get('token')
+        if not token:
+            return Response({"error": "Token ausente."}, status=status.HTTP_400_BAD_REQUEST)
+        precadastro = obter_precadastro_por_token(token)
+        if not precadastro:
+            return Response({"error": "Link inválido ou expirado."}, status=status.HTTP_404_NOT_FOUND)
+        if precadastro.reagendou_aula_experimental:
+            return Response({"error": "Você já realizou um reagendamento. Entre em contato para nova alteração."}, status=status.HTTP_403_FORBIDDEN)
+        if not precadastro.turma:
+            return Response({"error": "Turma não encontrada."}, status=status.HTTP_400_BAD_REQUEST)
+        # Datas disponíveis (mesmo endpoint que agendamento)
+        hoje = date.today()
+        turma = precadastro.turma
+        dias_turma = turma.dias_semana.all()
+        weekdays_validos = set()
+        for dia in dias_turma:
+            wd = DIASEMANA_WEEKDAY_MAP.get(dia.nome)
+            if wd is not None:
+                weekdays_validos.add(wd)
+        amanha = hoje + timedelta(days=1)
+        _, ultimo_dia = monthrange(hoje.year, hoje.month)
+        datas = []
+        for d in range(1, ultimo_dia + 1):
+            dt = date(hoje.year, hoje.month, d)
+            if dt.weekday() in weekdays_validos and dt >= amanha:
+                datas.append(dt.isoformat())
+        return Response({
+            "precadastro": {
+                "first_name": precadastro.first_name,
+                "last_name": precadastro.last_name,
+                "data_aula_experimental": precadastro.data_aula_experimental.isoformat() if precadastro.data_aula_experimental else None,
+                "turma_id": precadastro.turma.id,
+                "turma_nome": str(precadastro.turma),
+                "ct_nome": precadastro.turma.ct.nome if precadastro.turma.ct else None,
+            },
+            "datas_disponiveis": sorted(datas),
+        }, status=status.HTTP_200_OK)
+
+    def post(self, request):
+        token = request.data.get('token')
+        nova_data = request.data.get('nova_data')
+        if not token:
+            return Response({"error": "Token ausente."}, status=status.HTTP_400_BAD_REQUEST)
+        if not nova_data:
+            return Response({"error": "Nova data é obrigatória."}, status=status.HTTP_400_BAD_REQUEST)
+        precadastro = obter_precadastro_por_token(token)
+        if not precadastro:
+            return Response({"error": "Link inválido ou expirado."}, status=status.HTTP_404_NOT_FOUND)
+        if precadastro.reagendou_aula_experimental:
+            return Response({"error": "Você já realizou um reagendamento."}, status=status.HTTP_403_FORBIDDEN)
+        try:
+            dt = date.fromisoformat(nova_data)
+        except (ValueError, TypeError):
+            return Response({"error": "Data inválida."}, status=status.HTTP_400_BAD_REQUEST)
+        amanha = date.today() + timedelta(days=1)
+        if dt < amanha:
+            return Response({"error": "Reagendamento só é permitido com pelo menos 24h de antecedência."}, status=status.HTTP_400_BAD_REQUEST)
+        # Validar que a data está nas datas da turma
+        turma = precadastro.turma
+        dias_turma = turma.dias_semana.all()
+        weekdays_validos = set()
+        for dia in dias_turma:
+            wd = DIASEMANA_WEEKDAY_MAP.get(dia.nome)
+            if wd is not None:
+                weekdays_validos.add(wd)
+        if dt.weekday() not in weekdays_validos:
+            return Response({"error": "Data incompatível com os dias da turma."}, status=status.HTTP_400_BAD_REQUEST)
+        hoje = date.today()
+        if dt.year != hoje.year or dt.month != hoje.month:
+            return Response({"error": "A nova data deve ser no mês atual."}, status=status.HTTP_400_BAD_REQUEST)
+        precadastro.data_aula_experimental = dt
+        precadastro.reagendou_aula_experimental = True
+        precadastro.save(update_fields=['data_aula_experimental', 'reagendou_aula_experimental'])
+        try:
+            from usuarios.utils import enviar_confirmacao_aula_experimental
+            enviar_confirmacao_aula_experimental(precadastro)
+        except Exception as e:
+            logger.warning(f"Erro ao enviar e-mail de confirmação do reagendamento: {e}")
+        return Response({"message": "Reagendamento realizado com sucesso!", "data_aula_experimental": dt.isoformat()}, status=status.HTTP_200_OK)
 
 
 class FinalizarAgendamentoAPIView(APIView):

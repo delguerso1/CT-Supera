@@ -294,13 +294,13 @@ const DashboardProfessorScreen: React.FC<NavigationProps> = ({ navigation, route
       .map(aluno => aluno.id.toString());
 
     if (alunosIds.length === 0) {
-      Alert.alert('Atenção', 'Selecione pelo menos um aluno com check-in pendente.');
+      Alert.alert('Atenção', 'Selecione pelo menos um aluno ou aula experimental.');
       return;
     }
 
     Alert.alert(
       'Confirmar Presença',
-      `Deseja registrar presença para ${alunosIds.length} aluno(s)?`,
+      `Deseja registrar presença para ${alunosIds.length} registro(s)?`,
       [
         { text: 'Cancelar', style: 'cancel' },
         {
@@ -388,9 +388,11 @@ const DashboardProfessorScreen: React.FC<NavigationProps> = ({ navigation, route
     const alunosFiltrados = checkinData.alunos.filter(aluno =>
       normalizeSearch(aluno.nome).includes(searchNormalized)
     );
-    const alunosComCheckin = alunosFiltrados.filter(a => a.checkin_realizado);
-    const alunosSemCheckin = alunosFiltrados.filter(a => !a.checkin_realizado);
-    const selectedCount = getSelectedCount(alunosComCheckin);
+    const alunosAulaExperimental = alunosFiltrados.filter((a: any) => a.tipo === 'aula_experimental');
+    const alunosNormais = alunosFiltrados.filter((a: any) => a.tipo !== 'aula_experimental');
+    const alunosComCheckin = alunosNormais.filter(a => a.checkin_realizado);
+    const alunosSemCheckin = alunosNormais.filter(a => !a.checkin_realizado);
+    const selectedCount = getSelectedCount([...alunosComCheckin, ...alunosAulaExperimental]);
 
     return (
       <ScrollView style={styles.content}>
@@ -432,6 +434,34 @@ const DashboardProfessorScreen: React.FC<NavigationProps> = ({ navigation, route
               </TouchableOpacity>
             </View>
           </View>
+
+          {alunosAulaExperimental.length > 0 && (
+            <View style={styles.alunosSection}>
+              <Text style={styles.alunosSectionTitle}>
+                Aula Experimental ({alunosAulaExperimental.length})
+              </Text>
+              {alunosAulaExperimental.map(aluno => (
+                <View key={aluno.id} style={[styles.alunoItem, { backgroundColor: '#fff8e1' }]}>
+                  <View style={styles.alunoInfo}>
+                    <Text style={styles.alunoNome}>{aluno.nome}</Text>
+                    <View style={styles.alunoStatusRow}>
+                      <View style={[styles.statusDot, { backgroundColor: '#ff9800' }]} />
+                      <Text style={styles.alunoStatus}>
+                        {aluno.presenca_confirmada ? 'Compareceu' : 'Aguardando'}
+                      </Text>
+                    </View>
+                  </View>
+                  <Switch
+                    value={presencasSelecionadas[aluno.id] || false}
+                    onValueChange={() => togglePresenca(aluno.id)}
+                    disabled={aluno.presenca_confirmada || !aluno.pode_confirmar_presenca}
+                    trackColor={{ false: '#ccc', true: '#4caf50' }}
+                    thumbColor={presencasSelecionadas[aluno.id] ? '#fff' : '#f4f3f4'}
+                  />
+                </View>
+              ))}
+            </View>
+          )}
 
           {alunosComCheckin.length > 0 && (
             <View style={styles.alunosSection}>

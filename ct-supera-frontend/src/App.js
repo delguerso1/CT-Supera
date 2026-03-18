@@ -10,6 +10,7 @@ import DashboardProfessor from './pages/DashboardProfessor';
 import DashboardAluno from './pages/DashboardAluno';
 import ContratoAceite from './pages/ContratoAceite';
 import AgendamentoPage from './pages/AgendamentoPage';
+import ReagendamentoPage from './pages/ReagendamentoPage';
 import CadastroTurmas from './pages/CadastroTurmas';
 import EsqueciMinhaSenha from './pages/EsqueciMinhaSenha';
 import RedefinirSenha from './pages/RedefinirSenha';
@@ -88,6 +89,7 @@ function App() {
           <Route path="/redefinir-senha/:uidb64/:token" element={<RedefinirSenha />} />
           <Route path="/ativar-conta/:uidb64/:token" element={<AtivarConta />} />
           <Route path="/agendamento" element={<AgendamentoPage />} />
+          <Route path="/agendamento/reagendar" element={<ReagendamentoPage />} />
           <Route 
             path="/contrato" 
             element={

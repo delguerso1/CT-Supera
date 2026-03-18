@@ -1,6 +1,7 @@
 from django.urls import path
 from .views import (
-     ListarPrecadastrosAPIView, EditarExcluirPrecadastroAPIView,
+    ListarPrecadastrosAPIView, EditarExcluirPrecadastroAPIView,
+    ReagendarAulaExperimentalAPIView,
     FinalizarAgendamentoAPIView, LoginAPIView, LogoutAPIView, AtivarContaAPIView,
     ListarCriarUsuariosAPIView, EditarExcluirUsuarioAPIView, ReenviarConviteAPIView, AceitarContratoAPIView,
     ReverterAlunoParaPreCadastroAPIView,
@@ -10,6 +11,7 @@ from .views import (
 urlpatterns = [
 
     path('precadastros/', ListarPrecadastrosAPIView.as_view(), name='listar_precadastros_api'),
+    path('precadastros/reagendar/', ReagendarAulaExperimentalAPIView.as_view(), name='reagendar_aula_experimental_api'),
     path('precadastros/<int:pk>/', EditarExcluirPrecadastroAPIView.as_view(), name='editar_excluir_precadastro_api'),
     path('finalizar-agendamento/<int:precadastro_id>/', FinalizarAgendamentoAPIView.as_view(), name='finalizar_agendamento_api'),
     path('login/', LoginAPIView.as_view(), name='login_api'),

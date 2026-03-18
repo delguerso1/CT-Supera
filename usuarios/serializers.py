@@ -300,7 +300,11 @@ class PreCadastroSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = PreCadastro
-        fields = ['id', 'first_name', 'last_name', 'email', 'telefone', 'data_nascimento', 'cpf', 'status', 'origem', 'origem_display', 'criado_em', 'dia_vencimento', 'valor_mensalidade', 'turma']
+        fields = [
+            'id', 'first_name', 'last_name', 'email', 'telefone', 'data_nascimento', 'cpf', 'status', 'origem', 'origem_display',
+            'criado_em', 'dia_vencimento', 'valor_mensalidade', 'turma',
+            'data_aula_experimental', 'compareceu_aula_experimental', 'reagendou_aula_experimental',
+        ]
 
     def _idade_em_anos_completos(self, data_nascimento):
         if not data_nascimento:
@@ -328,6 +332,53 @@ class PreCadastroSerializer(serializers.ModelSerializer):
                 qs = qs.exclude(pk=self.instance.pk)
             if qs.exists():
                 raise serializers.ValidationError({'email': 'Esse e-mail já está cadastrado.'})
+
+        # Validação para origem=aula_experimental
+        origem = attrs.get('origem') or (self.instance.origem if self.instance else None)
+        if origem == 'aula_experimental':
+            data_aula = attrs.get('data_aula_experimental') or (self.instance.data_aula_experimental if self.instance else None)
+            turma = attrs.get('turma') or (self.instance.turma if self.instance else None)
+            if not data_aula:
+                raise serializers.ValidationError({
+                    'data_aula_experimental': 'Informe a data da aula experimental.'
+                })
+            from datetime import date
+            hoje = date.today()
+            if data_aula.month != hoje.month or data_aula.year != hoje.year:
+                raise serializers.ValidationError({
+                    'data_aula_experimental': 'A data deve ser no mês atual.'
+                })
+            if data_aula < hoje:
+                raise serializers.ValidationError({
+                    'data_aula_experimental': 'A data não pode ser no passado.'
+                })
+            if turma:
+                DIAS_MAP = {'Segunda-feira': 0, 'Terça-feira': 1, 'Quarta-feira': 2, 'Quinta-feira': 3,
+                            'Sexta-feira': 4, 'Sábado': 5, 'Domingo': 6}
+                dias_turma = turma.dias_semana.all()
+                weekdays_turma = {DIAS_MAP.get(d.nome) for d in dias_turma if DIAS_MAP.get(d.nome) is not None}
+                if data_aula.weekday() not in weekdays_turma:
+                    raise serializers.ValidationError({
+                        'data_aula_experimental': 'A data deve ser um dia de aula da turma selecionada.'
+                    })
+            cpf_raw = attrs.get('cpf') or (self.instance.cpf if self.instance else None)
+            if cpf_raw:
+                cpf_limpo = ''.join(c for c in str(cpf_raw) if c.isdigit())
+                if len(cpf_limpo) == 11:
+                    qs = PreCadastro.objects.filter(
+                        cpf=cpf_limpo, origem='aula_experimental', status='pendente'
+                    )
+                    if self.instance:
+                        qs = qs.exclude(pk=self.instance.pk)
+                    if qs.exists():
+                        raise serializers.ValidationError({
+                            'cpf': 'Este CPF já possui uma aula experimental agendada. Para reagendar, acesse o link enviado no e-mail de confirmação.'
+                        })
+            else:
+                raise serializers.ValidationError({
+                    'cpf': 'CPF é obrigatório para agendar aula experimental.'
+                })
+
         return attrs
 
 class MensalidadeSerializer(serializers.ModelSerializer):

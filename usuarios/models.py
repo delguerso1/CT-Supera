@@ -40,6 +40,9 @@ class PreCadastro(models.Model):
     usuario = models.OneToOneField('usuarios.Usuario', on_delete=models.SET_NULL, null=True, blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pendente')
     origem = models.CharField(max_length=20, choices=ORIGEM_CHOICES, blank=True, null=True, help_text="Origem do pré-cadastro: aula experimental, ex-aluno ou formulário")
+    data_aula_experimental = models.DateField(null=True, blank=True, help_text="Data escolhida pelo cliente para a aula experimental")
+    compareceu_aula_experimental = models.BooleanField(default=False, help_text="Professor marcou comparecimento na aula experimental")
+    reagendou_aula_experimental = models.BooleanField(default=False, help_text="Cliente já fez um reagendamento (máx. 1)")
 
     def __str__(self):
         return f"{self.first_name} {self.last_name or ''}".strip()
