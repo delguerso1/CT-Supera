@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import api, { MEDIA_URL } from '../services/api';
 
 const styles = {
@@ -83,17 +83,32 @@ const styles = {
     whiteSpace: 'nowrap',
   },
   avatar: {
-    width: '36px',
-    height: '36px',
+    width: '72px',
+    height: '72px',
     borderRadius: '50%',
     display: 'inline-flex',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#e0e0e0',
     color: '#555',
-    fontSize: '12px',
+    fontSize: '20px',
     fontWeight: 'bold',
     overflow: 'hidden',
+  },
+  fotoAmpliadaOverlay: {
+    position: 'fixed',
+    top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 2000,
+    cursor: 'pointer',
+  },
+  fotoAmpliadaImg: {
+    maxWidth: '90vw',
+    maxHeight: '90vh',
+    objectFit: 'contain',
   },
   editButton: {
     backgroundColor: '#2196f3',
@@ -201,6 +216,9 @@ function CadastroUsuario({ onUserChange }) {
   const [filtroTurmaSelecionada, setFiltroTurmaSelecionada] = useState('');
   const [filtroOrigemPrecadastro, setFiltroOrigemPrecadastro] = useState('');
   const [filtroStatusPrecadastro, setFiltroStatusPrecadastro] = useState('');
+  const [paginaAlunos, setPaginaAlunos] = useState(1);
+  const [fotoAmpliadaUrl, setFotoAmpliadaUrl] = useState(null);
+  const fotoAmpliadaHoverTimerRef = useRef(null);
   const [showParqModal, setShowParqModal] = useState(false);
   const [selectedParqUser, setSelectedParqUser] = useState(null);
   const [parqActionLoading, setParqActionLoading] = useState(false);
@@ -301,10 +319,10 @@ function CadastroUsuario({ onUserChange }) {
   useEffect(() => {
     const fetchCentros = async () => {
       try {
-        const response = await api.get('ct/');
-        console.log('[DEBUG] Resposta centros de treinamento:', response.data);
-        // Garante que sempre será um array
-        const centros = Array.isArray(response.data) ? response.data : [];
+        const response = await api.get('cts/');
+        const data = response.data;
+        // API pode retornar array direto ou { results: [...] } se paginado
+        const centros = Array.isArray(data) ? data : (data?.results || []);
         setCentrosTreinamento(centros);
       } catch (error) {
         console.error('[DEBUG] Erro ao carregar centros de treinamento:', error);
@@ -909,6 +927,8 @@ function CadastroUsuario({ onUserChange }) {
     }
   };
 
+  const USUARIOS_POR_PAGINA = 10;
+
   // Função para filtrar usuários por CT
   const getFilteredUsers = () => {
     // Se não há filtro selecionado ou não está na aba de alunos, retorna todos
@@ -940,6 +960,22 @@ function CadastroUsuario({ onUserChange }) {
       });
     });
   };
+
+  // Usuários a exibir (com paginação na aba alunos)
+  const getUsersToDisplay = () => {
+    const filtered = getFilteredUsers();
+    if (activeTab !== 'alunos') return filtered;
+    const start = (paginaAlunos - 1) * USUARIOS_POR_PAGINA;
+    return filtered.slice(start, start + USUARIOS_POR_PAGINA);
+  };
+
+  const totalAlunosFiltrados = activeTab === 'alunos' ? getFilteredUsers().length : 0;
+  const totalPaginasAlunos = Math.ceil(totalAlunosFiltrados / USUARIOS_POR_PAGINA) || 1;
+
+  // Resetar página ao mudar filtros ou aba
+  useEffect(() => {
+    setPaginaAlunos(1);
+  }, [activeTab, filtroCtSelecionado, filtroTurmaSelecionada]);
 
   return (
     <div style={styles.container}>
@@ -1172,7 +1208,7 @@ function CadastroUsuario({ onUserChange }) {
               </tr>
             </thead>
             <tbody>
-            {getFilteredUsers().map(user => (
+            {getUsersToDisplay().map(user => (
               <tr key={user.id}>
                 <td style={styles.td}>
                   <button
@@ -1196,7 +1232,21 @@ function CadastroUsuario({ onUserChange }) {
                 {activeTab === 'alunos' && (
                   <td style={styles.td}>
                     {user.foto_perfil ? (
-                      <div style={{ display: 'inline-flex', alignItems: 'center' }}>
+                      <div
+                        style={{ display: 'inline-flex', alignItems: 'center', cursor: 'pointer' }}
+                        onClick={() => setFotoAmpliadaUrl(getFotoUrl(user.foto_perfil))}
+                        onMouseEnter={() => {
+                          if (fotoAmpliadaHoverTimerRef.current) clearTimeout(fotoAmpliadaHoverTimerRef.current);
+                          fotoAmpliadaHoverTimerRef.current = setTimeout(() => setFotoAmpliadaUrl(getFotoUrl(user.foto_perfil)), 300);
+                        }}
+                        onMouseLeave={() => {
+                          if (fotoAmpliadaHoverTimerRef.current) {
+                            clearTimeout(fotoAmpliadaHoverTimerRef.current);
+                            fotoAmpliadaHoverTimerRef.current = null;
+                          }
+                        }}
+                        title="Clique ou passe o mouse para ampliar"
+                      >
                         <img
                           src={getFotoUrl(user.foto_perfil)}
                           alt="Foto do aluno"
@@ -1362,6 +1412,47 @@ function CadastroUsuario({ onUserChange }) {
             ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {activeTab === 'alunos' && totalAlunosFiltrados > USUARIOS_POR_PAGINA && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '1rem', padding: '0.5rem 0', flexWrap: 'wrap', gap: '0.5rem' }}>
+          <span style={{ color: '#666', fontSize: '0.9rem' }}>
+            Mostrando {((paginaAlunos - 1) * USUARIOS_POR_PAGINA) + 1} - {Math.min(paginaAlunos * USUARIOS_POR_PAGINA, totalAlunosFiltrados)} de {totalAlunosFiltrados} alunos
+          </span>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <button
+              type="button"
+              onClick={() => setPaginaAlunos(p => Math.max(1, p - 1))}
+              disabled={paginaAlunos <= 1}
+              style={{
+                ...styles.button,
+                padding: '0.4rem 0.8rem',
+                fontSize: '0.9rem',
+                opacity: paginaAlunos <= 1 ? 0.5 : 1,
+                cursor: paginaAlunos <= 1 ? 'not-allowed' : 'pointer'
+              }}
+            >
+              Anterior
+            </button>
+            <span style={{ fontSize: '0.9rem', color: '#333' }}>
+              Página {paginaAlunos} de {totalPaginasAlunos}
+            </span>
+            <button
+              type="button"
+              onClick={() => setPaginaAlunos(p => Math.min(totalPaginasAlunos, p + 1))}
+              disabled={paginaAlunos >= totalPaginasAlunos}
+              style={{
+                ...styles.button,
+                padding: '0.4rem 0.8rem',
+                fontSize: '0.9rem',
+                opacity: paginaAlunos >= totalPaginasAlunos ? 0.5 : 1,
+                cursor: paginaAlunos >= totalPaginasAlunos ? 'not-allowed' : 'pointer'
+              }}
+            >
+              Próxima
+            </button>
+          </div>
         </div>
       )}
 
@@ -2016,6 +2107,20 @@ function CadastroUsuario({ onUserChange }) {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {fotoAmpliadaUrl && (
+        <div
+          style={styles.fotoAmpliadaOverlay}
+          onClick={() => setFotoAmpliadaUrl(null)}
+        >
+          <img
+            src={fotoAmpliadaUrl}
+            alt="Foto em tamanho original"
+            style={styles.fotoAmpliadaImg}
+            onClick={(e) => e.stopPropagation()}
+          />
         </div>
       )}
 
