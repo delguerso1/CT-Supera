@@ -8,6 +8,7 @@ from django.db.models.functions import Coalesce
 from django.utils import timezone
 from .models import Mensalidade, Despesa, Salario, TransacaoC6Bank
 from .serializers import MensalidadeSerializer, DespesaSerializer, SalarioSerializer, TransacaoC6BankSerializer
+from .pagination import MensalidadePagination
 from .c6_client import c6_client, C6BankError, C6BankMethodNotAllowedError, C6BankInvalidRequestError
 from django.shortcuts import get_object_or_404
 from django.conf import settings
@@ -84,6 +85,7 @@ def calcular_multa_mora(mensalidade):
 # Mensalidades API
 class MensalidadeListCreateView(ListCreateAPIView):
     serializer_class = MensalidadeSerializer
+    pagination_class = MensalidadePagination
 
     def get_queryset(self):
         queryset = Mensalidade.objects.all()

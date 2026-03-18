@@ -271,11 +271,15 @@ export interface PreCadastro {
 
 export interface PainelGerente {
   alunos_ativos: number;
+  alunos_inativos: number;
   professores: number;
   mensalidades_pendentes: number;
-  mensalidades_atrasadas: number;
+  mensalidades_atrasadas_mes_anterior: number;
+  mensalidades_atrasadas_mais_30_dias: number;
   mensalidades_pagas: number;
   precadastros: number;
+  aulas_experimentais_futuras: number;
+  aulas_experimentais_ocorridas: number;
   turmas: Turma[];
   atividades_recentes: Activity[];
   first_name: string;

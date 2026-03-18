@@ -36,7 +36,7 @@ function ControleFinanceiro({ user, onDataChange }) {
       const data = response.data;
       if (data && data.results) {
         resultados = resultados.concat(data.results);
-        nextUrl = data.next ? data.next.replace(api.defaults.baseURL, '') : null;
+        nextUrl = data.next || null;
       } else {
         resultados = Array.isArray(data) ? data : [];
         nextUrl = null;
@@ -74,7 +74,7 @@ function ControleFinanceiro({ user, onDataChange }) {
 
   const fetchMensalidades = async () => {
     try {
-      let url = `financeiro/mensalidades/?mes=${mes}&ano=${ano}`;
+      let url = `financeiro/mensalidades/?mes=${mes}&ano=${ano}&page_size=500`;
       if (turmaFiltro) url += `&turma=${turmaFiltro}`;
       const data = await fetchAllPages(url);
       setMensalidades(Array.isArray(data) ? data : []);

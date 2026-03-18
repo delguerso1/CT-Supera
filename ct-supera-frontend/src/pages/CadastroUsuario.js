@@ -1116,7 +1116,10 @@ function CadastroUsuario({ onUserChange }) {
             <>
               <select
                 value={filtroCtSelecionado}
-                onChange={(e) => setFiltroCtSelecionado(e.target.value)}
+                onChange={(e) => {
+                  setFiltroCtSelecionado(e.target.value);
+                  setFiltroTurmaSelecionada(''); // Limpa turma ao trocar CT
+                }}
                 style={{
                   ...styles.select,
                   minWidth: '250px',
@@ -1131,7 +1134,7 @@ function CadastroUsuario({ onUserChange }) {
               </select>
               {filtroCtSelecionado && (
                 <button
-                  onClick={() => setFiltroCtSelecionado('')}
+                  onClick={() => { setFiltroCtSelecionado(''); setFiltroTurmaSelecionada(''); }}
                   style={{
                     ...styles.actionButton,
                     backgroundColor: '#757575',
@@ -1154,49 +1157,71 @@ function CadastroUsuario({ onUserChange }) {
               Nenhum Centro de Treinamento cadastrado ainda
             </span>
           )}
-          <label style={{ fontWeight: '500', color: '#333' }}>
-            Filtrar por Turma:
-          </label>
-          {Array.isArray(turmas) && turmas.length > 0 ? (
+          {filtroCtSelecionado && (
             <>
-              <select
-                value={filtroTurmaSelecionada}
-                onChange={(e) => setFiltroTurmaSelecionada(e.target.value)}
-                style={{
-                  ...styles.select,
-                  minWidth: '250px',
-                }}
-              >
-                <option value="">Todas as turmas</option>
-                {turmas.map(turma => (
-                  <option key={turma.id} value={turma.id}>
-                    Turma {turma.id} - {turma.ct_nome || 'CT'} - {turma.horario}
-                  </option>
-                ))}
-              </select>
-              {filtroTurmaSelecionada && (
-                <button
-                  onClick={() => setFiltroTurmaSelecionada('')}
-                  style={{
-                    ...styles.actionButton,
-                    backgroundColor: '#757575',
-                    padding: '0.5rem 1rem',
-                  }}
-                >
-                  Limpar Turma
-                </button>
-              )}
+              <label style={{ fontWeight: '500', color: '#333' }}>
+                Filtrar por Turma:
+              </label>
+              {(() => {
+                const turmasDoCt = (turmas || []).filter(t => {
+                  const ctId = t.ct && typeof t.ct === 'object' ? t.ct.id : t.ct;
+                  return String(ctId) === String(filtroCtSelecionado);
+                });
+                return turmasDoCt.length > 0 ? (
+                  <>
+                    <select
+                      value={filtroTurmaSelecionada}
+                      onChange={(e) => setFiltroTurmaSelecionada(e.target.value)}
+                      style={{
+                        ...styles.select,
+                        minWidth: '250px',
+                      }}
+                    >
+                      <option value="">Todas as turmas do CT</option>
+                      {turmasDoCt.map(turma => (
+                        <option key={turma.id} value={turma.id}>
+                          {turma.horario} - {(turma.dias_semana_nomes || []).join(', ')}
+                        </option>
+                      ))}
+                    </select>
+                    {filtroTurmaSelecionada && (
+                      <button
+                        onClick={() => setFiltroTurmaSelecionada('')}
+                        style={{
+                          ...styles.actionButton,
+                          backgroundColor: '#757575',
+                          padding: '0.5rem 1rem',
+                        }}
+                      >
+                        Limpar Turma
+                      </button>
+                    )}
+                  </>
+                ) : (
+                  <span style={{ 
+                    color: '#999', 
+                    fontSize: '14px',
+                    fontStyle: 'italic',
+                    padding: '0.5rem',
+                    backgroundColor: '#f5f5f5',
+                    borderRadius: '4px'
+                  }}>
+                    Nenhuma turma neste CT
+                  </span>
+                );
+              })()}
             </>
-          ) : (
+          )}
+          {!filtroCtSelecionado && centrosTreinamento?.length > 0 && (
             <span style={{ 
-              color: '#999', 
+              color: '#888', 
               fontSize: '14px',
               fontStyle: 'italic',
               padding: '0.5rem',
-              backgroundColor: '#f5f5f5',
+              backgroundColor: '#f9f9f9',
               borderRadius: '4px'
             }}>
-              Nenhuma turma cadastrada ainda
+              Selecione um CT para filtrar por turma
             </span>
           )}
         </div>

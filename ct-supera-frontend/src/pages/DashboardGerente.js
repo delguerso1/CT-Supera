@@ -318,11 +318,15 @@ function DashboardGerente({ user }) {
   const [activeSection, setActiveSection] = useState('dashboard');
   const [stats, setStats] = useState({
     alunosAtivos: 0,
+    alunosInativos: 0,
     professores: 0,
     mensalidadesPendentes: 0,
-    mensalidadesAtrasadas: 0,
+    mensalidadesAtrasadasMesAnterior: 0,
+    mensalidadesAtrasadasMais30Dias: 0,
     mensalidadesPagas: 0,
     precadastros: 0,
+    aulasExperimentaisFuturas: 0,
+    aulasExperimentaisOcorridas: 0,
     turmas: []
   });
   const [recentActivities, setRecentActivities] = useState([]);
@@ -344,23 +348,6 @@ function DashboardGerente({ user }) {
   const [fotoPreview, setFotoPreview] = useState(null);
   const [uploadingFoto, setUploadingFoto] = useState(false);
   const navigate = useNavigate();
-
-  const fetchGerenteData = useCallback(async () => {
-    try {
-      const response = await api.get('funcionarios/painel-gerente/');
-      setGerente(response.data);
-      setForm({
-        first_name: response.data.first_name || '',
-        last_name: response.data.last_name || '',
-        email: response.data.email || '',
-        telefone: response.data.telefone || '',
-        endereco: response.data.endereco || '',
-        data_nascimento: (response.data.data_nascimento || '').split('T')[0] || ''
-      });
-    } catch (err) {
-      setErro('Erro ao carregar dados do gerente.');
-    }
-  }, []);
 
   const fetchDashboardData = useCallback(async () => {
     try {
@@ -387,15 +374,30 @@ function DashboardGerente({ user }) {
 
       setStats({
         alunosAtivos: response.data.alunos_ativos || 0,
+        alunosInativos: response.data.alunos_inativos || 0,
         professores: response.data.professores || 0,
         mensalidadesPendentes: response.data.mensalidades_pendentes || 0,
-        mensalidadesAtrasadas: response.data.mensalidades_atrasadas || 0,
+        mensalidadesAtrasadasMesAnterior: response.data.mensalidades_atrasadas_mes_anterior || 0,
+        mensalidadesAtrasadasMais30Dias: response.data.mensalidades_atrasadas_mais_30_dias || 0,
         mensalidadesPagas: response.data.mensalidades_pagas || 0,
         precadastros: response.data.precadastros || 0,
+        aulasExperimentaisFuturas: response.data.aulas_experimentais_futuras || 0,
+        aulasExperimentaisOcorridas: response.data.aulas_experimentais_ocorridas || 0,
         turmas: response.data.turmas || []
       });
 
       setRecentActivities(response.data.atividades_recentes || []);
+
+      // Dados do gerente vêm no mesmo payload - evita chamada duplicada
+      setGerente(response.data);
+      setForm({
+        first_name: response.data.first_name || '',
+        last_name: response.data.last_name || '',
+        email: response.data.email || '',
+        telefone: response.data.telefone || '',
+        endereco: response.data.endereco || '',
+        data_nascimento: (response.data.data_nascimento || '').split('T')[0] || ''
+      });
 
     } catch (error) {
       if (error.response?.status === 403) {
@@ -426,8 +428,7 @@ function DashboardGerente({ user }) {
     }
 
     fetchDashboardData();
-    fetchGerenteData();
-  }, [user, navigate, fetchDashboardData, fetchGerenteData]);
+  }, [user, navigate, fetchDashboardData]);
 
   const handleFotoChange = (e) => {
     const file = e.target.files[0];
@@ -552,9 +553,10 @@ function DashboardGerente({ user }) {
       
       <div style={styles.statsGrid}>
         <div style={styles.statCard}>
-          <div style={styles.statTitle}>Alunos Ativos</div>
+          <div style={styles.statTitle}>Alunos</div>
           <div style={styles.statValueSuccess}>{stats.alunosAtivos}</div>
-          <div style={styles.statSubtitle}>Total de alunos ativos</div>
+          <div style={styles.statSubtitle}>Ativos</div>
+          <div style={{ ...styles.statSubtitle, marginTop: 4 }}>{stats.alunosInativos} inativos</div>
         </div>
         
         <div style={styles.statCard}>
@@ -564,27 +566,39 @@ function DashboardGerente({ user }) {
         </div>
         
         <div style={styles.statCard}>
+          <div style={styles.statTitle}>Turmas</div>
+          <div style={styles.statValue}>{Array.isArray(stats.turmas) ? stats.turmas.length : 0}</div>
+          <div style={styles.statSubtitle}>Total de turmas</div>
+        </div>
+        
+        <div style={styles.statCard}>
           <div style={styles.statTitle}>Mensalidades Pendentes</div>
           <div style={styles.statValueDanger}>{stats.mensalidadesPendentes}</div>
-          <div style={styles.statSubtitle}>Aguardando pagamento</div>
+          <div style={styles.statSubtitle}>Mês corrente</div>
         </div>
         
         <div style={styles.statCard}>
           <div style={styles.statTitle}>Mensalidades Atrasadas</div>
-          <div style={styles.statValueDanger}>{stats.mensalidadesAtrasadas}</div>
-          <div style={styles.statSubtitle}>Vencidas há mais de 30 dias</div>
+          <div style={styles.statValueDanger}>{stats.mensalidadesAtrasadasMesAnterior} / {stats.mensalidadesAtrasadasMais30Dias}</div>
+          <div style={styles.statSubtitle}>Mês anterior / +30 dias</div>
         </div>
         
         <div style={styles.statCard}>
           <div style={styles.statTitle}>Mensalidades Pagas</div>
           <div style={styles.statValueSuccess}>{stats.mensalidadesPagas}</div>
-          <div style={styles.statSubtitle}>Pagas este mês</div>
+          <div style={styles.statSubtitle}>Mês corrente</div>
         </div>
         
         <div style={styles.statCard}>
           <div style={styles.statTitle}>Pré-cadastros</div>
           <div style={styles.statValue}>{stats.precadastros}</div>
           <div style={styles.statSubtitle}>Aguardando aprovação</div>
+        </div>
+        
+        <div style={styles.statCard}>
+          <div style={styles.statTitle}>Aulas Experimentais</div>
+          <div style={styles.statValue}>{stats.aulasExperimentaisFuturas} / {stats.aulasExperimentaisOcorridas}</div>
+          <div style={styles.statSubtitle}>Futuras / Já ocorreram</div>
         </div>
       </div>
 
@@ -608,7 +622,7 @@ function DashboardGerente({ user }) {
                     {activity.description}
                   </div>
                   <div style={styles.activityDate}>
-                    {new Date(activity.data).toLocaleDateString('pt-BR')}
+                    {formatDateOnly(activity.data)}
                   </div>
                 </div>
               </div>

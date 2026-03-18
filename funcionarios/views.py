@@ -1,6 +1,7 @@
 from django.shortcuts import get_object_or_404
 from turmas.models import Turma
 from datetime import date
+from calendar import monthrange
 from usuarios.models import Usuario, PreCadastro
 from financeiro.models import Mensalidade
 from .models import Presenca
@@ -286,15 +287,72 @@ class PainelGerenteAPIView(APIView):
 
             # Estatísticas básicas
             hoje = timezone.now().date()
+            ano = hoje.year
+            mes = hoje.month
             primeiro_dia_mes = hoje.replace(day=1)
-            
+            ultimo_dia_mes = date(ano, mes, monthrange(ano, mes)[1])
+
+            # Mês anterior
+            if mes == 1:
+                ano_anterior, mes_anterior = ano - 1, 12
+            else:
+                ano_anterior, mes_anterior = ano, mes - 1
+            primeiro_dia_mes_anterior = date(ano_anterior, mes_anterior, 1)
+            ultimo_dia_mes_anterior = date(ano_anterior, mes_anterior, monthrange(ano_anterior, mes_anterior)[1])
+            limite_30_dias = hoje - timedelta(days=30)
+
+            # Alunos: ativos e inativos
             alunos_ativos = Usuario.objects.filter(tipo="aluno", ativo=True).count()
+            alunos_inativos = Usuario.objects.filter(tipo="aluno", ativo=False).count()
+
             professores = Usuario.objects.filter(tipo="professor", ativo=True).count()
-            mensalidades_pendentes = Mensalidade.objects.filter(status="pendente").count()
-            mensalidades_atrasadas = Mensalidade.objects.filter(status="atrasado").count()
-            mensalidades_pagas = Mensalidade.objects.filter(status="pago").count()
-            # Conta apenas pré-cadastros pendentes (não matriculados)
+
+            # Mensalidades pendentes do mês corrente (vencimento no mês atual)
+            mensalidades_pendentes = Mensalidade.objects.filter(
+                status="pendente",
+                data_vencimento__year=ano,
+                data_vencimento__month=mes
+            ).count()
+
+            # Mensalidades atrasadas: 1) vencimento no mês anterior, 2) atraso > 30 dias
+            mensalidades_atrasadas_mes_anterior = Mensalidade.objects.filter(
+                status="atrasado",
+                data_vencimento__gte=primeiro_dia_mes_anterior,
+                data_vencimento__lte=ultimo_dia_mes_anterior
+            ).count()
+            mensalidades_atrasadas_mais_30_dias = Mensalidade.objects.filter(
+                status="atrasado",
+                data_vencimento__lt=limite_30_dias
+            ).count()
+
+            # Mensalidades pagas no mês corrente (data do pagamento)
+            qs_pagas_mes = Mensalidade.objects.filter(status="pago")
+            mensalidades_pagas = qs_pagas_mes.filter(
+                data_pagamento__year=ano,
+                data_pagamento__month=mes
+            ).count()
+            # Fallback: se data_pagamento for null, considerar data_vencimento no mês
+            mensalidades_pagas += qs_pagas_mes.filter(
+                data_pagamento__isnull=True,
+                data_vencimento__year=ano,
+                data_vencimento__month=mes
+            ).count()
+
+            # Pré-cadastros pendentes
             precadastros = PreCadastro.objects.filter(status='pendente').count()
+
+            # Aulas experimentais: futuras e já ocorridas
+            aulas_experimentais_futuras = PreCadastro.objects.filter(
+                origem='aula_experimental',
+                status='pendente',
+                data_aula_experimental__gt=hoje
+            ).count()
+            aulas_experimentais_ocorridas = PreCadastro.objects.filter(
+                origem='aula_experimental',
+                data_aula_experimental__isnull=False,
+                data_aula_experimental__lte=hoje
+            ).count()
+
             turmas = Turma.objects.all()
 
             # Atividades recentes
@@ -337,11 +395,15 @@ class PainelGerenteAPIView(APIView):
             
             response_data = {
                 'alunos_ativos': alunos_ativos,
+                'alunos_inativos': alunos_inativos,
                 'professores': professores,
                 'mensalidades_pendentes': mensalidades_pendentes,
-                'mensalidades_atrasadas': mensalidades_atrasadas,
+                'mensalidades_atrasadas_mes_anterior': mensalidades_atrasadas_mes_anterior,
+                'mensalidades_atrasadas_mais_30_dias': mensalidades_atrasadas_mais_30_dias,
                 'mensalidades_pagas': mensalidades_pagas,
                 'precadastros': precadastros,
+                'aulas_experimentais_futuras': aulas_experimentais_futuras,
+                'aulas_experimentais_ocorridas': aulas_experimentais_ocorridas,
                 'turmas': TurmaSerializer(turmas, many=True).data,
                 'atividades_recentes': atividades[:5],
                 # Dados do gerente

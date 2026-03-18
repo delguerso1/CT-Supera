@@ -140,7 +140,7 @@ const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }
 
   const loadMensalidades = async () => {
     try {
-      const response = await financeiroService.getMensalidades(buildFinanceiroParams());
+      const response = await financeiroService.getMensalidades({ ...buildFinanceiroParams(), page_size: 500 });
       const data = response as any;
       const resolved = Array.isArray(data) ? data : data.results || data.mensalidades || data.data || [];
       setMensalidades(resolved);
@@ -536,8 +536,10 @@ const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }
       >
         <View style={styles.statsGrid}>
           <View style={styles.statCard}>
-            <Text style={styles.statTitle}>Alunos Ativos</Text>
+            <Text style={styles.statTitle}>Alunos</Text>
             <Text style={styles.statValue}>{painelGerente.alunos_ativos || 0}</Text>
+            <Text style={styles.statSubtitle}>Ativos</Text>
+            <Text style={[styles.statSubtitle, { marginTop: 4 }]}>{painelGerente.alunos_inativos || 0} inativos</Text>
           </View>
           
           <View style={styles.statCard}>
@@ -555,13 +557,15 @@ const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }
           <View style={styles.statCard}>
             <Text style={styles.statTitle}>Mensalidades Pendentes</Text>
             <Text style={styles.statValue}>{painelGerente.mensalidades_pendentes || 0}</Text>
+            <Text style={styles.statSubtitle}>Mês corrente</Text>
           </View>
           
           <View style={styles.statCard}>
             <Text style={styles.statTitle}>Mensalidades Atrasadas</Text>
             <Text style={[styles.statValue, { color: '#f44336' }]}>
-              {painelGerente.mensalidades_atrasadas || 0}
+              {painelGerente.mensalidades_atrasadas_mes_anterior || 0} / {painelGerente.mensalidades_atrasadas_mais_30_dias || 0}
             </Text>
+            <Text style={styles.statSubtitle}>Mês anterior / +30 dias</Text>
           </View>
           
           <View style={styles.statCard}>
@@ -569,6 +573,20 @@ const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }
             <Text style={[styles.statValue, { color: '#4caf50' }]}>
               {painelGerente.mensalidades_pagas || 0}
             </Text>
+            <Text style={styles.statSubtitle}>Mês corrente</Text>
+          </View>
+        </View>
+
+        <View style={styles.statsGrid}>
+          <View style={styles.statCard}>
+            <Text style={styles.statTitle}>Pré-cadastros</Text>
+            <Text style={styles.statValue}>{painelGerente.precadastros || 0}</Text>
+          </View>
+          
+          <View style={styles.statCard}>
+            <Text style={styles.statTitle}>Aulas Experimentais</Text>
+            <Text style={styles.statValue}>{painelGerente.aulas_experimentais_futuras || 0} / {painelGerente.aulas_experimentais_ocorridas || 0}</Text>
+            <Text style={styles.statSubtitle}>Futuras / Já ocorreram</Text>
           </View>
         </View>
 
@@ -594,7 +612,9 @@ const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }
               <View key={activity.id} style={styles.activityCard}>
                 <Text style={styles.activityDescription}>{activity.description}</Text>
                 <Text style={styles.activityDate}>
-                  {new Date(activity.data).toLocaleDateString('pt-BR')}
+                  {activity.data && !Number.isNaN(new Date(activity.data).getTime())
+                    ? new Date(activity.data).toLocaleDateString('pt-BR')
+                    : '-'}
                 </Text>
               </View>
             ))
@@ -1881,6 +1901,11 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     color: '#1a237e',
+  },
+  statSubtitle: {
+    fontSize: 11,
+    color: '#999',
+    marginTop: 4,
   },
   section: {
     backgroundColor: '#fff',
