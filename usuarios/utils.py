@@ -1,6 +1,6 @@
 from django.contrib.auth import authenticate, login
 from django.contrib import messages
-from django.core.mail import send_mail
+from django.core.mail import send_mail, EmailMultiAlternatives
 from django.core.signing import Signer
 from django.utils.http import urlsafe_base64_encode
 from django.utils.encoding import force_bytes
@@ -13,6 +13,152 @@ from urllib.parse import quote
 logger = logging.getLogger(__name__)
 
 SALT_REAGENDAR = "reagendar_aula_experimental"
+
+# Cores e branding do CT Supera (conforme o site)
+EMAIL_COR_PRIMARIA = "#1F6C86"      # Azul principal (navbar, títulos)
+EMAIL_COR_DESTAQUE = "#E0CC98"     # Dourado (botões)
+EMAIL_COR_FUNDO = "#f5f5f5"
+EMAIL_COR_FOOTER = "#666"
+
+
+def _get_logo_url():
+    """Retorna a URL absoluta do logo CT Supera para uso em e-mails."""
+    logo_url = getattr(settings, 'EMAIL_LOGO_URL', None)
+    if logo_url:
+        return logo_url
+    frontend_url = getattr(settings, 'FRONTEND_URL', 'https://ctsupera.com.br')
+    return f"{frontend_url.rstrip('/')}/logo-supera-principal.png"
+
+
+def _email_wrapper_html(content_html: str, titulo_header: str = "CT Supera", subtitulo: str = "") -> str:
+    """
+    Retorna o HTML completo de um e-mail com header (logo + cores), conteúdo e footer.
+    content_html: HTML do corpo da mensagem
+    titulo_header: título exibido no header (abaixo do logo)
+    subtitulo: subtítulo opcional no header
+    """
+    logo_url = _get_logo_url()
+    return f"""
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{titulo_header} - CT Supera</title>
+    <style>
+        body {{
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            margin: 0;
+            padding: 0;
+            background-color: {EMAIL_COR_FUNDO};
+        }}
+        .email-container {{
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }}
+        .email-header {{
+            background-color: {EMAIL_COR_PRIMARIA};
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }}
+        .email-header img {{
+            max-width: 200px;
+            height: auto;
+            max-height: 80px;
+            display: block;
+            margin: 0 auto 15px auto;
+        }}
+        .email-header h1 {{
+            margin: 0;
+            font-size: 24px;
+            font-weight: 600;
+        }}
+        .email-header .subtitle {{
+            margin-top: 8px;
+            opacity: 0.95;
+            font-size: 15px;
+        }}
+        .email-content {{
+            padding: 35px 30px;
+        }}
+        .cta-button {{
+            display: inline-block;
+            background-color: {EMAIL_COR_DESTAQUE};
+            color: {EMAIL_COR_PRIMARIA};
+            text-decoration: none;
+            padding: 14px 28px;
+            border-radius: 6px;
+            font-weight: bold;
+            font-size: 16px;
+            margin: 15px 0;
+        }}
+        .info-box {{
+            background-color: #f8f9fa;
+            border-left: 4px solid {EMAIL_COR_PRIMARIA};
+            padding: 18px;
+            margin: 20px 0;
+            border-radius: 0 8px 8px 0;
+        }}
+        .info-box h3 {{
+            margin: 0 0 12px 0;
+            color: #2c3e50;
+            font-size: 16px;
+        }}
+        .info-list {{
+            margin: 0;
+            padding-left: 20px;
+        }}
+        .info-list li {{
+            margin-bottom: 6px;
+            color: #555;
+        }}
+        .email-footer {{
+            background-color: #f8f9fa;
+            padding: 25px 30px;
+            text-align: center;
+            color: {EMAIL_COR_FOOTER};
+            font-size: 14px;
+        }}
+        .link-fallback {{
+            word-break: break-all;
+            color: {EMAIL_COR_PRIMARIA};
+            text-decoration: none;
+        }}
+        @media only screen and (max-width: 600px) {{
+            .email-container {{
+                margin: 10px;
+            }}
+            .email-header, .email-content, .email-footer {{
+                padding: 20px;
+            }}
+        }}
+    </style>
+</head>
+<body>
+    <div class="email-container">
+        <div class="email-header">
+            <img src="{logo_url}" alt="CT Supera - Centro de Treinamento" />
+            <h1>{titulo_header}</h1>
+            {f'<div class="subtitle">{subtitulo}</div>' if subtitulo else ''}
+        </div>
+        <div class="email-content">
+            {content_html}
+        </div>
+        <div class="email-footer">
+            <strong>CT Supera - Centro de Treinamento</strong><br>
+            Sistema de Gestão Completo
+        </div>
+    </div>
+</body>
+</html>
+"""
 
 
 def gerar_token_reagendamento(precadastro_id: int) -> str:
@@ -132,142 +278,13 @@ def enviar_convite_aluno(aluno) -> None:
         Qualquer dúvida, estamos à disposição. 🤝
         """
 
-        # Versão HTML profissional
-        mensagem_html = f"""
-        <!DOCTYPE html>
-        <html lang="pt-BR">
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Ativação de Conta - CT Supera</title>
-            <style>
-                body {{
-                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                    line-height: 1.6;
-                    color: #333;
-                    margin: 0;
-                    padding: 0;
-                    background-color: #f4f4f4;
-                }}
-                .container {{
-                    max-width: 600px;
-                    margin: 0 auto;
-                    background-color: #ffffff;
-                    border-radius: 8px;
-                    overflow: hidden;
-                    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-                }}
-                .header {{
-                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                    color: white;
-                    padding: 30px;
-                    text-align: center;
-                }}
-                .header h1 {{
-                    margin: 0;
-                    font-size: 28px;
-                    font-weight: 300;
-                }}
-                .header .subtitle {{
-                    margin-top: 10px;
-                    opacity: 0.9;
-                    font-size: 16px;
-                }}
-                .content {{
-                    padding: 40px 30px;
-                }}
-                .welcome {{
-                    font-size: 18px;
-                    color: #2c3e50;
-                    margin-bottom: 25px;
-                }}
-                .description {{
-                    color: #555;
-                    margin-bottom: 30px;
-                    font-size: 16px;
-                }}
-                .cta-button {{
-                    display: inline-block;
-                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                    color: white;
-                    text-decoration: none;
-                    padding: 15px 30px;
-                    border-radius: 25px;
-                    font-weight: bold;
-                    font-size: 16px;
-                    margin: 20px 0;
-                    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
-                    transition: all 0.3s ease;
-                }}
-                .cta-button:hover {{
-                    transform: translateY(-2px);
-                    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
-                }}
-                .info-box {{
-                    background-color: #f8f9fa;
-                    border-left: 4px solid #667eea;
-                    padding: 20px;
-                    margin: 25px 0;
-                    border-radius: 0 8px 8px 0;
-                }}
-                .info-box h3 {{
-                    margin: 0 0 15px 0;
-                    color: #2c3e50;
-                    font-size: 18px;
-                }}
-                .info-list {{
-                    margin: 0;
-                    padding-left: 20px;
-                }}
-                .info-list li {{
-                    margin-bottom: 8px;
-                    color: #555;
-                }}
-                .footer {{
-                    background-color: #f8f9fa;
-                    padding: 25px 30px;
-                    text-align: center;
-                    color: #666;
-                    font-size: 14px;
-                }}
-                .logo {{
-                    font-size: 24px;
-                    font-weight: bold;
-                    margin-bottom: 10px;
-                }}
-                .link-fallback {{
-                    word-break: break-all;
-                    color: #667eea;
-                    text-decoration: none;
-                }}
-                @media only screen and (max-width: 600px) {{
-                    .container {{
-                        margin: 10px;
-                        border-radius: 4px;
-                    }}
-                    .header, .content, .footer {{
-                        padding: 20px;
-                    }}
-                    .header h1 {{
-                        font-size: 24px;
-                    }}
-                }}
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <div class="header">
-                    <div class="logo">🏋️ CT Supera</div>
-                    <h1>Bem-vindo ao Sistema!</h1>
-                    <div class="subtitle">Sua conta foi criada com sucesso</div>
-                </div>
-                
-                <div class="content">
-                    <div class="welcome">
+        # Versão HTML com logo e cores CT Supera
+        content_html = f"""
+                    <div style="font-size: 18px; color: #2c3e50; margin-bottom: 20px;">
                         Olá <strong>{aluno.first_name}</strong>, seja bem-vindo ao CT Supera! 🚀
                     </div>
                     
-                    <div class="description">
+                    <div style="color: #555; margin-bottom: 25px; font-size: 16px;">
                         Sua conta foi criada com sucesso e está aguardando ativação. 
                         Para começar a usar o sistema, você precisa ativar sua conta e definir sua senha.
                     </div>
@@ -288,26 +305,19 @@ def enviar_convite_aluno(aluno) -> None:
                         </ul>
                     </div>
                     
-                    <div style="margin-top: 30px; padding: 15px; background-color: #e8f4fd; border-radius: 8px; border-left: 4px solid #3498db;">
+                    <div style="margin-top: 25px; padding: 15px; background-color: #e8f4fd; border-radius: 8px; border-left: 4px solid {EMAIL_COR_PRIMARIA};">
                         <strong>🔗 Link de Ativação:</strong><br>
                         <a href="{link_ativacao}" class="link-fallback">{link_ativacao}</a>
                     </div>
-                </div>
-                
-                <div class="footer">
-                    <div style="margin-bottom: 15px;">
-                        <strong>CT Supera - Centro de Treinamento</strong><br>
-                        Sistema de Gestão Completo
+                    <div style="color: #999; font-size: 12px; margin-top: 15px;">
+                        Se o link não funcionar, copie e cole o endereço acima no seu navegador.
                     </div>
-                    <div style="color: #999; font-size: 12px;">
-                        Se o link não funcionar, copie e cole o endereço acima no seu navegador.<br>
-                        Em caso de dúvidas, entre em contato conosco.
-                    </div>
-                </div>
-            </div>
-        </body>
-        </html>
         """
+        mensagem_html = _email_wrapper_html(
+            content_html,
+            titulo_header="Bem-vindo ao Sistema!",
+            subtitulo="Sua conta foi criada com sucesso"
+        )
 
         # Envia e-mail com versão HTML e texto simples
         send_mail(
@@ -323,6 +333,116 @@ def enviar_convite_aluno(aluno) -> None:
     except Exception as e:
         logger.error(f"Erro ao enviar convite para {aluno.email}: {str(e)}")
         raise
+
+
+def enviar_primeira_mensalidade_email(aluno, forma_pagamento, valor, data_vencimento, codigo_pix=None, digitable_line=None, pdf_content=None) -> bool:
+    """
+    Envia e-mail ao aluno com os dados da primeira mensalidade para pagamento.
+    forma_pagamento: 'pix' ou 'boleto'
+    codigo_pix: código PIX Copia e Cola (quando forma_pagamento='pix')
+    digitable_line: linha digitável do boleto (quando forma_pagamento='boleto')
+    pdf_content: bytes do PDF do boleto (opcional, para anexar)
+    """
+    if not aluno.email or aluno.email == 'pendente':
+        logger.warning("Aluno sem e-mail válido, não enviando cobrança.")
+        return False
+
+    nome = f"{aluno.first_name} {aluno.last_name or ''}".strip() or "Aluno"
+    valor_str = f"R$ {float(valor):.2f}".replace(".", ",")
+    data_str = data_vencimento.strftime("%d/%m/%Y") if hasattr(data_vencimento, 'strftime') else str(data_vencimento)
+
+    if forma_pagamento == 'pix' and codigo_pix:
+        assunto = "Sua primeira mensalidade - Pagamento via PIX - CT Supera"
+        corpo_texto = f"""
+Olá {nome}!
+
+Sua matrícula foi confirmada. Segue o pagamento da primeira mensalidade:
+
+ Valor: {valor_str}
+ Vencimento: {data_str}
+
+PAGAMENTO VIA PIX
+Copie o código abaixo e cole no app do seu banco para realizar o pagamento:
+
+{codigo_pix}
+
+Ou escaneie o QR Code anexo (se disponível).
+
+Qualquer dúvida, entre em contato conosco.
+"""
+        content_html = f"""
+                    <div style="font-size: 18px; color: #2c3e50; margin-bottom: 15px;">
+                        Olá <strong>{nome}</strong>,
+                    </div>
+                    <p style="color: #555; margin-bottom: 20px;">Sua matrícula foi confirmada. Segue o pagamento da primeira mensalidade:</p>
+                    <p><strong>Valor:</strong> {valor_str}<br><strong>Vencimento:</strong> {data_str}</p>
+                    <p style="margin-top: 20px;"><strong>PIX Copia e Cola:</strong></p>
+                    <pre style="background:#f5f5f5;padding:12px;border-radius:4px;overflow-x:auto;border-left:4px solid {EMAIL_COR_PRIMARIA};">{codigo_pix}</pre>
+                    <p style="margin-top: 15px;">Copie o código acima e cole no app do seu banco.</p>
+        """
+        corpo_html = _email_wrapper_html(
+            content_html,
+            titulo_header="Primeira mensalidade - PIX",
+            subtitulo="Pagamento via PIX"
+        )
+        email = EmailMultiAlternatives(
+            assunto,
+            corpo_texto.strip(),
+            settings.DEFAULT_FROM_EMAIL,
+            [aluno.email],
+        )
+        email.attach_alternative(corpo_html, "text/html")
+        email.send(fail_silently=False)
+        logger.info(f"Cobrança PIX enviada por e-mail para {aluno.email}")
+        return True
+
+    elif forma_pagamento == 'boleto' and digitable_line:
+        assunto = "Sua primeira mensalidade - Boleto - CT Supera"
+        corpo_texto = f"""
+Olá {nome}!
+
+Sua matrícula foi confirmada. Segue o pagamento da primeira mensalidade:
+
+ Valor: {valor_str}
+ Vencimento: {data_str}
+
+PAGAMENTO VIA BOLETO
+Linha digitável (copie e cole no app do banco ou internet banking):
+
+{digitable_line}
+
+O boleto em PDF está anexado a este e-mail.
+"""
+        content_html = f"""
+                    <div style="font-size: 18px; color: #2c3e50; margin-bottom: 15px;">
+                        Olá <strong>{nome}</strong>,
+                    </div>
+                    <p style="color: #555; margin-bottom: 20px;">Sua matrícula foi confirmada. Segue o pagamento da primeira mensalidade:</p>
+                    <p><strong>Valor:</strong> {valor_str}<br><strong>Vencimento:</strong> {data_str}</p>
+                    <p style="margin-top: 20px;"><strong>Linha digitável:</strong></p>
+                    <pre style="background:#f5f5f5;padding:12px;border-radius:4px;border-left:4px solid {EMAIL_COR_PRIMARIA};">{digitable_line}</pre>
+                    <p style="margin-top: 15px;">O boleto em PDF está anexado a este e-mail.</p>
+        """
+        corpo_html = _email_wrapper_html(
+            content_html,
+            titulo_header="Primeira mensalidade - Boleto",
+            subtitulo="Pagamento via Boleto"
+        )
+        email = EmailMultiAlternatives(
+            assunto,
+            corpo_texto.strip(),
+            settings.DEFAULT_FROM_EMAIL,
+            [aluno.email],
+        )
+        email.attach_alternative(corpo_html, "text/html")
+        if pdf_content:
+            email.attach("boleto_mensalidade.pdf", pdf_content, "application/pdf")
+        email.send(fail_silently=False)
+        logger.info(f"Boleto enviado por e-mail para {aluno.email}")
+        return True
+
+    logger.warning("enviar_primeira_mensalidade_email: forma_pagamento ou dados inválidos")
+    return False
 
 
 def reenviar_convite_aluno(aluno) -> bool:
@@ -377,12 +497,32 @@ Para reagendar (até 24h antes), acesse: {link_reagendar}
 
 Qualquer dúvida, entre em contato conosco.
 """
+        content_html = f"""
+                    <div style="font-size: 18px; color: #2c3e50; margin-bottom: 20px;">
+                        Olá <strong>{nome}</strong>,
+                    </div>
+                    <p style="color: #555; margin-bottom: 20px;">Sua aula experimental foi agendada com sucesso! 🎉</p>
+                    <div class="info-box">
+                        <h3>📅 Informações do agendamento</h3>
+                        <p style="margin: 0;"><strong>Data:</strong> {data_str}</p>
+                        {f'<p style="margin: 10px 0 0 0;">{turma_info.replace(chr(10), "<br>")}</p>' if turma_info else ''}
+                    </div>
+                    <p style="margin-top: 20px;">Para reagendar (até 24h antes), acesse:</p>
+                    <p><a href="{link_reagendar}" class="link-fallback">{link_reagendar}</a></p>
+                    <p style="margin-top: 20px; color: #666;">Qualquer dúvida, entre em contato conosco.</p>
+        """
+        mensagem_html = _email_wrapper_html(
+            content_html,
+            titulo_header="Aula experimental agendada",
+            subtitulo="Confirmação de agendamento"
+        )
         send_mail(
             assunto,
             mensagem.strip(),
             settings.DEFAULT_FROM_EMAIL,
             [precadastro.email],
             fail_silently=True,
+            html_message=mensagem_html,
         )
         logger.info(f"Confirmação de aula experimental enviada para {precadastro.email}")
         return True
@@ -425,12 +565,32 @@ Para reagendar (até 24h antes), acesse: {link_reagendar}
 
 Te esperamos!
 """
+        content_html = f"""
+                    <div style="font-size: 18px; color: #2c3e50; margin-bottom: 20px;">
+                        Olá <strong>{nome}</strong>,
+                    </div>
+                    <p style="color: #555; margin-bottom: 20px; font-size: 17px;"><strong>Lembrete: sua aula experimental é AMANHÃ! 🎯</strong></p>
+                    <div class="info-box">
+                        <h3>📅 Informações</h3>
+                        <p style="margin: 0;"><strong>Data:</strong> {data_str}</p>
+                        {f'<p style="margin: 10px 0 0 0;">{turma_info.replace(chr(10), "<br>")}</p>' if turma_info else ''}
+                    </div>
+                    <p style="margin-top: 20px;">Para reagendar (até 24h antes), acesse:</p>
+                    <p><a href="{link_reagendar}" class="link-fallback">{link_reagendar}</a></p>
+                    <p style="margin-top: 25px; font-size: 16px;">Te esperamos! 🏋️</p>
+        """
+        mensagem_html = _email_wrapper_html(
+            content_html,
+            titulo_header="Lembrete: aula experimental amanhã",
+            subtitulo="Não esqueça da sua aula!"
+        )
         send_mail(
             assunto,
             mensagem.strip(),
             settings.DEFAULT_FROM_EMAIL,
             [precadastro.email],
             fail_silently=True,
+            html_message=mensagem_html,
         )
         logger.info(f"Lembrete de aula experimental enviado para {precadastro.email}")
         return True
@@ -502,150 +662,13 @@ def enviar_recuperacao_senha(usuario) -> None:
         Qualquer dúvida, estamos à disposição. 🤝
         """
 
-        # Versão HTML profissional
-        mensagem_html = f"""
-        <!DOCTYPE html>
-        <html lang="pt-BR">
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Recuperação de Senha - CT Supera</title>
-            <style>
-                body {{
-                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-                    line-height: 1.6;
-                    color: #333;
-                    margin: 0;
-                    padding: 0;
-                    background-color: #f4f4f4;
-                }}
-                .container {{
-                    max-width: 600px;
-                    margin: 0 auto;
-                    background-color: #ffffff;
-                    border-radius: 8px;
-                    overflow: hidden;
-                    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-                }}
-                .header {{
-                    background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
-                    color: white;
-                    padding: 30px;
-                    text-align: center;
-                }}
-                .header h1 {{
-                    margin: 0;
-                    font-size: 28px;
-                    font-weight: 300;
-                }}
-                .header .subtitle {{
-                    margin-top: 10px;
-                    opacity: 0.9;
-                    font-size: 16px;
-                }}
-                .content {{
-                    padding: 40px 30px;
-                }}
-                .welcome {{
-                    font-size: 18px;
-                    color: #2c3e50;
-                    margin-bottom: 25px;
-                }}
-                .description {{
-                    color: #555;
-                    margin-bottom: 30px;
-                    font-size: 16px;
-                }}
-                .cta-button {{
-                    display: inline-block;
-                    background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
-                    color: white;
-                    text-decoration: none;
-                    padding: 15px 30px;
-                    border-radius: 25px;
-                    font-weight: bold;
-                    font-size: 16px;
-                    margin: 20px 0;
-                    box-shadow: 0 4px 15px rgba(231, 76, 60, 0.4);
-                    transition: all 0.3s ease;
-                }}
-                .cta-button:hover {{
-                    transform: translateY(-2px);
-                    box-shadow: 0 6px 20px rgba(231, 76, 60, 0.6);
-                }}
-                .info-box {{
-                    background-color: #f8f9fa;
-                    border-left: 4px solid #e74c3c;
-                    padding: 20px;
-                    margin: 25px 0;
-                    border-radius: 0 8px 8px 0;
-                }}
-                .info-box h3 {{
-                    margin: 0 0 15px 0;
-                    color: #2c3e50;
-                    font-size: 18px;
-                }}
-                .info-list {{
-                    margin: 0;
-                    padding-left: 20px;
-                }}
-                .info-list li {{
-                    margin-bottom: 8px;
-                    color: #555;
-                }}
-                .footer {{
-                    background-color: #f8f9fa;
-                    padding: 25px 30px;
-                    text-align: center;
-                    color: #666;
-                    font-size: 14px;
-                }}
-                .logo {{
-                    font-size: 24px;
-                    font-weight: bold;
-                    margin-bottom: 10px;
-                }}
-                .link-fallback {{
-                    word-break: break-all;
-                    color: #e74c3c;
-                    text-decoration: none;
-                }}
-                .security-notice {{
-                    background-color: #fff3cd;
-                    border: 1px solid #ffeaa7;
-                    border-radius: 8px;
-                    padding: 15px;
-                    margin: 20px 0;
-                    color: #856404;
-                }}
-                @media only screen and (max-width: 600px) {{
-                    .container {{
-                        margin: 10px;
-                        border-radius: 4px;
-                    }}
-                    .header, .content, .footer {{
-                        padding: 20px;
-                    }}
-                    .header h1 {{
-                        font-size: 24px;
-                    }}
-                }}
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <div class="header">
-                    <div class="logo">🔐 CT Supera</div>
-                    <h1>Recuperação de Senha</h1>
-                    <div class="subtitle">Redefina sua senha com segurança</div>
-                </div>
-                
-                <div class="content">
-                    <div class="welcome">
+        # Versão HTML com logo e cores CT Supera
+        content_html = f"""
+                    <div style="font-size: 18px; color: #2c3e50; margin-bottom: 20px;">
                         Olá <strong>{usuario.first_name}</strong>, recebemos sua solicitação! 🔐
                     </div>
                     
-                    <div class="description">
+                    <div style="color: #555; margin-bottom: 25px; font-size: 16px;">
                         Para redefinir sua senha e acessar sua conta novamente, 
                         clique no botão abaixo e siga as instruções.
                     </div>
@@ -656,7 +679,7 @@ def enviar_recuperacao_senha(usuario) -> None:
                         </a>
                     </div>
                     
-                    <div class="security-notice">
+                    <div style="background-color: #fff3cd; border: 1px solid #ffeaa7; border-radius: 8px; padding: 15px; margin: 20px 0; color: #856404;">
                         <strong>⚠️ Aviso de Segurança:</strong><br>
                         Se você não solicitou esta recuperação de senha, 
                         ignore este e-mail. Sua conta permanece segura.
@@ -672,26 +695,19 @@ def enviar_recuperacao_senha(usuario) -> None:
                         </ul>
                     </div>
                     
-                    <div style="margin-top: 30px; padding: 15px; background-color: #e8f4fd; border-radius: 8px; border-left: 4px solid #3498db;">
+                    <div style="margin-top: 25px; padding: 15px; background-color: #e8f4fd; border-radius: 8px; border-left: 4px solid {EMAIL_COR_PRIMARIA};">
                         <strong>🔗 Link de Recuperação:</strong><br>
                         <a href="{link_recuperacao}" class="link-fallback">{link_recuperacao}</a>
                     </div>
-                </div>
-                
-                <div class="footer">
-                    <div style="margin-bottom: 15px;">
-                        <strong>CT Supera - Centro de Treinamento</strong><br>
-                        Sistema de Gestão Completo
+                    <div style="color: #999; font-size: 12px; margin-top: 15px;">
+                        Se o link não funcionar, copie e cole o endereço acima no seu navegador.
                     </div>
-                    <div style="color: #999; font-size: 12px;">
-                        Se o link não funcionar, copie e cole o endereço acima no seu navegador.<br>
-                        Em caso de dúvidas, entre em contato conosco.
-                    </div>
-                </div>
-            </div>
-        </body>
-        </html>
         """
+        mensagem_html = _email_wrapper_html(
+            content_html,
+            titulo_header="Recuperação de Senha",
+            subtitulo="Redefina sua senha com segurança"
+        )
 
         # Envia e-mail com versão HTML e texto simples
         send_mail(

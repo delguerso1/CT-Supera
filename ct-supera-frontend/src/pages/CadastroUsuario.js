@@ -58,6 +58,7 @@ const styles = {
   },
   table: {
     width: '100%',
+    minWidth: '900px',
     borderCollapse: 'collapse',
     marginTop: '1rem',
   },
@@ -144,6 +145,23 @@ const styles = {
     maxHeight: '90vh',
     overflowY: 'auto',
   },
+  precadastroTooltip: {
+    position: 'absolute',
+    bottom: '100%',
+    left: 0,
+    marginBottom: '6px',
+    backgroundColor: 'white',
+    padding: '12px 14px',
+    borderRadius: '8px',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+    border: '1px solid #e0e0e0',
+    fontSize: '0.85rem',
+    color: '#444',
+    zIndex: 100,
+    minWidth: '260px',
+    whiteSpace: 'normal',
+    lineHeight: 1.5,
+  },
   form: {
     display: 'grid',
     gap: '1.5rem',
@@ -222,9 +240,7 @@ function CadastroUsuario({ onUserChange }) {
   const [showParqModal, setShowParqModal] = useState(false);
   const [selectedParqUser, setSelectedParqUser] = useState(null);
   const [parqActionLoading, setParqActionLoading] = useState(false);
-  const [showAlunoInfoModal, setShowAlunoInfoModal] = useState(false);
-  const [selectedAlunoInfo, setSelectedAlunoInfo] = useState(null);
-  const [showPrecadastroInfoModal, setShowPrecadastroInfoModal] = useState(false);
+  const [selectedUserInfo, setSelectedUserInfo] = useState(null);
   const [selectedPrecadastroInfo, setSelectedPrecadastroInfo] = useState(null);
   const [showMatriculaModal, setShowMatriculaModal] = useState(false);
   const [matriculaPrecadastro, setMatriculaPrecadastro] = useState(null);
@@ -420,28 +436,6 @@ function CadastroUsuario({ onUserChange }) {
     const numero = Number(valor);
     if (Number.isNaN(numero)) return String(valor);
     return `R$ ${numero.toFixed(2).replace('.', ',')}`;
-  };
-
-  const handleMostrarInfoAluno = (user) => {
-    if (!user || user.tipo !== 'aluno') return;
-    setSelectedAlunoInfo(user);
-    setShowAlunoInfoModal(true);
-  };
-
-  const handleMostrarInfoPrecadastro = (precadastro) => {
-    if (!precadastro) return;
-    setSelectedPrecadastroInfo(precadastro);
-    setShowPrecadastroInfoModal(true);
-  };
-
-  const handleClosePrecadastroInfoModal = () => {
-    setShowPrecadastroInfoModal(false);
-    setSelectedPrecadastroInfo(null);
-  };
-
-  const handleCloseAlunoInfoModal = () => {
-    setShowAlunoInfoModal(false);
-    setSelectedAlunoInfo(null);
   };
 
   const parqQuestions = [
@@ -787,6 +781,8 @@ function CadastroUsuario({ onUserChange }) {
       dia_vencimento_primeira: '',
       dias_habilitados: [],
       turma: precadastro.turma ? (typeof precadastro.turma === 'object' ? precadastro.turma.id : precadastro.turma) : '',
+      criar_primeira_mensalidade_agora: false,
+      forma_pagamento: '',
     });
     setError('');
     setSuccess('');
@@ -875,6 +871,21 @@ function CadastroUsuario({ onUserChange }) {
       setError('Selecione pelo menos um dia habilitado para treino.');
       return;
     }
+    if (!matriculaForm.ja_aluno && matriculaForm.criar_primeira_mensalidade_agora) {
+      if (!matriculaForm.forma_pagamento) {
+        setError('Selecione a forma de pagamento (PIX ou Boleto) para enviar a cobrança.');
+        return;
+      }
+      const diaVenc = parseInt(matriculaForm.dia_vencimento_primeira, 10);
+      if (!matriculaForm.dia_vencimento_primeira || Number.isNaN(diaVenc) || diaVenc < 1 || diaVenc > 31) {
+        setError('Informe o dia de vencimento do PIX/Boleto (1 a 31).');
+        return;
+      }
+      if (!matriculaForm.turma) {
+        setError('Selecione uma turma para criar e enviar a cobrança por e-mail.');
+        return;
+      }
+    }
     try {
       setMatriculaLoading(true);
       setError('');
@@ -895,9 +906,18 @@ function CadastroUsuario({ onUserChange }) {
       if (matriculaForm.turma) {
         payload.turma = parseInt(matriculaForm.turma, 10);
       }
+      if (!matriculaForm.ja_aluno) {
+        payload.criar_primeira_mensalidade_agora = !!matriculaForm.criar_primeira_mensalidade_agora;
+        if (matriculaForm.criar_primeira_mensalidade_agora && matriculaForm.forma_pagamento) {
+          payload.forma_pagamento = matriculaForm.forma_pagamento;
+        }
+      }
       const response = await api.post(`usuarios/finalizar-agendamento/${matriculaPrecadastro.id}/`, payload);
       if (response.data.message) {
-        setSuccess('Obrigado por se cadastrar! Um e-mail será enviado para ativação de senha.');
+        const msg = response.data.pagamento_enviado
+          ? 'Matrícula confirmada! E-mails de ativação e cobrança enviados ao aluno.'
+          : 'Obrigado por se cadastrar! Um e-mail será enviado para ativação de senha.';
+        setSuccess(msg);
         setShowMatriculaModal(false);
         setMatriculaPrecadastro(null);
         fetchUsers();
@@ -1190,13 +1210,13 @@ function CadastroUsuario({ onUserChange }) {
           Carregando...
         </div>
       ) : (
-        <div className="table-responsive">
+        <div className="table-responsive" style={{ overflowX: 'auto' }}>
           <table className="gestao-usuarios-table" style={styles.table}>
             <thead>
               <tr>
                 <th style={styles.th}>Nome</th>
                 {activeTab === 'alunos' && <th style={styles.th}>Foto</th>}
-                <th style={styles.th}>CPF</th>
+                {activeTab !== 'alunos' && <th style={styles.th}>CPF</th>}
                 <th style={styles.th}>E-mail</th>
                 <th style={styles.th}>Telefone</th>
                 {activeTab === 'alunos' && <th style={styles.th}>Centro(s) de Treinamento</th>}
@@ -1210,24 +1230,83 @@ function CadastroUsuario({ onUserChange }) {
             <tbody>
             {getUsersToDisplay().map(user => (
               <tr key={user.id}>
-                <td style={styles.td}>
-                  <button
-                    type="button"
-                    onClick={() => activeTab === 'precadastros' ? handleMostrarInfoPrecadastro(user) : handleMostrarInfoAluno(user)}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      padding: 0,
-                      margin: 0,
-                      color: '#1F6C86',
-                      cursor: 'pointer',
-                      textDecoration: 'underline',
-                      font: 'inherit',
-                    }}
-                    title={activeTab === 'precadastros' ? 'Ver informações do pré-cadastro' : 'Ver informações do aluno'}
-                  >
-                    {`${user.first_name} ${user.last_name || ''}`.trim()}
-                  </button>
+                <td style={{ ...styles.td, position: 'relative' }}>
+                  {activeTab === 'precadastros' ? (
+                    <div
+                      style={{ position: 'relative', display: 'inline-block' }}
+                      onMouseEnter={() => setSelectedPrecadastroInfo(user)}
+                      onMouseLeave={() => setSelectedPrecadastroInfo(null)}
+                    >
+                      {selectedPrecadastroInfo?.id === user.id && (
+                        <div style={styles.precadastroTooltip}>
+                          <div><strong>E-mail:</strong> {user.email}</div>
+                          <div><strong>Telefone:</strong> {user.telefone || '-'}</div>
+                          <div><strong>Tipo:</strong> {user.origem_display || user.origem || '-'}</div>
+                          {user.origem === 'aula_experimental' && user.data_aula_experimental && (
+                            <div>
+                              <strong>Data da aula experimental:</strong>{' '}
+                              {new Date(user.data_aula_experimental + 'T12:00:00').toLocaleDateString('pt-BR', {
+                                weekday: 'long',
+                                day: '2-digit',
+                                month: 'long',
+                                year: 'numeric'
+                              })}
+                            </div>
+                          )}
+                          <div><strong>Status:</strong> {user.status === 'matriculado' ? 'Matriculado' : user.status === 'cancelado' ? 'Cancelado' : 'Pendente'}</div>
+                        </div>
+                      )}
+                      <span style={{ color: '#1F6C86', textDecoration: 'underline', cursor: 'default' }}>
+                        {`${user.first_name} ${user.last_name || ''}`.trim()}
+                      </span>
+                    </div>
+                  ) : (activeTab === 'alunos' || activeTab === 'professores' || activeTab === 'gerentes') ? (
+                    <div
+                      style={{ position: 'relative', display: 'inline-block' }}
+                      onMouseEnter={() => setSelectedUserInfo(user)}
+                      onMouseLeave={() => setSelectedUserInfo(null)}
+                    >
+                      {selectedUserInfo?.id === user.id && (
+                        <div style={styles.precadastroTooltip}>
+                          {activeTab === 'alunos' && (
+                            <>
+                              <div><strong>CPF:</strong> {user.cpf || user.username || '-'}</div>
+                              <div><strong>Valor mensalidade:</strong> {formatValor(user.valor_mensalidade)}</div>
+                              <div>
+                                <strong>Dias habilitados:</strong>{' '}
+                                {Array.isArray(user.dias_habilitados_nomes) && user.dias_habilitados_nomes.length > 0
+                                  ? user.dias_habilitados_nomes.join(', ')
+                                  : Array.isArray(user.dias_habilitados) && user.dias_habilitados.length > 0
+                                    ? 'Configurado'
+                                    : 'Não configurado'}
+                              </div>
+                              {Array.isArray(user.centros_treinamento) && user.centros_treinamento.length > 0 && (
+                                <div><strong>CTs:</strong> {user.centros_treinamento.map(ct => ct.nome).join(', ')}</div>
+                              )}
+                            </>
+                          )}
+                          {(activeTab === 'professores' || activeTab === 'gerentes') && (
+                            <>
+                              <div><strong>E-mail:</strong> {user.email}</div>
+                              <div><strong>Telefone:</strong> {user.telefone || '-'}</div>
+                              {activeTab === 'professores' && user.salario_professor != null && user.salario_professor !== '' && (
+                                <div><strong>Salário:</strong> {formatValor(user.salario_professor)}</div>
+                              )}
+                              {activeTab === 'professores' && user.pix_professor && (
+                                <div><strong>PIX:</strong> {user.pix_professor}</div>
+                              )}
+                              {Array.isArray(user.centros_treinamento) && user.centros_treinamento.length > 0 && (
+                                <div><strong>CTs:</strong> {user.centros_treinamento.map(ct => ct.nome).join(', ')}</div>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      )}
+                      <span style={{ color: '#1F6C86', textDecoration: 'underline', cursor: 'default' }}>
+                        {`${user.first_name} ${user.last_name || ''}`.trim()}
+                      </span>
+                    </div>
+                  ) : null}
                 </td>
                 {activeTab === 'alunos' && (
                   <td style={styles.td}>
@@ -1272,7 +1351,9 @@ function CadastroUsuario({ onUserChange }) {
                     )}
                   </td>
                 )}
-                <td style={styles.td}>{user.cpf || user.username}</td>
+                {activeTab !== 'alunos' && (
+                  <td style={styles.td}>{user.cpf || user.username}</td>
+                )}
                 <td style={styles.td}>{user.email}</td>
                 <td style={styles.td}>{user.telefone}</td>
                 {activeTab === 'alunos' && (
@@ -1980,22 +2061,83 @@ function CadastroUsuario({ onUserChange }) {
                       (parseFloat(matriculaForm.valor_matricula || 0) + parseFloat(matriculaForm.valor_uniforme || 0) + parseFloat(matriculaForm.valor_mensalidade || 0)).toFixed(2).replace('.', ',')
                     }
                   </div>
-                  <div style={styles.formGroup}>
-                    <label style={styles.label} htmlFor="matricula_dia_vencimento_primeira">
-                      Dia de vencimento da primeira mensalidade
+                  {!matriculaForm.criar_primeira_mensalidade_agora && (
+                    <div style={styles.formGroup}>
+                      <label style={styles.label} htmlFor="matricula_dia_vencimento_primeira">
+                        Dia de vencimento da primeira mensalidade
+                      </label>
+                      <input
+                        type="number"
+                        id="matricula_dia_vencimento_primeira"
+                        name="dia_vencimento_primeira"
+                        value={matriculaForm.dia_vencimento_primeira}
+                        onChange={handleMatriculaChange}
+                        style={styles.input}
+                        min="1"
+                        max="31"
+                        placeholder="Ex: 15 (dia 1 a 31)"
+                        required={!matriculaForm.ja_aluno}
+                      />
+                    </div>
+                  )}
+
+                  <div style={{
+                    backgroundColor: '#e8f5e9',
+                    padding: '0.75rem',
+                    borderRadius: '4px',
+                    border: '1px solid #81c784',
+                    marginBottom: '1rem'
+                  }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', marginBottom: matriculaForm.criar_primeira_mensalidade_agora ? '0.75rem' : 0 }}>
+                      <input
+                        type="checkbox"
+                        name="criar_primeira_mensalidade_agora"
+                        checked={!!matriculaForm.criar_primeira_mensalidade_agora}
+                        onChange={handleMatriculaChange}
+                      />
+                      <span><strong>Criar primeira mensalidade agora</strong> e enviar por e-mail ao aluno</span>
                     </label>
-                    <input
-                      type="number"
-                      id="matricula_dia_vencimento_primeira"
-                      name="dia_vencimento_primeira"
-                      value={matriculaForm.dia_vencimento_primeira}
-                      onChange={handleMatriculaChange}
-                      style={styles.input}
-                      min="1"
-                      max="31"
-                      placeholder="Ex: 15 (dia 1 a 31)"
-                      required={!matriculaForm.ja_aluno}
-                    />
+                    {matriculaForm.criar_primeira_mensalidade_agora && (
+                      <>
+                        <div style={styles.formGroup}>
+                          <label style={styles.label} htmlFor="matricula_forma_pagamento">
+                            Forma de pagamento
+                          </label>
+                          <select
+                            id="matricula_forma_pagamento"
+                            name="forma_pagamento"
+                            value={matriculaForm.forma_pagamento}
+                            onChange={handleMatriculaChange}
+                            style={styles.select}
+                            required={!!matriculaForm.criar_primeira_mensalidade_agora}
+                          >
+                            <option value="">Selecione</option>
+                            <option value="pix">PIX</option>
+                            <option value="boleto">Boleto</option>
+                          </select>
+                        </div>
+                        <div style={styles.formGroup}>
+                          <label style={styles.label} htmlFor="matricula_dia_vencimento_pagamento">
+                            Dia de vencimento do PIX/Boleto (1 a 31)
+                          </label>
+                          <input
+                            type="number"
+                            id="matricula_dia_vencimento_pagamento"
+                            name="dia_vencimento_primeira"
+                            value={matriculaForm.dia_vencimento_primeira}
+                            onChange={handleMatriculaChange}
+                            style={styles.input}
+                            min="1"
+                            max="31"
+                            placeholder="Ex: 15"
+                            required={!!matriculaForm.criar_primeira_mensalidade_agora}
+                          />
+                          <div style={{ fontSize: '0.85rem', color: '#2e7d32', marginTop: '4px' }}>
+                            Será gerada a cobrança e enviada ao e-mail do aluno com as instruções de pagamento.
+                          </div>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </>
               )}
@@ -2074,42 +2216,6 @@ function CadastroUsuario({ onUserChange }) {
         </div>
       )}
 
-      {showAlunoInfoModal && selectedAlunoInfo && (
-        <div style={styles.modal}>
-          <div style={{ ...styles.modalContent, width: '420px' }}>
-            <h2 style={styles.title}>
-              Informações do aluno
-            </h2>
-            <div style={{ display: 'grid', gap: '10px', color: '#444', fontSize: '0.95rem' }}>
-              <div>
-                <strong>Nome:</strong>{' '}
-                {`${selectedAlunoInfo.first_name} ${selectedAlunoInfo.last_name || ''}`.trim()}
-              </div>
-              <div>
-                <strong>Valor mensalidade:</strong> {formatValor(selectedAlunoInfo.valor_mensalidade)}
-              </div>
-              <div>
-                <strong>Dias habilitados:</strong>{' '}
-                {Array.isArray(selectedAlunoInfo.dias_habilitados_nomes) && selectedAlunoInfo.dias_habilitados_nomes.length > 0
-                  ? selectedAlunoInfo.dias_habilitados_nomes.join(', ')
-                  : Array.isArray(selectedAlunoInfo.dias_habilitados) && selectedAlunoInfo.dias_habilitados.length > 0
-                    ? selectedAlunoInfo.dias_habilitados.join(', ')
-                    : 'Não configurado'}
-              </div>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>
-              <button
-                type="button"
-                style={{ ...styles.button, backgroundColor: '#f5f5f5', color: '#333' }}
-                onClick={handleCloseAlunoInfoModal}
-              >
-                Fechar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {fotoAmpliadaUrl && (
         <div
           style={styles.fotoAmpliadaOverlay}
@@ -2121,55 +2227,6 @@ function CadastroUsuario({ onUserChange }) {
             style={styles.fotoAmpliadaImg}
             onClick={(e) => e.stopPropagation()}
           />
-        </div>
-      )}
-
-      {showPrecadastroInfoModal && selectedPrecadastroInfo && (
-        <div style={styles.modal}>
-          <div style={{ ...styles.modalContent, width: '420px' }}>
-            <h2 style={styles.title}>
-              Informações do pré-cadastro
-            </h2>
-            <div style={{ display: 'grid', gap: '10px', color: '#444', fontSize: '0.95rem' }}>
-              <div>
-                <strong>Nome:</strong>{' '}
-                {`${selectedPrecadastroInfo.first_name} ${selectedPrecadastroInfo.last_name || ''}`.trim()}
-              </div>
-              <div>
-                <strong>E-mail:</strong> {selectedPrecadastroInfo.email}
-              </div>
-              <div>
-                <strong>Telefone:</strong> {selectedPrecadastroInfo.telefone || '-'}
-              </div>
-              <div>
-                <strong>Tipo:</strong> {selectedPrecadastroInfo.origem_display || selectedPrecadastroInfo.origem || '-'}
-              </div>
-              {selectedPrecadastroInfo.origem === 'aula_experimental' && selectedPrecadastroInfo.data_aula_experimental && (
-                <div>
-                  <strong>Data da aula experimental:</strong>{' '}
-                  {new Date(selectedPrecadastroInfo.data_aula_experimental + 'T12:00:00').toLocaleDateString('pt-BR', {
-                    weekday: 'long',
-                    day: '2-digit',
-                    month: 'long',
-                    year: 'numeric'
-                  })}
-                </div>
-              )}
-              <div>
-                <strong>Status:</strong>{' '}
-                {selectedPrecadastroInfo.status === 'matriculado' ? 'Matriculado' : selectedPrecadastroInfo.status === 'cancelado' ? 'Cancelado' : 'Pendente'}
-              </div>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px' }}>
-              <button
-                type="button"
-                style={{ ...styles.button, backgroundColor: '#f5f5f5', color: '#333' }}
-                onClick={handleClosePrecadastroInfoModal}
-              >
-                Fechar
-              </button>
-            </div>
-          </div>
         </div>
       )}
 

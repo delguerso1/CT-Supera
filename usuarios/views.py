@@ -179,7 +179,14 @@ class FinalizarAgendamentoAPIView(APIView):
         valor_uniforme = request.data.get("valor_uniforme")
         dia_vencimento_primeira = request.data.get("dia_vencimento_primeira")
         turma_id = request.data.get("turma")
-        
+        criar_primeira_mensalidade_agora = request.data.get("criar_primeira_mensalidade_agora")
+        forma_pagamento = request.data.get("forma_pagamento") or ""
+
+        criar_e_enviar = bool(criar_primeira_mensalidade_agora)
+        if isinstance(criar_primeira_mensalidade_agora, str):
+            criar_e_enviar = criar_primeira_mensalidade_agora.strip().lower() in ["true", "1", "sim", "yes"]
+        forma_pagamento = (forma_pagamento or "").strip().lower()
+
         print(f"[DEBUG] Finalizando agendamento - PreCadastro ID: {precadastro_id}")
         print(f"[DEBUG] Dia vencimento: {dia_vencimento}")
         print(f"[DEBUG] Já é aluno: {ja_aluno}")
@@ -262,6 +269,11 @@ class FinalizarAgendamentoAPIView(APIView):
             if dia_vencimento_primeira < 1 or dia_vencimento_primeira > 31:
                 return Response({"error": "Dia do vencimento da primeira mensalidade deve ser entre 1 e 31."}, status=status.HTTP_400_BAD_REQUEST)
 
+            if criar_e_enviar and forma_pagamento in ('pix', 'boleto') and not (turma_id or precadastro.turma_id):
+                return Response({
+                    "error": "Para criar e enviar a cobrança por e-mail, selecione uma turma."
+                }, status=status.HTTP_400_BAD_REQUEST)
+
         if ja_aluno_bool:
             precadastro.cpf = cpf
             precadastro.save()
@@ -312,11 +324,50 @@ class FinalizarAgendamentoAPIView(APIView):
                 plano=None,
                 dias_habilitados=dias_habilitados
             )
+            mensalidade_criada = None
             if usuario_aluno and precadastro.turma:
                 precadastro.turma.alunos.add(usuario_aluno)
                 from financeiro.services import criar_mensalidade_ao_vincular_turma
-                criar_mensalidade_ao_vincular_turma(usuario_aluno, precadastro.turma, valor_primeira_mensalidade=valor_primeira_mensalidade, dia_vencimento_primeira=dia_vencimento_primeira)
-            return Response({"message": "Pré-cadastro convertido em aluno com sucesso!"}, status=status.HTTP_200_OK)
+                mensalidade_criada = criar_mensalidade_ao_vincular_turma(
+                    usuario_aluno, precadastro.turma,
+                    valor_primeira_mensalidade=valor_primeira_mensalidade,
+                    dia_vencimento_primeira=dia_vencimento_primeira
+                )
+
+            # Opcional: criar cobrança (PIX/Boleto) e enviar por e-mail ao aluno
+            pagamento_enviado = False
+            if criar_e_enviar and forma_pagamento in ('pix', 'boleto') and mensalidade_criada and usuario_aluno.email and usuario_aluno.email != 'pendente':
+                try:
+                    if forma_pagamento == 'pix':
+                        from financeiro.services import gerar_pix_para_mensalidade
+                        resultado = gerar_pix_para_mensalidade(mensalidade_criada)
+                        from usuarios.utils import enviar_primeira_mensalidade_email
+                        pagamento_enviado = enviar_primeira_mensalidade_email(
+                            usuario_aluno, 'pix',
+                            valor=resultado['valor'],
+                            data_vencimento=resultado['data_vencimento'],
+                            codigo_pix=resultado.get('codigo_pix')
+                        )
+                    elif forma_pagamento == 'boleto':
+                        from financeiro.services import gerar_boleto_para_mensalidade
+                        resultado = gerar_boleto_para_mensalidade(mensalidade_criada)
+                        from usuarios.utils import enviar_primeira_mensalidade_email
+                        pagamento_enviado = enviar_primeira_mensalidade_email(
+                            usuario_aluno, 'boleto',
+                            valor=resultado['valor'],
+                            data_vencimento=resultado['data_vencimento'],
+                            digitable_line=resultado.get('digitable_line'),
+                            pdf_content=resultado.get('pdf_content')
+                        )
+                except Exception as e:
+                    logger.warning(f"Erro ao gerar/enviar cobrança da primeira mensalidade: {e}")
+                    import traceback
+                    logger.warning(traceback.format_exc())
+
+            msg = "Pré-cadastro convertido em aluno com sucesso!"
+            if pagamento_enviado:
+                msg += " Cobrança enviada por e-mail ao aluno."
+            return Response({"message": msg, "pagamento_enviado": pagamento_enviado}, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({"error": f"Erro ao finalizar agendamento: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
 

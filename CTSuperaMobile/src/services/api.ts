@@ -509,7 +509,7 @@ export const usuarioService = {
     await api.delete(`usuarios/precadastros/${id}/`);
   },
 
-  finalizarAgendamento: async (precadastroId: number, data: any): Promise<{ message: string }> => {
+  finalizarAgendamento: async (precadastroId: number, data: any): Promise<{ message: string; pagamento_enviado?: boolean }> => {
     const response = await api.post(`usuarios/finalizar-agendamento/${precadastroId}/`, data);
     return response.data;
   },
