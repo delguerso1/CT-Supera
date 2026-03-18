@@ -349,6 +349,8 @@ function DashboardProfessor({ user }) {
   const [success, setSuccess] = useState('');
   const [erro, setErro] = useState('');
   const [turmaPresenca, setTurmaPresenca] = useState(null);
+  const [alunosPresenca, setAlunosPresenca] = useState([]);
+  const [loadingPresenca, setLoadingPresenca] = useState(false);
   const [presencas, setPresencas] = useState({});
   const [fotoPerfil, setFotoPerfil] = useState(null);
   const [fotoPreview, setFotoPreview] = useState(null);
@@ -552,27 +554,55 @@ function DashboardProfessor({ user }) {
     }
   };
 
+  const handleAbrirModalPresenca = async (turma) => {
+    setTurmaPresenca(turma);
+    setPresencas({});
+    setAlunosPresenca([]);
+    try {
+      setLoadingPresenca(true);
+      setErro('');
+      const resp = await api.get(`funcionarios/verificar-checkin/${turma.id}/`);
+      setAlunosPresenca(resp.data.alunos || []);
+    } catch (err) {
+      console.error('Erro ao carregar alunos:', err);
+      setErro('Erro ao carregar alunos da turma.');
+      setTurmaPresenca(null);
+    } finally {
+      setLoadingPresenca(false);
+    }
+  };
+
   const handlePresencaChange = (alunoId, checked) => {
-    setPresencas({
-      ...presencas,
+    setPresencas(prev => ({
+      ...prev,
       [alunoId]: checked
-    });
+    }));
   };
 
   const handleRegistrarPresenca = async () => {
     if (!turmaPresenca) return;
 
+    const alunosIds = Object.keys(presencas).filter(id => presencas[id]).map(String);
+    if (alunosIds.length === 0) {
+      setErro('Selecione pelo menos um aluno.');
+      return;
+    }
+
     try {
-      await api.post('presencas/registrar/', {
-        turma: turmaPresenca.id,
-        alunos: Object.keys(presencas).map(id => ({ id: parseInt(id) })),
-        presencas: presencas
+      setErro('');
+      const response = await api.post(`funcionarios/registrar-presenca/${turmaPresenca.id}/`, {
+        presenca: alunosIds
       });
       setTurmaPresenca(null);
       setPresencas({});
-      setSuccess('Presenças registradas com sucesso!');
+      setAlunosPresenca([]);
+      setSuccess(response.data.message || 'Presenças registradas com sucesso!');
+      if (response.data.warning) {
+        setSuccess(prev => `${prev} ${response.data.warning}`);
+      }
     } catch (err) {
-      setErro('Erro ao registrar presenças.');
+      console.error('Erro ao registrar presença:', err);
+      setErro(err.response?.data?.error || 'Erro ao registrar presenças.');
     }
   };
 
@@ -1059,7 +1089,7 @@ function DashboardProfessor({ user }) {
                   <td style={styles.td}>
                     <button
                           style={styles.actionButton}
-                      onClick={() => setTurmaPresenca(turma)}
+                      onClick={() => handleAbrirModalPresenca(turma)}
                     >
                       Registrar Presença
                     </button>
@@ -1194,53 +1224,47 @@ function DashboardProfessor({ user }) {
             
             <div style={{ marginTop: '20px' }}>
               <h3 style={{ marginBottom: '16px' }}>Alunos</h3>
-              {turmaPresenca.alunos && turmaPresenca.alunos.length > 0 ? (
+              <p style={{ fontSize: '13px', color: '#666', marginBottom: '12px' }}>
+                💡 Selecione os alunos presentes. Você pode registrar presença mesmo sem check-in do aluno.
+              </p>
+              {loadingPresenca ? (
+                <p style={styles.noData}>Carregando alunos...</p>
+              ) : alunosPresenca.length > 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {turmaPresenca.alunos.map(aluno => (
-                    <div key={aluno.id} style={styles.checkboxContainer}>
+                  {alunosPresenca.map(aluno => (
+                    <div key={aluno.id} style={{
+                      ...styles.checkboxContainer,
+                      opacity: aluno.presenca_confirmada ? 0.7 : 1,
+                      backgroundColor: aluno.checkin_realizado ? '#f0f8ff' : '#fff8f0'
+                    }}>
                       <input
                         type="checkbox"
                         id={`aluno-${aluno.id}`}
                         checked={presencas[aluno.id] || false}
                         onChange={e => handlePresencaChange(aluno.id, e.target.checked)}
+                        disabled={aluno.presenca_confirmada}
                         style={styles.checkbox}
                       />
                       <label
                         htmlFor={`aluno-${aluno.id}`}
-                        style={{ ...styles.checkboxLabel, display: 'flex', alignItems: 'center', gap: '8px' }}
+                        style={{
+                          ...styles.checkboxLabel,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          cursor: aluno.presenca_confirmada ? 'not-allowed' : 'pointer'
+                        }}
                       >
-                        {aluno.foto_perfil ? (
-                          <img
-                            src={`${MEDIA_URL}${aluno.foto_perfil}`}
-                            alt="Foto do aluno"
-                            style={{
-                              width: '28px',
-                              height: '28px',
-                              borderRadius: '50%',
-                              objectFit: 'cover',
-                              backgroundColor: '#e0e0e0'
-                            }}
-                          />
-                        ) : (
-                          <span
-                            style={{
-                              width: '28px',
-                              height: '28px',
-                              borderRadius: '50%',
-                              backgroundColor: '#e0e0e0',
-                              color: '#555',
-                              fontSize: '11px',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              fontWeight: 'bold'
-                            }}
-                          >
-                            {(aluno.first_name || 'A').charAt(0).toUpperCase()}
-                            {(aluno.last_name || '').charAt(0).toUpperCase()}
-                          </span>
-                        )}
-                        <span>{aluno.first_name} {aluno.last_name} ({aluno.username})</span>
+                        <span>{aluno.nome || `${aluno.first_name || ''} ${aluno.last_name || ''}`.trim()} ({aluno.username})</span>
+                        <span style={{
+                          fontSize: '11px',
+                          padding: '2px 6px',
+                          borderRadius: 3,
+                          backgroundColor: aluno.presenca_confirmada ? '#4caf50' : aluno.checkin_realizado ? '#2196f3' : '#ff9800',
+                          color: 'white'
+                        }}>
+                          {aluno.presenca_confirmada ? '✅ Confirmada' : aluno.checkin_realizado ? 'Check-in OK' : 'Sem check-in'}
+                        </span>
                       </label>
                     </div>
                   ))}

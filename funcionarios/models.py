@@ -13,7 +13,7 @@ class Presenca(models.Model):
     presenca_confirmada = models.BooleanField(default=False)  # 🔹 Indica se o professor confirmou a presença
 
     class Meta:
-        unique_together = ("usuario", "data")  # 🔹 Impede duplicação no mesmo dia
+        unique_together = ("usuario", "turma", "data")  # Um registro por aluno por turma por dia
 
     def __str__(self):
         return f"{self.usuario.get_full_name()} - {self.data} ({self.turma})"

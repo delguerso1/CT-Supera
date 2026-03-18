@@ -67,37 +67,33 @@ class RegistrarPresencaAPIView(APIView):
         alunos = Usuario.objects.filter(tipo="aluno", ativo=True, turmas_aluno=turma)
 
         presencas_registradas = 0
-        alunos_sem_checkin = []
 
         for aluno in alunos:
             if str(aluno.id) in alunos_presentes:
-                # Verifica se o aluno fez check-in
                 presenca = Presenca.objects.filter(
                     usuario=aluno, 
                     data=hoje, 
-                    turma=turma,
-                    checkin_realizado=True
+                    turma=turma
                 ).first()
                 
                 if presenca:
-                    # Confirma a presença
+                    presenca.checkin_realizado = True
                     presenca.presenca_confirmada = True
                     presenca.save()
-                    presencas_registradas += 1
                 else:
-                    alunos_sem_checkin.append(f"{aluno.first_name} {aluno.last_name}")
+                    # Professor pode registrar presença manualmente (com ou sem check-in do aluno)
+                    Presenca.objects.create(
+                        usuario=aluno,
+                        turma=turma,
+                        data=hoje,
+                        checkin_realizado=True,
+                        presenca_confirmada=True
+                    )
+                presencas_registradas += 1
 
-        # Retorna resultado
-        if alunos_sem_checkin:
-            return Response({
-                "message": f"Presenças registradas: {presencas_registradas}",
-                "warning": f"Alunos sem check-in: {', '.join(alunos_sem_checkin)}",
-                "alunos_sem_checkin": alunos_sem_checkin
-            }, status=status.HTTP_200_OK)
-        else:
-            return Response({
-                "message": f"Presenças registradas com sucesso! ({presencas_registradas} alunos)"
-            }, status=status.HTTP_200_OK)
+        return Response({
+            "message": f"Presenças registradas com sucesso! ({presencas_registradas} aluno(s))"
+        }, status=status.HTTP_200_OK)
 
 
 def _serialize_presenca(presenca: Presenca):
