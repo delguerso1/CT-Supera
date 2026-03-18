@@ -1177,7 +1177,13 @@ function CadastroUsuario({ onUserChange }) {
                     }}
                     title="Ver informações do aluno"
                   >
-                    {`${user.first_name} ${user.last_name || ''}`.trim()}
+                    {(() => {
+                      const nome = `${user.first_name} ${user.last_name || ''}`.trim();
+                      const dataAula = user.origem === 'aula_experimental' && user.data_aula_experimental
+                        ? ` (aula ${new Date(user.data_aula_experimental + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })})`
+                        : '';
+                      return nome + dataAula;
+                    })()}
                   </button>
                 </td>
                 {activeTab === 'alunos' && (

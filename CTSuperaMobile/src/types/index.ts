@@ -265,6 +265,7 @@ export interface PreCadastro {
   origem_display?: string;
   criado_em: string;
   data_nascimento?: string;
+  data_aula_experimental?: string;
 }
 
 export interface PainelGerente {

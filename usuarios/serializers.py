@@ -374,11 +374,9 @@ class PreCadastroSerializer(serializers.ModelSerializer):
                         raise serializers.ValidationError({
                             'cpf': 'Este CPF já possui uma aula experimental agendada. Para reagendar, acesse o link enviado no e-mail de confirmação.'
                         })
-            else:
-                raise serializers.ValidationError({
-                    'cpf': 'CPF é obrigatório para agendar aula experimental.'
-                })
-
+        cpf_val = attrs.get('cpf')
+        if cpf_val is not None and not str(cpf_val).strip():
+            attrs['cpf'] = None
         return attrs
 
 class MensalidadeSerializer(serializers.ModelSerializer):

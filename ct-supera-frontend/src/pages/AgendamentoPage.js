@@ -41,6 +41,64 @@ const styles = {
   success: {
     color: '#388e3c',
     marginBottom: '10px'
+  },
+  calendar: {
+    margin: '16px 0',
+    padding: '16px',
+    background: '#fff',
+    borderRadius: '8px',
+    border: '1px solid #90caf9'
+  },
+  calendarHeader: {
+    textAlign: 'center',
+    fontSize: '1rem',
+    fontWeight: 'bold',
+    color: '#1F6C86',
+    marginBottom: '12px'
+  },
+  calendarWeekdays: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(7, 1fr)',
+    gap: '4px',
+    marginBottom: '4px'
+  },
+  calendarWeekday: {
+    textAlign: 'center',
+    fontSize: '0.7rem',
+    fontWeight: '600',
+    color: '#546e7a'
+  },
+  calendarGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(7, 1fr)',
+    gap: '4px'
+  },
+  calendarDay: {
+    aspectRatio: '1',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '0.85rem',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    minHeight: '32px'
+  },
+  calendarDayAvailable: {
+    background: '#e3f2fd',
+    color: '#1565c0',
+    fontWeight: '600'
+  },
+  calendarDaySelected: {
+    background: '#1F6C86',
+    color: '#fff',
+    fontWeight: '600'
+  },
+  calendarDayDisabled: {
+    color: '#b0bec5',
+    cursor: 'default'
+  },
+  calendarDayEmpty: {
+    visibility: 'hidden'
   }
 };
 
@@ -191,9 +249,13 @@ function AgendamentoPage() {
     setSuccess('');
 
     // Validação da turma selecionada
-    const turmaSelecionada = turmasFiltradas.find(t => t.id === parseInt(form.turma));
-    if (turmaSelecionada && !turmaSelecionada.tem_vagas) {
+    const turma = turmasFiltradas.find(t => t.id === parseInt(form.turma));
+    if (turma && !turma.tem_vagas) {
       setError('Esta turma não possui mais vagas disponíveis.');
+      return;
+    }
+    if (!form.data_aula_experimental) {
+      setError('Selecione a data da aula experimental no calendário.');
       return;
     }
 
@@ -249,6 +311,55 @@ function AgendamentoPage() {
   };
 
   const ctSelecionado = cts.find(ct => String(ct.id) === String(form.ct));
+  const turmaSelecionada = turmasFiltradas.find(t => t.id === parseInt(form.turma));
+
+  // Calendário do mês atual
+  const hoje = new Date();
+  const ano = hoje.getFullYear();
+  const mes = hoje.getMonth();
+  const primeiroDia = new Date(ano, mes, 1);
+  const ultimoDia = new Date(ano, mes + 1, 0);
+  const diasNoMes = ultimoDia.getDate();
+  const primeiroDiaSemana = primeiroDia.getDay(); // 0=dom, 1=seg, ...
+  const datasSet = new Set(datasDisponiveis);
+  const nomesDias = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+  const meses = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+
+  const renderCalendarioDias = () => {
+    const celulas = [];
+    const espacosInicio = primeiroDiaSemana;
+    for (let i = 0; i < espacosInicio; i++) {
+      celulas.push(<div key={`empty-${i}`} style={{ ...styles.calendarDay, ...styles.calendarDayEmpty }} />);
+    }
+    for (let dia = 1; dia <= diasNoMes; dia++) {
+      const dataStr = `${ano}-${String(mes + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
+      const disponivel = datasSet.has(dataStr);
+      const selecionado = form.data_aula_experimental === dataStr;
+      const dataObj = new Date(ano, mes, dia);
+      const passou = dataObj < new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
+      const podeClicar = disponivel && !passou;
+      celulas.push(
+        <div
+          key={dia}
+          style={{
+            ...styles.calendarDay,
+            ...(selecionado ? styles.calendarDaySelected : null),
+            ...(podeClicar ? styles.calendarDayAvailable : styles.calendarDayDisabled)
+          }}
+          onClick={() => podeClicar && setForm(prev => ({ ...prev, data_aula_experimental: dataStr }))}
+          onMouseEnter={(e) => {
+            if (podeClicar && !selecionado) e.currentTarget.style.background = '#bbdefb';
+          }}
+          onMouseLeave={(e) => {
+            if (podeClicar && !selecionado) e.currentTarget.style.background = '#e3f2fd';
+          }}
+        >
+          {dia}
+        </div>
+      );
+    }
+    return celulas;
+  };
 
   return (
     <>
@@ -305,9 +416,8 @@ function AgendamentoPage() {
             name="cpf"
             value={form.cpf}
             onChange={handleChange}
-            placeholder="CPF (obrigatório para aula experimental)"
+            placeholder="CPF (opcional)"
             maxLength={14}
-            required
           />
           <select
             style={styles.input}
@@ -354,31 +464,39 @@ function AgendamentoPage() {
               );
             })}
           </select>
-          <select
-            style={styles.input}
-            name="data_aula_experimental"
-            value={form.data_aula_experimental}
-            onChange={handleChange}
-            required
-            disabled={!form.turma || datasDisponiveis.length === 0}
-          >
-            <option value="">
-              {!form.turma
-                ? 'Selecione a turma primeiro'
-                : datasDisponiveis.length === 0
-                  ? 'Nenhuma data disponível neste mês'
-                  : 'Selecione a data da aula experimental'}
-            </option>
-            {datasDisponiveis.map(d => (
-              <option key={d} value={d}>
-                {new Date(d + 'T12:00:00').toLocaleDateString('pt-BR', {
-                  weekday: 'long',
-                  day: '2-digit',
-                  month: 'long'
-                })}
-              </option>
-            ))}
-          </select>
+          {form.turma && (
+            <div style={{ marginTop: '8px', marginBottom: '8px' }}>
+              <label style={{ display: 'block', textAlign: 'left', marginBottom: '4px', fontWeight: '500', color: '#333' }}>
+                Data da aula experimental
+              </label>
+              {turmaSelecionada?.horario && datasDisponiveis.length > 0 && (
+                <div style={{ marginBottom: '8px', padding: '8px 12px', background: '#e8f5e9', borderRadius: '6px', fontSize: '0.9rem', color: '#2e7d32', fontWeight: '500' }}>
+                  Horário das aulas: {formatarHorario(turmaSelecionada.horario)}
+                </div>
+              )}
+              {!form.turma || datasDisponiveis.length === 0 ? (
+                <div style={{ padding: '12px', background: '#f5f5f5', borderRadius: '6px', color: '#757575', fontSize: '0.9rem' }}>
+                  {!form.turma ? 'Selecione a turma primeiro' : 'Nenhuma data disponível neste mês'}
+                </div>
+              ) : (
+                <div style={styles.calendar}>
+                  <div style={styles.calendarHeader}>{meses[mes]} {ano}</div>
+                  <div style={styles.calendarWeekdays}>
+                    {nomesDias.map(d => <div key={d} style={styles.calendarWeekday}>{d}</div>)}
+                  </div>
+                  <div style={styles.calendarGrid}>
+                    {renderCalendarioDias()}
+                  </div>
+                  {form.data_aula_experimental && (
+                    <div style={{ marginTop: '8px', fontSize: '0.85rem', color: '#1565c0' }}>
+                      Selecionado: {new Date(form.data_aula_experimental + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}
+                      {turmaSelecionada?.horario && ` às ${formatarHorario(turmaSelecionada.horario)}`}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
           <button type="submit" style={styles.button}>Agendar</button>
         </form>
       </div>

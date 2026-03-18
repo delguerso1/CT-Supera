@@ -929,7 +929,13 @@ const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }
                 <View style={styles.precadastroHeader}>
                   <View style={styles.precadastroInfo}>
                     <Text style={styles.precadastroNome}>
-                      {precadastro.nome || `${precadastro.first_name || ''} ${precadastro.last_name || ''}`.trim() || 'Sem nome'}
+                      {(() => {
+                        const nome = precadastro.nome || `${precadastro.first_name || ''} ${precadastro.last_name || ''}`.trim() || 'Sem nome';
+                        const dataAula = precadastro.origem === 'aula_experimental' && precadastro.data_aula_experimental
+                          ? ` (aula ${new Date(precadastro.data_aula_experimental + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })})`
+                          : '';
+                        return nome + dataAula;
+                      })()}
                     </Text>
                     <Text style={styles.precadastroEmail}>{precadastro.email}</Text>
                     {precadastro.telefone && (

@@ -467,7 +467,13 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
                 precadastros.map((item) => (
                   <View key={item.id} style={styles.card}>
                     <Text style={styles.cardTitle}>
-                      {item.nome || `${item.first_name || ''} ${item.last_name || ''}`.trim() || 'Sem nome'}
+                      {(() => {
+                        const nome = item.nome || `${item.first_name || ''} ${item.last_name || ''}`.trim() || 'Sem nome';
+                        const dataAula = item.origem === 'aula_experimental' && item.data_aula_experimental
+                          ? ` (aula ${new Date(item.data_aula_experimental + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })})`
+                          : '';
+                        return nome + dataAula;
+                      })()}
                     </Text>
                     <Text style={styles.cardSubtitle}>{item.email}</Text>
                     <Text style={styles.cardSubtitle}>
