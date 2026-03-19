@@ -343,6 +343,11 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
 
   const handleFinalizarMatricula = async () => {
     if (!matriculaPrecadastro) return;
+    const cpfDigits = String(matriculaForm.cpf || '').replace(/\D/g, '');
+    if (!matriculaPrecadastro.cpf && cpfDigits.length !== 11) {
+      Alert.alert('Atenção', 'Informe o CPF do aluno (11 dígitos).');
+      return;
+    }
     const valorMensalidade = Number(matriculaForm.valor_mensalidade);
     if (!matriculaForm.valor_mensalidade || Number.isNaN(valorMensalidade) || valorMensalidade <= 0) {
       Alert.alert('Atenção', 'Informe o valor da mensalidade.');
@@ -361,6 +366,18 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
         Alert.alert('Atenção', 'Informe o dia de vencimento da primeira mensalidade (1 a 31).');
         return;
       }
+    }
+    const diaVenM = Number(matriculaForm.dia_vencimento);
+    if (!matriculaForm.dia_vencimento || Number.isNaN(diaVenM) || ![1, 5, 10].includes(diaVenM)) {
+      Alert.alert('Atenção', 'Selecione o dia de vencimento das mensalidades (1, 5 ou 10).');
+      return;
+    }
+    if (!matriculaForm.ja_aluno && !matriculaForm.turma) {
+      Alert.alert(
+        'Atenção',
+        'Selecione uma turma. É obrigatório para novo aluno (primeira mensalidade no financeiro).',
+      );
+      return;
     }
     if (!matriculaForm.dias_habilitados || matriculaForm.dias_habilitados.length === 0) {
       Alert.alert('Atenção', 'Selecione pelo menos um dia habilitado para treino.');
@@ -382,16 +399,17 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
       }
     }
     try {
+      const round2 = (v: string | number) => Math.round(Number(v || 0) * 100) / 100;
       const payload: any = {
         cpf: matriculaForm.cpf,
         dia_vencimento: Number(matriculaForm.dia_vencimento),
         ja_aluno: matriculaForm.ja_aluno,
-        valor_mensalidade,
+        valor_mensalidade: round2(matriculaForm.valor_mensalidade),
         dias_habilitados: matriculaForm.dias_habilitados,
       };
       if (!matriculaForm.ja_aluno) {
-        payload.valor_matricula = Number(matriculaForm.valor_matricula || 0);
-        payload.valor_uniforme = Number(matriculaForm.valor_uniforme || 0);
+        payload.valor_matricula = round2(matriculaForm.valor_matricula);
+        payload.valor_uniforme = round2(matriculaForm.valor_uniforme);
         payload.dia_vencimento_primeira = Number(matriculaForm.dia_vencimento_primeira);
       }
       if (matriculaForm.turma) {
@@ -730,7 +748,9 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Matricular pré-cadastro</Text>
             <ScrollView>
-              <Text style={styles.sectionTitle}>Turma (opcional)</Text>
+              <Text style={styles.sectionTitle}>
+                {matriculaForm.ja_aluno ? 'Turma (opcional)' : 'Turma (obrigatório para novo aluno)'}
+              </Text>
               {turmasParaMatricula.filter(t => t.ativo !== false).length === 0 ? (
                 <Text style={styles.noData}>Nenhuma turma disponível.</Text>
               ) : (
@@ -750,19 +770,29 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
                 ))
               )}
 
-              <TextInput
-                style={styles.input}
-                placeholder="CPF"
-                value={matriculaForm.cpf}
-                onChangeText={(value) => setMatriculaForm(prev => ({ ...prev, cpf: value }))}
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="Dia de vencimento (1, 5 ou 10)"
-                keyboardType="numeric"
-                value={matriculaForm.dia_vencimento}
-                onChangeText={(value) => setMatriculaForm(prev => ({ ...prev, dia_vencimento: value }))}
-              />
+              {!matriculaPrecadastro.cpf ? (
+                <TextInput
+                  style={styles.input}
+                  placeholder="CPF (obrigatório)"
+                  keyboardType="numeric"
+                  value={matriculaForm.cpf}
+                  onChangeText={(value) => setMatriculaForm(prev => ({ ...prev, cpf: value }))}
+                />
+              ) : null}
+              <Text style={styles.sectionTitle}>Dia de vencimento das mensalidades</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+                {(['1', '5', '10'] as const).map((d) => (
+                  <TouchableOpacity
+                    key={d}
+                    style={[styles.dayItem, matriculaForm.dia_vencimento === d && styles.turmaItemSelected]}
+                    onPress={() => setMatriculaForm(prev => ({ ...prev, dia_vencimento: d }))}
+                  >
+                    <Text style={[styles.dayText, matriculaForm.dia_vencimento === d && styles.turmaItemTextSelected]}>
+                      Dia {d}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
               <View style={styles.switchRow}>
                 <Text style={styles.switchLabel}>Já é aluno? (recredenciamento)</Text>
                 <Switch
@@ -802,7 +832,7 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
                     onChangeText={(value) => setMatriculaForm(prev => ({ ...prev, valor_mensalidade: value }))}
                   />
                   <Text style={styles.sectionTitle}>
-                    Total: R$ {(Number(matriculaForm.valor_matricula || 0) + Number(matriculaForm.valor_uniforme || 0) + Number(matriculaForm.valor_mensalidade || 0)).toFixed(2)}
+                    Total: R$ {(Math.round((Number(matriculaForm.valor_matricula || 0) + Number(matriculaForm.valor_uniforme || 0) + Number(matriculaForm.valor_mensalidade || 0)) * 100) / 100).toFixed(2)}
                   </Text>
                   {!matriculaForm.criar_primeira_mensalidade_agora && (
                     <TextInput

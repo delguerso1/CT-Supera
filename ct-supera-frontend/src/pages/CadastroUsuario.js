@@ -847,12 +847,21 @@ function CadastroUsuario({ onUserChange }) {
       setError('Selecione o dia de vencimento.');
       return;
     }
+    const diaVen = parseInt(matriculaForm.dia_vencimento, 10);
+    if (![1, 5, 10].includes(diaVen)) {
+      setError('O dia de vencimento das mensalidades deve ser 1, 5 ou 10.');
+      return;
+    }
     const valorMensalidade = parseFloat(matriculaForm.valor_mensalidade);
     if (!matriculaForm.valor_mensalidade || Number.isNaN(valorMensalidade) || valorMensalidade <= 0) {
       setError('Informe o valor da mensalidade.');
       return;
     }
     if (!matriculaForm.ja_aluno) {
+      if (!matriculaForm.turma) {
+        setError('Selecione uma turma. É obrigatório para registrar a primeira mensalidade no financeiro.');
+        return;
+      }
       const vm = parseFloat(matriculaForm.valor_mensalidade);
       const vMat = parseFloat(matriculaForm.valor_matricula || 0);
       const vUnif = parseFloat(matriculaForm.valor_uniforme || 0);
@@ -889,15 +898,16 @@ function CadastroUsuario({ onUserChange }) {
     try {
       setMatriculaLoading(true);
       setError('');
+      const round2 = (v) => Math.round(parseFloat(v || 0) * 100) / 100;
       const payload = {
         dia_vencimento: parseInt(matriculaForm.dia_vencimento, 10),
         ja_aluno: Boolean(matriculaForm.ja_aluno),
-        valor_mensalidade: valorMensalidade,
+        valor_mensalidade: round2(matriculaForm.valor_mensalidade),
         dias_habilitados: matriculaForm.dias_habilitados,
       };
       if (!matriculaForm.ja_aluno) {
-        payload.valor_matricula = parseFloat(matriculaForm.valor_matricula || 0);
-        payload.valor_uniforme = parseFloat(matriculaForm.valor_uniforme || 0);
+        payload.valor_matricula = round2(matriculaForm.valor_matricula);
+        payload.valor_uniforme = round2(matriculaForm.valor_uniforme);
         payload.dia_vencimento_primeira = parseInt(matriculaForm.dia_vencimento_primeira, 10);
       }
       if (matriculaForm.cpf) {
@@ -1943,7 +1953,7 @@ function CadastroUsuario({ onUserChange }) {
           <div style={styles.modalContent}>
             <h2 style={styles.title}>Matricular pré-cadastro</h2>
             <div style={{ fontSize: '0.9rem', color: '#666' }}>
-              A matrícula adiciona R$ 90,00 à primeira mensalidade e o vencimento será em 48h.
+              A primeira mensalidade inclui matrícula + uniforme + mensalidade do mês. O vencimento será no dia informado abaixo.
             </div>
             <div style={{
               backgroundColor: '#e3f2fd',
@@ -2002,8 +2012,9 @@ function CadastroUsuario({ onUserChange }) {
                   value={matriculaForm.turma}
                   onChange={handleMatriculaChange}
                   style={styles.select}
+                  required={!matriculaForm.ja_aluno}
                 >
-                  <option value="">Selecione uma turma (opcional)</option>
+                  <option value="">{matriculaForm.ja_aluno ? 'Selecione uma turma (opcional)' : 'Selecione uma turma (obrigatório para novo aluno)'}</option>
                   {Array.isArray(turmas) && turmas.filter(t => t.ativo !== false).map(turma => (
                     <option key={turma.id} value={turma.id}>
                       {turma.ct_nome || 'CT'} - {(turma.dias_semana_nomes || []).join(', ')} às {turma.horario || ''}
@@ -2083,7 +2094,7 @@ function CadastroUsuario({ onUserChange }) {
                   </div>
                   <div style={{ fontSize: '0.95rem', color: '#1F6C86', fontWeight: 600, marginBottom: '0.5rem' }}>
                     Total primeira mensalidade: R$ {
-                      (parseFloat(matriculaForm.valor_matricula || 0) + parseFloat(matriculaForm.valor_uniforme || 0) + parseFloat(matriculaForm.valor_mensalidade || 0)).toFixed(2).replace('.', ',')
+                      (Math.round((parseFloat(matriculaForm.valor_matricula || 0) + parseFloat(matriculaForm.valor_uniforme || 0) + parseFloat(matriculaForm.valor_mensalidade || 0)) * 100) / 100).toFixed(2).replace('.', ',')
                     }
                   </div>
                   {!matriculaForm.criar_primeira_mensalidade_agora && (

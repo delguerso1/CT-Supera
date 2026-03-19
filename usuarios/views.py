@@ -17,7 +17,7 @@ from usuarios.forms import DefinirSenhaForm
 from usuarios.serializers import DefinirSenhaSerializer, SolicitarRecuperacaoSenhaSerializer, RedefinirSenhaSerializer
 from financeiro.models import Mensalidade
 from django.utils import timezone
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from .serializers import UsuarioSerializer, PreCadastroSerializer, MensalidadeSerializer, SalarioSerializer
 from datetime import date, timedelta
 from django.core.mail import send_mail
@@ -187,13 +187,12 @@ class FinalizarAgendamentoAPIView(APIView):
             criar_e_enviar = criar_primeira_mensalidade_agora.strip().lower() in ["true", "1", "sim", "yes"]
         forma_pagamento = (forma_pagamento or "").strip().lower()
 
-        print(f"[DEBUG] Finalizando agendamento - PreCadastro ID: {precadastro_id}")
-        print(f"[DEBUG] Dia vencimento: {dia_vencimento}")
-        print(f"[DEBUG] Já é aluno: {ja_aluno}")
-        print(f"[DEBUG] Dias habilitados: {dias_habilitados_ids}")
-        print(f"[DEBUG] Valor mensalidade: {valor_mensalidade}")
-        print(f"[DEBUG] Valor matrícula: {valor_matricula}, uniforme: {valor_uniforme}, dia venc. primeira: {dia_vencimento_primeira}")
-        print(f"[DEBUG] Data nascimento do pré-cadastro: {precadastro.data_nascimento}")
+        logger.debug(
+            "Finalizar agendamento precadastro=%s ja_aluno=%s turma_id=%s",
+            precadastro_id,
+            ja_aluno,
+            getattr(precadastro, "turma_id", None),
+        )
 
         ja_aluno_bool = bool(ja_aluno)
         if isinstance(ja_aluno, str):
@@ -243,6 +242,16 @@ class FinalizarAgendamentoAPIView(APIView):
                     precadastro.turma = turma_obj
                     precadastro.save()
 
+        # Aluno novo: sem turma não há registro financeiro da 1ª parcela (matrícula+uniforme+mensalidade)
+        if not ja_aluno_bool and not precadastro.turma_id:
+            return Response(
+                {
+                    "error": "Para alunos novos, selecione uma turma. Sem turma, a primeira mensalidade "
+                    "(matrícula + uniforme + mensalidade) não é gerada no financeiro."
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         try:
             valor_mensalidade = Decimal(str(valor_mensalidade))
         except (InvalidOperation, TypeError, ValueError):
@@ -259,7 +268,7 @@ class FinalizarAgendamentoAPIView(APIView):
             except (InvalidOperation, TypeError, ValueError):
                 valor_matricula_dec = Decimal("0")
                 valor_uniforme_dec = Decimal("0")
-            valor_primeira_mensalidade = valor_matricula_dec + valor_uniforme_dec + valor_mensalidade
+            valor_primeira_mensalidade = (valor_matricula_dec + valor_uniforme_dec + valor_mensalidade).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
             if valor_primeira_mensalidade <= 0:
                 return Response({"error": "A soma (matrícula + uniforme + mensalidade) deve ser maior que zero."}, status=status.HTTP_400_BAD_REQUEST)
             try:
@@ -307,9 +316,8 @@ class FinalizarAgendamentoAPIView(APIView):
                 if usuario_aluno and precadastro.turma:
                     precadastro.turma.alunos.add(usuario_aluno)
                     from financeiro.services import criar_mensalidade_ao_vincular_turma
-                    val_primeira = valor_primeira_mensalidade if not ja_aluno_bool else None
-                    dia_venc_primeira = dia_vencimento_primeira if not ja_aluno_bool else None
-                    criar_mensalidade_ao_vincular_turma(usuario_aluno, precadastro.turma, valor_primeira_mensalidade=val_primeira, dia_vencimento_primeira=dia_venc_primeira)
+                    # Ramo ja_aluno: sem 1ª parcela composta (só mensalidade via aluno.valor_mensalidade)
+                    criar_mensalidade_ao_vincular_turma(usuario_aluno, precadastro.turma)
                 return Response({"message": "Pré-cadastro convertido em aluno com sucesso!"}, status=status.HTTP_200_OK)
             except Exception as e:
                 return Response({"error": f"Erro ao finalizar agendamento: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
