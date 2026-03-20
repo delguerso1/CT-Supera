@@ -2,7 +2,11 @@ from django.db import models
 from django.utils import timezone
 from datetime import timedelta, date
 from calendar import monthrange
-from usuarios.models import Usuario  
+from usuarios.models import Usuario
+
+
+def _hoje_br():
+    return timezone.now().date()
 
 CATEGORIAS_DESPESAS = [
     ("salario", "Salário de Funcionário"),
@@ -30,17 +34,36 @@ class Mensalidade(models.Model):
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="pendente")
     observacoes = models.TextField(blank=True, null=True)
 
+    @property
+    def status_efetivo(self):
+        """
+        Status para exibição e filtros:
+        - pago: registrado como pago
+        - atrasado: não pago e já passou o dia de vencimento
+        - pendente: não pago e ainda não venceu (hoje <= vencimento)
+        """
+        if self.status == "pago":
+            return "pago"
+        hoje = _hoje_br()
+        if self.data_vencimento and hoje > self.data_vencimento:
+            return "atrasado"
+        return "pendente"
+
     def save(self, *args, **kwargs):
-        hoje = timezone.now().date()
+        hoje = _hoje_br()
 
         if not self.data_vencimento:
             self.data_vencimento = self.data_inicio + timedelta(days=30)  # 🔹 Define vencimento automático
 
-        if self.status == "pago" and not self.data_pagamento:
-            self.data_pagamento = timezone.now()
-
-        if self.status == "pendente" and hoje > self.data_vencimento:
-            self.status = "atrasado"
+        if self.status == "pago":
+            if not self.data_pagamento:
+                self.data_pagamento = timezone.now()
+        else:
+            # Mantém o registro alinhado: pendente vs atrasado conforme a data
+            if hoje > self.data_vencimento:
+                self.status = "atrasado"
+            else:
+                self.status = "pendente"
 
         super().save(*args, **kwargs)
 

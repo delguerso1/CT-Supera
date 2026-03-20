@@ -3,7 +3,7 @@ from rest_framework import status
 from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIView
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
-from django.db.models import Sum
+from django.db.models import Sum, Q
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 from .models import Mensalidade, Despesa, Salario, TransacaoC6Bank
@@ -98,7 +98,8 @@ class MensalidadeListCreateView(ListCreateAPIView):
         turma_id = self.request.query_params.get('turma')
         if turma_id:
             try:
-                queryset = queryset.filter(aluno__turmas_aluno_id=int(turma_id))
+                # M2M: não existe turmas_aluno_id; usar __id (igual usuarios/views)
+                queryset = queryset.filter(aluno__turmas_aluno__id=int(turma_id)).distinct()
             except (TypeError, ValueError):
                 pass
         mes_param = self.request.query_params.get('mes')
@@ -111,6 +112,15 @@ class MensalidadeListCreateView(ListCreateAPIView):
                     queryset = queryset.filter(data_vencimento__month=mes, data_vencimento__year=ano)
             except (TypeError, ValueError):
                 pass
+        # Filtro por status efetivo (não pago + data) — alinha com Controle Financeiro
+        status_param = (self.request.query_params.get('status') or '').strip().lower()
+        hoje = timezone.now().date()
+        if status_param == 'pago':
+            queryset = queryset.filter(status='pago')
+        elif status_param == 'pendente':
+            queryset = queryset.filter(~Q(status='pago'), data_vencimento__gte=hoje)
+        elif status_param == 'atrasado':
+            queryset = queryset.filter(~Q(status='pago'), data_vencimento__lt=hoje)
         return queryset.order_by('-data_vencimento', '-id')
 
 class MensalidadeRetrieveUpdateDestroyView(RetrieveUpdateDestroyAPIView):

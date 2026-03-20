@@ -41,6 +41,11 @@ class MensalidadeSerializer(serializers.ModelSerializer):
             return None
         return obj.data_pagamento.strftime("%Y-%m-%d")
 
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        ret['status'] = instance.status_efetivo
+        return ret
+
 class PresencaSerializer(serializers.ModelSerializer):
     class Meta:
         model = Presenca

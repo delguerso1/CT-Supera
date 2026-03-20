@@ -321,7 +321,7 @@ function DashboardGerente({ user }) {
     alunosInativos: 0,
     professores: 0,
     mensalidadesPendentes: 0,
-    mensalidadesAtrasadasMesAnterior: 0,
+    mensalidadesAtrasadasMesCorrente: 0,
     mensalidadesAtrasadasMais30Dias: 0,
     mensalidadesPagas: 0,
     precadastros: 0,
@@ -377,7 +377,7 @@ function DashboardGerente({ user }) {
         alunosInativos: response.data.alunos_inativos || 0,
         professores: response.data.professores || 0,
         mensalidadesPendentes: response.data.mensalidades_pendentes || 0,
-        mensalidadesAtrasadasMesAnterior: response.data.mensalidades_atrasadas_mes_anterior || 0,
+        mensalidadesAtrasadasMesCorrente: response.data.mensalidades_atrasadas_mes_corrente || 0,
         mensalidadesAtrasadasMais30Dias: response.data.mensalidades_atrasadas_mais_30_dias || 0,
         mensalidadesPagas: response.data.mensalidades_pagas || 0,
         precadastros: response.data.precadastros || 0,
@@ -579,8 +579,8 @@ function DashboardGerente({ user }) {
         
         <div style={styles.statCard}>
           <div style={styles.statTitle}>Mensalidades Atrasadas</div>
-          <div style={styles.statValueDanger}>{stats.mensalidadesAtrasadasMesAnterior} / {stats.mensalidadesAtrasadasMais30Dias}</div>
-          <div style={styles.statSubtitle}>Mês anterior / +30 dias</div>
+          <div style={styles.statValueDanger}>{stats.mensalidadesAtrasadasMesCorrente} / {stats.mensalidadesAtrasadasMais30Dias}</div>
+          <div style={styles.statSubtitle}>Mês corrente / +30 dias</div>
         </div>
         
         <div style={styles.statCard}>

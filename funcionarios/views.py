@@ -1,7 +1,6 @@
 from django.shortcuts import get_object_or_404
 from turmas.models import Turma
 from datetime import date
-from calendar import monthrange
 from usuarios.models import Usuario, PreCadastro
 from financeiro.models import Mensalidade
 from .models import Presenca
@@ -289,16 +288,6 @@ class PainelGerenteAPIView(APIView):
             hoje = timezone.now().date()
             ano = hoje.year
             mes = hoje.month
-            primeiro_dia_mes = hoje.replace(day=1)
-            ultimo_dia_mes = date(ano, mes, monthrange(ano, mes)[1])
-
-            # Mês anterior
-            if mes == 1:
-                ano_anterior, mes_anterior = ano - 1, 12
-            else:
-                ano_anterior, mes_anterior = ano, mes - 1
-            primeiro_dia_mes_anterior = date(ano_anterior, mes_anterior, 1)
-            ultimo_dia_mes_anterior = date(ano_anterior, mes_anterior, monthrange(ano_anterior, mes_anterior)[1])
             limite_30_dias = hoje - timedelta(days=30)
 
             # Alunos: ativos e inativos
@@ -307,22 +296,25 @@ class PainelGerenteAPIView(APIView):
 
             professores = Usuario.objects.filter(tipo="professor", ativo=True).count()
 
-            # Mensalidades pendentes do mês corrente (vencimento no mês atual)
+            # Pendentes: não pagas, vencem no mês atual e ainda não passou o vencimento
             mensalidades_pendentes = Mensalidade.objects.filter(
-                status="pendente",
+                ~Q(status="pago"),
                 data_vencimento__year=ano,
-                data_vencimento__month=mes
+                data_vencimento__month=mes,
+                data_vencimento__gte=hoje,
             ).count()
 
-            # Mensalidades atrasadas: 1) vencimento no mês anterior, 2) atraso > 30 dias
-            mensalidades_atrasadas_mes_anterior = Mensalidade.objects.filter(
-                status="atrasado",
-                data_vencimento__gte=primeiro_dia_mes_anterior,
-                data_vencimento__lte=ultimo_dia_mes_anterior
+            # Atrasadas: não pagas; (1) vencimento no mês corrente e já passou o dia do vencimento
+            # (2) vencimento há mais de 30 dias (acúmulo de atraso)
+            mensalidades_atrasadas_mes_corrente = Mensalidade.objects.filter(
+                ~Q(status="pago"),
+                data_vencimento__year=ano,
+                data_vencimento__month=mes,
+                data_vencimento__lt=hoje,
             ).count()
             mensalidades_atrasadas_mais_30_dias = Mensalidade.objects.filter(
-                status="atrasado",
-                data_vencimento__lt=limite_30_dias
+                ~Q(status="pago"),
+                data_vencimento__lt=limite_30_dias,
             ).count()
 
             # Mensalidades pagas no mês corrente (data do pagamento)
@@ -398,7 +390,7 @@ class PainelGerenteAPIView(APIView):
                 'alunos_inativos': alunos_inativos,
                 'professores': professores,
                 'mensalidades_pendentes': mensalidades_pendentes,
-                'mensalidades_atrasadas_mes_anterior': mensalidades_atrasadas_mes_anterior,
+                'mensalidades_atrasadas_mes_corrente': mensalidades_atrasadas_mes_corrente,
                 'mensalidades_atrasadas_mais_30_dias': mensalidades_atrasadas_mais_30_dias,
                 'mensalidades_pagas': mensalidades_pagas,
                 'precadastros': precadastros,

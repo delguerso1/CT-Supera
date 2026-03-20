@@ -54,6 +54,8 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
     dia_vencimento: '1',
     ja_aluno: false,
     valor_mensalidade: '',
+    valor_mensalidade_proporcional: '',
+    valor_mensalidade_mes_seguinte: '',
     valor_matricula: '',
     valor_uniforme: '',
     dia_vencimento_primeira: '',
@@ -308,6 +310,8 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
         dia_vencimento: '1',
         ja_aluno: false,
         valor_mensalidade: '',
+        valor_mensalidade_proporcional: '',
+        valor_mensalidade_mes_seguinte: '',
         valor_matricula: '',
         valor_uniforme: '',
         dia_vencimento_primeira: '',
@@ -348,17 +352,35 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
       Alert.alert('Atenção', 'Informe o CPF do aluno (11 dígitos).');
       return;
     }
-    const valorMensalidade = Number(matriculaForm.valor_mensalidade);
-    if (!matriculaForm.valor_mensalidade || Number.isNaN(valorMensalidade) || valorMensalidade <= 0) {
-      Alert.alert('Atenção', 'Informe o valor da mensalidade.');
-      return;
+    if (!matriculaForm.ja_aluno) {
+      const vMesSeg = Number(matriculaForm.valor_mensalidade_mes_seguinte);
+      if (!matriculaForm.valor_mensalidade_mes_seguinte || Number.isNaN(vMesSeg) || vMesSeg <= 0) {
+        Alert.alert('Atenção', 'Informe a mensalidade do mês seguinte (valor cheio).');
+        return;
+      }
+      const vProp = Number(matriculaForm.valor_mensalidade_proporcional || 0);
+      if (matriculaForm.valor_mensalidade_proporcional && Number.isNaN(vProp)) {
+        Alert.alert('Atenção', 'Mensalidade proporcional inválida (use 0 se não houver).');
+        return;
+      }
+      if (vProp < 0) {
+        Alert.alert('Atenção', 'A mensalidade proporcional não pode ser negativa.');
+        return;
+      }
+    } else {
+      const valorMensalidade = Number(matriculaForm.valor_mensalidade);
+      if (!matriculaForm.valor_mensalidade || Number.isNaN(valorMensalidade) || valorMensalidade <= 0) {
+        Alert.alert('Atenção', 'Informe o valor da mensalidade.');
+        return;
+      }
     }
     if (!matriculaForm.ja_aluno) {
+      const vProp = Number(matriculaForm.valor_mensalidade_proporcional || 0);
       const vMat = Number(matriculaForm.valor_matricula || 0);
       const vUnif = Number(matriculaForm.valor_uniforme || 0);
-      const total = valorMensalidade + vMat + vUnif;
+      const total = vProp + vMat + vUnif;
       if (Number.isNaN(total) || total <= 0) {
-        Alert.alert('Atenção', 'Informe os valores da matrícula, uniforme e mensalidade.');
+        Alert.alert('Atenção', 'Matrícula + uniforme + proporcional deve ser maior que zero.');
         return;
       }
       const diaPrimeira = Number(matriculaForm.dia_vencimento_primeira);
@@ -404,13 +426,16 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
         cpf: matriculaForm.cpf,
         dia_vencimento: Number(matriculaForm.dia_vencimento),
         ja_aluno: matriculaForm.ja_aluno,
-        valor_mensalidade: round2(matriculaForm.valor_mensalidade),
         dias_habilitados: matriculaForm.dias_habilitados,
       };
       if (!matriculaForm.ja_aluno) {
+        payload.valor_mensalidade_proporcional = round2(matriculaForm.valor_mensalidade_proporcional || 0);
+        payload.valor_mensalidade_mes_seguinte = round2(matriculaForm.valor_mensalidade_mes_seguinte);
         payload.valor_matricula = round2(matriculaForm.valor_matricula);
         payload.valor_uniforme = round2(matriculaForm.valor_uniforme);
         payload.dia_vencimento_primeira = Number(matriculaForm.dia_vencimento_primeira);
+      } else {
+        payload.valor_mensalidade = round2(matriculaForm.valor_mensalidade);
       }
       if (matriculaForm.turma) {
         payload.turma = Number(matriculaForm.turma);
@@ -797,7 +822,19 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
                 <Text style={styles.switchLabel}>Já é aluno? (recredenciamento)</Text>
                 <Switch
                   value={matriculaForm.ja_aluno}
-                  onValueChange={(value) => setMatriculaForm(prev => ({ ...prev, ja_aluno: value }))}
+                  onValueChange={(value) =>
+                    setMatriculaForm((prev) => ({
+                      ...prev,
+                      ja_aluno: value,
+                      dias_habilitados: [],
+                      ...(value
+                        ? {
+                            valor_mensalidade_proporcional: '',
+                            valor_mensalidade_mes_seguinte: '',
+                          }
+                        : { valor_mensalidade: '' }),
+                    }))
+                  }
                 />
               </View>
               {matriculaForm.ja_aluno ? (
@@ -826,13 +863,20 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
                   />
                   <TextInput
                     style={styles.input}
-                    placeholder="Valor da mensalidade do mês (R$)"
+                    placeholder="Mensalidade proporcional — 1ª cobrança (R$)"
                     keyboardType="numeric"
-                    value={matriculaForm.valor_mensalidade}
-                    onChangeText={(value) => setMatriculaForm(prev => ({ ...prev, valor_mensalidade: value }))}
+                    value={matriculaForm.valor_mensalidade_proporcional}
+                    onChangeText={(value) => setMatriculaForm(prev => ({ ...prev, valor_mensalidade_proporcional: value }))}
+                  />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Mensalidade mês seguinte — valor cheio (R$)"
+                    keyboardType="numeric"
+                    value={matriculaForm.valor_mensalidade_mes_seguinte}
+                    onChangeText={(value) => setMatriculaForm(prev => ({ ...prev, valor_mensalidade_mes_seguinte: value }))}
                   />
                   <Text style={styles.sectionTitle}>
-                    Total: R$ {(Math.round((Number(matriculaForm.valor_matricula || 0) + Number(matriculaForm.valor_uniforme || 0) + Number(matriculaForm.valor_mensalidade || 0)) * 100) / 100).toFixed(2)}
+                    Total 1ª cobrança: R$ {(Math.round((Number(matriculaForm.valor_matricula || 0) + Number(matriculaForm.valor_uniforme || 0) + Number(matriculaForm.valor_mensalidade_proporcional || 0)) * 100) / 100).toFixed(2)}
                   </Text>
                   {!matriculaForm.criar_primeira_mensalidade_agora && (
                     <TextInput

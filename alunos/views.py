@@ -1,4 +1,4 @@
-from django.shortcuts import  get_object_or_404
+from django.shortcuts import get_object_or_404
 from financeiro.models import Mensalidade
 from datetime import date, timedelta
 from funcionarios.models import Presenca
@@ -6,11 +6,6 @@ from turmas.models import Turma
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from django.shortcuts import get_object_or_404
-from financeiro.models import Mensalidade
-from funcionarios.models import Presenca
-from turmas.models import Turma
-from datetime import date
 from .serializers import MensalidadeSerializer, UsuarioSerializer
 from rest_framework import status
 
@@ -20,15 +15,11 @@ class HistoricoPagamentosAPIView(APIView):
 
     def get(self, request):
         aluno = request.user
-        mensalidades_vencidas = Mensalidade.objects.filter(
-            aluno=aluno, status="pendente", data_vencimento__lt=date.today()
-        )
-        mensalidades_vincendas = Mensalidade.objects.filter(
-            aluno=aluno, status="pendente", data_vencimento__gte=date.today()
-        )
-        mensalidades_pagas = Mensalidade.objects.filter(
-            aluno=aluno, status="pago"
-        )
+        hoje = date.today()
+        nao_pagas = Mensalidade.objects.filter(aluno=aluno).exclude(status="pago")
+        mensalidades_vencidas = nao_pagas.filter(data_vencimento__lt=hoje)
+        mensalidades_vincendas = nao_pagas.filter(data_vencimento__gte=hoje)
+        mensalidades_pagas = Mensalidade.objects.filter(aluno=aluno, status="pago")
 
         return Response({
             "mensalidades_vencidas": MensalidadeSerializer(mensalidades_vencidas, many=True).data,
@@ -60,7 +51,11 @@ class PagamentoEmDiaAPIView(APIView):
 
     def get(self, request):
         usuario = request.user
-        pagamento_ok = not Mensalidade.objects.filter(aluno=usuario, status="pendente").exists()
+        hoje = date.today()
+        # Em dia: não há mensalidade não paga já vencida (atrasada)
+        pagamento_ok = not Mensalidade.objects.filter(
+            aluno=usuario
+        ).exclude(status="pago").filter(data_vencimento__lt=hoje).exists()
         return Response({"pagamento_em_dia": pagamento_ok})
 
 
@@ -124,16 +119,10 @@ class PainelAlunoAPIView(APIView):
         else:
             idade = None
 
-        mensalidades_em_atraso = Mensalidade.objects.filter(
-            aluno=usuario,
-            status="atrasado"
-        )
-        mensalidades_pendentes_vencidas = Mensalidade.objects.filter(
-            aluno=usuario,
-            status="pendente",
-            data_vencimento__lt=hoje
-        )
-        pode_fazer_checkin = not (mensalidades_em_atraso.exists() or mensalidades_pendentes_vencidas.exists())
+        mensalidades_atrasadas = Mensalidade.objects.filter(
+            aluno=usuario
+        ).exclude(status="pago").filter(data_vencimento__lt=hoje)
+        pode_fazer_checkin = not mensalidades_atrasadas.exists()
         motivo_checkin_bloqueado = None
         if pode_fazer_checkin:
             pode_fazer_checkin, motivo_checkin_bloqueado = self._validar_regras_checkin(usuario, turma, hoje)
@@ -142,7 +131,9 @@ class PainelAlunoAPIView(APIView):
             "usuario": UsuarioSerializer(usuario).data,
             "historico_aulas": historico_aulas.values(),
             "historico_pagamentos": MensalidadeSerializer(historico_pagamentos, many=True).data,
-            "pagamento_ok": not Mensalidade.objects.filter(aluno=usuario, status="pendente").exists(),
+            "pagamento_ok": not Mensalidade.objects.filter(
+                aluno=usuario
+            ).exclude(status="pago").filter(data_vencimento__lt=hoje).exists(),
             "idade": idade,
             "turma": turma_nome,
             "status_hoje": {
@@ -161,21 +152,15 @@ class RealizarCheckinAPIView(APIView):
     def post(self, request):
         usuario = request.user
         hoje = date.today()
-        mensalidades_pendentes = Mensalidade.objects.filter(
-            aluno=usuario,
-            status="atrasado"
-        ).order_by('data_vencimento')
-        mensalidades_pendentes_vencidas = Mensalidade.objects.filter(
-            aluno=usuario,
-            status="pendente",
-            data_vencimento__lt=hoje
-        ).order_by('data_vencimento')
+        mensalidades_nao_pagas_atrasadas = Mensalidade.objects.filter(
+            aluno=usuario
+        ).exclude(status="pago").filter(data_vencimento__lt=hoje).order_by('data_vencimento')
 
-        if mensalidades_pendentes.exists() or mensalidades_pendentes_vencidas.exists():
+        if mensalidades_nao_pagas_atrasadas.exists():
             return Response({
                 "error": "Você possui pendências de pagamento!",
                 "mensalidades_pendentes": MensalidadeSerializer(
-                    list(mensalidades_pendentes) + list(mensalidades_pendentes_vencidas),
+                    list(mensalidades_nao_pagas_atrasadas),
                     many=True
                 ).data
             }, status=status.HTTP_403_FORBIDDEN)

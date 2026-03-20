@@ -175,6 +175,8 @@ class FinalizarAgendamentoAPIView(APIView):
         ja_aluno = request.data.get("ja_aluno")
         dias_habilitados_ids = request.data.get("dias_habilitados")
         valor_mensalidade = request.data.get("valor_mensalidade")
+        valor_mensalidade_proporcional = request.data.get("valor_mensalidade_proporcional")
+        valor_mensalidade_mes_seguinte = request.data.get("valor_mensalidade_mes_seguinte")
         valor_matricula = request.data.get("valor_matricula")
         valor_uniforme = request.data.get("valor_uniforme")
         dia_vencimento_primeira = request.data.get("dia_vencimento_primeira")
@@ -247,30 +249,74 @@ class FinalizarAgendamentoAPIView(APIView):
             return Response(
                 {
                     "error": "Para alunos novos, selecione uma turma. Sem turma, a primeira mensalidade "
-                    "(matrícula + uniforme + mensalidade) não é gerada no financeiro."
+                    "(matrícula + uniforme + mensalidade proporcional) não é gerada no financeiro."
                 },
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        try:
-            valor_mensalidade = Decimal(str(valor_mensalidade))
-        except (InvalidOperation, TypeError, ValueError):
-            return Response({"error": "Informe um valor de mensalidade válido."}, status=status.HTTP_400_BAD_REQUEST)
-        if valor_mensalidade <= 0:
-            return Response({"error": "O valor da mensalidade deve ser maior que zero."}, status=status.HTTP_400_BAD_REQUEST)
-
         valor_primeira_mensalidade = None
-        dia_vencimento_primeira = None
-        if not ja_aluno_bool:
+
+        if ja_aluno_bool:
+            try:
+                valor_mensalidade = Decimal(str(valor_mensalidade))
+            except (InvalidOperation, TypeError, ValueError):
+                return Response({"error": "Informe um valor de mensalidade válido."}, status=status.HTTP_400_BAD_REQUEST)
+            if valor_mensalidade <= 0:
+                return Response({"error": "O valor da mensalidade deve ser maior que zero."}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            # Aluno novo: mensalidade proporcional entra na 1ª cobrança; mensalidade do mês seguinte grava no cadastro
+            uses_campos_separados = "valor_mensalidade_mes_seguinte" in request.data
+            if uses_campos_separados:
+                try:
+                    v_prop = Decimal(str(valor_mensalidade_proporcional if valor_mensalidade_proporcional not in (None, "") else 0))
+                except (InvalidOperation, TypeError, ValueError):
+                    return Response(
+                        {"error": "Informe um valor válido para a mensalidade proporcional (pode ser 0)."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                try:
+                    valor_mensalidade = Decimal(str(valor_mensalidade_mes_seguinte))
+                except (InvalidOperation, TypeError, ValueError):
+                    return Response(
+                        {"error": "Informe um valor válido para a mensalidade do mês seguinte."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                if v_prop < 0:
+                    return Response(
+                        {"error": "A mensalidade proporcional não pode ser negativa."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                if valor_mensalidade <= 0:
+                    return Response(
+                        {"error": "A mensalidade do mês seguinte deve ser maior que zero."},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+            else:
+                # Compatibilidade: um único campo (proporcional + valor fixo iguais)
+                try:
+                    valor_mensalidade = Decimal(str(valor_mensalidade))
+                except (InvalidOperation, TypeError, ValueError):
+                    return Response({"error": "Informe um valor de mensalidade válido."}, status=status.HTTP_400_BAD_REQUEST)
+                if valor_mensalidade <= 0:
+                    return Response({"error": "O valor da mensalidade deve ser maior que zero."}, status=status.HTTP_400_BAD_REQUEST)
+                v_prop = valor_mensalidade
+
             try:
                 valor_matricula_dec = Decimal(str(valor_matricula or 0))
                 valor_uniforme_dec = Decimal(str(valor_uniforme or 0))
             except (InvalidOperation, TypeError, ValueError):
                 valor_matricula_dec = Decimal("0")
                 valor_uniforme_dec = Decimal("0")
-            valor_primeira_mensalidade = (valor_matricula_dec + valor_uniforme_dec + valor_mensalidade).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            valor_primeira_mensalidade = (valor_matricula_dec + valor_uniforme_dec + v_prop).quantize(
+                Decimal("0.01"), rounding=ROUND_HALF_UP
+            )
             if valor_primeira_mensalidade <= 0:
-                return Response({"error": "A soma (matrícula + uniforme + mensalidade) deve ser maior que zero."}, status=status.HTTP_400_BAD_REQUEST)
+                return Response(
+                    {
+                        "error": "A soma (matrícula + uniforme + mensalidade proporcional) deve ser maior que zero."
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
             try:
                 dia_vencimento_primeira = int(dia_vencimento_primeira or dia_vencimento)
             except (TypeError, ValueError):

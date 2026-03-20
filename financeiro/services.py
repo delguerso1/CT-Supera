@@ -30,7 +30,7 @@ def criar_mensalidade_ao_vincular_turma(aluno, turma, valor_primeira_mensalidade
     Cria mensalidade quando aluno é vinculado a uma turma, se:
     - O CT da turma não tem sem_financeiro
     - O aluno ainda não possui mensalidade (evita duplicação)
-    - valor_primeira_mensalidade: valor opcional (matrícula + uniforme + mensalidade)
+    - valor_primeira_mensalidade: valor opcional (matrícula + uniforme + mensalidade proporcional do mês)
     - dia_vencimento_primeira: dia do mês (1-31) para vencimento da primeira mensalidade
 
     Retorna a Mensalidade criada ou None se não criou.

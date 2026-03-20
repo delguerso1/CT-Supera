@@ -563,9 +563,9 @@ const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }
           <View style={styles.statCard}>
             <Text style={styles.statTitle}>Mensalidades Atrasadas</Text>
             <Text style={[styles.statValue, { color: '#f44336' }]}>
-              {painelGerente.mensalidades_atrasadas_mes_anterior || 0} / {painelGerente.mensalidades_atrasadas_mais_30_dias || 0}
+              {painelGerente.mensalidades_atrasadas_mes_corrente || 0} / {painelGerente.mensalidades_atrasadas_mais_30_dias || 0}
             </Text>
-            <Text style={styles.statSubtitle}>Mês anterior / +30 dias</Text>
+            <Text style={styles.statSubtitle}>Mês corrente / +30 dias</Text>
           </View>
           
           <View style={styles.statCard}>

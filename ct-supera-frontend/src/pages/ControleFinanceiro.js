@@ -58,7 +58,7 @@ function ControleFinanceiro({ user, onDataChange }) {
   useEffect(() => {
     fetchMensalidades();
     // eslint-disable-next-line
-  }, [turmaFiltro]);
+  }, [turmaFiltro, mensalidadeStatus]);
 
   const fetchDashboard = async () => {
     setLoading(true);
@@ -119,7 +119,7 @@ function ControleFinanceiro({ user, onDataChange }) {
     }
   };
 
-  // Filtro por status (turma já é filtrada na API)
+  // Status já filtrado na API quando há seleção; mantém filtro local como redundância
   const mensalidadesFiltradas = mensalidades
     .filter(m => !mensalidadeStatus || m.status === mensalidadeStatus);
 
@@ -321,8 +321,8 @@ function ControleFinanceiro({ user, onDataChange }) {
         >
           <option value="">Todos os status</option>
           <option value="pago">Pago</option>
-          <option value="pendente">Pendente</option>
-          <option value="atrasado">Atrasado</option>
+          <option value="pendente">Pendente (não vencida)</option>
+          <option value="atrasado">Atrasada (vencida e não paga)</option>
         </select>
       </div>
       <div style={{ overflowX: 'auto', marginBottom: 24 }}>

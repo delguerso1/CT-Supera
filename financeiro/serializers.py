@@ -24,6 +24,12 @@ class MensalidadeSerializer(serializers.ModelSerializer):
         """Valor a exibir: valor_pago (com multa/juros) se houver, senão valor base."""
         return obj.valor_pago if obj.valor_pago is not None else obj.valor
 
+    def to_representation(self, instance):
+        """Status na API reflete vencimento (pendente / atrasado / pago), não só o valor gravado no BD."""
+        ret = super().to_representation(instance)
+        ret['status'] = instance.status_efetivo
+        return ret
+
 
 class TransacaoC6BankSerializer(serializers.ModelSerializer):
     mensalidade_info = serializers.SerializerMethodField()
@@ -50,5 +56,5 @@ class TransacaoC6BankSerializer(serializers.ModelSerializer):
             'aluno_nome': obj.mensalidade.aluno.get_full_name(),
             'valor': obj.mensalidade.valor,
             'data_vencimento': obj.mensalidade.data_vencimento,
-            'status': obj.mensalidade.status
+            'status': obj.mensalidade.status_efetivo
         }
