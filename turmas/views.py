@@ -18,9 +18,17 @@ def _validar_aluno_turma(aluno, turma):
         return False, "Dias habilitados do aluno não configurados."
 
     dias_turma = set(turma.dias_semana.values_list('id', flat=True))
+    if not dias_turma:
+        return False, "A turma não possui dias da semana cadastrados."
+
     dias_aluno = set(aluno.dias_habilitados.values_list('id', flat=True))
-    if not dias_aluno.issubset(dias_turma):
-        return False, "Dias habilitados do aluno não estão dentro dos dias da turma."
+    # Pelo menos um dia em comum: aluno pode ter mais dias habilitados que a turma
+    # (ex.: seg–sex no aluno e turma só seg/qua/sex).
+    dias_comuns = dias_aluno & dias_turma
+    if not dias_comuns:
+        return False, (
+            "Não há dia em comum entre os dias habilitados do aluno e os dias em que a turma funciona."
+        )
 
     return True, None
 
