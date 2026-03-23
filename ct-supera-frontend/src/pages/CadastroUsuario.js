@@ -202,6 +202,39 @@ const styles = {
     color: '#2e7d32',
     marginTop: '0.5rem',
   },
+  modalContentWide: {
+    width: 'min(92vw, 720px)',
+    maxWidth: '720px',
+  },
+  turmasPickerBox: {
+    border: '1px solid #ddd',
+    borderRadius: '8px',
+    maxHeight: 'min(42vh, 340px)',
+    overflowY: 'auto',
+    overflowX: 'auto',
+    backgroundColor: '#fafafa',
+    WebkitOverflowScrolling: 'touch',
+  },
+  turmasPickerRow: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: '10px',
+    padding: '10px 12px',
+    borderBottom: '1px solid #eee',
+    cursor: 'pointer',
+  },
+  turmasPickerRowLast: {
+    borderBottom: 'none',
+  },
+  turmasPickerText: {
+    flex: 1,
+    minWidth: '200px',
+    whiteSpace: 'normal',
+    wordBreak: 'break-word',
+    lineHeight: 1.45,
+    fontSize: '0.95rem',
+    color: '#333',
+  },
 };
 
 function CadastroUsuario({ onUserChange }) {
@@ -550,14 +583,22 @@ function CadastroUsuario({ onUserChange }) {
     }));
   };
 
-  const handleTurmasAlunoChange = (e) => {
-    const selected = Array.from(e.target.selectedOptions, opt => opt.value);
-    if (selected.length > 2) {
-      setError('Selecione no máximo duas turmas. Use Ctrl+clique (ou Cmd no Mac) para marcar ou desmarcar.');
-      return;
-    }
-    setError('');
-    setFormData(prev => ({ ...prev, turmas: selected }));
+  const handleToggleTurmaAluno = (turmaId) => {
+    const idStr = String(turmaId);
+    setFormData(prev => {
+      const cur = Array.isArray(prev.turmas) ? [...prev.turmas] : [];
+      const idx = cur.indexOf(idStr);
+      if (idx >= 0) {
+        setError('');
+        return { ...prev, turmas: cur.filter(x => x !== idStr) };
+      }
+      if (cur.length >= 2) {
+        setError('Selecione no máximo duas turmas.');
+        return prev;
+      }
+      setError('');
+      return { ...prev, turmas: [...cur, idStr] };
+    });
   };
 
   const handleSubmit = async (e) => {
@@ -1676,7 +1717,12 @@ function CadastroUsuario({ onUserChange }) {
 
       {showModal && (
         <div style={styles.modal}>
-          <div style={styles.modalContent}>
+          <div
+            style={{
+              ...styles.modalContent,
+              ...(editingUser && activeTab === 'alunos' ? styles.modalContentWide : {}),
+            }}
+          >
             <h2 style={styles.title}>
               {editingUser 
                 ? (activeTab === 'precadastros' ? 'Editar Pré-cadastro' : `Editar ${activeTab.slice(0, -1).charAt(0).toUpperCase() + activeTab.slice(0, -1).slice(1)}`)
@@ -1962,25 +2008,51 @@ function CadastroUsuario({ onUserChange }) {
                   </div>
                   {editingUser && (
                   <div style={styles.formGroup}>
-                    <label style={styles.label} htmlFor="aluno_edicao_turmas">
+                    <span style={styles.label} id="aluno_edicao_turmas_label">
                       Turmas vinculadas (até 2)
-                    </label>
-                    <select
-                      id="aluno_edicao_turmas"
-                      multiple
-                      size={Math.min(8, Math.max(3, (turmas || []).filter(t => t.ativo !== false).length || 3))}
-                      value={formData.turmas || []}
-                      onChange={handleTurmasAlunoChange}
-                      style={{ ...styles.select, minHeight: '140px', width: '100%' }}
+                    </span>
+                    <div
+                      style={styles.turmasPickerBox}
+                      role="group"
+                      aria-labelledby="aluno_edicao_turmas_label"
                     >
-                      {Array.isArray(turmas) && turmas.filter(t => t.ativo !== false).map(t => (
-                        <option key={t.id} value={String(t.id)}>
-                          {t.ct_nome || 'CT'} — {(t.dias_semana_nomes || []).join(', ')} às {t.horario || ''}
-                        </option>
-                      ))}
-                    </select>
+                      {(!Array.isArray(turmas) || turmas.filter(t => t.ativo !== false).length === 0) && (
+                        <div style={{ padding: '12px', color: '#888', fontSize: '0.9rem' }}>
+                          Nenhuma turma ativa disponível.
+                        </div>
+                      )}
+                      {Array.isArray(turmas) && turmas.filter(t => t.ativo !== false).map((t, i, arr) => {
+                        const tid = t.id;
+                        const sel = (formData.turmas || []).includes(String(tid));
+                        const isLast = i === arr.length - 1;
+                        return (
+                          <label
+                            key={tid}
+                            htmlFor={`turma_chk_${tid}`}
+                            style={{
+                              ...styles.turmasPickerRow,
+                              ...(isLast ? styles.turmasPickerRowLast : {}),
+                              backgroundColor: sel ? '#e8f4f8' : 'transparent',
+                            }}
+                          >
+                            <input
+                              id={`turma_chk_${tid}`}
+                              type="checkbox"
+                              checked={sel}
+                              onChange={() => handleToggleTurmaAluno(tid)}
+                              style={{ marginTop: '3px', flexShrink: 0 }}
+                            />
+                            <span style={styles.turmasPickerText}>
+                              <strong>{t.ct_nome || 'CT'}</strong>
+                              <br />
+                              {(t.dias_semana_nomes || []).join(', ')} · {t.horario || ''}
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
                     <div style={{ fontSize: '0.85rem', color: '#666', marginTop: '0.35rem' }}>
-                      Segure Ctrl (Windows) ou Cmd (Mac) e clique para selecionar ou remover turmas. Nenhuma seleção remove todos os vínculos. É necessário haver dia em comum entre os dias habilitados do aluno e os dias de cada turma.
+                      Marque até duas turmas. Nenhuma seleção remove os vínculos. É necessário haver dia em comum entre os dias habilitados do aluno e os dias de cada turma.
                     </div>
                   </div>
                   )}
