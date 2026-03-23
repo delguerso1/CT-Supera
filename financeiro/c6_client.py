@@ -17,6 +17,14 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 
+def _path_exists_safe(path: Path) -> bool:
+    """Evita PermissionError em CI (ex.: paths sob /root inacessíveis ao runner)."""
+    try:
+        return path.exists()
+    except (PermissionError, OSError):
+        return False
+
+
 class C6BankError(Exception):
     """
     Exceção base para erros da API do C6 Bank conforme RFC 7807
@@ -229,6 +237,10 @@ class C6BankClient:
             logger.warning(f"  - Cert: {cert_path_str} (existe: {cert_exists})")
             logger.warning(f"  - Key: {key_path_str} (existe: {key_exists})")
             logger.warning(f"  - BASE_DIR: {BASE_DIR}")
+
+            if os.environ.get("GITHUB_ACTIONS") == "true" or os.environ.get("CI") == "true":
+                logger.warning("CI: certificados C6 ausentes ou incompletos; continuando sem SSL.")
+                return cert_config
             
             # Tenta verificar caminhos alternativos (apenas caminhos relativos ao BASE_DIR)
             caminhos_alternativos = [
@@ -244,8 +256,8 @@ class C6BankClient:
             
             for alt_cert, alt_key in caminhos_alternativos:
                 try:
-                    cert_existe = alt_cert.exists()
-                    key_existe = alt_key.exists()
+                    cert_existe = _path_exists_safe(alt_cert)
+                    key_existe = _path_exists_safe(alt_key)
                     logger.warning(f"  - Tentando: cert={alt_cert} (existe: {cert_existe}), key={alt_key} (existe: {key_existe})")
                     if cert_existe and key_existe:
                         logger.info(f"✅ Usando caminhos alternativos encontrados!")
@@ -259,13 +271,13 @@ class C6BankClient:
                     logger.debug(f"  - Erro ao verificar {alt_cert}: {e}")
                     continue
             
-            # Lista arquivos na pasta de certificados para debug (trata erros de permissão)
+            # Lista arquivos na pasta de certificados para debug
             try:
                 cert_dir = BASE_DIR / "certificados" / "Producao"
                 cert_dir_abs = Path("/root/ct-supera/certificados/Producao")
                 
                 # Tenta listar usando caminho relativo
-                if cert_dir.exists():
+                if _path_exists_safe(cert_dir):
                     try:
                         logger.warning(f"  - Arquivos em {cert_dir}:")
                         arquivos_encontrados = []
@@ -283,8 +295,8 @@ class C6BankClient:
                 else:
                     logger.warning(f"  - Pasta {cert_dir} não existe")
                 
-                # Tenta listar usando caminho absoluto também
-                if cert_dir_abs.exists() and str(cert_dir_abs) != str(cert_dir):
+                # Tenta listar usando caminho absoluto também (só se acessível; /root pode falhar no CI)
+                if _path_exists_safe(cert_dir_abs) and str(cert_dir_abs) != str(cert_dir):
                     try:
                         logger.warning(f"  - Arquivos em {cert_dir_abs} (absoluto):")
                         for arquivo in cert_dir_abs.iterdir():
