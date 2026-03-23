@@ -1491,6 +1491,29 @@ function CadastroUsuario({ onUserChange }) {
                           {activeTab === 'alunos' && (
                             <>
                               <div><strong>CPF:</strong> {user.cpf || user.username || '-'}</div>
+                              <div>
+                                <strong>Turma(s):</strong>
+                                {Array.isArray(user.turmas_vinculadas) && user.turmas_vinculadas.length > 0 ? (
+                                  <ul style={{ margin: '6px 0 0 0', paddingLeft: '18px', listStyleType: 'disc' }}>
+                                    {user.turmas_vinculadas.map((t) => {
+                                      const partes = [
+                                        t.ct_nome,
+                                        t.horario,
+                                        Array.isArray(t.dias_semana_nomes) && t.dias_semana_nomes.length
+                                          ? t.dias_semana_nomes.join(', ')
+                                          : null,
+                                      ].filter(Boolean);
+                                      return (
+                                        <li key={t.id} style={{ marginBottom: '4px' }}>
+                                          {partes.join(' — ')}
+                                        </li>
+                                      );
+                                    })}
+                                  </ul>
+                                ) : (
+                                  <span> Nenhuma turma vinculada.</span>
+                                )}
+                              </div>
                               <div><strong>Valor mensalidade:</strong> {formatValor(user.valor_mensalidade)}</div>
                               <div>
                                 <strong>Dias habilitados:</strong>{' '}

@@ -794,6 +794,11 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
                 value={formData.email}
                 onChangeText={(value) => setFormData(prev => ({ ...prev, email: value }))}
               />
+              {(activeTab === 'alunos' || activeTab === 'precadastros') && (
+                <Text style={styles.hintEmail}>
+                  Menores podem usar o mesmo e-mail do responsável ou de irmãos. Maiores de idade: e-mail único.
+                </Text>
+              )}
               <TextInput
                 style={styles.input}
                 placeholder={
@@ -1358,6 +1363,13 @@ const styles = StyleSheet.create({
     color: colors.primary,
     marginBottom: 10,
     marginTop: -4,
+  },
+  hintEmail: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginBottom: 10,
+    marginTop: -4,
+    lineHeight: 17,
   },
   hintError: {
     fontSize: 12,
