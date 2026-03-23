@@ -193,7 +193,6 @@ function LoginPage() {
               inputMode="numeric"
               autoComplete="username"
               required
-              autoComplete="username"
             />
           </div>
           
