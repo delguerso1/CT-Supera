@@ -7,6 +7,11 @@ from .views import (
     ReverterAlunoParaPreCadastroAPIView,
     SolicitarRecuperacaoSenhaAPIView, RedefinirSenhaAPIView
 )
+from .push_views import (
+    RegistrarPushTokenExpoAPIView,
+    NotificacaoAppEstatisticasAPIView,
+    EnviarNotificacaoAlunosAppAPIView,
+)
 
 urlpatterns = [
 
@@ -22,6 +27,9 @@ urlpatterns = [
     path('reenviar-convite/<int:usuario_id>/', ReenviarConviteAPIView.as_view(), name='reenviar_convite_api'),
     path('esqueci-senha/', SolicitarRecuperacaoSenhaAPIView.as_view(), name='solicitar_recuperacao_senha_api'),
     path('redefinir-senha/<str:uidb64>/<str:token>/', RedefinirSenhaAPIView.as_view(), name='redefinir_senha_api'),
+    path('push-token/', RegistrarPushTokenExpoAPIView.as_view(), name='registrar_push_token_expo_api'),
+    path('notificacoes-app/estatisticas/', NotificacaoAppEstatisticasAPIView.as_view(), name='notificacao_app_estatisticas_api'),
+    path('notificacoes-app/enviar/', EnviarNotificacaoAlunosAppAPIView.as_view(), name='enviar_notificacao_alunos_app_api'),
     path('', ListarCriarUsuariosAPIView.as_view(), name='listar_criar_usuarios_api'),
     path('<int:pk>/', EditarExcluirUsuarioAPIView.as_view(), name='editar_excluir_usuario_api'),
 ]

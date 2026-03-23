@@ -1,5 +1,11 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import api, { MEDIA_URL } from '../services/api';
+import {
+  apenasDigitosCpf,
+  formatarCpfMascara,
+  MSG_CPF_11_DIGITOS,
+  MSG_CPF_MATRICULA,
+} from '../utils/cpf';
 
 const styles = {
   container: {
@@ -216,6 +222,9 @@ function CadastroUsuario({ onUserChange }) {
     telefone_emergencia: '',
     nome_responsavel: '',
     ficha_medica: '',
+    turma: '',
+    turmas: [],
+    origem: 'formulario',
   });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -531,6 +540,8 @@ function CadastroUsuario({ onUserChange }) {
       valorFormatado = checked;
     } else if (name === 'telefone' || name === 'telefone_responsavel' || name === 'telefone_emergencia') {
       valorFormatado = formatarTelefone(value);
+    } else if (name === 'cpf') {
+      valorFormatado = formatarCpfMascara(value);
     }
 
     setFormData(prev => ({
@@ -539,15 +550,36 @@ function CadastroUsuario({ onUserChange }) {
     }));
   };
 
+  const handleTurmasAlunoChange = (e) => {
+    const selected = Array.from(e.target.selectedOptions, opt => opt.value);
+    if (selected.length > 2) {
+      setError('Selecione no máximo duas turmas. Use Ctrl+clique (ou Cmd no Mac) para marcar ou desmarcar.');
+      return;
+    }
+    setError('');
+    setFormData(prev => ({ ...prev, turmas: selected }));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setSuccess('');
 
+    const cpfDigitos = apenasDigitosCpf(formData.cpf);
+    if (activeTab === 'precadastros') {
+      if (cpfDigitos.length > 0 && cpfDigitos.length !== 11) {
+        setError(MSG_CPF_11_DIGITOS);
+        return;
+      }
+    } else if (cpfDigitos.length !== 11) {
+      setError(MSG_CPF_11_DIGITOS);
+      return;
+    }
+
     // Campos base para todos os tipos
     const dados = {
-      username: formData.cpf.replace(/\D/g, ''),
-      cpf: formData.cpf.replace(/\D/g, ''),
+      username: cpfDigitos,
+      cpf: cpfDigitos,
       email: formData.email,
       tipo: formData.tipo,
       first_name: formData.first_name,
@@ -574,6 +606,13 @@ function CadastroUsuario({ onUserChange }) {
       if (pixProfessor) dados.pix_professor = pixProfessor;
     }
 
+    if (formData.tipo === 'aluno' && editingUser && activeTab !== 'precadastros') {
+      const ids = (formData.turmas || [])
+        .map((id) => parseInt(id, 10))
+        .filter((n) => !Number.isNaN(n));
+      dados.turmas = ids.slice(0, 2);
+    }
+
     console.log('[DEBUG] Dados enviados:', dados);
     console.log('[DEBUG] FormData original:', formData);
 
@@ -586,7 +625,7 @@ function CadastroUsuario({ onUserChange }) {
           email: formData.email,
           telefone: formData.telefone,
           data_nascimento: formData.data_nascimento,
-          cpf: formData.cpf && formData.cpf.replace(/\D/g, '').length > 0 ? formData.cpf.replace(/\D/g, '') : null,
+          cpf: cpfDigitos.length > 0 ? cpfDigitos : null,
           origem: formData.origem || (editingUser && editingUser.origem) || 'formulario',
         };
         const turmaId = formData.turma || (editingUser && editingUser.turma && (typeof editingUser.turma === 'object' ? editingUser.turma.id : editingUser.turma));
@@ -624,7 +663,12 @@ function CadastroUsuario({ onUserChange }) {
       }
     } catch (err) {
       console.error('[DEBUG] Erro detalhado:', err.response?.data);
-      const errorMessage = err.response?.data?.parq_question_1 || err.response?.data?.error || err.response?.data?.detail || 'Erro ao cadastrar usuário.';
+      const data = err.response?.data;
+      let errorMessage =
+        data?.parq_question_1 || data?.error || data?.detail || 'Erro ao cadastrar usuário.';
+      if (data?.cpf) {
+        errorMessage = Array.isArray(data.cpf) ? data.cpf[0] : data.cpf;
+      }
       setError(Array.isArray(errorMessage) ? errorMessage[0] : errorMessage);
     }
   };
@@ -634,7 +678,7 @@ function CadastroUsuario({ onUserChange }) {
     setFormData({
         first_name: user.first_name || '',
         last_name: user.last_name || '',
-        cpf: user.cpf || user.username || '',
+        cpf: formatarCpfMascara(user.cpf || user.username || ''),
         email: user.email || '',
         tipo: user.tipo || 'aluno',
         telefone: user.telefone || '',
@@ -644,7 +688,27 @@ function CadastroUsuario({ onUserChange }) {
         telefone_emergencia: user.telefone_emergencia || '',
         nome_responsavel: user.nome_responsavel || '',
         ficha_medica: user.ficha_medica || '',
-        turma: user.turma ? (typeof user.turma === 'object' ? user.turma.id : user.turma) : '',
+        turma: (() => {
+          if (activeTab === 'precadastros') {
+            if (user.turma != null && user.turma !== '') {
+              return String(typeof user.turma === 'object' ? user.turma.id : user.turma);
+            }
+            return '';
+          }
+          return '';
+        })(),
+        turmas: (() => {
+          if (activeTab === 'alunos' && user.tipo === 'aluno') {
+            if (Array.isArray(user.turmas) && user.turmas.length) {
+              return user.turmas.map((id) => String(id)).slice(0, 2);
+            }
+            const tv = user.turmas_vinculadas;
+            if (Array.isArray(tv) && tv.length > 0) {
+              return tv.map((t) => String(t.id)).slice(0, 2);
+            }
+          }
+          return [];
+        })(),
         origem: user.origem || 'formulario',
       });
     
@@ -755,6 +819,7 @@ function CadastroUsuario({ onUserChange }) {
       nome_responsavel: '',
       ficha_medica: '',
       turma: '',
+      turmas: [],
       origem: activeTab === 'precadastros' ? 'formulario' : undefined,
     });
     
@@ -776,7 +841,7 @@ function CadastroUsuario({ onUserChange }) {
     }
     setMatriculaPrecadastro(precadastro);
     setMatriculaForm({
-      cpf: precadastro.cpf || '',
+      cpf: formatarCpfMascara(precadastro.cpf || ''),
       dia_vencimento: '1',
       ja_aluno: false,
       valor_mensalidade: '',
@@ -807,6 +872,13 @@ function CadastroUsuario({ onUserChange }) {
       setMatriculaForm(prev => ({
         ...prev,
         [name]: checked,
+      }));
+      return;
+    }
+    if (name === 'cpf') {
+      setMatriculaForm(prev => ({
+        ...prev,
+        cpf: formatarCpfMascara(value),
       }));
       return;
     }
@@ -848,9 +920,11 @@ function CadastroUsuario({ onUserChange }) {
 
   const handleConfirmMatricula = async () => {
     if (!matriculaPrecadastro) return;
-    const precisaCpf = !matriculaPrecadastro.cpf;
-    if (precisaCpf && !matriculaForm.cpf) {
-      setError('Informe o CPF do aluno.');
+    const cpfDigitosForm = apenasDigitosCpf(matriculaForm.cpf);
+    const cpfPrecadastro = apenasDigitosCpf(matriculaPrecadastro.cpf);
+    const cpfFinalMatricula = cpfDigitosForm.length > 0 ? cpfDigitosForm : cpfPrecadastro;
+    if (cpfFinalMatricula.length !== 11) {
+      setError(MSG_CPF_MATRICULA);
       return;
     }
     if (!matriculaForm.dia_vencimento) {
@@ -940,9 +1014,7 @@ function CadastroUsuario({ onUserChange }) {
       } else {
         payload.valor_mensalidade = round2(matriculaForm.valor_mensalidade);
       }
-      if (matriculaForm.cpf) {
-        payload.cpf = matriculaForm.cpf;
-      }
+      payload.cpf = cpfFinalMatricula;
       if (matriculaForm.turma) {
         payload.turma = parseInt(matriculaForm.turma, 10);
       }
@@ -1654,6 +1726,10 @@ function CadastroUsuario({ onUserChange }) {
                   value={formData.cpf}
                   onChange={handleChange}
                   style={styles.input}
+                  placeholder="000.000.000-00"
+                  maxLength={14}
+                  inputMode="numeric"
+                  autoComplete="off"
                   required={activeTab !== 'precadastros'}
                 />
               </div>
@@ -1790,7 +1866,6 @@ function CadastroUsuario({ onUserChange }) {
                           value={formData.nome_responsavel}
                           onChange={handleChange}
                           style={styles.input}
-                          required={activeTab !== 'precadastros'}
                         />
                       </div>
                       <div style={styles.formGroup}>
@@ -1804,7 +1879,6 @@ function CadastroUsuario({ onUserChange }) {
                           value={formData.telefone_responsavel}
                           onChange={handleChange}
                           style={styles.input}
-                          required={activeTab !== 'precadastros'}
                           placeholder="(00) 00000-0000"
                         />
                       </div>
@@ -1886,6 +1960,30 @@ function CadastroUsuario({ onUserChange }) {
                       required={activeTab !== 'precadastros'}
                     />
                   </div>
+                  {editingUser && (
+                  <div style={styles.formGroup}>
+                    <label style={styles.label} htmlFor="aluno_edicao_turmas">
+                      Turmas vinculadas (até 2)
+                    </label>
+                    <select
+                      id="aluno_edicao_turmas"
+                      multiple
+                      size={Math.min(8, Math.max(3, (turmas || []).filter(t => t.ativo !== false).length || 3))}
+                      value={formData.turmas || []}
+                      onChange={handleTurmasAlunoChange}
+                      style={{ ...styles.select, minHeight: '140px', width: '100%' }}
+                    >
+                      {Array.isArray(turmas) && turmas.filter(t => t.ativo !== false).map(t => (
+                        <option key={t.id} value={String(t.id)}>
+                          {t.ct_nome || 'CT'} — {(t.dias_semana_nomes || []).join(', ')} às {t.horario || ''}
+                        </option>
+                      ))}
+                    </select>
+                    <div style={{ fontSize: '0.85rem', color: '#666', marginTop: '0.35rem' }}>
+                      Segure Ctrl (Windows) ou Cmd (Mac) e clique para selecionar ou remover turmas. Nenhuma seleção remove todos os vínculos. É necessário haver dia em comum entre os dias habilitados do aluno e os dias de cada turma.
+                    </div>
+                  </div>
+                  )}
                   <div style={styles.formGroup}>
                     <label style={styles.label}>
                       Dias habilitados para treino ({diasHabilitadosAluno.length})
@@ -2026,7 +2124,10 @@ function CadastroUsuario({ onUserChange }) {
                     value={matriculaForm.cpf}
                     onChange={handleMatriculaChange}
                     style={styles.input}
-                    placeholder="Apenas números"
+                    placeholder="000.000.000-00"
+                    maxLength={14}
+                    inputMode="numeric"
+                    autoComplete="off"
                     required
                   />
                 </div>

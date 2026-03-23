@@ -16,6 +16,12 @@ import { useAuth } from '../utils/AuthContext';
 import { usuarioService, turmaService } from '../services/api';
 import { User, PreCadastro, Turma } from '../types';
 import { NavigationProps } from '../types';
+import {
+  apenasDigitosCpf,
+  formatarCpfMascara,
+  MSG_CPF_11_DIGITOS,
+  MSG_CPF_MATRICULA,
+} from '../utils/cpf';
 
 type TabKey = 'alunos' | 'professores' | 'gerentes' | 'precadastros';
 
@@ -133,7 +139,7 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
     setFormData({
       first_name: (target as any).first_name || '',
       last_name: (target as any).last_name || '',
-      cpf: (target as any).cpf || '',
+      cpf: formatarCpfMascara((target as any).cpf || ''),
       email: (target as any).email || '',
       telefone: (target as any).telefone || '',
       endereco: (target as any).endereco || '',
@@ -161,10 +167,11 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
   };
 
   const buildPayload = () => {
+    const cpfDigits = apenasDigitosCpf(formData.cpf);
     const payload: any = {
       first_name: formData.first_name,
       last_name: formData.last_name,
-      cpf: formData.cpf,
+      cpf: activeTab === 'precadastros' ? (cpfDigits.length > 0 ? cpfDigits : null) : cpfDigits,
       email: formData.email,
       telefone: formData.telefone,
       endereco: formData.endereco,
@@ -198,6 +205,16 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
   };
 
   const handleSave = async () => {
+    const cpfDigits = apenasDigitosCpf(formData.cpf);
+    if (activeTab === 'precadastros') {
+      if (cpfDigits.length > 0 && cpfDigits.length !== 11) {
+        Alert.alert('Validação', MSG_CPF_11_DIGITOS);
+        return;
+      }
+    } else if (cpfDigits.length !== 11) {
+      Alert.alert('Validação', MSG_CPF_11_DIGITOS);
+      return;
+    }
     try {
       setSaving(true);
       const payload = buildPayload();
@@ -306,7 +323,7 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
         ? (typeof precadastroTurma === 'object' ? precadastroTurma.id : precadastroTurma)
         : '';
       setMatriculaForm({
-        cpf: precadastro.cpf || '',
+        cpf: formatarCpfMascara(precadastro.cpf || ''),
         dia_vencimento: '1',
         ja_aluno: false,
         valor_mensalidade: '',
@@ -347,9 +364,11 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
 
   const handleFinalizarMatricula = async () => {
     if (!matriculaPrecadastro) return;
-    const cpfDigits = String(matriculaForm.cpf || '').replace(/\D/g, '');
-    if (!matriculaPrecadastro.cpf && cpfDigits.length !== 11) {
-      Alert.alert('Atenção', 'Informe o CPF do aluno (11 dígitos).');
+    const cpfDigitosForm = apenasDigitosCpf(matriculaForm.cpf);
+    const cpfPrecadastro = apenasDigitosCpf(matriculaPrecadastro.cpf);
+    const cpfFinalMatricula = cpfDigitosForm.length > 0 ? cpfDigitosForm : cpfPrecadastro;
+    if (cpfFinalMatricula.length !== 11) {
+      Alert.alert('Atenção', MSG_CPF_MATRICULA);
       return;
     }
     if (!matriculaForm.ja_aluno) {
@@ -423,7 +442,7 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
     try {
       const round2 = (v: string | number) => Math.round(Number(v || 0) * 100) / 100;
       const payload: any = {
-        cpf: matriculaForm.cpf,
+        cpf: cpfFinalMatricula,
         dia_vencimento: Number(matriculaForm.dia_vencimento),
         ja_aluno: matriculaForm.ja_aluno,
         dias_habilitados: matriculaForm.dias_habilitados,
@@ -646,7 +665,9 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
                 style={styles.input}
                 placeholder="CPF"
                 value={formData.cpf}
-                onChangeText={(value) => setFormData(prev => ({ ...prev, cpf: value }))}
+                onChangeText={(value) =>
+                  setFormData(prev => ({ ...prev, cpf: formatarCpfMascara(value) }))
+                }
               />
               <TextInput
                 style={styles.input}
@@ -798,10 +819,13 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
               {!matriculaPrecadastro.cpf ? (
                 <TextInput
                   style={styles.input}
-                  placeholder="CPF (obrigatório)"
+                  placeholder="000.000.000-00"
                   keyboardType="numeric"
+                  maxLength={14}
                   value={matriculaForm.cpf}
-                  onChangeText={(value) => setMatriculaForm(prev => ({ ...prev, cpf: value }))}
+                  onChangeText={(value) =>
+                    setMatriculaForm(prev => ({ ...prev, cpf: formatarCpfMascara(value) }))
+                  }
                 />
               ) : null}
               <Text style={styles.sectionTitle}>Dia de vencimento das mensalidades</Text>

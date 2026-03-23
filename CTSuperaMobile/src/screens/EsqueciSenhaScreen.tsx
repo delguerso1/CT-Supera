@@ -13,38 +13,21 @@ import {
 } from 'react-native';
 import { authService } from '../services/api';
 import { NavigationProps } from '../types';
+import { formatarCpfMascara, apenasDigitosCpf, MSG_CPF_11_DIGITOS } from '../utils/cpf';
 
 const EsqueciSenhaScreen: React.FC<NavigationProps> = ({ navigation }) => {
   const [cpf, setCpf] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const formatCPF = (text: string) => {
-    // Remove tudo que não é número
-    const numbers = text.replace(/\D/g, '');
-    
-    // Aplica a máscara
-    if (numbers.length <= 3) {
-      return numbers;
-    } else if (numbers.length <= 6) {
-      return `${numbers.slice(0, 3)}.${numbers.slice(3)}`;
-    } else if (numbers.length <= 9) {
-      return `${numbers.slice(0, 3)}.${numbers.slice(3, 6)}.${numbers.slice(6)}`;
-    } else {
-      return `${numbers.slice(0, 3)}.${numbers.slice(3, 6)}.${numbers.slice(6, 9)}-${numbers.slice(9, 11)}`;
-    }
-  };
-
   const handleSolicitarRecuperacao = async () => {
-    if (!cpf.trim()) {
+    const cpfLimpo = apenasDigitosCpf(cpf);
+    if (!cpfLimpo) {
       Alert.alert('Erro', 'Por favor, informe seu CPF.');
       return;
     }
 
-    // Remove formatação do CPF
-    const cpfLimpo = cpf.replace(/\D/g, '');
-
     if (cpfLimpo.length !== 11) {
-      Alert.alert('Erro', 'CPF inválido. Por favor, informe um CPF válido.');
+      Alert.alert('Erro', MSG_CPF_11_DIGITOS);
       return;
     }
 
@@ -98,7 +81,7 @@ const EsqueciSenhaScreen: React.FC<NavigationProps> = ({ navigation }) => {
             <TextInput
               style={styles.input}
               value={cpf}
-              onChangeText={(text) => setCpf(formatCPF(text))}
+              onChangeText={(text) => setCpf(formatarCpfMascara(text))}
               placeholder="000.000.000-00"
               keyboardType="numeric"
               maxLength={14}

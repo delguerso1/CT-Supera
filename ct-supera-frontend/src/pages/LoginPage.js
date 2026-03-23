@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
+import { formatarCpfMascara, apenasDigitosCpf, MSG_CPF_11_DIGITOS } from '../utils/cpf';
 
 const styles = {
   container: {
@@ -119,14 +120,6 @@ function LoginPage() {
     console.log('LoginPage renderizado - Botão Instagram deve estar visível');
   }, []);
 
-  const formatarCPF = (value) => {
-    const cpfNumeros = value.replace(/\D/g, '');
-    if (cpfNumeros.length <= 11) {
-      return cpfNumeros;
-    }
-    return cpfNumeros.slice(0, 11);
-  };
-
   const handleLogin = async (e) => {
     e.preventDefault();
     setError('');
@@ -135,9 +128,9 @@ function LoginPage() {
       console.log('[DEBUG] Iniciando tentativa de login...');
       console.log('[DEBUG] CPF:', cpf);
       
-      const cpfNumeros = cpf.replace(/\D/g, '');
+      const cpfNumeros = apenasDigitosCpf(cpf);
       if (cpfNumeros.length !== 11) {
-        setError('CPF deve conter 11 dígitos');
+        setError(MSG_CPF_11_DIGITOS);
         return;
       }
 
@@ -192,10 +185,13 @@ function LoginPage() {
             <input
               id="cpf"
               type="text"
-              placeholder="Digite seu CPF (apenas números)"
+              placeholder="000.000.000-00"
               value={cpf}
-              onChange={(e) => setCpf(formatarCPF(e.target.value))}
+              onChange={(e) => setCpf(formatarCpfMascara(e.target.value))}
               style={styles.input}
+              maxLength={14}
+              inputMode="numeric"
+              autoComplete="username"
               required
               autoComplete="username"
             />

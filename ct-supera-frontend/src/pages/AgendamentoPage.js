@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import api from '../services/api';
+import { formatarCpfMascara, apenasDigitosCpf, MSG_CPF_11_DIGITOS } from '../utils/cpf';
 
 const styles = {
   container: {
@@ -222,6 +223,9 @@ function AgendamentoPage() {
   const handleChange = (e) => {
     const { name, value } = e.target;
     let update = { [name]: value };
+    if (name === 'cpf') {
+      update = { cpf: formatarCpfMascara(value) };
+    }
     if (name === 'ct') {
       update.turma = '';
       update.data_aula_experimental = '';
@@ -259,7 +263,11 @@ function AgendamentoPage() {
       return;
     }
 
-    const cpfLimpo = form.cpf ? form.cpf.replace(/\D/g, '') : '';
+    const cpfLimpo = apenasDigitosCpf(form.cpf);
+    if (cpfLimpo.length > 0 && cpfLimpo.length !== 11) {
+      setError(MSG_CPF_11_DIGITOS);
+      return;
+    }
     const dados = {
       first_name: formatarNome(form.first_name),
       last_name: formatarNome(form.last_name),
@@ -416,8 +424,10 @@ function AgendamentoPage() {
             name="cpf"
             value={form.cpf}
             onChange={handleChange}
-            placeholder="CPF (opcional)"
+            placeholder="CPF (opcional) — 000.000.000-00"
             maxLength={14}
+            inputMode="numeric"
+            autoComplete="off"
           />
           <select
             style={styles.input}

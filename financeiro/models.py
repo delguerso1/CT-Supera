@@ -1,4 +1,6 @@
-from django.db import models
+from django.db import IntegrityError, models
+from django.db.models import UniqueConstraint
+from django.db.models.functions import ExtractMonth, ExtractYear
 from django.utils import timezone
 from datetime import timedelta, date
 from calendar import monthrange
@@ -99,11 +101,24 @@ class Mensalidade(models.Model):
         if existe:
             return None
         valor = mensalidade_base.aluno.valor_mensalidade or mensalidade_base.valor
-        return cls.objects.create(
-            aluno=mensalidade_base.aluno,
-            valor=valor,
-            data_vencimento=data_vencimento
-        )
+        try:
+            return cls.objects.create(
+                aluno=mensalidade_base.aluno,
+                valor=valor,
+                data_vencimento=data_vencimento,
+            )
+        except IntegrityError:
+            return None
+
+    class Meta:
+        constraints = [
+            UniqueConstraint(
+                'aluno',
+                ExtractYear('data_vencimento'),
+                ExtractMonth('data_vencimento'),
+                name='uniq_mensalidade_aluno_ano_mes',
+            ),
+        ]
 
     def __str__(self):
         return f"{self.aluno.get_full_name()} - R${self.valor} ({self.get_status_display()})"

@@ -439,19 +439,38 @@ class ConverterPrecadastroAPIView(APIView):
         if precadastro.usuario:
             return Response({"error": "Este pré-cadastro já foi convertido em aluno!"}, status=status.HTTP_400_BAD_REQUEST)
 
+        cpf_digits = ''.join(c for c in str(precadastro.cpf or '') if c.isdigit())
+        if len(cpf_digits) != 11:
+            return Response(
+                {"error": "Informe um CPF válido com 11 dígitos no pré-cadastro antes de converter."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        precadastro.cpf = cpf_digits
+        precadastro.save(update_fields=['cpf'])
+
+        existente = Usuario.objects.filter(tipo='aluno', cpf=cpf_digits).first()
+        if existente:
+            precadastro.usuario = existente
+            precadastro.status = "matriculado"
+            precadastro.save(update_fields=['usuario', 'status'])
+            return Response(
+                {"message": "Pré-cadastro vinculado ao aluno já cadastrado (mesmo CPF)."},
+                status=status.HTTP_200_OK,
+            )
+
         # Importa as funções necessárias
         from usuarios.utils import enviar_convite_aluno
         
         # Cria usuário inativo (será ativado via link)
         usuario = Usuario.objects.create_user(
-            username=precadastro.cpf.replace(".", "").replace("-", ""),
+            username=cpf_digits,
             email=precadastro.email,
             password=None,  # Não define senha - usuário definirá via link
             tipo="aluno",
             first_name=precadastro.first_name,
             last_name=precadastro.last_name,
             telefone=precadastro.telefone,
-            cpf=precadastro.cpf,
+            cpf=cpf_digits,
             data_nascimento=precadastro.data_nascimento,
             is_active=False  # Usuário inativo até ativar via link
         )

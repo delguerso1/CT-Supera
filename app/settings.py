@@ -32,15 +32,22 @@ SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'chave-secreta-padrao')
 DEBUG = os.getenv('DJANGO_DEBUG', 'False') == 'True'
 
 ALLOWED_HOSTS = [
-    'localhost', 
-    '127.0.0.1', 
+    'localhost',
+    '127.0.0.1',
     'ctsupera.com.br',
     'www.ctsupera.com.br',
     '163.176.178.246',
     '13.59.11.161',
+    '192.168.18.87',
+    '192.168.18.11',
     os.getenv('DOMAIN_NAME', 'ctsupera.com.br'),
     os.getenv('SERVER_IP', '13.59.11.161'),
 ]
+# IPs adicionais (ex.: PC na rede local para app mobile): DJANGO_EXTRA_ALLOWED_HOSTS=192.168.1.10,192.168.1.11
+for _h in os.getenv('DJANGO_EXTRA_ALLOWED_HOSTS', '').split(','):
+    _h = _h.strip()
+    if _h and _h not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append(_h)
 
 
 # Application definition

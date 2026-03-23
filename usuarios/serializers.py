@@ -1,6 +1,10 @@
 from rest_framework import serializers
+from rest_framework.fields import empty
+from django.db import transaction
 from usuarios.models import Usuario, PreCadastro
 from turmas.models import DiaSemana, Turma
+from turmas.views import _validar_aluno_turma
+from financeiro.services import criar_mensalidade_ao_vincular_turma
 from financeiro.models import Mensalidade, Salario
 import re
 
@@ -29,6 +33,14 @@ class UsuarioSerializer(serializers.ModelSerializer):
     nome_completo = serializers.SerializerMethodField()
     tipo_display = serializers.SerializerMethodField()
     centros_treinamento = serializers.SerializerMethodField()
+    turmas_vinculadas = serializers.SerializerMethodField()
+    turmas = serializers.ListField(
+        child=serializers.IntegerField(min_value=1),
+        max_length=2,
+        required=False,
+        allow_empty=True,
+        write_only=True,
+    )
     dias_habilitados = serializers.PrimaryKeyRelatedField(
         queryset=DiaSemana.objects.all(),
         many=True,
@@ -59,8 +71,10 @@ class UsuarioSerializer(serializers.ModelSerializer):
             'dia_vencimento', 'valor_mensalidade', 'cpf',
             'plano', 'dias_habilitados', 'dias_habilitados_nomes',
             'nome_responsavel', 'telefone_responsavel', 'telefone_emergencia',
-            'ficha_medica', 'salario_professor', 'pix_professor', 'foto_perfil',
+            'ficha_medica', 'salario_professor', 'pix_professor',             'foto_perfil',
             'centros_treinamento',
+            'turmas_vinculadas',
+            'turmas',
             # Campos do PAR-Q
             'parq_question_1', 'parq_question_2', 'parq_question_3', 'parq_question_4',
             'parq_question_5', 'parq_question_6', 'parq_question_7', 'parq_question_8',
@@ -97,13 +111,76 @@ class UsuarioSerializer(serializers.ModelSerializer):
             return [{'id': ct['ct__id'], 'nome': ct['ct__nome']} for ct in cts]
         return []
 
+    def get_turmas_vinculadas(self, obj):
+        """Turmas do aluno com CT e horário (listagem / detalhe)."""
+        if obj.tipo != 'aluno':
+            return []
+        out = []
+        for t in obj.turmas_aluno.all().order_by('horario', 'id'):
+            horario_str = t.horario.strftime('%H:%M') if getattr(t, 'horario', None) else ''
+            dias = [dia.nome for dia in t.dias_semana.all()]
+            out.append({
+                'id': t.id,
+                'ct_nome': t.ct.nome if t.ct_id else '',
+                'horario': horario_str,
+                'dias_semana_nomes': dias,
+                'ativo': bool(t.ativo),
+            })
+        return out
+
     def get_dias_habilitados_nomes(self, obj):
         return [dia.nome for dia in obj.dias_habilitados.all()]
+
+    def validate_cpf(self, value):
+        if value is None or (isinstance(value, str) and not str(value).strip()):
+            return value
+        cpf_limpo = re.sub(r'\D', '', str(value))
+        if len(cpf_limpo) != 11:
+            raise serializers.ValidationError('CPF deve conter exatamente 11 dígitos.')
+        return cpf_limpo
+
+    def validate_turmas(self, value):
+        if not value:
+            return []
+        if len(value) > 2:
+            raise serializers.ValidationError('No máximo duas turmas por aluno.')
+        seen = set()
+        for tid in value:
+            if tid in seen:
+                raise serializers.ValidationError('Não repita a mesma turma.')
+            seen.add(tid)
+            if not Turma.objects.filter(id=tid, ativo=True).exists():
+                raise serializers.ValidationError(f'Turma {tid} inválida ou inativa.')
+        return list(value)
+
+    def _aplicar_turmas_aluno(self, instance, turmas_ids):
+        """Define até duas turmas no M2M; valida compatibilidade com dias habilitados."""
+        if turmas_ids == []:
+            instance.turmas_aluno.clear()
+            return
+        turma_objs = []
+        for tid in turmas_ids[:2]:
+            turma_obj = Turma.objects.filter(id=tid, ativo=True).first()
+            if not turma_obj:
+                raise serializers.ValidationError({'turmas': f'Turma {tid} inválida ou inativa.'})
+            ok, motivo = _validar_aluno_turma(instance, turma_obj)
+            if not ok:
+                raise serializers.ValidationError({'turmas': motivo})
+            turma_objs.append(turma_obj)
+        instance.turmas_aluno.set(turma_objs)
+        for t in turma_objs:
+            criar_mensalidade_ao_vincular_turma(instance, t)
 
     def to_representation(self, instance):
         representation = super().to_representation(instance)
         representation['tipo'] = instance.tipo
-        
+        if instance.tipo == 'aluno':
+            representation['turmas'] = list(
+                instance.turmas_aluno.order_by('horario', 'id').values_list('id', flat=True)[:2]
+            )
+        else:
+            representation['turmas'] = []
+
         # Remove ficha_medica para Professor e Gerente
         if instance.tipo in ['professor', 'gerente']:
             representation.pop('ficha_medica', None)
@@ -115,6 +192,8 @@ class UsuarioSerializer(serializers.ModelSerializer):
             representation.pop('plano', None)
             representation.pop('dias_habilitados', None)
             representation.pop('dias_habilitados_nomes', None)
+            representation.pop('turmas_vinculadas', None)
+            representation.pop('turmas', None)
             # Remove campos PAR-Q para professor e gerente
             for field in ['parq_question_1', 'parq_question_2', 'parq_question_3', 
                          'parq_question_4', 'parq_question_5', 'parq_question_6', 
@@ -129,15 +208,20 @@ class UsuarioSerializer(serializers.ModelSerializer):
         # Cria usuário inativo (será ativado via link)
         from usuarios.utils import enviar_convite_aluno
         dias_habilitados = validated_data.pop('dias_habilitados', [])
-        
-        instance = self.Meta.model(**validated_data)
-        instance.is_active = False  # Usuário inativo até ativar via link
-        instance.set_unusable_password()  # Não define senha - usuário definirá via link
-        instance.save()
+        turmas_ids = validated_data.pop('turmas', empty)
 
-        if dias_habilitados:
-            instance.dias_habilitados.set(dias_habilitados)
-        
+        with transaction.atomic():
+            instance = self.Meta.model(**validated_data)
+            instance.is_active = False  # Usuário inativo até ativar via link
+            instance.set_unusable_password()  # Não define senha - usuário definirá via link
+            instance.save()
+
+            if dias_habilitados:
+                instance.dias_habilitados.set(dias_habilitados)
+
+            if turmas_ids is not empty and instance.tipo == 'aluno':
+                self._aplicar_turmas_aluno(instance, turmas_ids)
+
         # Envia convite de ativação se o usuário tiver e-mail
         if instance.email:
             try:
@@ -149,79 +233,84 @@ class UsuarioSerializer(serializers.ModelSerializer):
                 import logging
                 logger = logging.getLogger(__name__)
                 logger.error(f"Erro ao enviar convite de ativação para {instance.email}: {e}")
-        
+
         return instance
 
     def update(self, instance, validated_data):
         print(f"[DEBUG] Serializer update - validated_data: {validated_data}")
         print(f"[DEBUG] Serializer update - instance: {instance.id}")
-        
+
+        turmas_val = validated_data.pop('turmas', empty)
         dias_habilitados = validated_data.pop('dias_habilitados', None)
         dia_vencimento_antigo = instance.dia_vencimento
         valor_mensalidade_antigo = instance.valor_mensalidade
         password = validated_data.pop('password', None)
-        
-        # Verificar se algum campo PAR-Q foi realmente alterado (valor mudou)
-        parq_fields = ['parq_question_1', 'parq_question_2', 'parq_question_3', 'parq_question_4',
-                       'parq_question_5', 'parq_question_6', 'parq_question_7', 'parq_question_8',
-                       'parq_question_9', 'parq_question_10']
-        
-        parq_fields_present = any(field in validated_data for field in parq_fields)
-        parq_fields_updated = False
-        for field in parq_fields:
-            if field in validated_data:
-                # Compara o valor atual com o novo valor
-                valor_atual = getattr(instance, field, False)
-                valor_novo = validated_data[field]
-                if valor_atual != valor_novo:
-                    parq_fields_updated = True
-                    break
-        
-        # Validar se pode preencher o PAR-Q novamente (1 ano após último preenchimento)
-        # Só valida se os valores realmente mudaram E o questionário já foi preenchido antes
-        if parq_fields_updated and instance.is_aluno() and instance.parq_completed:
-            if not instance.can_fill_parq_again():
-                from django.utils import timezone
-                from datetime import timedelta
-                
-                data_preenchimento = instance.parq_completion_date
-                if data_preenchimento:
-                    if hasattr(data_preenchimento, 'date'):
-                        data_preenchimento = data_preenchimento.date()
-                    
-                    um_ano_depois = data_preenchimento + timedelta(days=365)
-                    hoje = timezone.now().date()
-                    
-                    dias_restantes = (um_ano_depois - hoje).days
-                    
-                    raise serializers.ValidationError({
-                        'parq_question_1': f'O questionário PAR-Q só pode ser preenchido uma vez por ano. '
-                                         f'Último preenchimento: {instance.parq_completion_date.strftime("%d/%m/%Y") if instance.parq_completion_date else "N/A"}. '
-                                         f'Você poderá preencher novamente em {dias_restantes} dia(s).'
-                    })
-        
-        for attr, value in validated_data.items():
-            setattr(instance, attr, value)
-            
-        # Se campos PAR-Q foram enviados pela primeira vez ou atualizados, marcar como completo
-        if instance.is_aluno() and (parq_fields_updated or (parq_fields_present and not instance.parq_completed)):
-            from django.utils import timezone
-            instance.parq_completed = True
-            instance.parq_completion_date = timezone.now()
-            
-        if password is not None:
-            instance.set_password(password)
-        instance.save()
 
-        if dias_habilitados is not None:
-            instance.dias_habilitados.set(dias_habilitados)
-        
-        # Atualiza mensalidades pendentes se necessário
-        if (
-            ('dia_vencimento' in validated_data and validated_data['dia_vencimento'] != dia_vencimento_antigo)
-            or ('valor_mensalidade' in validated_data and validated_data['valor_mensalidade'] != valor_mensalidade_antigo)
-        ):
-            instance.atualizar_mensalidades_pendentes()
+        with transaction.atomic():
+            # Verificar se algum campo PAR-Q foi realmente alterado (valor mudou)
+            parq_fields = ['parq_question_1', 'parq_question_2', 'parq_question_3', 'parq_question_4',
+                           'parq_question_5', 'parq_question_6', 'parq_question_7', 'parq_question_8',
+                           'parq_question_9', 'parq_question_10']
+
+            parq_fields_present = any(field in validated_data for field in parq_fields)
+            parq_fields_updated = False
+            for field in parq_fields:
+                if field in validated_data:
+                    # Compara o valor atual com o novo valor
+                    valor_atual = getattr(instance, field, False)
+                    valor_novo = validated_data[field]
+                    if valor_atual != valor_novo:
+                        parq_fields_updated = True
+                        break
+
+            # Validar se pode preencher o PAR-Q novamente (1 ano após último preenchimento)
+            # Só valida se os valores realmente mudaram E o questionário já foi preenchido antes
+            if parq_fields_updated and instance.is_aluno() and instance.parq_completed:
+                if not instance.can_fill_parq_again():
+                    from django.utils import timezone
+                    from datetime import timedelta
+
+                    data_preenchimento = instance.parq_completion_date
+                    if data_preenchimento:
+                        if hasattr(data_preenchimento, 'date'):
+                            data_preenchimento = data_preenchimento.date()
+
+                        um_ano_depois = data_preenchimento + timedelta(days=365)
+                        hoje = timezone.now().date()
+
+                        dias_restantes = (um_ano_depois - hoje).days
+
+                        raise serializers.ValidationError({
+                            'parq_question_1': f'O questionário PAR-Q só pode ser preenchido uma vez por ano. '
+                                             f'Último preenchimento: {instance.parq_completion_date.strftime("%d/%m/%Y") if instance.parq_completion_date else "N/A"}. '
+                                             f'Você poderá preencher novamente em {dias_restantes} dia(s).'
+                        })
+
+            for attr, value in validated_data.items():
+                setattr(instance, attr, value)
+
+            # Se campos PAR-Q foram enviados pela primeira vez ou atualizados, marcar como completo
+            if instance.is_aluno() and (parq_fields_updated or (parq_fields_present and not instance.parq_completed)):
+                from django.utils import timezone
+                instance.parq_completed = True
+                instance.parq_completion_date = timezone.now()
+
+            if password is not None:
+                instance.set_password(password)
+            instance.save()
+
+            if dias_habilitados is not None:
+                instance.dias_habilitados.set(dias_habilitados)
+
+            if turmas_val is not empty and instance.tipo == 'aluno':
+                self._aplicar_turmas_aluno(instance, turmas_val)
+
+            # Atualiza mensalidades pendentes se necessário
+            if (
+                ('dia_vencimento' in validated_data and validated_data['dia_vencimento'] != dia_vencimento_antigo)
+                or ('valor_mensalidade' in validated_data and validated_data['valor_mensalidade'] != valor_mensalidade_antigo)
+            ):
+                instance.atualizar_mensalidades_pendentes()
         return instance
 
     def _idade_em_anos_completos(self, data_nascimento):
@@ -240,13 +329,26 @@ class UsuarioSerializer(serializers.ModelSerializer):
         if 'last_name' in attrs:
             attrs['last_name'] = self._formatar_nome(attrs['last_name'])
         tipo = attrs.get('tipo', getattr(self.instance, 'tipo', None))
-        cpf = attrs.get('cpf', getattr(self.instance, 'cpf', None))
+        cpf_enviado = 'cpf' in attrs
+        cpf = attrs.get('cpf') if cpf_enviado else None
+        if cpf is None and self.instance:
+            cpf = self.instance.cpf
+        if cpf is not None and str(cpf).strip():
+            cpf = re.sub(r'\D', '', str(cpf))
+        else:
+            cpf = None
         if not cpf:
             raise serializers.ValidationError({
                 'cpf': 'CPF é obrigatório para este tipo de usuário.'
             })
-        if 'username' not in attrs:
-            attrs['username'] = re.sub(r'\D', '', str(cpf))
+        if len(cpf) != 11:
+            raise serializers.ValidationError({
+                'cpf': 'CPF deve conter exatamente 11 dígitos.',
+            })
+        if cpf_enviado:
+            attrs['cpf'] = cpf
+        # Login é sempre o CPF (11 dígitos); sobrescreve username vazio ou enviado pelo cliente
+        attrs['username'] = cpf
         email = attrs.get('email')
         data_nascimento = attrs.get('data_nascimento')
         if self.instance:
@@ -305,6 +407,27 @@ class PreCadastroSerializer(serializers.ModelSerializer):
             'criado_em', 'dia_vencimento', 'valor_mensalidade', 'turma',
             'data_aula_experimental', 'compareceu_aula_experimental', 'reagendou_aula_experimental',
         ]
+
+    def validate_cpf(self, value):
+        if value is None:
+            return None
+        s = str(value).strip()
+        if not s:
+            return None
+        cpf_limpo = re.sub(r'\D', '', s)
+        if len(cpf_limpo) != 11:
+            raise serializers.ValidationError('CPF deve conter exatamente 11 dígitos.')
+        return cpf_limpo
+
+    def validate_telefone(self, value):
+        if value is None or not str(value).strip():
+            raise serializers.ValidationError('Telefone é obrigatório.')
+        digitos = re.sub(r'\D', '', str(value))
+        if len(digitos) not in (10, 11):
+            raise serializers.ValidationError(
+                'Informe o telefone com DDD: 10 ou 11 dígitos (apenas números).'
+            )
+        return digitos
 
     def _idade_em_anos_completos(self, data_nascimento):
         if not data_nascimento:
@@ -374,9 +497,6 @@ class PreCadastroSerializer(serializers.ModelSerializer):
                         raise serializers.ValidationError({
                             'cpf': 'Este CPF já possui uma aula experimental agendada. Para reagendar, acesse o link enviado no e-mail de confirmação.'
                         })
-        cpf_val = attrs.get('cpf')
-        if cpf_val is not None and not str(cpf_val).strip():
-            attrs['cpf'] = None
         return attrs
 
 class MensalidadeSerializer(serializers.ModelSerializer):
@@ -429,7 +549,7 @@ class SolicitarRecuperacaoSenhaSerializer(serializers.Serializer):
         cpf_limpo = re.sub(r'\D', '', value)
         
         if len(cpf_limpo) != 11:
-            raise serializers.ValidationError("CPF deve ter 11 dígitos.")
+            raise serializers.ValidationError("CPF deve conter exatamente 11 dígitos.")
         
         return cpf_limpo
 

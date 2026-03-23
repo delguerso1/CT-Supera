@@ -8,6 +8,7 @@ from calendar import monthrange
 from decimal import Decimal
 
 from datetime import date, timedelta
+from django.db import IntegrityError
 from django.utils import timezone
 
 from financeiro.models import Mensalidade, TransacaoC6Bank
@@ -108,13 +109,17 @@ def gerar_mensalidades_para_mes(ano: int, mes: int) -> int:
         ).exists()
 
         if not existe:
-            Mensalidade.objects.create(
-                aluno=aluno,
-                valor=valor,
-                data_inicio=hoje,
-                data_vencimento=data_vencimento
-            )
-            total_geradas += 1
+            try:
+                Mensalidade.objects.create(
+                    aluno=aluno,
+                    valor=valor,
+                    data_inicio=hoje,
+                    data_vencimento=data_vencimento,
+                )
+                total_geradas += 1
+            except IntegrityError:
+                # Outra requisição/thread criou no mesmo instante
+                pass
 
     if total_geradas > 0:
         logger.info(f'Mensalidades: {total_geradas} criada(s) para {ano}/{mes:02d}')

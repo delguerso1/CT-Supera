@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.forms import ReadOnlyPasswordHashField
 from django import forms
-from .models import Usuario
+from .models import Usuario, PushTokenExpo
 
 
 class UsuarioCreationForm(forms.ModelForm):
@@ -30,7 +30,7 @@ class UsuarioCreationForm(forms.ModelForm):
     def clean_cpf(self):
         cpf = "".join(c for c in (self.cleaned_data.get("cpf") or "").strip() if c.isdigit())
         if len(cpf) != 11:
-            raise forms.ValidationError("CPF deve ter exatamente 11 dígitos.")
+            raise forms.ValidationError("CPF deve conter exatamente 11 dígitos.")
         if Usuario.objects.filter(cpf=cpf).exists():
             raise forms.ValidationError("Já existe um usuário com este CPF.")
         return cpf
@@ -125,3 +125,16 @@ class UsuarioAdmin(admin.ModelAdmin):
     desativar_usuario.short_description = "Desativar usuários selecionados"
 
     actions = [ativar_usuario, desativar_usuario]
+
+
+@admin.register(PushTokenExpo)
+class PushTokenExpoAdmin(admin.ModelAdmin):
+    list_display = ("usuario", "token_preview", "atualizado_em")
+    search_fields = ("token", "usuario__cpf", "usuario__first_name")
+    raw_id_fields = ("usuario",)
+    readonly_fields = ("criado_em", "atualizado_em")
+
+    @admin.display(description="Token")
+    def token_preview(self, obj):
+        t = obj.token or ""
+        return (t[:36] + "…") if len(t) > 36 else t

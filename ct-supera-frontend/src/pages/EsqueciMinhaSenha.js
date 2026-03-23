@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
+import { formatarCpfMascara, apenasDigitosCpf, MSG_CPF_11_DIGITOS } from '../utils/cpf';
 
 const EsqueciMinhaSenha = () => {
   const [cpf, setCpf] = useState('');
@@ -9,22 +10,8 @@ const EsqueciMinhaSenha = () => {
   const [error, setError] = useState('');
   const navigate = useNavigate();
 
-  const formatCPF = (value) => {
-    // Remove tudo que não é dígito
-    const numbers = value.replace(/\D/g, '');
-    
-    // Aplica a máscara do CPF
-    return numbers.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
-  };
-
   const handleCPFChange = (e) => {
-    const formatted = formatCPF(e.target.value);
-    setCpf(formatted);
-  };
-
-  const validateCPF = (cpf) => {
-    const numbers = cpf.replace(/\D/g, '');
-    return numbers.length === 11;
+    setCpf(formatarCpfMascara(e.target.value));
   };
 
   const handleSubmit = async (e) => {
@@ -32,15 +19,15 @@ const EsqueciMinhaSenha = () => {
     setError('');
     setMessage('');
 
-    if (!validateCPF(cpf)) {
-      setError('CPF deve ter 11 dígitos');
+    const cpfNumbers = apenasDigitosCpf(cpf);
+    if (cpfNumbers.length !== 11) {
+      setError(MSG_CPF_11_DIGITOS);
       return;
     }
 
     setLoading(true);
 
     try {
-      const cpfNumbers = cpf.replace(/\D/g, '');
       const response = await api.post('/usuarios/esqueci-senha/', {
         cpf: cpfNumbers
       });
@@ -223,6 +210,8 @@ const EsqueciMinhaSenha = () => {
               placeholder="000.000.000-00"
               style={styles.input}
               maxLength="14"
+              inputMode="numeric"
+              autoComplete="off"
               required
             />
           </div>

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
+import { formatarCpfMascara, apenasDigitosCpf, MSG_CPF_11_DIGITOS } from '../utils/cpf';
 
 function FormacaoAtletas() {
   const [formData, setFormData] = useState({
@@ -53,8 +54,6 @@ function FormacaoAtletas() {
     return numeros;
   };
 
-  const formatarCpf = (cpf) => cpf.replace(/\D/g, '').slice(0, 11);
-
   const handleChange = (e) => {
     const { name, value } = e.target;
     let valorFormatado = value;
@@ -65,7 +64,7 @@ function FormacaoAtletas() {
       valorFormatado = formatarTelefone(value);
     }
     if (name === 'cpf') {
-      valorFormatado = formatarCpf(value);
+      valorFormatado = formatarCpfMascara(value);
     }
     setFormData(prev => ({
       ...prev,
@@ -77,12 +76,17 @@ function FormacaoAtletas() {
     e.preventDefault();
     setError('');
     setSuccess('');
+    const cpfDig = apenasDigitosCpf(formData.cpf);
+    if (cpfDig.length > 0 && cpfDig.length !== 11) {
+      setError(MSG_CPF_11_DIGITOS);
+      return;
+    }
     setLoading(true);
     try {
       const payload = {
         first_name: formData.first_name,
         last_name: formData.last_name,
-        cpf: formatarCpf(formData.cpf),
+        cpf: cpfDig || undefined,
         email: formData.email,
         telefone: formData.telefone,
         data_nascimento: formData.data_nascimento
@@ -168,6 +172,10 @@ function FormacaoAtletas() {
             name="cpf"
             value={formData.cpf}
             onChange={handleChange}
+            placeholder="000.000.000-00"
+            maxLength={14}
+            inputMode="numeric"
+            autoComplete="off"
             required
           />
         </div>

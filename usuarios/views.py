@@ -21,11 +21,21 @@ from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from .serializers import UsuarioSerializer, PreCadastroSerializer, MensalidadeSerializer, SalarioSerializer
 from datetime import date, timedelta
 from django.core.mail import send_mail
-from django.db import transaction
+from django.db import transaction, IntegrityError
+from django.db.models import Prefetch
 import logging
 from calendar import monthrange
+import re
 
 logger = logging.getLogger(__name__)
+
+
+def _telefone_br_so_digitos(valor):
+    """Retorna 10 ou 11 dígitos ou None (mesma regra do pré-cadastro)."""
+    if not valor:
+        return None
+    d = re.sub(r"\D", "", str(valor))
+    return d if len(d) in (10, 11) else None
 
 
 class ListarPrecadastrosAPIView(ListCreateAPIView):
@@ -206,7 +216,10 @@ class FinalizarAgendamentoAPIView(APIView):
         if cpf:
             cpf = "".join([c for c in str(cpf) if c.isdigit()])
         if not cpf or len(cpf) != 11:
-            return Response({"error": "CPF inválido ou não fornecido."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"error": "CPF deve conter exatamente 11 dígitos."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         try:
             dia_vencimento = int(dia_vencimento)
@@ -581,7 +594,11 @@ class ReverterAlunoParaPreCadastroAPIView(APIView):
                 precadastro.first_name = usuario.first_name
                 precadastro.last_name = usuario.last_name
                 precadastro.cpf = usuario.cpf
-                precadastro.telefone = usuario.telefone or precadastro.telefone
+                tel = _telefone_br_so_digitos(usuario.telefone)
+                if tel:
+                    precadastro.telefone = tel
+                elif not precadastro.telefone:
+                    precadastro.telefone = "11999999999"
                 precadastro.data_nascimento = usuario.data_nascimento
                 precadastro.email = usuario.email or precadastro.email
                 precadastro.status = "pendente"
@@ -593,7 +610,7 @@ class ReverterAlunoParaPreCadastroAPIView(APIView):
                     first_name=usuario.first_name,
                     last_name=usuario.last_name,
                     cpf=usuario.cpf,
-                    telefone=usuario.telefone or "(00)00000-0000",
+                    telefone=_telefone_br_so_digitos(usuario.telefone) or "11999999999",
                     data_nascimento=usuario.data_nascimento,
                     email=usuario.email or "pendente",
                     status="pendente",
@@ -673,6 +690,12 @@ class ListarCriarUsuariosAPIView(ListCreateAPIView):
         turma_id = self.request.query_params.get('turma', None)
         if turma_id:
             queryset = queryset.filter(turmas_aluno__id=turma_id).distinct()
+        queryset = queryset.prefetch_related(
+            Prefetch(
+                'turmas_aluno',
+                queryset=Turma.objects.select_related('ct').prefetch_related('dias_semana'),
+            )
+        )
         return queryset
 
     def list(self, request, *args, **kwargs):
@@ -681,30 +704,29 @@ class ListarCriarUsuariosAPIView(ListCreateAPIView):
         return Response(serializer.data)
 
     def create(self, request, *args, **kwargs):
-        try:
-            if request.user.tipo == "gerente" and request.data.get("tipo") == "aluno":
-                return Response(
-                    {"error": "Gerentes devem criar alunos via pré-cadastro e matrícula."},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            serializer = self.get_serializer(data=request.data)
-            serializer.is_valid(raise_exception=True)
-            instance = serializer.save()
-            # Mensalidade só é criada ao vincular aluno à turma (AdicionarAlunoAPIView)
-            headers = self.get_success_headers(serializer.data)
-            # Retorna o objeto criado (com id)
-            return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
-        except Exception as e:
-            # Captura erro específico de CPF duplicado
-            if 'UNIQUE constraint failed: usuarios_usuario.cpf' in str(e):
-                return Response(
-                    {"error": "CPF já cadastrado no sistema. Use um CPF diferente."}, 
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            # Para outros erros, retorna erro genérico
+        if request.user.tipo == "gerente" and request.data.get("tipo") == "aluno":
             return Response(
-                {"error": f"Erro ao cadastrar usuário: {str(e)}"}, 
+                {"error": "Gerentes devem criar alunos via pré-cadastro e matrícula."},
                 status=status.HTTP_400_BAD_REQUEST
+            )
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            serializer.save()
+            headers = self.get_success_headers(serializer.data)
+            return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+        except IntegrityError as e:
+            err = str(e).lower()
+            if "cpf" in err or "username" in err:
+                return Response(
+                    {"error": "CPF já cadastrado no sistema. Use um CPF diferente."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            raise
+        except Exception as e:
+            return Response(
+                {"error": f"Erro ao cadastrar usuário: {str(e)}"},
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
 

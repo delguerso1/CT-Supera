@@ -1,5 +1,8 @@
 name: Rollback para Backup Anterior
 
+permissions:
+  contents: read
+
 on:
   workflow_dispatch:
     inputs:

@@ -29,7 +29,18 @@ class PreCadastro(models.Model):
     first_name = models.CharField(max_length=100, blank=False, null=False)
     last_name = models.CharField(max_length=100, blank=True, null=True)
     cpf = models.CharField(max_length=11, unique=True, blank=True, null=True)
-    telefone = models.CharField(max_length=20, validators=[RegexValidator(regex=r'^\(\d{2}\)\d{5}-\d{4}$', message="Formato inválido. Use (21)00000-0000.")], blank=False, null=False)
+    telefone = models.CharField(
+        max_length=20,
+        validators=[
+            RegexValidator(
+                regex=r'^\d{10,11}$',
+                message="Informe o telefone com DDD: 10 ou 11 dígitos (apenas números).",
+            )
+        ],
+        blank=False,
+        null=False,
+        help_text="Apenas números, com DDD (10 ou 11 dígitos).",
+    )
     data_nascimento = models.DateField(null=True, blank=False)
     email = models.EmailField(max_length=255, unique=False, blank=False, null=False, default='pendente', error_messages={
         'blank': "O campo e-mail não pode estar vazio.",
@@ -53,6 +64,37 @@ class PreCadastro(models.Model):
             raise PermissionDenied("⚠️ Apenas professores e gerentes podem finalizar o agendamento.")
 
         if not self.usuario:
+            cpf_digits = ''.join(c for c in str(self.cpf or '') if c.isdigit())
+            if len(cpf_digits) != 11:
+                raise ValidationError(
+                    "⚠️ Informe um CPF válido com 11 dígitos antes de matricular."
+                )
+            self.cpf = cpf_digits
+
+            # Reingresso / ex-aluno: já existe cadastro com este CPF — vincula em vez de criar (evita UNIQUE em username/cpf).
+            existente = Usuario.objects.filter(tipo='aluno', cpf=cpf_digits).first()
+            if existente:
+                existente.dia_vencimento = dia_vencimento
+                existente.valor_mensalidade = valor_mensalidade
+                if plano is not None:
+                    existente.plano = plano
+                existente.ativo = True
+                if dias_habilitados:
+                    existente.dias_habilitados.set(dias_habilitados)
+                existente.save()
+                if hasattr(existente, 'atualizar_mensalidades_pendentes'):
+                    existente.atualizar_mensalidades_pendentes()
+                self.usuario = existente
+                self.status = 'matriculado'
+                self.save(update_fields=['usuario', 'status', 'cpf'])
+                logger.info(
+                    'Pré-cadastro %s vinculado ao aluno existente id=%s (CPF %s)',
+                    self.pk,
+                    existente.pk,
+                    cpf_digits,
+                )
+                return existente
+
             def _formatar_nome(valor):
                 if not valor:
                     return valor
@@ -75,29 +117,29 @@ class PreCadastro(models.Model):
                     (hoje.month, hoje.day) < (self.data_nascimento.month, self.data_nascimento.day)
                 )
 
-            # Define os campos de telefone com base na idade
+            # Telefone do responsável (menores) é opcional; maiores precisam de telefone (emergência)
             telefone_responsavel = None
             telefone_emergencia = None
 
             if idade is not None and idade < 18:
-                if not self.telefone:
-                    raise ValidationError("⚠️ Alunos menores de idade devem ter um telefone do responsável.")
-                telefone_responsavel = self.telefone
+                pass
             else:
                 if not self.telefone:
-                    raise ValidationError("⚠️ Alunos maiores de idade devem ter um telefone de emergência.")
+                    raise ValidationError(
+                        "⚠️ Alunos maiores de idade devem informar o telefone (usado como telefone de emergência)."
+                    )
                 telefone_emergencia = self.telefone
 
             # Cria o usuário aluno inativo (será ativado via link)
             usuario_aluno = Usuario.objects.create_user(
-                username=self.cpf.replace(".", "").replace("-", ""),
+                username=cpf_digits,
                 email=self.email if self.email else "",
                 password=None,  # Não define senha - usuário definirá via link
                 tipo="aluno",
                 first_name=_formatar_nome(self.first_name),
                 last_name=_formatar_nome(self.last_name or ""),
-                telefone=self.telefone,
-                cpf=self.cpf,
+                telefone=self.telefone or "",
+                cpf=cpf_digits,
                 data_nascimento=self.data_nascimento,
                 telefone_responsavel=telefone_responsavel,
                 telefone_emergencia=telefone_emergencia,
@@ -326,13 +368,9 @@ class Usuario(AbstractUser):
         if self.tipo == "professor" and not self.telefone:
             raise ValidationError({"telefone": "Professores devem informar um telefone."})
 
-        # 🔹 Lógica para alunos: necessidade de telefone do responsável ou emergência
-        if self.tipo == "aluno":
-            if idade is not None:
-                if idade < 18 and not self.telefone_responsavel:
-                    raise ValidationError({"telefone_responsavel": "Alunos menores de idade devem ter um telefone do responsável."})
-                elif idade >= 18 and not self.telefone_emergencia:
-                    raise ValidationError({"telefone_emergencia": "Alunos maiores de idade devem ter um telefone de emergência."})
+        # 🔹 Alunos maiores de idade: telefone de emergência obrigatório (responsável é opcional para menores)
+        if self.tipo == "aluno" and idade is not None and idade >= 18 and not self.telefone_emergencia:
+            raise ValidationError({"telefone_emergencia": "Alunos maiores de idade devem ter um telefone de emergência."})
 
 
     def save(self, *args, **kwargs):
@@ -363,5 +401,25 @@ class Usuario(AbstractUser):
             mensalidade.data_vencimento = nova_data_vencimento
             mensalidade.valor = self.valor_mensalidade
             mensalidade.save()
+
+
+class PushTokenExpo(models.Model):
+    """Token Expo Push por dispositivo (app mobile). Usado para avisos do gerente aos alunos."""
+
+    usuario = models.ForeignKey(
+        Usuario,
+        on_delete=models.CASCADE,
+        related_name="push_tokens_expo",
+    )
+    token = models.CharField(max_length=255, unique=True)
+    atualizado_em = models.DateTimeField(auto_now=True)
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Token push Expo"
+        verbose_name_plural = "Tokens push Expo"
+
+    def __str__(self):
+        return f"{self.usuario_id} — {self.token[:24]}…"
 
 

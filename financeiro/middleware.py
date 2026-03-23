@@ -25,15 +25,17 @@ class MensalidadeMesViradoMiddleware:
         return self.get_response(request)
 
     def _verificar_virada_mes(self):
+        """
+        Dispara a geração de mensalidades uma vez por mês (ano-mês).
+        Usa cache.add em chave única por mês para evitar corrida entre requisições
+        simultâneas (get+set não é atômico).
+        """
         hoje = timezone.now().date()
         mes_atual = f'{hoje.year}-{hoje.month:02d}'
-
-        ultimo_mes_processado = cache.get(CACHE_KEY_ULTIMO_MES_GERADO)
-
-        if ultimo_mes_processado != mes_atual:
+        chave_mes = f'{CACHE_KEY_ULTIMO_MES_GERADO}:{mes_atual}'
+        if cache.add(chave_mes, '1', CACHE_TIMEOUT):
             mes_virado.send(
                 sender=self.__class__,
                 ano=hoje.year,
                 mes=hoje.month
             )
-            cache.set(CACHE_KEY_ULTIMO_MES_GERADO, mes_atual, CACHE_TIMEOUT)

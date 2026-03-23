@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { useAuth } from '../utils/AuthContext';
 import { NavigationProps } from '../types';
+import { formatarCpfMascara, apenasDigitosCpf, MSG_CPF_11_DIGITOS } from '../utils/cpf';
 
 const LoginScreen: React.FC<NavigationProps> = ({ navigation }) => {
   const [username, setUsername] = useState('');
@@ -21,19 +22,23 @@ const LoginScreen: React.FC<NavigationProps> = ({ navigation }) => {
   const { login } = useAuth();
 
   const handleLogin = async () => {
-    const cpf = username.trim();
-    if (!cpf || !password.trim()) {
+    if (!password.trim()) {
       Alert.alert('Erro', 'Por favor, preencha todos os campos.');
       return;
     }
-    if (cpf.length !== 11) {
-      Alert.alert('Erro', 'O CPF deve ter exatamente 11 dígitos.');
+    const cpfLimpo = apenasDigitosCpf(username);
+    if (!cpfLimpo) {
+      Alert.alert('Erro', 'Por favor, preencha todos os campos.');
+      return;
+    }
+    if (cpfLimpo.length !== 11) {
+      Alert.alert('Erro', MSG_CPF_11_DIGITOS);
       return;
     }
 
     try {
       setLoading(true);
-      await login(cpf, password);
+      await login(cpfLimpo, password);
       // A navegação será feita automaticamente pelo AuthProvider
     } catch (error: any) {
       const msg = error.response?.data?.error
@@ -64,10 +69,10 @@ const LoginScreen: React.FC<NavigationProps> = ({ navigation }) => {
             <TextInput
               style={styles.input}
               value={username}
-              onChangeText={(t) => setUsername(t.replace(/\D/g, '').slice(0, 11))}
-              placeholder="Apenas números (11 dígitos)"
+              onChangeText={(t) => setUsername(formatarCpfMascara(t))}
+              placeholder="000.000.000-00"
               keyboardType="numeric"
-              maxLength={11}
+              maxLength={14}
               autoCapitalize="none"
               autoCorrect={false}
               editable={!loading}

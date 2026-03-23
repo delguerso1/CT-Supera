@@ -15,10 +15,20 @@ class DespesaSerializer(serializers.ModelSerializer):
 class MensalidadeSerializer(serializers.ModelSerializer):
     aluno = UsuarioSerializer(read_only=True)
     valor_efetivo = serializers.SerializerMethodField()
+    aluno_nome = serializers.SerializerMethodField()
 
     class Meta:
         model = Mensalidade
         fields = '__all__'
+
+    def get_aluno_nome(self, obj):
+        if not getattr(obj, 'aluno_id', None):
+            return ''
+        u = obj.aluno
+        nome = u.get_full_name() if hasattr(u, 'get_full_name') else ''
+        if not nome:
+            nome = f"{getattr(u, 'first_name', '') or ''} {getattr(u, 'last_name', '') or ''}".strip()
+        return nome or f"Aluno #{u.pk}"
 
     def get_valor_efetivo(self, obj):
         """Valor a exibir: valor_pago (com multa/juros) se houver, senão valor base."""

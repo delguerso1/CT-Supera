@@ -5,16 +5,24 @@ on:
     branches: [ main ]
   workflow_dispatch:  # Permite execução manual
 
+# Evita dois deploys simultâneos ao mesmo ambiente
+concurrency:
+  group: production-hostinger
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
 jobs:
   test:
     name: Testes e Validações
     runs-on: ubuntu-latest
     steps:
       - name: Checkout código
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
@@ -37,34 +45,18 @@ jobs:
         run: |
           python manage.py check
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '16'
-          cache: 'npm'
-          cache-dependency-path: ct-supera-frontend/package-lock.json
-
-      - name: Instalar dependências Node.js
-        working-directory: ./ct-supera-frontend
-        run: npm ci
-
-      - name: Verificar erros de lint (Frontend)
-        working-directory: ./ct-supera-frontend
-        run: npm run build
-        continue-on-error: true
-
   build-frontend:
     name: Build do Frontend
     needs: test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout código
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: '16'
+          node-version: '18'
           cache: 'npm'
           cache-dependency-path: ct-supera-frontend/package-lock.json
 
@@ -92,7 +84,7 @@ jobs:
       url: https://ctsupera.com.br
     steps:
       - name: Checkout código
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Download do build do frontend
         uses: actions/download-artifact@v4

@@ -9,6 +9,16 @@ import datetime
 from datetime import date
 from ct.models import CentroDeTreinamento
 
+def normalizar_telefone_precadastro_br(valor):
+    """Pré-cadastro: só dígitos, 10 (fixo) ou 11 (celular) com DDD."""
+    if not valor or not str(valor).strip():
+        raise ValidationError("Telefone é obrigatório.")
+    d = re.sub(r"\D", "", str(valor))
+    if len(d) not in (10, 11):
+        raise ValidationError("Informe o telefone com DDD: 10 ou 11 dígitos (apenas números).")
+    return d
+
+
 def validar_telefone(telefone):
     if telefone:
         telefone = re.sub(r'\D', '', telefone)  # 🔹 Remove caracteres não numéricos
@@ -20,7 +30,7 @@ def validar_cpf(cpf):
     cpf = re.sub(r'\D', '', cpf)  # 🔹 Remove caracteres não numéricos
     
     if len(cpf) != 11:
-        raise ValidationError("CPF deve conter 11 dígitos.")
+        raise ValidationError("CPF deve conter exatamente 11 dígitos.")
     
     if cpf == cpf[0] * 11:  # 🔹 Verifica se todos os dígitos são iguais
         raise ValidationError("CPF inválido.")
@@ -81,9 +91,7 @@ class UsuarioForm(forms.ModelForm):
 
     def clean_cpf(self):
         cpf = self.cleaned_data["cpf"]
-        cpf = re.sub(r"\D", "", cpf)
-        # Aqui você pode chamar sua função validar_cpf se quiser
-        return cpf
+        return validar_cpf(cpf)
 
     def clean_telefone(self):
         telefone = self.cleaned_data.get("telefone")
@@ -108,12 +116,8 @@ class UsuarioForm(forms.ModelForm):
             else:
                 hoje = datetime.date.today()
                 idade = hoje.year - data_nascimento.year - ((hoje.month, hoje.day) < (data_nascimento.month, data_nascimento.day))
-                if idade < 18:
-                    if not telefone_responsavel:
-                        self.add_error("telefone_responsavel", "Telefone do responsável é obrigatório para alunos menores de idade.")
-                else:
-                    if not telefone_emergencia:
-                        self.add_error("telefone_emergencia", "Telefone de emergência é obrigatório para alunos maiores de idade.")
+                if idade >= 18 and not telefone_emergencia:
+                    self.add_error("telefone_emergencia", "Telefone de emergência é obrigatório para alunos maiores de idade.")
 
         return cleaned_data
 
@@ -143,7 +147,10 @@ class UsuarioForm(forms.ModelForm):
 
 
 class PreCadastroForm(forms.ModelForm):
-    telefone = forms.CharField(max_length=20, widget=forms.TextInput(attrs={"placeholder": "(21)00000-0000"}))
+    telefone = forms.CharField(
+        max_length=20,
+        widget=forms.TextInput(attrs={"placeholder": "DDD + número (só números), ex: 21999999999"}),
+    )
     data_nascimento = forms.DateField(widget=forms.DateInput(attrs={"type": "date"}), label="Data de Nascimento")
     turma = forms.ModelChoiceField(queryset=Turma.objects.all(), empty_label="Selecione uma turma", required=True)
 
@@ -169,6 +176,9 @@ class PreCadastroForm(forms.ModelForm):
                 raise ValidationError("⚠️ Esse e-mail já está cadastrado no sistema.")
         return email
 
+    def clean_telefone(self):
+        return normalizar_telefone_precadastro_br(self.cleaned_data.get("telefone"))
+
     def clean(self):
         cleaned_data = super().clean()
         turma = cleaned_data.get('turma')
@@ -186,6 +196,9 @@ class AgendarAulaForm(forms.ModelForm):
         model = PreCadastro
         fields = ['first_name', 'last_name', 'telefone', 'data_nascimento', 'email', 'turma']
 
+    def clean_telefone(self):
+        return normalizar_telefone_precadastro_br(self.cleaned_data.get("telefone"))
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['turma'].queryset = Turma.objects.filter(dia_semana__in=['segunda', 'terca', 'quarta', 'quinta', 'sexta'])
@@ -202,6 +215,9 @@ class PreCadastroEditForm(forms.ModelForm):
     class Meta:
         model = PreCadastro
         fields = ["first_name", "last_name", "telefone", "data_nascimento", "email", "turma", "cpf"]
+
+    def clean_telefone(self):
+        return normalizar_telefone_precadastro_br(self.cleaned_data.get("telefone"))
 
 
 class DefinirSenhaForm(forms.Form):

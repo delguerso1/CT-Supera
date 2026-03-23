@@ -49,7 +49,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         cpf = ''.join(c for c in options['cpf'] if c.isdigit())
         if len(cpf) != 11:
-            self.stderr.write(self.style.ERROR('CPF deve ter exatamente 11 dígitos.'))
+            self.stderr.write(self.style.ERROR('CPF deve conter exatamente 11 dígitos.'))
             return
 
         senha = options['senha']

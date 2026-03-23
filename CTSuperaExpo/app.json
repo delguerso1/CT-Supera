@@ -1,0 +1,54 @@
+{
+  "expo": {
+    "name": "CT Supera",
+    "slug": "CTSuperaExpo",
+    "scheme": "ctsupera",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/logo-supera-principal.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#1F6C86"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.ctsupera.app"
+    },
+    "android": {
+      "package": "com.ctsupera.app",
+      "usesCleartextTraffic": true,
+      "notification": {
+        "icon": "./assets/icon.png",
+        "color": "#1F6C86"
+      },
+      "adaptiveIcon": {
+        "backgroundColor": "#E8F4F8",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-font",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#1F6C86"
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "f1baab53-bbd8-436a-b0ed-18389f501f59"
+      }
+    },
+    "owner": "devra.group"
+  }
+}
