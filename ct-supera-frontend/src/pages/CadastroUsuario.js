@@ -273,6 +273,7 @@ function CadastroUsuario({ onUserChange }) {
   const [turmas, setTurmas] = useState([]);
   const [diasSemana, setDiasSemana] = useState([]);
   const [filtroCtSelecionado, setFiltroCtSelecionado] = useState('');
+  const [filtroBuscaNomeAluno, setFiltroBuscaNomeAluno] = useState('');
   const [filtroTurmaSelecionada, setFiltroTurmaSelecionada] = useState('');
   const [filtroOrigemPrecadastro, setFiltroOrigemPrecadastro] = useState('');
   const [filtroStatusPrecadastro, setFiltroStatusPrecadastro] = useState('');
@@ -1102,36 +1103,47 @@ function CadastroUsuario({ onUserChange }) {
 
   const USUARIOS_POR_PAGINA = 10;
 
-  // Função para filtrar usuários por CT
+  // Lista da aba Alunos: filtro por CT, busca por nome e ordem alfabética (A–Z)
   const getFilteredUsers = () => {
-    // Se não há filtro selecionado ou não está na aba de alunos, retorna todos
-    if (!filtroCtSelecionado || filtroCtSelecionado === '' || activeTab !== 'alunos') {
+    if (activeTab !== 'alunos') {
       return users;
     }
-    
-    // Converte o filtro para número
-    const filtroId = parseInt(filtroCtSelecionado, 10);
-    if (isNaN(filtroId)) {
-      return users;
-    }
-    
-    // Filtra os usuários que têm o CT selecionado
-    return users.filter(user => {
-      // Verifica se o usuário tem centros de treinamento
-      if (!user.centros_treinamento || !Array.isArray(user.centros_treinamento) || user.centros_treinamento.length === 0) {
-        return false;
+
+    let list = [...users];
+
+    if (filtroCtSelecionado) {
+      const filtroId = parseInt(filtroCtSelecionado, 10);
+      if (!isNaN(filtroId)) {
+        list = list.filter(user => {
+          if (!user.centros_treinamento || !Array.isArray(user.centros_treinamento) || user.centros_treinamento.length === 0) {
+            return false;
+          }
+          return user.centros_treinamento.some(ct => {
+            if (!ct || ct.id === null || ct.id === undefined) {
+              return false;
+            }
+            const ctId = typeof ct.id === 'number' ? ct.id : parseInt(String(ct.id), 10);
+            return !isNaN(ctId) && ctId === filtroId;
+          });
+        });
       }
-      
-      // Verifica se algum dos CTs do usuário corresponde ao filtro
-      return user.centros_treinamento.some(ct => {
-        if (!ct || ct.id === null || ct.id === undefined) {
-          return false;
-        }
-        // Converte o ID do CT para número para comparação
-        const ctId = typeof ct.id === 'number' ? ct.id : parseInt(String(ct.id), 10);
-        return !isNaN(ctId) && ctId === filtroId;
+    }
+
+    const q = filtroBuscaNomeAluno.trim().toLowerCase();
+    if (q) {
+      list = list.filter(user => {
+        const nome = `${user.first_name || ''} ${user.last_name || ''}`.trim().toLowerCase();
+        return nome.includes(q);
       });
+    }
+
+    list.sort((a, b) => {
+      const na = `${a.first_name || ''} ${a.last_name || ''}`.trim();
+      const nb = `${b.first_name || ''} ${b.last_name || ''}`.trim();
+      return na.localeCompare(nb, 'pt-BR', { sensitivity: 'base' });
     });
+
+    return list;
   };
 
   // Usuários a exibir (com paginação na aba alunos)
@@ -1148,7 +1160,7 @@ function CadastroUsuario({ onUserChange }) {
   // Resetar página ao mudar filtros ou aba
   useEffect(() => {
     setPaginaAlunos(1);
-  }, [activeTab, filtroCtSelecionado, filtroTurmaSelecionada]);
+  }, [activeTab, filtroCtSelecionado, filtroTurmaSelecionada, filtroBuscaNomeAluno]);
 
   return (
     <div style={styles.container}>
@@ -1262,6 +1274,36 @@ function CadastroUsuario({ onUserChange }) {
       {/* Filtros por CT e Turma - apenas para alunos */}
       {activeTab === 'alunos' && (
         <div style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+          <label style={{ fontWeight: '500', color: '#333', whiteSpace: 'nowrap' }} htmlFor="busca_nome_aluno">
+            Buscar por nome:
+          </label>
+          <input
+            id="busca_nome_aluno"
+            type="search"
+            placeholder="Nome ou sobrenome"
+            value={filtroBuscaNomeAluno}
+            onChange={e => setFiltroBuscaNomeAluno(e.target.value)}
+            style={{
+              ...styles.input,
+              minWidth: '200px',
+              maxWidth: '320px',
+              flex: '1 1 200px',
+            }}
+            autoComplete="off"
+          />
+          {filtroBuscaNomeAluno.trim() && (
+            <button
+              type="button"
+              onClick={() => setFiltroBuscaNomeAluno('')}
+              style={{
+                ...styles.actionButton,
+                backgroundColor: '#757575',
+                padding: '0.5rem 1rem',
+              }}
+            >
+              Limpar busca
+            </button>
+          )}
           <label style={{ fontWeight: '500', color: '#333' }}>
             Filtrar por Centro de Treinamento:
           </label>
