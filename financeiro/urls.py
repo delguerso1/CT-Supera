@@ -1,7 +1,7 @@
 from django.urls import path
 from .views import (
     MensalidadeListCreateView, MensalidadeRetrieveUpdateDestroyView,
-    BaixarMensalidadeAPIView,
+    BaixarMensalidadeAPIView, AumentoMensalidadeGlobalAPIView,
     DespesaListCreateView, DespesaRetrieveUpdateDestroyView,
     SalarioListCreateView, SalarioRetrieveUpdateDestroyView,
     PagarSalarioAPIView, DashboardFinanceiroAPIView, RelatorioFinanceiroAPIView, 
@@ -22,6 +22,7 @@ urlpatterns = [
     path('mensalidades/', MensalidadeListCreateView.as_view(), name='mensalidade_list_create'),
     path('mensalidades/<int:pk>/', MensalidadeRetrieveUpdateDestroyView.as_view(), name='mensalidade_detail'),
     path('mensalidades/<int:pk>/dar-baixa/', BaixarMensalidadeAPIView.as_view(), name='mensalidade_dar_baixa'),
+    path('aumento-mensalidade-global/', AumentoMensalidadeGlobalAPIView.as_view(), name='aumento_mensalidade_global'),
     path('mensalidades/<int:pk>/gerar-pix/', GerarPixAPIView.as_view(), name='gerar_pix'),
     path('mensalidades/<int:pk>/status-pix/', ConsultarStatusPixAPIView.as_view(), name='status_pix'),
     path('mensalidades/<int:pk>/gerar-boleto/', GerarBoletoAPIView.as_view(), name='gerar_boleto'),

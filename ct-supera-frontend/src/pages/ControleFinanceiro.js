@@ -19,6 +19,8 @@ function ControleFinanceiro({ user, onDataChange }) {
   const [turmaFiltro, setTurmaFiltro] = useState('');
   const [mensalidadeStatus, setMensalidadeStatus] = useState('');
   const [pagina, setPagina] = useState(1);
+  const [aumentoIncremento, setAumentoIncremento] = useState('');
+  const [aumentoAplicando, setAumentoAplicando] = useState(false);
   const [showDespesaModal, setShowDespesaModal] = useState(false);
   const [editDespesa, setEditDespesa] = useState(null);
   const [despesaForm, setDespesaForm] = useState({ categoria: 'outros', descricao: '', valor: '', data: '' });
@@ -119,9 +121,23 @@ function ControleFinanceiro({ user, onDataChange }) {
     }
   };
 
+  /** Nome completo para exibição e ordenação (API pode vir com aluno nested ou só id). */
+  const nomeAlunoMensalidade = (m) => {
+    if (typeof m.aluno === 'object' && m.aluno) {
+      return `${m.aluno.first_name || ''} ${m.aluno.last_name || ''}`.trim();
+    }
+    const aluno = alunos.find(a => a.id === m.aluno || String(a.id) === String(m.aluno));
+    return aluno
+      ? `${aluno.first_name || ''} ${aluno.last_name || ''}`.trim()
+      : '';
+  };
+
   // Status já filtrado na API quando há seleção; mantém filtro local como redundância
   const mensalidadesFiltradas = mensalidades
-    .filter(m => !mensalidadeStatus || m.status === mensalidadeStatus);
+    .filter(m => !mensalidadeStatus || m.status === mensalidadeStatus)
+    .sort((a, b) =>
+      nomeAlunoMensalidade(a).localeCompare(nomeAlunoMensalidade(b), 'pt-BR', { sensitivity: 'base' })
+    );
 
   // Paginação
   const totalPaginas = Math.ceil(mensalidadesFiltradas.length / itensPorPagina);
@@ -295,6 +311,88 @@ function ControleFinanceiro({ user, onDataChange }) {
         </div>
       </div>
 
+      {user?.tipo === 'gerente' && (
+        <div
+          style={{
+            marginBottom: 24,
+            padding: 16,
+            background: '#e3f2fd',
+            borderRadius: 8,
+            border: '1px solid #90caf9',
+            maxWidth: 480,
+          }}
+        >
+          <h3 style={{ color: '#1F6C86', marginTop: 0, marginBottom: 8, fontSize: '1.1rem' }}>
+            Aumento de mensalidade (todos os alunos ativos)
+          </h3>
+          <p style={{ margin: '0 0 12px', fontSize: 14, color: '#455a64', lineHeight: 1.45 }}>
+            O valor será <strong>somado</strong> ao valor de mensalidade no cadastro de cada aluno ativo que já tem valor
+            (ex.: R$ 150,00 + R$ 10,00 = R$ 160,00). <strong>Só mensalidades com vencimento futuro</strong> passam a esse
+            novo valor; <strong>parcelas já vencidas</strong> permanecem como estão. Alunos sem valor no cadastro não entram.
+          </p>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontWeight: 600, color: '#37474f' }}>Incremento (R$)</span>
+              <input
+                type="text"
+                inputMode="decimal"
+                value={aumentoIncremento}
+                onChange={e => setAumentoIncremento(e.target.value)}
+                placeholder="ex: 10 ou 10,50"
+                disabled={aumentoAplicando}
+                style={{
+                  width: 140,
+                  padding: '0.6rem',
+                  borderRadius: 4,
+                  border: '1px solid #ccc',
+                  fontSize: 16,
+                }}
+              />
+            </label>
+            <button
+              type="button"
+              disabled={aumentoAplicando}
+              onClick={async () => {
+                const t = String(aumentoIncremento).trim().replace(',', '.');
+                const v = parseFloat(t);
+                if (!Number.isFinite(v) || v <= 0) {
+                  window.alert('Informe um valor maior que zero.');
+                  return;
+                }
+                const msg = `Somar R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ao valor de mensalidade de todos os alunos ativos que já têm valor cadastrado?\n\nEsta alteração é permanente.`;
+                if (!window.confirm(msg)) return;
+                try {
+                  setAumentoAplicando(true);
+                  await api.post('financeiro/aumento-mensalidade-global/', { incremento: t });
+                  setAumentoIncremento('');
+                  await fetchMensalidades();
+                  await fetchDashboard();
+                  await fetchAlunos();
+                  if (onDataChange) onDataChange();
+                  window.alert('Aumento aplicado com sucesso.');
+                } catch (e) {
+                  window.alert(e.response?.data?.error || 'Erro ao aplicar aumento.');
+                } finally {
+                  setAumentoAplicando(false);
+                }
+              }}
+              style={{
+                background: '#1F6C86',
+                color: '#fff',
+                border: 'none',
+                borderRadius: 4,
+                padding: '0.6rem 1rem',
+                fontSize: 15,
+                cursor: aumentoAplicando ? 'not-allowed' : 'pointer',
+                minHeight: 44,
+              }}
+            >
+              {aumentoAplicando ? 'Aplicando…' : 'Aplicar aumento'}
+            </button>
+          </div>
+        </div>
+      )}
+
       <h3 style={{ color: '#1F6C86', marginTop: 32 }}>Mensalidades</h3>
       <div className="controle-financeiro-busca" style={{ marginBottom: 12, display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center' }}>
         <select
@@ -345,9 +443,7 @@ function ControleFinanceiro({ user, onDataChange }) {
             {mensalidadesPaginadas.map(m => (
               <tr key={m.id} style={{ borderBottom: '1px solid #eee' }}>
                 <td style={{ padding: 10 }}>
-                  {typeof m.aluno === 'object'
-                    ? `${m.aluno.first_name} ${m.aluno.last_name}`.trim()
-                    : getNomeAluno(m.aluno)}
+                  {nomeAlunoMensalidade(m) || (typeof m.aluno !== 'object' ? getNomeAluno(m.aluno) : '')}
                 </td>
                 <td style={{ padding: 10, textAlign: 'right' }}>{formatCurrency(m.valor_efetivo ?? m.valor)}</td>
                 <td style={{ padding: 10, textAlign: 'center' }}>{formatDate(m.data_vencimento)}</td>

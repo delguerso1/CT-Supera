@@ -160,9 +160,7 @@ function FormacaoAtletas() {
   const handleChange = (e) => {
     const { name, value } = e.target;
     let valorFormatado = value;
-    if (name === 'first_name' || name === 'last_name') {
-      valorFormatado = formatarNome(value);
-    }
+    // Não formatar nome durante a digitação — formatarNome remove espaços à direita e impede "Maria Silva".
     if (name === 'telefone') {
       valorFormatado = formatarTelefone(value);
     }
@@ -187,8 +185,8 @@ function FormacaoAtletas() {
     setLoading(true);
     try {
       const payload = {
-        first_name: formData.first_name,
-        last_name: formData.last_name,
+        first_name: formatarNome(formData.first_name),
+        last_name: formatarNome(formData.last_name),
         cpf: cpfDig || undefined,
         email: formData.email,
         telefone: formData.telefone,

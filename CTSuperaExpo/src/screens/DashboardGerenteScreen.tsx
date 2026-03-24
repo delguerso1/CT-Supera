@@ -95,6 +95,8 @@ const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }
   const [notifMensagem, setNotifMensagem] = useState('');
   const [notifStats, setNotifStats] = useState<{ alunos_com_app: number; tokens_registrados: number } | null>(null);
   const [sendingNotif, setSendingNotif] = useState(false);
+  const [aumentoMensalidadeValor, setAumentoMensalidadeValor] = useState('');
+  const [aumentoMensalidadeLoading, setAumentoMensalidadeLoading] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -495,6 +497,41 @@ const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }
     );
   };
 
+  const handleAplicarAumentoMensalidadeGlobal = () => {
+    const t = aumentoMensalidadeValor.trim().replace(',', '.');
+    const v = parseFloat(t);
+    if (!Number.isFinite(v) || v <= 0) {
+      Alert.alert('Atenção', 'Informe um valor maior que zero.');
+      return;
+    }
+    const valorFmt = v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    Alert.alert(
+      'Confirmar aumento global',
+      `Somar R$ ${valorFmt} ao valor de mensalidade no cadastro de cada aluno ativo que já tem valor definido. ` +
+        'Mensalidades futuras serão atualizadas; parcelas já vencidas não mudam.\n\nDeseja continuar?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Aplicar',
+          onPress: async () => {
+            try {
+              setAumentoMensalidadeLoading(true);
+              await financeiroService.aplicarAumentoMensalidadeGlobal(t);
+              setAumentoMensalidadeValor('');
+              await loadFinanceiroData();
+              await loadAlunos();
+              Alert.alert('Sucesso', 'Aumento aplicado com sucesso.');
+            } catch (error: any) {
+              Alert.alert('Erro', formatarErroApi(error));
+            } finally {
+              setAumentoMensalidadeLoading(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const handleSelecionarFoto = async () => {
     const res = await pickImageFromLibrary({ quality: 0.8 });
     if (!res.ok) {
@@ -837,6 +874,36 @@ const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }
                 {formatCurrency(dashboardFinanceiro?.saldo_final)}
               </Text>
             </View>
+          </View>
+        </View>
+
+        <View style={[styles.section, styles.aumentoMensalidadeSection]}>
+          <Text style={styles.sectionTitle}>Aumento de mensalidade (global)</Text>
+          <Text style={styles.aumentoMensalidadeHint}>
+            O valor será somado ao cadastro de cada aluno ativo que já tem mensalidade definida. Afeta apenas
+            mensalidades futuras; parcelas vencidas não são alteradas.
+          </Text>
+          <View style={styles.aumentoMensalidadeRow}>
+            <TextInput
+              style={styles.aumentoMensalidadeInput}
+              value={aumentoMensalidadeValor}
+              onChangeText={setAumentoMensalidadeValor}
+              placeholder="Ex.: 10 ou 10,50"
+              placeholderTextColor="#999"
+              keyboardType="decimal-pad"
+              editable={!aumentoMensalidadeLoading}
+            />
+            <TouchableOpacity
+              style={[styles.aumentoMensalidadeButton, aumentoMensalidadeLoading && styles.buttonDisabled]}
+              onPress={handleAplicarAumentoMensalidadeGlobal}
+              disabled={aumentoMensalidadeLoading}
+            >
+              {aumentoMensalidadeLoading ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <Text style={styles.aumentoMensalidadeButtonText}>Aplicar</Text>
+              )}
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -2054,6 +2121,48 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
     marginBottom: 16,
+  },
+  aumentoMensalidadeSection: {
+    marginBottom: 8,
+  },
+  aumentoMensalidadeHint: {
+    fontSize: 13,
+    color: '#666',
+    lineHeight: 19,
+    marginBottom: 12,
+  },
+  aumentoMensalidadeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  aumentoMensalidadeInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: '#fff',
+    fontSize: 16,
+    color: '#333',
+  },
+  aumentoMensalidadeButton: {
+    backgroundColor: colors.primary,
+    paddingVertical: 12,
+    paddingHorizontal: 18,
+    borderRadius: 8,
+    minWidth: 100,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  aumentoMensalidadeButtonText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  buttonDisabled: {
+    opacity: 0.65,
   },
   infoRow: {
     flexDirection: 'row',

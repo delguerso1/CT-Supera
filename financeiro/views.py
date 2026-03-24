@@ -4,6 +4,7 @@ from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIV
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from django.db.models import Sum, Q
+from django.db import transaction
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 from .models import Mensalidade, Despesa, Salario, TransacaoC6Bank
@@ -16,7 +17,7 @@ from datetime import timedelta
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from django.http import JsonResponse
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 import json
 import logging
 import re
@@ -224,6 +225,72 @@ class BaixarMensalidadeAPIView(APIView):
         return Response({
             'message': 'Mensalidade dada baixa com sucesso!',
             'mensalidade': serializer.data
+        }, status=status.HTTP_200_OK)
+
+
+class AumentoMensalidadeGlobalAPIView(APIView):
+    """
+    Soma um valor ao valor_mensalidade de cada aluno (cadastro) e sincroniza apenas
+    mensalidades com vencimento futuro (data_vencimento >= hoje). Parcelas já vencidas
+    não são alteradas. Apenas gerentes.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        if request.user.tipo != 'gerente':
+            return Response(
+                {'error': 'Apenas gerentes podem aplicar aumento global de mensalidade.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        raw = request.data.get('incremento')
+        if raw is None or str(raw).strip() == '':
+            return Response(
+                {'error': 'Informe o incremento em reais (ex.: 10 ou 10,50).'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            inc = Decimal(str(raw).strip().replace(',', '.'))
+        except (InvalidOperation, ValueError):
+            return Response({'error': 'Valor de incremento inválido.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if inc <= 0:
+            return Response(
+                {'error': 'O incremento deve ser maior que zero.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        from usuarios.models import Usuario
+
+        with transaction.atomic():
+            alunos = list(
+                Usuario.objects.select_for_update().filter(
+                    tipo='aluno',
+                    ativo=True,
+                    valor_mensalidade__isnull=False,
+                )
+            )
+            if not alunos:
+                return Response(
+                    {
+                        'error': 'Nenhum aluno ativo com valor de mensalidade cadastrado. Defina o valor nos cadastros antes de aplicar o aumento.',
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            n = 0
+            for u in alunos:
+                u.valor_mensalidade = u.valor_mensalidade + inc
+                u.save(update_fields=['valor_mensalidade'])
+                # Só mensalidades com vencimento >= hoje (futuras); vencidas não mudam
+                u.atualizar_mensalidades_pendentes()
+                n += 1
+
+        return Response({
+            'message': f'Aumento de R$ {inc} aplicado: cadastro e mensalidades futuras de {n} aluno(s). Parcelas já vencidas não foram alteradas.',
+            'incremento': str(inc),
+            'alunos_atualizados': n,
         }, status=status.HTTP_200_OK)
 
 

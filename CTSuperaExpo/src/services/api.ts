@@ -419,6 +419,14 @@ export const financeiroService = {
     const response = await api.patch(`financeiro/salarios/${id}/`, { status: 'pago' });
     return response.data;
   },
+
+  /** Soma valor ao valor_mensalidade dos alunos ativos (cadastro) e sincroniza mensalidades futuras. Apenas gerente. */
+  aplicarAumentoMensalidadeGlobal: async (
+    incremento: string | number
+  ): Promise<{ message: string; incremento: string; alunos_atualizados: number }> => {
+    const response = await api.post('financeiro/aumento-mensalidade-global/', { incremento });
+    return response.data;
+  },
 };
 
 export const funcionarioService = {
