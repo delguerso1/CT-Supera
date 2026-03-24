@@ -13,18 +13,43 @@ function FormacaoAtletas() {
     turma: ''
   });
   const [turmas, setTurmas] = useState([]);
+  const [loadingTurmas, setLoadingTurmas] = useState(true);
+  const [turmasError, setTurmasError] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
+  /** Segue todas as páginas da API (DRF pagina turmas/; antes só vinha a 1ª página). */
+  const fetchAllPages = async (initialUrl) => {
+    let resultados = [];
+    let nextUrl = initialUrl;
+    while (nextUrl) {
+      const response = await api.get(nextUrl);
+      const data = response.data;
+      if (data && Array.isArray(data.results)) {
+        resultados = resultados.concat(data.results);
+        nextUrl = data.next || null;
+      } else {
+        resultados = Array.isArray(data) ? data : [];
+        nextUrl = null;
+      }
+    }
+    return resultados;
+  };
+
   useEffect(() => {
     const fetchTurmas = async () => {
+      setLoadingTurmas(true);
+      setTurmasError('');
       try {
-        const response = await api.get('turmas/');
-        const data = response.data?.results || response.data || [];
-        setTurmas(Array.isArray(data) ? data : []);
+        const todas = await fetchAllPages('turmas/');
+        setTurmas(todas);
       } catch (err) {
         console.error('Erro ao carregar turmas:', err);
+        setTurmas([]);
+        setTurmasError('Não foi possível carregar a lista de turmas. Atualize a página ou tente mais tarde.');
+      } finally {
+        setLoadingTurmas(false);
       }
     };
     fetchTurmas();
@@ -130,13 +155,18 @@ function FormacaoAtletas() {
 
   const formatarHorario = (horario) => {
     if (!horario) return '';
+    const s = typeof horario === 'string' ? horario : String(horario);
     try {
-      const [h, m] = horario.split(':');
-      return `${h.padStart(2, '0')}:${(m || '00').padStart(2, '0')}`;
+      const partes = s.split(':');
+      const h = partes[0] || '0';
+      const m = partes[1] || '00';
+      return `${h.padStart(2, '0')}:${m.padStart(2, '0')}`;
     } catch {
-      return horario;
+      return s;
     }
   };
+
+  const turmasAtivas = turmas.filter(t => t.ativo !== false);
 
   return (
     <div style={{ padding: '2rem', maxWidth: '720px', margin: '0 auto' }}>
@@ -212,28 +242,40 @@ function FormacaoAtletas() {
         </div>
 
         <div style={{ display: 'grid', gap: '0.5rem' }}>
-          <label>Turma</label>
+          <label>
+            Turma
+            {!loadingTurmas && turmasAtivas.length > 0 && (
+              <span style={{ fontWeight: 'normal', color: '#666' }}>
+                {' '}
+                ({turmasAtivas.length === 1 ? '1 disponível' : `${turmasAtivas.length} disponíveis`})
+              </span>
+            )}
+          </label>
           <select
             name="turma"
             value={formData.turma}
             onChange={handleChange}
+            disabled={loadingTurmas || !!turmasError}
             style={{
               padding: '0.75rem',
               borderRadius: '4px',
               border: '1px solid #ddd',
               fontSize: '1rem',
-              backgroundColor: '#fff'
+              backgroundColor: loadingTurmas || turmasError ? '#f5f5f5' : '#fff'
             }}
           >
-            <option value="">Selecione a turma</option>
-            {turmas.filter(t => t.ativo !== false).map(turma => (
+            <option value="">{loadingTurmas ? 'Carregando turmas…' : 'Selecione a turma'}</option>
+            {turmasAtivas.map(turma => (
               <option key={turma.id} value={turma.id}>
                 {turma.ct_nome || 'CT'} - {Array.isArray(turma.dias_semana_nomes) ? turma.dias_semana_nomes.join(', ') : '-'} às {formatarHorario(turma.horario)}
               </option>
             ))}
           </select>
-          {turmas.length === 0 && (
-            <span style={{ fontSize: '0.85rem', color: '#999' }}>Carregando turmas...</span>
+          {turmasError && (
+            <span style={{ fontSize: '0.85rem', color: '#c62828' }}>{turmasError}</span>
+          )}
+          {!loadingTurmas && !turmasError && turmasAtivas.length === 0 && (
+            <span style={{ fontSize: '0.85rem', color: '#999' }}>Nenhuma turma ativa no momento.</span>
           )}
         </div>
 

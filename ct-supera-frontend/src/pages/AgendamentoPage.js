@@ -17,13 +17,37 @@ const styles = {
     fontWeight: 'bold',
     marginBottom: '24px'
   },
+  form: {
+    textAlign: 'left',
+    width: '100%'
+  },
+  fieldGroup: {
+    marginBottom: '16px',
+    width: '100%'
+  },
+  label: {
+    display: 'block',
+    fontSize: '0.9rem',
+    fontWeight: '600',
+    color: '#37474f',
+    marginBottom: '6px',
+    lineHeight: 1.35
+  },
+  hint: {
+    fontSize: '0.8rem',
+    fontWeight: 'normal',
+    color: '#607d8b',
+    marginTop: '4px',
+    lineHeight: 1.35
+  },
   input: {
     width: '100%',
     padding: '10px',
-    margin: '10px 0',
+    margin: 0,
     borderRadius: '4px',
     border: '1px solid #ccc',
-    fontSize: '1rem'
+    fontSize: '1rem',
+    boxSizing: 'border-box'
   },
   button: {
     backgroundColor: '#1F6C86',
@@ -263,6 +287,11 @@ function AgendamentoPage() {
       return;
     }
 
+    if (!form.data_nascimento) {
+      setError('Informe sua data de nascimento.');
+      return;
+    }
+
     const cpfLimpo = apenasDigitosCpf(form.cpf);
     if (cpfLimpo.length > 0 && cpfLimpo.length !== 11) {
       setError(MSG_CPF_11_DIGITOS);
@@ -376,79 +405,118 @@ function AgendamentoPage() {
         <h2 style={styles.title}>Agende sua Aula Experimental</h2>
         {error && <div style={styles.error}>{error}</div>}
         {success && <div style={styles.success}>{success}</div>}
-        <form onSubmit={handleSubmit}>
-          <input
-            style={styles.input}
-            name="first_name"
-            value={form.first_name}
-            onChange={handleChange}
-            placeholder="Nome"
-            required
-          />
-          <input
-            style={styles.input}
-            name="last_name"
-            value={form.last_name}
-            onChange={handleChange}
-            placeholder="Sobrenome"
-            required
-          />
-          <input
-            style={styles.input}
-            name="email"
-            type="email"
-            value={form.email}
-            onChange={handleChange}
-            placeholder="E-mail"
-            required
-          />
-          <input
-            style={styles.input}
-            name="telefone"
-            value={form.telefone}
-            onChange={e => setForm({ ...form, telefone: formatTelefone(e.target.value) })}
-            placeholder="Telefone (ex: (21)99999-9999)"
-            required
-          />
-          <input
-            style={styles.input}
-            name="data_nascimento"
-            type="date"
-            value={form.data_nascimento}
-            onChange={handleChange}
-            placeholder="Data de nascimento"
-            required
-          />
-          <input
-            style={styles.input}
-            name="cpf"
-            value={form.cpf}
-            onChange={handleChange}
-            placeholder="CPF (opcional) — 000.000.000-00"
-            maxLength={14}
-            inputMode="numeric"
-            autoComplete="off"
-          />
-          <select
-            style={styles.input}
-            name="ct"
-            value={form.ct}
-            onChange={handleChange}
-            required
-          >
+        <form onSubmit={handleSubmit} style={styles.form}>
+          <div style={styles.fieldGroup}>
+            <label htmlFor="agendamento-first_name" style={styles.label}>Nome</label>
+            <input
+              id="agendamento-first_name"
+              style={styles.input}
+              name="first_name"
+              value={form.first_name}
+              onChange={handleChange}
+              autoComplete="given-name"
+              required
+            />
+          </div>
+          <div style={styles.fieldGroup}>
+            <label htmlFor="agendamento-last_name" style={styles.label}>Sobrenome</label>
+            <input
+              id="agendamento-last_name"
+              style={styles.input}
+              name="last_name"
+              value={form.last_name}
+              onChange={handleChange}
+              autoComplete="family-name"
+              required
+            />
+          </div>
+          <div style={styles.fieldGroup}>
+            <label htmlFor="agendamento-email" style={styles.label}>E-mail</label>
+            <input
+              id="agendamento-email"
+              style={styles.input}
+              name="email"
+              type="email"
+              value={form.email}
+              onChange={handleChange}
+              autoComplete="email"
+              required
+            />
+          </div>
+          <div style={styles.fieldGroup}>
+            <label htmlFor="agendamento-telefone" style={styles.label}>Telefone</label>
+            <input
+              id="agendamento-telefone"
+              style={styles.input}
+              name="telefone"
+              value={form.telefone}
+              onChange={e => setForm({ ...form, telefone: formatTelefone(e.target.value) })}
+              placeholder="(21) 99999-9999"
+              inputMode="tel"
+              autoComplete="tel"
+              required
+            />
+          </div>
+          <div style={styles.fieldGroup}>
+            <label htmlFor="agendamento-data_nascimento" style={styles.label}>
+              Data de nascimento
+            </label>
+            <input
+              id="agendamento-data_nascimento"
+              style={styles.input}
+              name="data_nascimento"
+              type="date"
+              value={form.data_nascimento}
+              onChange={handleChange}
+              autoComplete="bday"
+              max={new Date().toISOString().slice(0, 10)}
+              required
+            />
+            <p style={styles.hint}>
+              Usamos sua idade para mostrar apenas turmas adequadas à sua faixa etária (crianças, adolescentes ou adultos).
+            </p>
+          </div>
+          <div style={styles.fieldGroup}>
+            <label htmlFor="agendamento-cpf" style={styles.label}>CPF (opcional)</label>
+            <input
+              id="agendamento-cpf"
+              style={styles.input}
+              name="cpf"
+              value={form.cpf}
+              onChange={handleChange}
+              placeholder="000.000.000-00"
+              maxLength={14}
+              inputMode="numeric"
+              autoComplete="off"
+            />
+          </div>
+          <div style={styles.fieldGroup}>
+            <label htmlFor="agendamento-ct" style={styles.label}>Centro de Treinamento</label>
+            <select
+              id="agendamento-ct"
+              style={styles.input}
+              name="ct"
+              value={form.ct}
+              onChange={handleChange}
+              required
+            >
             <option value="">Selecione o Centro de Treinamento</option>
             {cts.map(ct => (
               <option key={ct.id} value={ct.id}>{ct.nome}</option>
             ))}
           </select>
-          <select
-            style={styles.input}
-            name="turma"
-            value={form.turma}
-            onChange={handleChange}
-            required
-            disabled={!form.ct || !form.data_nascimento}
-          >
+          </div>
+          <div style={styles.fieldGroup}>
+            <label htmlFor="agendamento-turma" style={styles.label}>Turma</label>
+            <select
+              id="agendamento-turma"
+              style={styles.input}
+              name="turma"
+              value={form.turma}
+              onChange={handleChange}
+              required
+              disabled={!form.ct || !form.data_nascimento}
+            >
             <option value="">
               {!form.data_nascimento
                 ? 'Informe a data de nascimento para ver as turmas'
@@ -474,9 +542,10 @@ function AgendamentoPage() {
               );
             })}
           </select>
+          </div>
           {form.turma && (
-            <div style={{ marginTop: '8px', marginBottom: '8px' }}>
-              <label style={{ display: 'block', textAlign: 'left', marginBottom: '4px', fontWeight: '500', color: '#333' }}>
+            <div style={{ ...styles.fieldGroup, marginTop: '8px' }}>
+              <label style={{ ...styles.label, marginBottom: '8px' }}>
                 Data da aula experimental
               </label>
               {turmaSelecionada?.horario && datasDisponiveis.length > 0 && (
@@ -507,7 +576,9 @@ function AgendamentoPage() {
               )}
             </div>
           )}
-          <button type="submit" style={styles.button}>Agendar</button>
+          <div style={{ textAlign: 'center', marginTop: '8px' }}>
+            <button type="submit" style={styles.button}>Agendar</button>
+          </div>
         </form>
       </div>
     </>
