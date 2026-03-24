@@ -2,6 +2,84 @@ import React, { useState, useEffect } from 'react';
 import api from '../services/api';
 import { formatarCpfMascara, apenasDigitosCpf, MSG_CPF_11_DIGITOS } from '../utils/cpf';
 
+/** Mesma base visual de AgendamentoPage (aula experimental). */
+const styles = {
+  container: {
+    maxWidth: '500px',
+    margin: '40px auto',
+    padding: '32px',
+    background: '#e3f2fd',
+    borderRadius: '12px',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.07)',
+    textAlign: 'center'
+  },
+  title: {
+    color: '#1F6C86',
+    fontWeight: 'bold',
+    marginBottom: '12px',
+    fontSize: '1.5rem'
+  },
+  subtitle: {
+    color: '#555',
+    marginBottom: '20px',
+    fontSize: '0.95rem',
+    lineHeight: 1.5,
+    textAlign: 'left'
+  },
+  form: {
+    textAlign: 'left',
+    width: '100%'
+  },
+  fieldGroup: {
+    marginBottom: '16px',
+    width: '100%'
+  },
+  label: {
+    display: 'block',
+    fontSize: '0.9rem',
+    fontWeight: '600',
+    color: '#37474f',
+    marginBottom: '6px',
+    lineHeight: 1.35
+  },
+  hint: {
+    fontSize: '0.8rem',
+    fontWeight: 'normal',
+    color: '#607d8b',
+    marginTop: '4px',
+    lineHeight: 1.35
+  },
+  input: {
+    width: '100%',
+    padding: '10px',
+    margin: 0,
+    borderRadius: '4px',
+    border: '1px solid #ccc',
+    fontSize: '1rem',
+    boxSizing: 'border-box'
+  },
+  button: {
+    backgroundColor: '#1F6C86',
+    color: 'white',
+    padding: '10px 24px',
+    border: 'none',
+    borderRadius: '4px',
+    fontSize: '1rem',
+    cursor: 'pointer',
+    marginTop: '10px'
+  },
+  error: {
+    color: '#d32f2f',
+    marginBottom: '10px',
+    textAlign: 'left'
+  },
+  success: {
+    color: '#388e3c',
+    marginBottom: '10px',
+    textAlign: 'left'
+  }
+};
+
 function FormacaoAtletas() {
   const [formData, setFormData] = useState({
     first_name: '',
@@ -169,35 +247,46 @@ function FormacaoAtletas() {
   const turmasAtivas = turmas.filter(t => t.ativo !== false);
 
   return (
-    <div style={{ padding: '2rem', maxWidth: '720px', margin: '0 auto' }}>
-      <h1 style={{ color: '#1F6C86' }}>Alunos</h1>
-      <p style={{ color: '#555', marginBottom: '1.5rem' }}>
+    <div style={styles.container}>
+      <h2 style={styles.title}>Alunos</h2>
+      <p style={styles.subtitle}>
         Se você já é aluno do CT Supera, preencha o cadastro abaixo e selecione a turma de sua preferência.
       </p>
 
-      <form onSubmit={handleSubmit} style={{ display: 'grid', gap: '1rem' }}>
-        <div style={{ display: 'grid', gap: '0.5rem' }}>
-          <label>Nome</label>
+      {error && <div style={styles.error}>{error}</div>}
+      {success && <div style={styles.success}>{success}</div>}
+
+      <form onSubmit={handleSubmit} style={styles.form}>
+        <div style={styles.fieldGroup}>
+          <label htmlFor="alunos-first_name" style={styles.label}>Nome</label>
           <input
+            id="alunos-first_name"
+            style={styles.input}
             type="text"
             name="first_name"
             value={formData.first_name}
             onChange={handleChange}
+            autoComplete="given-name"
             required
           />
         </div>
-        <div style={{ display: 'grid', gap: '0.5rem' }}>
-          <label>Sobrenome</label>
+        <div style={styles.fieldGroup}>
+          <label htmlFor="alunos-last_name" style={styles.label}>Sobrenome</label>
           <input
+            id="alunos-last_name"
+            style={styles.input}
             type="text"
             name="last_name"
             value={formData.last_name}
             onChange={handleChange}
+            autoComplete="family-name"
           />
         </div>
-        <div style={{ display: 'grid', gap: '0.5rem' }}>
-          <label>CPF</label>
+        <div style={styles.fieldGroup}>
+          <label htmlFor="alunos-cpf" style={styles.label}>CPF</label>
           <input
+            id="alunos-cpf"
+            style={styles.input}
             type="text"
             name="cpf"
             value={formData.cpf}
@@ -209,40 +298,54 @@ function FormacaoAtletas() {
             required
           />
         </div>
-        <div style={{ display: 'grid', gap: '0.5rem' }}>
-          <label>E-mail</label>
+        <div style={styles.fieldGroup}>
+          <label htmlFor="alunos-email" style={styles.label}>E-mail</label>
           <input
+            id="alunos-email"
+            style={styles.input}
             type="email"
             name="email"
             value={formData.email}
             onChange={handleChange}
+            autoComplete="email"
             required
           />
         </div>
-        <div style={{ display: 'grid', gap: '0.5rem' }}>
-          <label>Telefone</label>
+        <div style={styles.fieldGroup}>
+          <label htmlFor="alunos-telefone" style={styles.label}>Telefone</label>
           <input
+            id="alunos-telefone"
+            style={styles.input}
             type="tel"
             name="telefone"
             value={formData.telefone}
             onChange={handleChange}
-            placeholder="(21)00000-0000"
+            placeholder="(21) 99999-9999"
+            inputMode="tel"
+            autoComplete="tel"
             required
           />
         </div>
-        <div style={{ display: 'grid', gap: '0.5rem' }}>
-          <label>Data de Nascimento</label>
+        <div style={styles.fieldGroup}>
+          <label htmlFor="alunos-data_nascimento" style={styles.label}>Data de nascimento</label>
           <input
+            id="alunos-data_nascimento"
+            style={styles.input}
             type="date"
             name="data_nascimento"
             value={formData.data_nascimento}
             onChange={handleChange}
+            autoComplete="bday"
+            max={new Date().toISOString().slice(0, 10)}
             required
           />
+          <p style={styles.hint}>
+            Necessário para o cadastro e para indicar a turma adequada à sua idade, quando aplicável.
+          </p>
         </div>
 
-        <div style={{ display: 'grid', gap: '0.5rem' }}>
-          <label>
+        <div style={styles.fieldGroup}>
+          <label htmlFor="alunos-turma" style={styles.label}>
             Turma
             {!loadingTurmas && turmasAtivas.length > 0 && (
               <span style={{ fontWeight: 'normal', color: '#666' }}>
@@ -252,17 +355,15 @@ function FormacaoAtletas() {
             )}
           </label>
           <select
+            id="alunos-turma"
+            style={{
+              ...styles.input,
+              backgroundColor: loadingTurmas || turmasError ? '#f5f5f5' : '#fff'
+            }}
             name="turma"
             value={formData.turma}
             onChange={handleChange}
             disabled={loadingTurmas || !!turmasError}
-            style={{
-              padding: '0.75rem',
-              borderRadius: '4px',
-              border: '1px solid #ddd',
-              fontSize: '1rem',
-              backgroundColor: loadingTurmas || turmasError ? '#f5f5f5' : '#fff'
-            }}
           >
             <option value="">{loadingTurmas ? 'Carregando turmas…' : 'Selecione a turma'}</option>
             {turmasAtivas.map(turma => (
@@ -272,30 +373,26 @@ function FormacaoAtletas() {
             ))}
           </select>
           {turmasError && (
-            <span style={{ fontSize: '0.85rem', color: '#c62828' }}>{turmasError}</span>
+            <p style={{ ...styles.hint, color: '#c62828', marginTop: '8px' }}>{turmasError}</p>
           )}
           {!loadingTurmas && !turmasError && turmasAtivas.length === 0 && (
-            <span style={{ fontSize: '0.85rem', color: '#999' }}>Nenhuma turma ativa no momento.</span>
+            <p style={{ ...styles.hint, color: '#757575', marginTop: '8px' }}>Nenhuma turma ativa no momento.</p>
           )}
         </div>
 
-        {error && <div style={{ color: '#d32f2f' }}>{error}</div>}
-        {success && <div style={{ color: '#2e7d32' }}>{success}</div>}
-
-        <button
-          type="submit"
-          disabled={loading}
-          style={{
-            backgroundColor: '#1F6C86',
-            color: 'white',
-            padding: '0.75rem 1.25rem',
-            border: 'none',
-            borderRadius: '6px',
-            cursor: loading ? 'not-allowed' : 'pointer'
-          }}
-        >
-          {loading ? 'Enviando...' : 'Enviar cadastro'}
-        </button>
+        <div style={{ textAlign: 'center', marginTop: '8px' }}>
+          <button
+            type="submit"
+            disabled={loading}
+            style={{
+              ...styles.button,
+              cursor: loading ? 'not-allowed' : 'pointer',
+              opacity: loading ? 0.85 : 1
+            }}
+          >
+            {loading ? 'Enviando...' : 'Enviar cadastro'}
+          </button>
+        </div>
       </form>
     </div>
   );
