@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import api from '../services/api';
 import { formatarCpfMascara, apenasDigitosCpf, MSG_CPF_11_DIGITOS } from '../utils/cpf';
+import { normalizarTelefoneBrParaApi } from '../utils/telefone';
 
 const styles = {
   container: {
@@ -297,11 +298,18 @@ function AgendamentoPage() {
       setError(MSG_CPF_11_DIGITOS);
       return;
     }
+    const telefoneDigitos = normalizarTelefoneBrParaApi(form.telefone);
+    if (telefoneDigitos.length !== 10 && telefoneDigitos.length !== 11) {
+      setError(
+        'Informe o telefone com DDD (10 ou 11 dígitos). Você pode colar com +55; o sistema ajusta automaticamente.'
+      );
+      return;
+    }
     const dados = {
       first_name: formatarNome(form.first_name),
       last_name: formatarNome(form.last_name),
       email: form.email,
-      telefone: form.telefone,
+      telefone: telefoneDigitos,
       data_nascimento: form.data_nascimento,
       cpf: cpfLimpo,
       turma: form.turma || undefined,

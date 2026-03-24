@@ -6,6 +6,7 @@ import {
   MSG_CPF_11_DIGITOS,
   MSG_CPF_MATRICULA,
 } from '../utils/cpf';
+import { normalizarTelefoneBrParaApi } from '../utils/telefone';
 
 const styles = {
   container: {
@@ -139,17 +140,24 @@ const styles = {
     bottom: 0,
     backgroundColor: 'rgba(0,0,0,0.5)',
     display: 'flex',
-    justifyContent: 'center',
+    flexDirection: 'column',
+    justifyContent: 'flex-start',
     alignItems: 'center',
+    paddingTop: 'max(12px, env(safe-area-inset-top, 0px))',
+    paddingBottom: '16px',
+    overflowY: 'auto',
+    WebkitOverflowScrolling: 'touch',
     zIndex: 1000,
+    boxSizing: 'border-box',
   },
   modalContent: {
     backgroundColor: 'white',
     padding: '2rem',
     borderRadius: '8px',
     width: '500px',
-    maxHeight: '90vh',
+    maxHeight: 'min(92vh, calc(100vh - max(12px, env(safe-area-inset-top, 0px)) - 24px))',
     overflowY: 'auto',
+    flexShrink: 0,
   },
   precadastroTooltip: {
     position: 'absolute',
@@ -304,6 +312,13 @@ function CadastroUsuario({ onUserChange }) {
     forma_pagamento: '',
   });
 
+  const usuarioModalOverlayRef = useRef(null);
+  const usuarioModalContentRef = useRef(null);
+  const matriculaModalOverlayRef = useRef(null);
+  const matriculaModalContentRef = useRef(null);
+  const parqModalOverlayRef = useRef(null);
+  const parqModalContentRef = useRef(null);
+
   // Defina fetchUsers usando useCallback
   const fetchAllPages = async (initialUrl) => {
     let resultados = [];
@@ -424,6 +439,45 @@ function CadastroUsuario({ onUserChange }) {
     };
     fetchDiasSemana();
   }, []);
+
+  useEffect(() => {
+    if (!showModal) return;
+    const id = requestAnimationFrame(() => {
+      if (usuarioModalOverlayRef.current) {
+        usuarioModalOverlayRef.current.scrollTop = 0;
+      }
+      if (usuarioModalContentRef.current) {
+        usuarioModalContentRef.current.scrollTop = 0;
+      }
+    });
+    return () => cancelAnimationFrame(id);
+  }, [showModal]);
+
+  useEffect(() => {
+    if (!showMatriculaModal) return;
+    const id = requestAnimationFrame(() => {
+      if (matriculaModalOverlayRef.current) {
+        matriculaModalOverlayRef.current.scrollTop = 0;
+      }
+      if (matriculaModalContentRef.current) {
+        matriculaModalContentRef.current.scrollTop = 0;
+      }
+    });
+    return () => cancelAnimationFrame(id);
+  }, [showMatriculaModal]);
+
+  useEffect(() => {
+    if (!showParqModal) return;
+    const id = requestAnimationFrame(() => {
+      if (parqModalOverlayRef.current) {
+        parqModalOverlayRef.current.scrollTop = 0;
+      }
+      if (parqModalContentRef.current) {
+        parqModalContentRef.current.scrollTop = 0;
+      }
+    });
+    return () => cancelAnimationFrame(id);
+  }, [showParqModal]);
 
   const calcularIdade = (dataNascimento) => {
     if (!dataNascimento) return null;
@@ -613,6 +667,13 @@ function CadastroUsuario({ onUserChange }) {
         setError(MSG_CPF_11_DIGITOS);
         return;
       }
+      const telPrec = normalizarTelefoneBrParaApi(formData.telefone);
+      if (telPrec.length !== 10 && telPrec.length !== 11) {
+        setError(
+          'Pré-cadastro: informe telefone com DDD (10 ou 11 dígitos). Pode colar com +55.'
+        );
+        return;
+      }
     } else if (cpfDigitos.length !== 11) {
       setError(MSG_CPF_11_DIGITOS);
       return;
@@ -665,7 +726,7 @@ function CadastroUsuario({ onUserChange }) {
           first_name: formData.first_name,
           last_name: formData.last_name || '',
           email: formData.email,
-          telefone: formData.telefone,
+          telefone: normalizarTelefoneBrParaApi(formData.telefone),
           data_nascimento: formData.data_nascimento,
           cpf: cpfDigitos.length > 0 ? cpfDigitos : null,
           origem: formData.origem || (editingUser && editingUser.origem) || 'formulario',
@@ -1781,8 +1842,9 @@ function CadastroUsuario({ onUserChange }) {
       )}
 
       {showModal && (
-        <div style={styles.modal}>
+        <div ref={usuarioModalOverlayRef} style={styles.modal}>
           <div
+            ref={usuarioModalContentRef}
             style={{
               ...styles.modalContent,
               ...(editingUser && activeTab === 'alunos' ? styles.modalContentWide : {}),
@@ -2214,8 +2276,8 @@ function CadastroUsuario({ onUserChange }) {
       )}
 
       {showMatriculaModal && matriculaPrecadastro && (
-        <div style={styles.modal}>
-          <div style={styles.modalContent}>
+        <div ref={matriculaModalOverlayRef} style={styles.modal}>
+          <div ref={matriculaModalContentRef} style={styles.modalContent}>
             <h2 style={styles.title}>Matricular pré-cadastro</h2>
             <div style={{ fontSize: '0.9rem', color: '#666' }}>
               A primeira mensalidade inclui matrícula + uniforme + mensalidade do mês. O vencimento será no dia informado abaixo.
@@ -2557,8 +2619,8 @@ function CadastroUsuario({ onUserChange }) {
       )}
 
       {showParqModal && selectedParqUser && (
-        <div style={styles.modal}>
-          <div style={styles.modalContent}>
+        <div ref={parqModalOverlayRef} style={styles.modal}>
+          <div ref={parqModalContentRef} style={styles.modalContent}>
             <h2 style={styles.title}>
               Respostas PAR-Q - {selectedParqUser.first_name} {selectedParqUser.last_name}
             </h2>

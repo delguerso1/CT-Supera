@@ -11,9 +11,11 @@ from ct.models import CentroDeTreinamento
 
 def normalizar_telefone_precadastro_br(valor):
     """Pré-cadastro: só dígitos, 10 (fixo) ou 11 (celular) com DDD."""
+    from usuarios.utils import normalizar_telefone_br_para_precadastro
+
     if not valor or not str(valor).strip():
         raise ValidationError("Telefone é obrigatório.")
-    d = re.sub(r"\D", "", str(valor))
+    d = normalizar_telefone_br_para_precadastro(valor)
     if len(d) not in (10, 11):
         raise ValidationError("Informe o telefone com DDD: 10 ou 11 dígitos (apenas números).")
     return d

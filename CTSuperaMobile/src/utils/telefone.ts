@@ -1,6 +1,5 @@
 /**
- * Normaliza para envio à API: 10 ou 11 dígitos (DDD + número).
- * Aceita colagem com +55; não remove "55" quando há só 11 dígitos (pode ser DDD 55 no RS).
+ * Mesma lógica do painel web / Expo: +55, zeros à esquerda; DDD 55 (11 dígitos) preservado.
  */
 export function normalizarTelefoneBrParaApi(valor: string): string {
   let d = String(valor || '').replace(/\D/g, '');
@@ -17,13 +16,6 @@ export function normalizarTelefoneBrParaApi(valor: string): string {
     d = d.slice(-11);
   }
   return d;
-}
-
-/** Campo de pré-cadastro: só dígitos; até 15 para permitir colar +55 antes de normalizar no envio. */
-export function formatarTelefoneSoDigitos(texto: string): string {
-  return String(texto || '')
-    .replace(/\D/g, '')
-    .slice(0, 15);
 }
 
 export function telefoneBrValido(texto: string): boolean {

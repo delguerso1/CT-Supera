@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -28,7 +28,12 @@ import {
   calcularIdade,
 } from '../utils/dataNascimento';
 import { formatarErroApi, parseDecimalBrasil } from '../utils/apiError';
-import { formatarTelefoneSoDigitos, telefoneBrValido } from '../utils/telefone';
+import {
+  formatarTelefoneSoDigitos,
+  normalizarTelefoneBrParaApi,
+  telefoneBrValido,
+} from '../utils/telefone';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import SafeScreen from '../components/SafeScreen';
 import { colors } from '../theme';
 
@@ -36,6 +41,9 @@ type TabKey = 'alunos' | 'professores' | 'gerentes' | 'precadastros';
 
 const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
+  const formModalScrollRef = useRef<ScrollView>(null);
+  const matriculaModalScrollRef = useRef<ScrollView>(null);
   const [activeTab, setActiveTab] = useState<TabKey>('alunos');
   const [users, setUsers] = useState<User[]>([]);
   const [precadastros, setPrecadastros] = useState<PreCadastro[]>([]);
@@ -90,6 +98,22 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
       fetchUsers();
     }
   }, [activeTab, user, filtroStatusPrecadastro]);
+
+  useEffect(() => {
+    if (!showForm) return;
+    const id = requestAnimationFrame(() => {
+      formModalScrollRef.current?.scrollTo({ y: 0, animated: false });
+    });
+    return () => cancelAnimationFrame(id);
+  }, [showForm]);
+
+  useEffect(() => {
+    if (!showMatriculaModal) return;
+    const id = requestAnimationFrame(() => {
+      matriculaModalScrollRef.current?.scrollTo({ y: 0, animated: false });
+    });
+    return () => cancelAnimationFrame(id);
+  }, [showMatriculaModal]);
 
   const fetchUsers = async () => {
     try {
@@ -229,7 +253,7 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
       email: formData.email.trim(),
       telefone:
         activeTab === 'precadastros'
-          ? formatarTelefoneSoDigitos(formData.telefone)
+          ? normalizarTelefoneBrParaApi(formData.telefone)
           : formData.telefone,
       endereco: formData.endereco,
       data_nascimento: normalizarDataNascimentoParaApi(formData.data_nascimento),
@@ -272,11 +296,10 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
         Alert.alert('Validação', MSG_CPF_11_DIGITOS);
         return;
       }
-      const telDigitos = formatarTelefoneSoDigitos(formData.telefone);
-      if (!telefoneBrValido(telDigitos)) {
+      if (!telefoneBrValido(formData.telefone)) {
         Alert.alert(
           'Validação',
-          'Informe o telefone com DDD usando só números (10 ou 11 dígitos). Ex.: 21999999999.'
+          'Informe o telefone com DDD (10 ou 11 dígitos). Pode colar com +55; o sistema ajusta automaticamente.'
         );
         return;
       }
@@ -761,12 +784,16 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
       </View>
 
       <Modal visible={showForm} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
+        <View style={[styles.modalOverlay, { paddingTop: insets.top + 8 }]}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>
               {editingUser ? 'Editar registro' : 'Novo registro'}
             </Text>
-            <ScrollView>
+            <ScrollView
+              ref={formModalScrollRef}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator
+            >
               <TextInput
                 style={styles.input}
                 placeholder="Nome"
@@ -807,7 +834,7 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
                     : 'Telefone'
                 }
                 keyboardType="number-pad"
-                maxLength={activeTab === 'precadastros' ? 11 : undefined}
+                maxLength={activeTab === 'precadastros' ? 15 : undefined}
                 value={formData.telefone}
                 onChangeText={(value) =>
                   setFormData(prev => ({
@@ -978,10 +1005,14 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
       </Modal>
 
       <Modal visible={showMatriculaModal} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
+        <View style={[styles.modalOverlay, { paddingTop: insets.top + 8 }]}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Matricular pré-cadastro</Text>
-            <ScrollView>
+            <ScrollView
+              ref={matriculaModalScrollRef}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator
+            >
               <Text style={styles.sectionTitle}>
                 {matriculaForm.ja_aluno ? 'Turma (opcional)' : 'Turma (obrigatório para novo aluno)'}
               </Text>
@@ -1327,14 +1358,15 @@ const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    padding: 16,
+    justifyContent: 'flex-start',
+    paddingHorizontal: 16,
+    paddingBottom: 16,
   },
   modalContent: {
     backgroundColor: '#fff',
     borderRadius: 12,
     padding: 16,
-    maxHeight: '90%',
+    maxHeight: '92%',
   },
   modalTitle: {
     fontSize: 18,

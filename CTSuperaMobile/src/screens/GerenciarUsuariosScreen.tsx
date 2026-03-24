@@ -22,6 +22,7 @@ import {
   MSG_CPF_11_DIGITOS,
   MSG_CPF_MATRICULA,
 } from '../utils/cpf';
+import { normalizarTelefoneBrParaApi, telefoneBrValido } from '../utils/telefone';
 
 type TabKey = 'alunos' | 'professores' | 'gerentes' | 'precadastros';
 
@@ -173,7 +174,10 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
       last_name: formData.last_name,
       cpf: activeTab === 'precadastros' ? (cpfDigits.length > 0 ? cpfDigits : null) : cpfDigits,
       email: formData.email,
-      telefone: formData.telefone,
+      telefone:
+        activeTab === 'precadastros'
+          ? normalizarTelefoneBrParaApi(formData.telefone)
+          : formData.telefone,
       endereco: formData.endereco,
       data_nascimento: formData.data_nascimento || null,
     };
@@ -209,6 +213,13 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
     if (activeTab === 'precadastros') {
       if (cpfDigits.length > 0 && cpfDigits.length !== 11) {
         Alert.alert('Validação', MSG_CPF_11_DIGITOS);
+        return;
+      }
+      if (!telefoneBrValido(formData.telefone)) {
+        Alert.alert(
+          'Validação',
+          'Informe o telefone com DDD (10 ou 11 dígitos). Pode colar com +55; o sistema ajusta automaticamente.'
+        );
         return;
       }
     } else if (cpfDigits.length !== 11) {

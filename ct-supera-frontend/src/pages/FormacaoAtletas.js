@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
 import { formatarCpfMascara, apenasDigitosCpf, MSG_CPF_11_DIGITOS } from '../utils/cpf';
+import { normalizarTelefoneBrParaApi } from '../utils/telefone';
 
 /** Mesma base visual de AgendamentoPage (aula experimental). */
 const styles = {
@@ -182,6 +183,14 @@ function FormacaoAtletas() {
       setError(MSG_CPF_11_DIGITOS);
       return;
     }
+    const telefoneDigitos = normalizarTelefoneBrParaApi(formData.telefone);
+    if (telefoneDigitos.length !== 10 && telefoneDigitos.length !== 11) {
+      setError(
+        'Informe o telefone com DDD (10 ou 11 dígitos). Você pode colar com +55 ou máscara; o sistema ajusta automaticamente.'
+      );
+      return;
+    }
+
     setLoading(true);
     try {
       const payload = {
@@ -189,7 +198,7 @@ function FormacaoAtletas() {
         last_name: formatarNome(formData.last_name),
         cpf: cpfDig || undefined,
         email: formData.email,
-        telefone: formData.telefone,
+        telefone: telefoneDigitos,
         data_nascimento: formData.data_nascimento
       };
       if (formData.turma) payload.turma = parseInt(formData.turma, 10);
@@ -323,6 +332,9 @@ function FormacaoAtletas() {
             autoComplete="tel"
             required
           />
+          <p style={styles.hint}>
+            DDD + número (10 ou 11 dígitos). Pode colar com +55 ou WhatsApp.
+          </p>
         </div>
         <div style={styles.fieldGroup}>
           <label htmlFor="alunos-data_nascimento" style={styles.label}>Data de nascimento</label>

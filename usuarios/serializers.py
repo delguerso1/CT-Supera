@@ -462,9 +462,11 @@ class PreCadastroSerializer(serializers.ModelSerializer):
         return cpf_limpo
 
     def validate_telefone(self, value):
+        from usuarios.utils import normalizar_telefone_br_para_precadastro
+
         if value is None or not str(value).strip():
             raise serializers.ValidationError('Telefone é obrigatório.')
-        digitos = re.sub(r'\D', '', str(value))
+        digitos = normalizar_telefone_br_para_precadastro(value)
         if len(digitos) not in (10, 11):
             raise serializers.ValidationError(
                 'Informe o telefone com DDD: 10 ou 11 dígitos (apenas números).'

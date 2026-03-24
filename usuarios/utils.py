@@ -9,8 +9,28 @@ import logging
 from django.conf import settings
 from typing import Optional, List
 from urllib.parse import quote
+import re
 
 logger = logging.getLogger(__name__)
+
+
+def normalizar_telefone_br_para_precadastro(valor) -> str:
+    """
+    Extrai 10 ou 11 dígitos (DDD + número) a partir de máscara, +55, zeros à esquerda.
+    Não remove o prefixo 55 quando há só 11 dígitos (pode ser DDD 55 no RS).
+    """
+    if not valor:
+        return ''
+    d = re.sub(r'\D', '', str(valor))
+    while len(d) > 11 and d.startswith('0'):
+        d = d[1:]
+    if len(d) >= 12 and d.startswith('55'):
+        d = d[2:]
+    while len(d) > 11 and d.startswith('0'):
+        d = d[1:]
+    if len(d) > 11:
+        d = d[-11:]
+    return d
 
 SALT_REAGENDAR = "reagendar_aula_experimental"
 
