@@ -668,7 +668,12 @@ function DashboardProfessor({ user }) {
                 ':hover': {
                   backgroundColor: '#f5f5f5'
                 }
-              }} onClick={() => setCtSelecionado(ct)}>
+              }}
+                onClick={() => {
+                  setCtSelecionado(ct);
+                  setActiveSection('turmas');
+                }}
+              >
                 <h4 style={{ margin: '0 0 8px 0', color: '#1F6C86' }}>{ct.nome}</h4>
                 <p style={{ margin: 0, color: '#666' }}>
                   Clique para ver as turmas deste centro

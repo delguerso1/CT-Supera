@@ -246,6 +246,16 @@ const styles = {
 };
 
 function CadastroUsuario({ onUserChange }) {
+  const singularEntidadePorTab = (tab) => {
+    const map = {
+      alunos: 'Aluno',
+      professores: 'Professor',
+      gerentes: 'Gerente',
+      precadastros: 'Pré-cadastro',
+    };
+    return map[tab] || tab;
+  };
+
   const [activeTab, setActiveTab] = useState('alunos');
   const [users, setUsers] = useState([]);
   const [showModal, setShowModal] = useState(false);
@@ -1231,10 +1241,9 @@ function CadastroUsuario({ onUserChange }) {
         </h2>
         {activeTab !== 'alunos' && (
           <button style={styles.button} onClick={handleNewUser}>
-            {activeTab === 'precadastros' ? 'Novo Pré-cadastro' : 
-             activeTab === 'professores' ? 'Novo Professor' :
-             activeTab === 'gerentes' ? 'Novo Gerente' :
-             `Novo ${activeTab.slice(0, -1).charAt(0).toUpperCase() + activeTab.slice(0, -1).slice(1)}`}
+            {activeTab === 'precadastros'
+              ? 'Novo Pré-cadastro'
+              : `Novo ${singularEntidadePorTab(activeTab)}`}
           </button>
         )}
       </div>
@@ -1851,10 +1860,13 @@ function CadastroUsuario({ onUserChange }) {
             }}
           >
             <h2 style={styles.title}>
-              {editingUser 
-                ? (activeTab === 'precadastros' ? 'Editar Pré-cadastro' : `Editar ${activeTab.slice(0, -1).charAt(0).toUpperCase() + activeTab.slice(0, -1).slice(1)}`)
-                : (activeTab === 'precadastros' ? 'Novo Pré-cadastro' : `Novo ${activeTab.slice(0, -1).charAt(0).toUpperCase() + activeTab.slice(0, -1).slice(1)}`)
-              }
+              {editingUser
+                ? activeTab === 'precadastros'
+                  ? 'Editar Pré-cadastro'
+                  : `Editar ${singularEntidadePorTab(activeTab)}`
+                : activeTab === 'precadastros'
+                  ? 'Novo Pré-cadastro'
+                  : `Novo ${singularEntidadePorTab(activeTab)}`}
             </h2>
 
             <form style={styles.form} onSubmit={handleSubmit}>
@@ -2024,7 +2036,7 @@ function CadastroUsuario({ onUserChange }) {
                 />
               </div>
 
-              {formData.data_nascimento && (
+              {formData.tipo === 'aluno' && formData.data_nascimento && (
                 <>
                   {calcularIdade(formData.data_nascimento) < 18 ? (
                     <>
@@ -2267,7 +2279,7 @@ function CadastroUsuario({ onUserChange }) {
                     flex: 1,
                   }}
                 >
-                  {editingUser ? 'Salvar' : `Cadastrar ${activeTab.slice(0, -1).charAt(0).toUpperCase() + activeTab.slice(0, -1).slice(1)}`}
+                  {editingUser ? 'Salvar' : `Cadastrar ${singularEntidadePorTab(activeTab)}`}
                 </button>
               </div>
             </form>

@@ -332,9 +332,6 @@ function FormacaoAtletas() {
             autoComplete="tel"
             required
           />
-          <p style={styles.hint}>
-            DDD + número (10 ou 11 dígitos). Pode colar com +55 ou WhatsApp.
-          </p>
         </div>
         <div style={styles.fieldGroup}>
           <label htmlFor="alunos-data_nascimento" style={styles.label}>Data de nascimento</label>
