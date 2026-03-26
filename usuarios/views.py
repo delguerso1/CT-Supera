@@ -839,6 +839,91 @@ class ReenviarConviteAPIView(APIView):
             )
 
 
+class SolicitarPrimeiroAcessoAPIView(APIView):
+    """
+    Aluno já matriculado que ainda não ativou a conta: solicita reenvio do e-mail de ativação
+    informando apenas o CPF (rota pública, mesmo fluxo do convite inicial).
+    """
+    permission_classes = []
+
+    def post(self, request):
+        cpf_raw = (request.data.get('cpf') or '').strip()
+        cpf = re.sub(r'\D', '', str(cpf_raw))
+        if len(cpf) != 11:
+            return Response(
+                {'error': 'Informe um CPF válido com 11 dígitos.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            usuario = Usuario.objects.get(username=cpf, tipo='aluno')
+        except Usuario.DoesNotExist:
+            return Response(
+                {
+                    'message': (
+                        'Se o CPF estiver cadastrado e elegível, você receberá um e-mail '
+                        'com o link de ativação na caixa cadastrada.'
+                    ),
+                    'code': 'GENERIC',
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        if not usuario.email or usuario.email == 'pendente':
+            return Response(
+                {
+                    'message': (
+                        'Se o CPF estiver cadastrado e elegível, você receberá um e-mail '
+                        'com o link de ativação na caixa cadastrada.'
+                    ),
+                    'code': 'GENERIC',
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        # Conta já pode fazer login (ativa e com senha definida)
+        if usuario.is_active and usuario.has_usable_password():
+            return Response(
+                {
+                    'message': (
+                        'Sua conta já está ativa. Use o login com CPF e senha ou, se esqueceu a senha, '
+                        "a opção 'Recuperar senha'."
+                    ),
+                    'code': 'ALREADY_ACTIVE',
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        try:
+            from usuarios.utils import enviar_convite_aluno
+            enviar_convite_aluno(usuario)
+            logger.info(f'Primeiro acesso: convite reenviado para aluno CPF {cpf}')
+            return Response(
+                {
+                    'message': (
+                        'Enviamos um e-mail com o link para ativar sua conta e definir sua senha. '
+                        'Verifique a caixa de entrada e o spam.'
+                    ),
+                    'code': 'SENT',
+                },
+                status=status.HTTP_200_OK,
+            )
+        except ValueError as e:
+            logger.warning(f'Primeiro acesso: validação ao enviar convite: {e}')
+            return Response(
+                {
+                    'error': 'Não foi possível enviar o e-mail. Verifique os dados ou contate o CT.',
+                    'code': 'SEND_FAILED',
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except Exception as e:
+            logger.error(f'Primeiro acesso: erro ao enviar convite: {e}')
+            return Response(
+                {'error': 'Não foi possível enviar o e-mail agora. Tente novamente mais tarde.'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
 class SolicitarRecuperacaoSenhaAPIView(APIView):
     """API para solicitar recuperação de senha."""
     permission_classes = []  # Não requer autenticação

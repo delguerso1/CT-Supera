@@ -48,10 +48,14 @@ def validar_email_aluno_cadastro(email, data_nascimento, instance_usuario=None, 
     if not email or str(email).strip().lower() == 'pendente':
         return
 
-    qs_u = Usuario.objects.filter(email=email)
-    qs_p = PreCadastro.objects.filter(email=email)
+    email_limpo = str(email).strip().lower()
+    qs_u = Usuario.objects.filter(email__iexact=email_limpo)
+    qs_p = PreCadastro.objects.filter(email__iexact=email_limpo)
     if instance_usuario is not None:
         qs_u = qs_u.exclude(pk=instance_usuario.pk)
+        # Pré-cadastro matriculado continua no banco com o mesmo e-mail do aluno;
+        # não é "outra pessoa" usando o e-mail.
+        qs_p = qs_p.exclude(usuario_id=instance_usuario.pk)
     if instance_precadastro is not None:
         qs_p = qs_p.exclude(pk=instance_precadastro.pk)
 

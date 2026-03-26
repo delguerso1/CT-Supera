@@ -5,6 +5,7 @@ from .views import (
     FinalizarAgendamentoAPIView, LoginAPIView, LogoutAPIView, AtivarContaAPIView,
     ListarCriarUsuariosAPIView, EditarExcluirUsuarioAPIView, ReenviarConviteAPIView, AceitarContratoAPIView,
     ReverterAlunoParaPreCadastroAPIView,
+    SolicitarPrimeiroAcessoAPIView,
     SolicitarRecuperacaoSenhaAPIView, RedefinirSenhaAPIView
 )
 from .push_views import (
@@ -20,6 +21,7 @@ urlpatterns = [
     path('precadastros/<int:pk>/', EditarExcluirPrecadastroAPIView.as_view(), name='editar_excluir_precadastro_api'),
     path('finalizar-agendamento/<int:precadastro_id>/', FinalizarAgendamentoAPIView.as_view(), name='finalizar_agendamento_api'),
     path('login/', LoginAPIView.as_view(), name='login_api'),
+    path('primeiro-acesso/', SolicitarPrimeiroAcessoAPIView.as_view(), name='solicitar_primeiro_acesso_api'),
     path('logout/', LogoutAPIView.as_view(), name='logout_api'),
     path('aceitar-contrato/', AceitarContratoAPIView.as_view(), name='aceitar_contrato_api'),
     path('reverter-aluno/<int:usuario_id>/', ReverterAlunoParaPreCadastroAPIView.as_view(), name='reverter_aluno_precadastro_api'),

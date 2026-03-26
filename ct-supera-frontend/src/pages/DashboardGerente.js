@@ -294,7 +294,66 @@ const styles = {
     fontSize: '12px',
     cursor: 'pointer',
     transition: 'background-color 0.3s ease'
-  }
+  },
+  modalOverlay: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    zIndex: 2000,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '20px',
+    boxSizing: 'border-box',
+  },
+  modalBox: {
+    backgroundColor: 'white',
+    borderRadius: '12px',
+    maxWidth: '480px',
+    width: '100%',
+    maxHeight: '75vh',
+    display: 'flex',
+    flexDirection: 'column',
+    boxShadow: '0 12px 40px rgba(0,0,0,0.15)',
+  },
+  modalHeader: {
+    padding: '16px 20px',
+    borderBottom: '1px solid #eee',
+    fontWeight: 'bold',
+    color: '#1F6C86',
+    fontSize: '18px',
+  },
+  modalBody: {
+    padding: '12px 20px 20px',
+    overflowY: 'auto',
+    flex: 1,
+  },
+  modalCloseBtn: {
+    marginTop: '12px',
+    width: '100%',
+    padding: '10px',
+    borderRadius: '8px',
+    border: '1px solid #ccc',
+    backgroundColor: '#f5f5f5',
+    cursor: 'pointer',
+    fontSize: '15px',
+    fontWeight: '600',
+    color: '#333',
+  },
+  listaInativoItem: {
+    padding: '10px 0',
+    borderBottom: '1px solid #f0f0f0',
+    fontSize: '15px',
+    color: '#333',
+  },
+  listaInativoMotivo: {
+    fontSize: '12px',
+    color: '#888',
+    marginTop: '4px',
+  },
 };
 
 function formatDateOnly(dateString) {
@@ -347,7 +406,28 @@ function DashboardGerente({ user }) {
   const [fotoPerfil, setFotoPerfil] = useState(null);
   const [fotoPreview, setFotoPreview] = useState(null);
   const [uploadingFoto, setUploadingFoto] = useState(false);
+  const [showModalInativos, setShowModalInativos] = useState(false);
+  const [listaInativos, setListaInativos] = useState([]);
+  const [loadingListaInativos, setLoadingListaInativos] = useState(false);
+  const [erroListaInativos, setErroListaInativos] = useState('');
   const navigate = useNavigate();
+
+  const abrirModalAlunosInativos = async () => {
+    setErroListaInativos('');
+    setShowModalInativos(true);
+    setLoadingListaInativos(true);
+    setListaInativos([]);
+    try {
+      const { data } = await api.get('funcionarios/painel-gerente/alunos-inativos/');
+      setListaInativos(Array.isArray(data.alunos) ? data.alunos : []);
+    } catch (e) {
+      setErroListaInativos(
+        e.response?.data?.error || 'Não foi possível carregar a lista de alunos.'
+      );
+    } finally {
+      setLoadingListaInativos(false);
+    }
+  };
 
   const fetchDashboardData = useCallback(async () => {
     try {
@@ -556,7 +636,28 @@ function DashboardGerente({ user }) {
           <div style={styles.statTitle}>Alunos</div>
           <div style={styles.statValueSuccess}>{stats.alunosAtivos}</div>
           <div style={styles.statSubtitle}>Ativos</div>
-          <div style={{ ...styles.statSubtitle, marginTop: 4 }}>{stats.alunosInativos} inativos</div>
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={abrirModalAlunosInativos}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                abrirModalAlunosInativos();
+              }
+            }}
+            style={{
+              ...styles.statSubtitle,
+              marginTop: 4,
+              cursor: 'pointer',
+              color: '#1F6C86',
+              textDecoration: 'underline',
+              fontWeight: 600,
+            }}
+            title="Clique para ver os nomes dos alunos inativos"
+          >
+            {stats.alunosInativos} inativos
+          </div>
         </div>
         
         <div style={styles.statCard}>
@@ -1094,6 +1195,53 @@ function DashboardGerente({ user }) {
           {activeSection === 'financeiro' && renderFinanceiro()}
         </div>
       </div>
+
+      {showModalInativos && (
+        <div
+          style={styles.modalOverlay}
+          onClick={() => setShowModalInativos(false)}
+          role="presentation"
+        >
+          <div
+            style={styles.modalBox}
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-labelledby="modal-inativos-titulo"
+          >
+            <div id="modal-inativos-titulo" style={styles.modalHeader}>
+              Alunos inativos
+            </div>
+            <div style={styles.modalBody}>
+              {loadingListaInativos && <p style={{ color: '#666' }}>Carregando…</p>}
+              {erroListaInativos && (
+                <p style={{ color: '#c62828', margin: 0 }}>{erroListaInativos}</p>
+              )}
+              {!loadingListaInativos && !erroListaInativos && listaInativos.length === 0 && (
+                <p style={{ color: '#666', margin: 0 }}>Nenhum aluno inativo neste critério.</p>
+              )}
+              {!loadingListaInativos &&
+                !erroListaInativos &&
+                listaInativos.map((a) => (
+                  <div key={a.id} style={styles.listaInativoItem}>
+                    <div>
+                      {`${a.first_name || ''} ${a.last_name || ''}`.trim() || '—'}
+                    </div>
+                    {a.motivo ? (
+                      <div style={styles.listaInativoMotivo}>{a.motivo}</div>
+                    ) : null}
+                  </div>
+                ))}
+              <button
+                type="button"
+                style={styles.modalCloseBtn}
+                onClick={() => setShowModalInativos(false)}
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

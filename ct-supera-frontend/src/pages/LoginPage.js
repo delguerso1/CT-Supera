@@ -107,18 +107,39 @@ const styles = {
     display: 'inline-block',
     transition: 'all 0.3s ease',
   },
+  success: {
+    color: '#1b5e20',
+    textAlign: 'center',
+    marginTop: '10px',
+    padding: '10px',
+    backgroundColor: '#e8f5e9',
+    borderRadius: '6px',
+    border: '1px solid #a5d6a7',
+    fontSize: '14px',
+  },
+  linkButton: {
+    background: 'none',
+    border: 'none',
+    color: '#1F6C86',
+    fontSize: '14px',
+    fontWeight: '600',
+    cursor: 'pointer',
+    textDecoration: 'underline',
+    padding: '4px 0',
+    fontFamily: 'inherit',
+  },
 };
 
 function LoginPage() {
   const [cpf, setCpf] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [primeiroAcessoOpen, setPrimeiroAcessoOpen] = useState(false);
+  const [cpfPrimeiroAcesso, setCpfPrimeiroAcesso] = useState('');
+  const [primeiroAcessoLoading, setPrimeiroAcessoLoading] = useState(false);
+  const [primeiroAcessoMessage, setPrimeiroAcessoMessage] = useState('');
+  const [primeiroAcessoError, setPrimeiroAcessoError] = useState('');
   const navigate = useNavigate();
-
-  // Debug: Verificar se o componente está renderizando
-  React.useEffect(() => {
-    console.log('LoginPage renderizado - Botão Instagram deve estar visível');
-  }, []);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -166,6 +187,30 @@ function LoginPage() {
       console.error('[DEBUG] Erro no login:', error);
       const errorMessage = error.response?.data?.error || error.response?.data?.detail || 'Erro ao realizar login. Tente novamente.';
       setError(errorMessage);
+    }
+  };
+
+  const handlePrimeiroAcesso = async (e) => {
+    e.preventDefault();
+    setPrimeiroAcessoError('');
+    setPrimeiroAcessoMessage('');
+    const cpfNumeros = apenasDigitosCpf(cpfPrimeiroAcesso);
+    if (cpfNumeros.length !== 11) {
+      setPrimeiroAcessoError(MSG_CPF_11_DIGITOS);
+      return;
+    }
+    try {
+      setPrimeiroAcessoLoading(true);
+      const response = await api.post('usuarios/primeiro-acesso/', { cpf: cpfNumeros });
+      setPrimeiroAcessoMessage(response.data?.message || 'Solicitação registrada.');
+    } catch (err) {
+      const msg =
+        err.response?.data?.error ||
+        err.response?.data?.detail ||
+        'Não foi possível enviar. Tente novamente.';
+      setPrimeiroAcessoError(typeof msg === 'string' ? msg : 'Não foi possível enviar. Tente novamente.');
+    } finally {
+      setPrimeiroAcessoLoading(false);
     }
   };
 
@@ -240,6 +285,77 @@ function LoginPage() {
           <a href="/esqueci-senha" style={styles.forgotPasswordLink}>
             🔑 Recuperar Senha
           </a>
+        </div>
+
+        <div style={{ ...styles.forgotPassword, marginTop: '16px' }}>
+          <div style={styles.forgotPasswordText}>
+            É aluno, já está matriculado e ainda não ativou o acesso?
+          </div>
+          {!primeiroAcessoOpen ? (
+            <button
+              type="button"
+              style={styles.forgotPasswordLink}
+              onClick={() => {
+                setPrimeiroAcessoOpen(true);
+                setPrimeiroAcessoError('');
+                setPrimeiroAcessoMessage('');
+              }}
+            >
+              Primeiro acesso — ativar conta
+            </button>
+          ) : (
+            <form style={{ marginTop: '12px', textAlign: 'left' }} onSubmit={handlePrimeiroAcesso}>
+              <p style={{ fontSize: '13px', color: '#555', marginBottom: '12px', lineHeight: 1.45 }}>
+                Informe o mesmo CPF da matrícula. Enviaremos o link de ativação para o e-mail cadastrado.
+              </p>
+              <div style={styles.inputGroup}>
+                <label style={styles.label} htmlFor="cpf-primeiro-acesso">
+                  CPF
+                </label>
+                <input
+                  id="cpf-primeiro-acesso"
+                  type="text"
+                  placeholder="000.000.000-00"
+                  value={cpfPrimeiroAcesso}
+                  onChange={(e) => setCpfPrimeiroAcesso(formatarCpfMascara(e.target.value))}
+                  style={styles.input}
+                  maxLength={14}
+                  inputMode="numeric"
+                  autoComplete="username"
+                  disabled={primeiroAcessoLoading}
+                />
+              </div>
+              <button
+                type="submit"
+                style={{ ...styles.button, width: '100%', marginTop: '8px' }}
+                disabled={primeiroAcessoLoading}
+              >
+                {primeiroAcessoLoading ? 'Enviando…' : '📧 Solicitar ativação de senha'}
+              </button>
+              {primeiroAcessoMessage && (
+                <div style={styles.success} role="status">
+                  {primeiroAcessoMessage}
+                </div>
+              )}
+              {primeiroAcessoError && (
+                <div className="alert alert-danger" style={{ ...styles.error, marginTop: '10px' }}>
+                  {primeiroAcessoError}
+                </div>
+              )}
+              <button
+                type="button"
+                style={{ ...styles.linkButton, marginTop: '12px', display: 'block', width: '100%', textAlign: 'center' }}
+                onClick={() => {
+                  setPrimeiroAcessoOpen(false);
+                  setCpfPrimeiroAcesso('');
+                  setPrimeiroAcessoMessage('');
+                  setPrimeiroAcessoError('');
+                }}
+              >
+                Voltar ao login
+              </button>
+            </form>
+          )}
         </div>
       </div>
     </div>

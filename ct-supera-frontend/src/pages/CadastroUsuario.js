@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import api, { MEDIA_URL } from '../services/api';
 import {
   apenasDigitosCpf,
@@ -159,11 +160,8 @@ const styles = {
     overflowY: 'auto',
     flexShrink: 0,
   },
+  /** Painel flutuante (portal em document.body); posição top/left aplicadas em runtime */
   precadastroTooltip: {
-    position: 'absolute',
-    bottom: '100%',
-    left: 0,
-    marginBottom: '6px',
     backgroundColor: 'white',
     padding: '12px 14px',
     borderRadius: '8px',
@@ -171,7 +169,6 @@ const styles = {
     border: '1px solid #e0e0e0',
     fontSize: '0.85rem',
     color: '#444',
-    zIndex: 100,
     minWidth: '260px',
     whiteSpace: 'normal',
     lineHeight: 1.5,
@@ -303,6 +300,8 @@ function CadastroUsuario({ onUserChange }) {
   const [parqActionLoading, setParqActionLoading] = useState(false);
   const [selectedUserInfo, setSelectedUserInfo] = useState(null);
   const [selectedPrecadastroInfo, setSelectedPrecadastroInfo] = useState(null);
+  const [userTooltipAnchor, setUserTooltipAnchor] = useState(null);
+  const [precadastroTooltipAnchor, setPrecadastroTooltipAnchor] = useState(null);
   const [showMatriculaModal, setShowMatriculaModal] = useState(false);
   const [matriculaPrecadastro, setMatriculaPrecadastro] = useState(null);
   const [matriculaLoading, setMatriculaLoading] = useState(false);
@@ -547,6 +546,48 @@ function CadastroUsuario({ onUserChange }) {
     const numero = Number(valor);
     if (Number.isNaN(numero)) return String(valor);
     return `R$ ${numero.toFixed(2).replace('.', ',')}`;
+  };
+
+  const computeTooltipAnchor = useCallback((rect) => {
+    const margin = 8;
+    const maxW = Math.min(320, window.innerWidth - 2 * margin);
+    const left = Math.max(margin, Math.min(rect.left, window.innerWidth - maxW - margin));
+    const spaceBelow = window.innerHeight - rect.bottom - margin;
+    const estH = 260;
+    const preferBelow = spaceBelow >= 120 || rect.top - margin < estH;
+    let top = preferBelow ? rect.bottom + 8 : Math.max(margin, rect.top - estH - 8);
+    if (top + estH > window.innerHeight - margin) {
+      top = Math.max(margin, window.innerHeight - estH - margin);
+    }
+    return { top, left, maxWidth: maxW };
+  }, []);
+
+  const handleToggleUserInfo = (e, user) => {
+    e.stopPropagation();
+    const rect = e.currentTarget.getBoundingClientRect();
+    if (selectedUserInfo?.id === user.id) {
+      setSelectedUserInfo(null);
+      setUserTooltipAnchor(null);
+      return;
+    }
+    setSelectedPrecadastroInfo(null);
+    setPrecadastroTooltipAnchor(null);
+    setSelectedUserInfo(user);
+    setUserTooltipAnchor(computeTooltipAnchor(rect));
+  };
+
+  const handleTogglePrecadastroInfo = (e, user) => {
+    e.stopPropagation();
+    const rect = e.currentTarget.getBoundingClientRect();
+    if (selectedPrecadastroInfo?.id === user.id) {
+      setSelectedPrecadastroInfo(null);
+      setPrecadastroTooltipAnchor(null);
+      return;
+    }
+    setSelectedUserInfo(null);
+    setUserTooltipAnchor(null);
+    setSelectedPrecadastroInfo(user);
+    setPrecadastroTooltipAnchor(computeTooltipAnchor(rect));
   };
 
   const parqQuestions = [
@@ -1233,6 +1274,35 @@ function CadastroUsuario({ onUserChange }) {
     setPaginaAlunos(1);
   }, [activeTab, filtroCtSelecionado, filtroTurmaSelecionada, filtroBuscaNomeAluno]);
 
+  useEffect(() => {
+    setSelectedUserInfo(null);
+    setUserTooltipAnchor(null);
+    setSelectedPrecadastroInfo(null);
+    setPrecadastroTooltipAnchor(null);
+  }, [activeTab, paginaAlunos]);
+
+  useEffect(() => {
+    if (!selectedUserInfo && !selectedPrecadastroInfo) return undefined;
+    const close = () => {
+      setSelectedUserInfo(null);
+      setUserTooltipAnchor(null);
+      setSelectedPrecadastroInfo(null);
+      setPrecadastroTooltipAnchor(null);
+    };
+    const onKey = (ev) => {
+      if (ev.key === 'Escape') close();
+    };
+    const onResize = () => close();
+    document.addEventListener('click', close);
+    window.addEventListener('keydown', onKey);
+    window.addEventListener('resize', onResize);
+    return () => {
+      document.removeEventListener('click', close);
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('resize', onResize);
+    };
+  }, [selectedUserInfo, selectedPrecadastroInfo]);
+
   return (
     <div style={styles.container}>
       <div style={styles.header}>
@@ -1522,100 +1592,38 @@ function CadastroUsuario({ onUserChange }) {
               <tr key={user.id}>
                 <td style={{ ...styles.td, position: 'relative' }}>
                   {activeTab === 'precadastros' ? (
-                    <div
-                      style={{ position: 'relative', display: 'inline-block' }}
-                      onMouseEnter={() => setSelectedPrecadastroInfo(user)}
-                      onMouseLeave={() => setSelectedPrecadastroInfo(null)}
-                    >
-                      {selectedPrecadastroInfo?.id === user.id && (
-                        <div style={styles.precadastroTooltip}>
-                          <div><strong>E-mail:</strong> {user.email}</div>
-                          <div><strong>Telefone:</strong> {user.telefone || '-'}</div>
-                          <div><strong>Tipo:</strong> {user.origem_display || user.origem || '-'}</div>
-                          {user.origem === 'aula_experimental' && user.data_aula_experimental && (
-                            <div>
-                              <strong>Data da aula experimental:</strong>{' '}
-                              {new Date(user.data_aula_experimental + 'T12:00:00').toLocaleDateString('pt-BR', {
-                                weekday: 'long',
-                                day: '2-digit',
-                                month: 'long',
-                                year: 'numeric'
-                              })}
-                            </div>
-                          )}
-                          <div><strong>Status:</strong> {user.status === 'matriculado' ? 'Matriculado' : user.status === 'cancelado' ? 'Cancelado' : 'Pendente'}</div>
-                        </div>
-                      )}
-                      <span style={{ color: '#1F6C86', textDecoration: 'underline', cursor: 'default' }}>
+                    <div style={{ position: 'relative', display: 'inline-block' }}>
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        data-tooltip-name-trigger="precadastro"
+                        onClick={(e) => handleTogglePrecadastroInfo(e, user)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            handleTogglePrecadastroInfo(e, user);
+                          }
+                        }}
+                        style={{ color: '#1F6C86', textDecoration: 'underline', cursor: 'pointer' }}
+                      >
                         {`${user.first_name} ${user.last_name || ''}`.trim()}
                       </span>
                     </div>
                   ) : (activeTab === 'alunos' || activeTab === 'professores' || activeTab === 'gerentes') ? (
-                    <div
-                      style={{ position: 'relative', display: 'inline-block' }}
-                      onMouseEnter={() => setSelectedUserInfo(user)}
-                      onMouseLeave={() => setSelectedUserInfo(null)}
-                    >
-                      {selectedUserInfo?.id === user.id && (
-                        <div style={styles.precadastroTooltip}>
-                          {activeTab === 'alunos' && (
-                            <>
-                              <div><strong>CPF:</strong> {user.cpf || user.username || '-'}</div>
-                              <div>
-                                <strong>Turma(s):</strong>
-                                {Array.isArray(user.turmas_vinculadas) && user.turmas_vinculadas.length > 0 ? (
-                                  <ul style={{ margin: '6px 0 0 0', paddingLeft: '18px', listStyleType: 'disc' }}>
-                                    {user.turmas_vinculadas.map((t) => {
-                                      const partes = [
-                                        t.ct_nome,
-                                        t.horario,
-                                        Array.isArray(t.dias_semana_nomes) && t.dias_semana_nomes.length
-                                          ? t.dias_semana_nomes.join(', ')
-                                          : null,
-                                      ].filter(Boolean);
-                                      return (
-                                        <li key={t.id} style={{ marginBottom: '4px' }}>
-                                          {partes.join(' — ')}
-                                        </li>
-                                      );
-                                    })}
-                                  </ul>
-                                ) : (
-                                  <span> Nenhuma turma vinculada.</span>
-                                )}
-                              </div>
-                              <div><strong>Valor mensalidade:</strong> {formatValor(user.valor_mensalidade)}</div>
-                              <div>
-                                <strong>Dias habilitados:</strong>{' '}
-                                {Array.isArray(user.dias_habilitados_nomes) && user.dias_habilitados_nomes.length > 0
-                                  ? user.dias_habilitados_nomes.join(', ')
-                                  : Array.isArray(user.dias_habilitados) && user.dias_habilitados.length > 0
-                                    ? 'Configurado'
-                                    : 'Não configurado'}
-                              </div>
-                              {Array.isArray(user.centros_treinamento) && user.centros_treinamento.length > 0 && (
-                                <div><strong>CTs:</strong> {user.centros_treinamento.map(ct => ct.nome).join(', ')}</div>
-                              )}
-                            </>
-                          )}
-                          {(activeTab === 'professores' || activeTab === 'gerentes') && (
-                            <>
-                              <div><strong>E-mail:</strong> {user.email}</div>
-                              <div><strong>Telefone:</strong> {user.telefone || '-'}</div>
-                              {activeTab === 'professores' && user.salario_professor != null && user.salario_professor !== '' && (
-                                <div><strong>Salário:</strong> {formatValor(user.salario_professor)}</div>
-                              )}
-                              {activeTab === 'professores' && user.pix_professor && (
-                                <div><strong>PIX:</strong> {user.pix_professor}</div>
-                              )}
-                              {Array.isArray(user.centros_treinamento) && user.centros_treinamento.length > 0 && (
-                                <div><strong>CTs:</strong> {user.centros_treinamento.map(ct => ct.nome).join(', ')}</div>
-                              )}
-                            </>
-                          )}
-                        </div>
-                      )}
-                      <span style={{ color: '#1F6C86', textDecoration: 'underline', cursor: 'default' }}>
+                    <div style={{ position: 'relative', display: 'inline-block' }}>
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        data-tooltip-name-trigger="user"
+                        onClick={(e) => handleToggleUserInfo(e, user)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            handleToggleUserInfo(e, user);
+                          }
+                        }}
+                        style={{ color: '#1F6C86', textDecoration: 'underline', cursor: 'pointer' }}
+                      >
                         {`${user.first_name} ${user.last_name || ''}`.trim()}
                       </span>
                     </div>
@@ -2675,6 +2683,118 @@ function CadastroUsuario({ onUserChange }) {
             </div>
           </div>
         </div>
+      )}
+
+      {selectedPrecadastroInfo && precadastroTooltipAnchor && createPortal(
+        <div
+          data-tooltip-panel
+          role="tooltip"
+          style={{
+            position: 'fixed',
+            zIndex: 10050,
+            ...styles.precadastroTooltip,
+            top: precadastroTooltipAnchor.top,
+            left: precadastroTooltipAnchor.left,
+            maxWidth: precadastroTooltipAnchor.maxWidth,
+            maxHeight: 'min(50vh, 360px)',
+            overflowY: 'auto',
+            WebkitOverflowScrolling: 'touch',
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div><strong>E-mail:</strong> {selectedPrecadastroInfo.email}</div>
+          <div><strong>Telefone:</strong> {selectedPrecadastroInfo.telefone || '-'}</div>
+          <div><strong>Tipo:</strong> {selectedPrecadastroInfo.origem_display || selectedPrecadastroInfo.origem || '-'}</div>
+          {selectedPrecadastroInfo.origem === 'aula_experimental' && selectedPrecadastroInfo.data_aula_experimental && (
+            <div>
+              <strong>Data da aula experimental:</strong>{' '}
+              {new Date(selectedPrecadastroInfo.data_aula_experimental + 'T12:00:00').toLocaleDateString('pt-BR', {
+                weekday: 'long',
+                day: '2-digit',
+                month: 'long',
+                year: 'numeric'
+              })}
+            </div>
+          )}
+          <div><strong>Status:</strong> {selectedPrecadastroInfo.status === 'matriculado' ? 'Matriculado' : selectedPrecadastroInfo.status === 'cancelado' ? 'Cancelado' : 'Pendente'}</div>
+        </div>,
+        document.body
+      )}
+
+      {selectedUserInfo && userTooltipAnchor && createPortal(
+        <div
+          data-tooltip-panel
+          role="tooltip"
+          style={{
+            position: 'fixed',
+            zIndex: 10050,
+            ...styles.precadastroTooltip,
+            top: userTooltipAnchor.top,
+            left: userTooltipAnchor.left,
+            maxWidth: userTooltipAnchor.maxWidth,
+            maxHeight: 'min(50vh, 360px)',
+            overflowY: 'auto',
+            WebkitOverflowScrolling: 'touch',
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {activeTab === 'alunos' && (
+            <>
+              <div><strong>CPF:</strong> {selectedUserInfo.cpf || selectedUserInfo.username || '-'}</div>
+              <div>
+                <strong>Turma(s):</strong>
+                {Array.isArray(selectedUserInfo.turmas_vinculadas) && selectedUserInfo.turmas_vinculadas.length > 0 ? (
+                  <ul style={{ margin: '6px 0 0 0', paddingLeft: '18px', listStyleType: 'disc' }}>
+                    {selectedUserInfo.turmas_vinculadas.map((t) => {
+                      const partes = [
+                        t.ct_nome,
+                        t.horario,
+                        Array.isArray(t.dias_semana_nomes) && t.dias_semana_nomes.length
+                          ? t.dias_semana_nomes.join(', ')
+                          : null,
+                      ].filter(Boolean);
+                      return (
+                        <li key={t.id} style={{ marginBottom: '4px' }}>
+                          {partes.join(' — ')}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : (
+                  <span> Nenhuma turma vinculada.</span>
+                )}
+              </div>
+              <div><strong>Valor mensalidade:</strong> {formatValor(selectedUserInfo.valor_mensalidade)}</div>
+              <div>
+                <strong>Dias habilitados:</strong>{' '}
+                {Array.isArray(selectedUserInfo.dias_habilitados_nomes) && selectedUserInfo.dias_habilitados_nomes.length > 0
+                  ? selectedUserInfo.dias_habilitados_nomes.join(', ')
+                  : Array.isArray(selectedUserInfo.dias_habilitados) && selectedUserInfo.dias_habilitados.length > 0
+                    ? 'Configurado'
+                    : 'Não configurado'}
+              </div>
+              {Array.isArray(selectedUserInfo.centros_treinamento) && selectedUserInfo.centros_treinamento.length > 0 && (
+                <div><strong>CTs:</strong> {selectedUserInfo.centros_treinamento.map(ct => ct.nome).join(', ')}</div>
+              )}
+            </>
+          )}
+          {(activeTab === 'professores' || activeTab === 'gerentes') && (
+            <>
+              <div><strong>E-mail:</strong> {selectedUserInfo.email}</div>
+              <div><strong>Telefone:</strong> {selectedUserInfo.telefone || '-'}</div>
+              {activeTab === 'professores' && selectedUserInfo.salario_professor != null && selectedUserInfo.salario_professor !== '' && (
+                <div><strong>Salário:</strong> {formatValor(selectedUserInfo.salario_professor)}</div>
+              )}
+              {activeTab === 'professores' && selectedUserInfo.pix_professor && (
+                <div><strong>PIX:</strong> {selectedUserInfo.pix_professor}</div>
+              )}
+              {Array.isArray(selectedUserInfo.centros_treinamento) && selectedUserInfo.centros_treinamento.length > 0 && (
+                <div><strong>CTs:</strong> {selectedUserInfo.centros_treinamento.map(ct => ct.nome).join(', ')}</div>
+              )}
+            </>
+          )}
+        </div>,
+        document.body
       )}
     </div>
   );

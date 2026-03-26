@@ -290,9 +290,13 @@ class PainelGerenteAPIView(APIView):
             mes = hoje.month
             limite_30_dias = hoje - timedelta(days=30)
 
-            # Alunos: ativos e inativos
-            alunos_ativos = Usuario.objects.filter(tipo="aluno", ativo=True).count()
-            alunos_inativos = Usuario.objects.filter(tipo="aluno", ativo=False).count()
+            # Alunos: partição coerente com a Gestão de Usuários (badge Ativo/Inativo = is_active)
+            # e com o campo de negócio `ativo`. Conta como "ativo" só quem está ativo no CT
+            # e com conta liberada (login); pendente de ativação de e-mail (ativo=True, is_active=False)
+            # entra como inativo, alinhado à listagem.
+            qs_alunos = Usuario.objects.filter(tipo="aluno")
+            alunos_ativos = qs_alunos.filter(ativo=True, is_active=True).count()
+            alunos_inativos = qs_alunos.exclude(ativo=True, is_active=True).count()
 
             professores = Usuario.objects.filter(tipo="professor", ativo=True).count()
 
@@ -416,6 +420,40 @@ class PainelGerenteAPIView(APIView):
         except Exception as e:
             logger.error(f"Erro ao gerar dashboard do gerente: {str(e)}", exc_info=True)
             return Response({'error': 'Erro ao carregar dashboard do gerente'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class ListaAlunosInativosPainelAPIView(APIView):
+    """
+    Lista alunos considerados 'inativos' no painel do gerente (mesma regra do contador:
+    não estão ativos no CT e com conta ativa ao mesmo tempo).
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if request.user.tipo != 'gerente':
+            return Response({'error': 'Permissão negada.'}, status=status.HTTP_403_FORBIDDEN)
+
+        qs = (
+            Usuario.objects.filter(tipo='aluno')
+            .exclude(ativo=True, is_active=True)
+            .order_by('first_name', 'last_name', 'id')
+        )
+        alunos = []
+        for a in qs:
+            partes_motivo = []
+            if not a.is_active:
+                partes_motivo.append('Conta não ativada')
+            if not a.ativo:
+                partes_motivo.append('Inativo no CT')
+            alunos.append({
+                'id': a.id,
+                'first_name': a.first_name or '',
+                'last_name': a.last_name or '',
+                'ativo': bool(a.ativo),
+                'is_active': bool(a.is_active),
+                'motivo': ' · '.join(partes_motivo) if partes_motivo else '',
+            })
+        return Response({'alunos': alunos, 'total': len(alunos)}, status=status.HTTP_200_OK)
 
 
 class ListarPrecadastrosAPIView(APIView):
