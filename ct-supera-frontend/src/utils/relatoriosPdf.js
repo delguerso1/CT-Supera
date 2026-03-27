@@ -9,6 +9,11 @@ const MESES = [
   'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
 ];
 
+/** Cores da marca (alinhado ao painel web #1F6C86) */
+const COL_PRIMARY = [31, 108, 134];
+const COL_PRIMARY_LIGHT = [230, 242, 246];
+const COL_ACCENT_BAR = [180, 210, 220];
+
 /** Ordem e rótulos em português para o relatório de alunos (campos administrativos/financeiros) */
 const CAMPOS_ALUNO = [
   ['id', 'ID'],
@@ -21,9 +26,6 @@ const CAMPOS_ALUNO = [
   ['dia_vencimento', 'Dia de vencimento'],
   ['valor_mensalidade', 'Valor mensalidade'],
   ['dias_habilitados_nomes', 'Dias habilitados'],
-  ['nome_responsavel', 'Nome do responsável'],
-  ['telefone_responsavel', 'Telefone do responsável'],
-  ['telefone_emergencia', 'Telefone de emergência'],
 ];
 
 function fmtValor(v) {
@@ -167,63 +169,119 @@ function linhaMensalidadePdf(m, fmtMoney) {
 }
 
 /**
+ * Corpo da tabela (rótulo | valor) para um aluno no PDF.
+ */
+function corpoTabelaAluno(row) {
+  return CAMPOS_ALUNO.map(([key, label]) => [label, fmtValor(row[key])]);
+}
+
+/**
  * @param {Array<Record<string, unknown> & { _turmasRaw?: object[] }>} rows - rowAlunoCompleto + _turmasRaw
  */
 export function downloadPdfRelatorioAlunos(rows) {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const margin = 14;
+  const pageW = doc.internal.pageSize.getWidth();
   const pageH = doc.internal.pageSize.getHeight();
-  const maxW = doc.internal.pageSize.getWidth() - 2 * margin;
-  let y = 18;
+  const maxW = pageW - 2 * margin;
+  let y = 14;
 
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(15);
-  doc.text('Relatório de alunos — CT Supera', margin, y);
-  y += 7;
-  doc.setFontSize(9);
-  doc.setFont('helvetica', 'normal');
-  doc.text(`Gerado em ${new Date().toLocaleString('pt-BR')}`, margin, y);
-  y += 10;
+  const desenharFaixaTitulo = () => {
+    doc.setFillColor(...COL_PRIMARY);
+    doc.rect(0, 0, pageW, 26, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(16);
+    doc.text('Relatório de alunos', margin, 16);
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.text('CT Supera · Lista administrativa e de contato', margin, 22);
+    doc.setTextColor(0, 0, 0);
+    y = 32;
+    doc.setFontSize(8);
+    doc.setTextColor(90, 90, 90);
+    doc.text(`Gerado em ${new Date().toLocaleString('pt-BR')}`, margin, y);
+    doc.setTextColor(0, 0, 0);
+    y += 8;
+  };
+
+  desenharFaixaTitulo();
+
+  const tableOptsAluno = {
+    theme: 'grid',
+    headStyles: {
+      fillColor: COL_PRIMARY,
+      textColor: 255,
+      fontStyle: 'bold',
+      fontSize: 9,
+      cellPadding: { top: 2.5, bottom: 2.5, left: 3, right: 3 },
+    },
+    styles: {
+      fontSize: 8,
+      cellPadding: { top: 2, bottom: 2, left: 3, right: 3 },
+      lineColor: [200, 215, 222],
+      lineWidth: 0.15,
+    },
+    columnStyles: {
+      0: { cellWidth: 52, fontStyle: 'bold', textColor: [45, 65, 75], fillColor: COL_PRIMARY_LIGHT },
+      1: { cellWidth: maxW - 52 },
+    },
+    margin: { left: margin, right: margin },
+  };
+
+  const blocoAlunoTabela = (row, tituloAluno) => {
+    autoTable(doc, {
+      startY: y,
+      head: [[{ content: tituloAluno, colSpan: 2 }]],
+      body: corpoTabelaAluno(row),
+      ...tableOptsAluno,
+    });
+    y = doc.lastAutoTable.finalY + 6;
+  };
+
+  const secaoCt = (titulo, subtitulo) => {
+    if (y + 18 > pageH - 16) {
+      doc.addPage();
+      y = margin;
+    }
+    doc.setFillColor(...COL_PRIMARY);
+    doc.roundedRect(margin, y, maxW, 9, 1.5, 1.5, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.text(titulo, margin + 3, y + 6.2);
+    doc.setTextColor(0, 0, 0);
+    y += 11;
+    if (subtitulo) {
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(70, 90, 100);
+      doc.text(subtitulo, margin + 2, y);
+      doc.setTextColor(0, 0, 0);
+      y += 5;
+    }
+  };
+
+  const secaoTurma = (texto) => {
+    if (y + 12 > pageH - 16) {
+      doc.addPage();
+      y = margin;
+    }
+    doc.setFillColor(...COL_ACCENT_BAR);
+    doc.roundedRect(margin + 2, y, maxW - 4, 7, 1, 1, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(...COL_PRIMARY);
+    const linhas = doc.splitTextToSize(texto, maxW - 10);
+    doc.text(linhas, margin + 5, y + 5);
+    doc.setTextColor(0, 0, 0);
+    y += linhas.length * 4 + 4;
+  };
 
   const { porCt, nomesCt, semTurma } = agruparPorCtETurma(rows);
 
-  const blocoCampos = (row, tituloAluno) => {
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(9);
-    const tl = doc.splitTextToSize(tituloAluno, maxW);
-    if (y + tl.length * 4 + 40 > pageH - 12) {
-      doc.addPage();
-      y = margin;
-    }
-    doc.text(tl, margin, y);
-    y += tl.length * 4 + 2;
-
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8);
-    CAMPOS_ALUNO.forEach(([key, label]) => {
-      const val = fmtValor(row[key]);
-      const texto = `${label}: ${val}`;
-      const linhas = doc.splitTextToSize(texto, maxW);
-      if (y + linhas.length * 3.5 > pageH - 12) {
-        doc.addPage();
-        y = margin;
-      }
-      doc.text(linhas, margin, y);
-      y += linhas.length * 3.5 + 1.5;
-    });
-    y += 5;
-  };
-
   for (const ctNome of nomesCt) {
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(12);
-    const ctLinhas = doc.splitTextToSize(`Centro de Treinamento: ${ctNome}`, maxW);
-    if (y + ctLinhas.length * 5 + 20 > pageH - 12) {
-      doc.addPage();
-      y = margin;
-    }
-    doc.text(ctLinhas, margin, y);
-    y += ctLinhas.length * 5 + 4;
+    secaoCt(`Centro de Treinamento · ${ctNome}`, null);
 
     const porTurma = porCt.get(ctNome);
     const entradas = [...porTurma.entries()].sort((a, b) => {
@@ -236,38 +294,22 @@ export function downloadPdfRelatorioAlunos(rows) {
     });
 
     for (const [, { info, alunos }] of entradas) {
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(10);
-      const sub = doc.splitTextToSize(labelTurma(info), maxW);
-      if (y + sub.length * 4.5 + 15 > pageH - 12) {
-        doc.addPage();
-        y = margin;
-      }
-      doc.text(sub, margin + 3, y);
-      y += sub.length * 4.5 + 3;
+      secaoTurma(labelTurma(info));
 
       const ordenados = [...alunos].sort(cmpNomeAluno);
       ordenados.forEach((aluno, i) => {
         const nome = String(aluno.nome_completo || '').trim() || `#${aluno.id}`;
-        blocoCampos(aluno, `${i + 1}. ${nome}`);
+        blocoAlunoTabela(aluno, `${i + 1}. ${nome}`);
       });
     }
   }
 
   if (semTurma.length > 0) {
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(12);
-    const sec = doc.splitTextToSize('Alunos sem turma vinculada', maxW);
-    if (y + sec.length * 5 + 20 > pageH - 12) {
-      doc.addPage();
-      y = margin;
-    }
-    doc.text(sec, margin, y);
-    y += sec.length * 5 + 4;
+    secaoCt('Alunos sem turma vinculada', null);
 
     semTurma.forEach((aluno, i) => {
       const nome = String(aluno.nome_completo || '').trim() || `#${aluno.id}`;
-      blocoCampos(aluno, `${i + 1}. ${nome}`);
+      blocoAlunoTabela(aluno, `${i + 1}. ${nome}`);
     });
   }
 

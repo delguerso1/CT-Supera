@@ -552,37 +552,43 @@ function CadastroUsuario({ onUserChange }) {
 
   const computeTooltipAnchor = useCallback((rect) => {
     const margin = 8;
-    const gap = 8;
+    const gap = 4;
     const vv = typeof window !== 'undefined' ? window.visualViewport : null;
     const viewH = vv ? vv.height : window.innerHeight;
     const viewW = vv ? vv.width : window.innerWidth;
     const maxW = Math.min(320, viewW - 2 * margin);
-    // Horizontal: alinhar ao elemento clicado. O min(rect.left, viewW-maxW) antigo empurrava o painel
-    // para a esquerda quando o nome ficava à direita, longe do clique e às vezes fora do sítio certo.
-    let left = rect.left;
-    if (left + maxW > viewW - margin) {
-      left = rect.right - maxW;
-    }
+    const preferredMaxH = 360;
+
+    // Horizontal: centrar sob o nome (rect é o span clicado); depois apertar à viewport.
+    let left = rect.left + rect.width / 2 - maxW / 2;
     left = Math.max(margin, Math.min(left, viewW - maxW - margin));
-    // Alinhado ao maxHeight do painel: min(50vh, 360px)
-    const estH = Math.min(360, Math.round(viewH * 0.5));
-    const spaceBelow = viewH - rect.bottom - margin;
-    const spaceAbove = rect.top - margin;
+
+    // Vertical: colar ao nome (abaixo ou acima). Evita o clamp antigo (maxTop) que mandava o painel
+    // para o topo do ecrã quando havia pouco espaço — ficava longe do clique no PC e no telemóvel.
+    const belowStart = rect.bottom + gap;
+    const spaceBelow = Math.max(0, viewH - belowStart - margin);
+    const spaceAbove = Math.max(0, rect.top - margin);
+    const minComfortBelow = 72;
 
     let top;
-    if (spaceBelow >= estH + gap) {
-      top = rect.bottom + gap;
-    } else if (spaceAbove >= estH + gap) {
-      top = rect.top - estH - gap;
-    } else if (spaceBelow >= spaceAbove) {
-      top = rect.bottom + gap;
+    let maxHeight;
+
+    const preferBelow =
+      (spaceBelow >= minComfortBelow || spaceBelow >= spaceAbove) && belowStart + 72 <= viewH - margin;
+
+    if (preferBelow) {
+      top = belowStart;
+      maxHeight = Math.min(preferredMaxH, Math.max(80, spaceBelow));
     } else {
-      top = rect.top - estH - gap;
+      maxHeight = Math.min(preferredMaxH, Math.max(80, spaceAbove - gap));
+      top = rect.top - gap - maxHeight;
+      if (top < margin) {
+        maxHeight = Math.max(80, rect.top - margin - gap);
+        top = margin;
+      }
     }
 
-    const maxTop = Math.max(margin, viewH - estH - margin);
-    top = Math.min(Math.max(top, margin), maxTop);
-    return { top, left, maxWidth: maxW };
+    return { top, left, maxWidth: maxW, maxHeight };
   }, []);
 
   const handleToggleUserInfo = (e, user) => {
@@ -2741,7 +2747,7 @@ function CadastroUsuario({ onUserChange }) {
             top: precadastroTooltipAnchor.top,
             left: precadastroTooltipAnchor.left,
             maxWidth: precadastroTooltipAnchor.maxWidth,
-            maxHeight: 'min(50vh, 360px)',
+            maxHeight: precadastroTooltipAnchor.maxHeight,
             overflowY: 'auto',
             WebkitOverflowScrolling: 'touch',
           }}
@@ -2777,7 +2783,7 @@ function CadastroUsuario({ onUserChange }) {
             top: userTooltipAnchor.top,
             left: userTooltipAnchor.left,
             maxWidth: userTooltipAnchor.maxWidth,
-            maxHeight: 'min(50vh, 360px)',
+            maxHeight: userTooltipAnchor.maxHeight,
             overflowY: 'auto',
             WebkitOverflowScrolling: 'touch',
           }}
