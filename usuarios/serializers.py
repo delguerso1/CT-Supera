@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from rest_framework.fields import empty
 from django.db import transaction
+from django.utils import timezone
 from usuarios.models import Usuario, PreCadastro
 from turmas.models import DiaSemana, Turma
 from turmas.views import _validar_aluno_turma
@@ -120,7 +121,7 @@ class UsuarioSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'username', 'email', 'first_name', 'last_name',
             'tipo', 'tipo_display', 'nome_completo', 'telefone',
-            'endereco', 'data_nascimento', 'ativo', 'is_active',
+            'endereco', 'data_nascimento', 'ativo', 'data_inativacao', 'is_active',
             'dia_vencimento', 'valor_mensalidade', 'cpf',
             'plano', 'dias_habilitados', 'dias_habilitados_nomes',
             'nome_responsavel', 'telefone_responsavel', 'telefone_emergencia',
@@ -339,6 +340,13 @@ class UsuarioSerializer(serializers.ModelSerializer):
                                              f'Você poderá preencher novamente em {dias_restantes} dia(s).'
                         })
 
+            # Registra desistência (inativação) para relatórios mensais
+            if instance.tipo == 'aluno' and 'ativo' in validated_data:
+                if validated_data['ativo'] is False and instance.ativo is True:
+                    validated_data['data_inativacao'] = timezone.now().date()
+                elif validated_data['ativo'] is True:
+                    validated_data['data_inativacao'] = None
+
             for attr, value in validated_data.items():
                 setattr(instance, attr, value)
 
@@ -450,9 +458,10 @@ class PreCadastroSerializer(serializers.ModelSerializer):
         model = PreCadastro
         fields = [
             'id', 'first_name', 'last_name', 'email', 'telefone', 'data_nascimento', 'cpf', 'status', 'origem', 'origem_display',
-            'criado_em', 'dia_vencimento', 'valor_mensalidade', 'turma',
+            'criado_em', 'matriculado_em', 'dia_vencimento', 'valor_mensalidade', 'turma',
             'data_aula_experimental', 'compareceu_aula_experimental', 'reagendou_aula_experimental',
         ]
+        read_only_fields = ('matriculado_em', 'criado_em')
 
     def validate_cpf(self, value):
         if value is None:

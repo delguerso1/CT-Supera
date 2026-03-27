@@ -327,6 +327,8 @@ function CadastroUsuario({ onUserChange }) {
   const matriculaModalContentRef = useRef(null);
   const parqModalOverlayRef = useRef(null);
   const parqModalContentRef = useRef(null);
+  /** Evita fechar o tooltip no mesmo gesto que abre (mobile: click fantasma no document). */
+  const tooltipOpenedAtRef = useRef(0);
 
   // Defina fetchUsers usando useCallback
   const fetchAllPages = async (initialUrl) => {
@@ -550,15 +552,30 @@ function CadastroUsuario({ onUserChange }) {
 
   const computeTooltipAnchor = useCallback((rect) => {
     const margin = 8;
-    const maxW = Math.min(320, window.innerWidth - 2 * margin);
-    const left = Math.max(margin, Math.min(rect.left, window.innerWidth - maxW - margin));
-    const spaceBelow = window.innerHeight - rect.bottom - margin;
-    const estH = 260;
-    const preferBelow = spaceBelow >= 120 || rect.top - margin < estH;
-    let top = preferBelow ? rect.bottom + 8 : Math.max(margin, rect.top - estH - 8);
-    if (top + estH > window.innerHeight - margin) {
-      top = Math.max(margin, window.innerHeight - estH - margin);
+    const gap = 8;
+    const vv = typeof window !== 'undefined' ? window.visualViewport : null;
+    const viewH = vv ? vv.height : window.innerHeight;
+    const viewW = vv ? vv.width : window.innerWidth;
+    const maxW = Math.min(320, viewW - 2 * margin);
+    const left = Math.max(margin, Math.min(rect.left, viewW - maxW - margin));
+    // Alinhado ao maxHeight do painel: min(50vh, 360px)
+    const estH = Math.min(360, Math.round(viewH * 0.5));
+    const spaceBelow = viewH - rect.bottom - margin;
+    const spaceAbove = rect.top - margin;
+
+    let top;
+    if (spaceBelow >= estH + gap) {
+      top = rect.bottom + gap;
+    } else if (spaceAbove >= estH + gap) {
+      top = rect.top - estH - gap;
+    } else if (spaceBelow >= spaceAbove) {
+      top = rect.bottom + gap;
+    } else {
+      top = rect.top - estH - gap;
     }
+
+    const maxTop = Math.max(margin, viewH - estH - margin);
+    top = Math.min(Math.max(top, margin), maxTop);
     return { top, left, maxWidth: maxW };
   }, []);
 
@@ -570,6 +587,7 @@ function CadastroUsuario({ onUserChange }) {
       setUserTooltipAnchor(null);
       return;
     }
+    tooltipOpenedAtRef.current = Date.now();
     setSelectedPrecadastroInfo(null);
     setPrecadastroTooltipAnchor(null);
     setSelectedUserInfo(user);
@@ -584,6 +602,7 @@ function CadastroUsuario({ onUserChange }) {
       setPrecadastroTooltipAnchor(null);
       return;
     }
+    tooltipOpenedAtRef.current = Date.now();
     setSelectedUserInfo(null);
     setUserTooltipAnchor(null);
     setSelectedPrecadastroInfo(user);
@@ -1283,23 +1302,29 @@ function CadastroUsuario({ onUserChange }) {
 
   useEffect(() => {
     if (!selectedUserInfo && !selectedPrecadastroInfo) return undefined;
-    const close = () => {
+    const clearTooltip = () => {
       setSelectedUserInfo(null);
       setUserTooltipAnchor(null);
       setSelectedPrecadastroInfo(null);
       setPrecadastroTooltipAnchor(null);
     };
-    const onKey = (ev) => {
-      if (ev.key === 'Escape') close();
+    const closeOnOutsideClick = (ev) => {
+      if (Date.now() - tooltipOpenedAtRef.current < 550) return;
+      const t = ev.target;
+      if (t && typeof t.closest === 'function') {
+        if (t.closest('[data-tooltip-panel]')) return;
+        if (t.closest('[data-tooltip-name-trigger]')) return;
+      }
+      clearTooltip();
     };
-    const onResize = () => close();
-    document.addEventListener('click', close);
+    const onKey = (ev) => {
+      if (ev.key === 'Escape') clearTooltip();
+    };
+    document.addEventListener('click', closeOnOutsideClick);
     window.addEventListener('keydown', onKey);
-    window.addEventListener('resize', onResize);
     return () => {
-      document.removeEventListener('click', close);
+      document.removeEventListener('click', closeOnOutsideClick);
       window.removeEventListener('keydown', onKey);
-      window.removeEventListener('resize', onResize);
     };
   }, [selectedUserInfo, selectedPrecadastroInfo]);
 
@@ -1597,6 +1622,7 @@ function CadastroUsuario({ onUserChange }) {
                         role="button"
                         tabIndex={0}
                         data-tooltip-name-trigger="precadastro"
+                        onPointerDown={(e) => e.stopPropagation()}
                         onClick={(e) => handleTogglePrecadastroInfo(e, user)}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter' || e.key === ' ') {
@@ -1604,7 +1630,13 @@ function CadastroUsuario({ onUserChange }) {
                             handleTogglePrecadastroInfo(e, user);
                           }
                         }}
-                        style={{ color: '#1F6C86', textDecoration: 'underline', cursor: 'pointer' }}
+                        style={{
+                          color: '#1F6C86',
+                          textDecoration: 'underline',
+                          cursor: 'pointer',
+                          touchAction: 'manipulation',
+                          WebkitTapHighlightColor: 'transparent',
+                        }}
                       >
                         {`${user.first_name} ${user.last_name || ''}`.trim()}
                       </span>
@@ -1615,6 +1647,7 @@ function CadastroUsuario({ onUserChange }) {
                         role="button"
                         tabIndex={0}
                         data-tooltip-name-trigger="user"
+                        onPointerDown={(e) => e.stopPropagation()}
                         onClick={(e) => handleToggleUserInfo(e, user)}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter' || e.key === ' ') {
@@ -1622,7 +1655,13 @@ function CadastroUsuario({ onUserChange }) {
                             handleToggleUserInfo(e, user);
                           }
                         }}
-                        style={{ color: '#1F6C86', textDecoration: 'underline', cursor: 'pointer' }}
+                        style={{
+                          color: '#1F6C86',
+                          textDecoration: 'underline',
+                          cursor: 'pointer',
+                          touchAction: 'manipulation',
+                          WebkitTapHighlightColor: 'transparent',
+                        }}
                       >
                         {`${user.first_name} ${user.last_name || ''}`.trim()}
                       </span>

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import api from '../services/api';
+import { downloadPdfRelatorioAlunos, downloadPdfRelatorioFinanceiro } from '../utils/relatoriosPdf';
 
 const styles = {
   formGroup: { marginBottom: '1rem' },
@@ -28,7 +29,114 @@ function ControleFinanceiro({ user, onDataChange }) {
   const [formData] = useState({});
   const [alunos, setAlunos] = useState([]);
   const [turmas, setTurmas] = useState([]);
+  const [relatorioGerando, setRelatorioGerando] = useState(false);
   const itensPorPagina = 10;
+
+  const formatTurmasVinculadas = (arr) => {
+    if (!Array.isArray(arr) || !arr.length) return '';
+    return arr
+      .map((t) => {
+        const dias = (t.dias_semana_nomes || []).join(', ');
+        const partes = [t.ct_nome, t.horario, dias].filter(Boolean);
+        return partes.join(' — ');
+      })
+      .join(' | ');
+  };
+
+  const rowAlunoCompleto = (a) => ({
+    id: a.id,
+    username: a.username,
+    email: a.email,
+    first_name: a.first_name,
+    last_name: a.last_name,
+    nome_completo: a.nome_completo,
+    tipo: a.tipo,
+    tipo_display: a.tipo_display,
+    telefone: a.telefone,
+    endereco: a.endereco,
+    data_nascimento: a.data_nascimento,
+    ativo: a.ativo,
+    is_active: a.is_active,
+    cpf: a.cpf,
+    dia_vencimento: a.dia_vencimento,
+    valor_mensalidade: a.valor_mensalidade,
+    plano: a.plano,
+    dias_habilitados_nomes: Array.isArray(a.dias_habilitados_nomes) ? a.dias_habilitados_nomes.join(', ') : '',
+    centros_treinamento: Array.isArray(a.centros_treinamento)
+      ? a.centros_treinamento.map((c) => c.nome || c.id).join(', ')
+      : '',
+    turmas_vinculadas: formatTurmasVinculadas(a.turmas_vinculadas),
+    nome_responsavel: a.nome_responsavel,
+    telefone_responsavel: a.telefone_responsavel,
+    telefone_emergencia: a.telefone_emergencia,
+    ficha_medica: a.ficha_medica,
+    foto_perfil: a.foto_perfil,
+    parq_question_1: a.parq_question_1,
+    parq_question_2: a.parq_question_2,
+    parq_question_3: a.parq_question_3,
+    parq_question_4: a.parq_question_4,
+    parq_question_5: a.parq_question_5,
+    parq_question_6: a.parq_question_6,
+    parq_question_7: a.parq_question_7,
+    parq_question_8: a.parq_question_8,
+    parq_question_9: a.parq_question_9,
+    parq_question_10: a.parq_question_10,
+    parq_completed: a.parq_completed,
+    parq_completion_date: a.parq_completion_date,
+    contrato_aceito: a.contrato_aceito,
+    contrato_aceito_em: a.contrato_aceito_em,
+  });
+
+  const handleGerarRelatorioAlunos = async () => {
+    if (user?.tipo !== 'gerente') return;
+    setRelatorioGerando(true);
+    try {
+      const lista = await fetchAllPages('usuarios/?tipo=aluno&page_size=500');
+      if (!Array.isArray(lista) || lista.length === 0) {
+        window.alert('Nenhum aluno encontrado.');
+        return;
+      }
+      const rows = lista.map(rowAlunoCompleto);
+      downloadPdfRelatorioAlunos(rows);
+    } catch (e) {
+      window.alert(e.response?.data?.error || 'Erro ao gerar relatório de alunos.');
+    } finally {
+      setRelatorioGerando(false);
+    }
+  };
+
+  const handleGerarRelatorioFinanceiro = async () => {
+    if (user?.tipo !== 'gerente') return;
+    setRelatorioGerando(true);
+    try {
+      const [{ data: dash }, mensList, despList, salList, profs] = await Promise.all([
+        api.get('financeiro/dashboard/', { params: { mes, ano } }),
+        fetchAllPages(`financeiro/mensalidades/?mes=${mes}&ano=${ano}&page_size=500`),
+        fetchAllPages(`financeiro/despesas/?mes=${mes}&ano=${ano}&page_size=500`),
+        fetchAllPages(`financeiro/salarios/?mes=${mes}&ano=${ano}&page_size=500`),
+        fetchAllPages('usuarios/?tipo=professor&page_size=500'),
+      ]);
+      const nomeProfessorPorId = new Map(
+        (Array.isArray(profs) ? profs : []).map((p) => [
+          p.id,
+          `${p.first_name || ''} ${p.last_name || ''}`.trim(),
+        ])
+      );
+      downloadPdfRelatorioFinanceiro({
+        dash,
+        mes,
+        ano,
+        mensList,
+        despList,
+        salList,
+        nomeProfessorPorId,
+      });
+    } catch (e) {
+      window.alert(e.response?.data?.error || 'Erro ao gerar relatório financeiro.');
+    } finally {
+      setRelatorioGerando(false);
+    }
+  };
 
   const fetchAllPages = async (initialUrl) => {
     let resultados = [];
@@ -310,6 +418,63 @@ function ControleFinanceiro({ user, onDataChange }) {
           </div>
         </div>
       </div>
+
+      {user?.tipo === 'gerente' && (
+        <div
+          style={{
+            marginBottom: 24,
+            padding: 16,
+            background: '#f5f5f5',
+            borderRadius: 8,
+            border: '1px solid #e0e0e0',
+          }}
+        >
+          <h3 style={{ color: '#1F6C86', marginTop: 0, marginBottom: 8, fontSize: '1.1rem' }}>
+            Relatórios (exportar PDF)
+          </h3>
+          <p style={{ margin: '0 0 12px', fontSize: 14, color: '#455a64', lineHeight: 1.45 }}>
+            O PDF de alunos inclui todos os campos disponíveis na API (cadastro, turmas, CTs, PAR-Q, etc.).
+            O PDF financeiro usa o <strong>mês e ano selecionados</strong> acima: resumo, tabelas de mensalidades,
+            despesas e salários do período.
+          </p>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
+            <button
+              type="button"
+              disabled={relatorioGerando}
+              onClick={handleGerarRelatorioAlunos}
+              style={{
+                background: '#37474f',
+                color: '#fff',
+                border: 'none',
+                borderRadius: 4,
+                padding: '0.65rem 1rem',
+                fontSize: 15,
+                cursor: relatorioGerando ? 'not-allowed' : 'pointer',
+                minHeight: 44,
+              }}
+            >
+              {relatorioGerando ? 'Gerando…' : 'Relatório de alunos (completo)'}
+            </button>
+            <button
+              type="button"
+              disabled={relatorioGerando}
+              onClick={handleGerarRelatorioFinanceiro}
+              style={{
+                background: '#1F6C86',
+                color: '#fff',
+                border: 'none',
+                borderRadius: 4,
+                padding: '0.65rem 1rem',
+                fontSize: 15,
+                cursor: relatorioGerando ? 'not-allowed' : 'pointer',
+                minHeight: 44,
+              }}
+            >
+              {relatorioGerando ? 'Gerando…' : 'Relatório financeiro do período'}
+            </button>
+          </div>
+        </div>
+      )}
 
       {user?.tipo === 'gerente' && (
         <div

@@ -3,6 +3,7 @@ from django.db import models
 from django.core.exceptions import ValidationError
 from datetime import date
 from django.core.exceptions import PermissionDenied
+from django.utils import timezone as django_timezone
 from django.core.mail import send_mail
 from django.core.validators import RegexValidator
 from ct.models import CentroDeTreinamento
@@ -54,9 +55,33 @@ class PreCadastro(models.Model):
     data_aula_experimental = models.DateField(null=True, blank=True, help_text="Data escolhida pelo cliente para a aula experimental")
     compareceu_aula_experimental = models.BooleanField(default=False, help_text="Professor marcou comparecimento na aula experimental")
     reagendou_aula_experimental = models.BooleanField(default=False, help_text="Cliente já fez um reagendamento (máx. 1)")
+    matriculado_em = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Momento em que o pré-cadastro passou a matriculado (nova matrícula via fluxo de pré-cadastro).",
+    )
 
     def __str__(self):
         return f"{self.first_name} {self.last_name or ''}".strip()
+
+    def save(self, *args, **kwargs):
+        """Registra matriculado_em na transição para status matriculado (relatórios mensais)."""
+        old_status = None
+        if self.pk:
+            old_status = (
+                PreCadastro.objects.filter(pk=self.pk).values_list("status", flat=True).first()
+            )
+        if self.status == "matriculado" and old_status != "matriculado":
+            if self.matriculado_em is None:
+                self.matriculado_em = django_timezone.now()
+        uf = kwargs.get("update_fields")
+        if (
+            self.matriculado_em is not None
+            and uf is not None
+            and "matriculado_em" not in uf
+        ):
+            kwargs = {**kwargs, "update_fields": list(uf) + ["matriculado_em"]}
+        super().save(*args, **kwargs)
 
     def converter_para_aluno(self, usuario, dia_vencimento=None, valor_mensalidade=None, plano=None, dias_habilitados=None):
         """Transforma o PreCadastro diretamente em um Usuario (Aluno). Apenas professores ou gerentes podem finalizar."""
@@ -189,6 +214,11 @@ class Usuario(AbstractUser):
     cpf = models.CharField(max_length=11, unique=True, blank=False, null=False)
     endereco = models.CharField(max_length=255, blank=True, null=True)
     ativo = models.BooleanField(default=True)  # 🔹 Para ativação/inativação rápida
+    data_inativacao = models.DateField(
+        null=True,
+        blank=True,
+        help_text="Data em que o aluno foi inativado (desistência). Preenchida automaticamente ao marcar ativo=False.",
+    )
     data_nascimento = models.DateField(null=True, blank=True)
     nome_responsavel = models.CharField(max_length=100, blank=True, null=True)
     telefone_responsavel = models.CharField(max_length=20, blank=True, null=True)

@@ -4,6 +4,7 @@ from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIV
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from django.db.models import Sum, Q
+from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.db.models.functions import Coalesce
 from django.utils import timezone
@@ -12,6 +13,7 @@ from .serializers import MensalidadeSerializer, DespesaSerializer, SalarioSerial
 from .pagination import MensalidadePagination
 from .c6_client import c6_client, C6BankError, C6BankMethodNotAllowedError, C6BankInvalidRequestError
 from django.shortcuts import get_object_or_404
+from usuarios.models import PreCadastro
 from django.conf import settings
 from datetime import timedelta
 from django.views.decorators.csrf import csrf_exempt
@@ -322,6 +324,28 @@ class DashboardFinanceiroAPIView(APIView):
         total_salarios_pagos = salarios.filter(status="pago").aggregate(Sum("valor"))["valor__sum"] or 0
         saldo_final = total_pago - total_despesas - total_salarios
 
+        # Novas matrículas = pré-cadastros que passaram a matriculado no mês (fluxo lead → aluno)
+        matriculas_no_mes = PreCadastro.objects.filter(
+            status="matriculado",
+            matriculado_em__year=ano,
+            matriculado_em__month=mes,
+        ).count()
+        desistencias_qs = User.objects.filter(
+            tipo="aluno",
+            data_inativacao__year=ano,
+            data_inativacao__month=mes,
+        ).order_by("data_inativacao", "last_name", "first_name")
+        desistencias_no_mes = desistencias_qs.count()
+        desistencias_alunos = [
+            {
+                "id": u.id,
+                "nome": (u.get_full_name() or f"{u.first_name or ''} {u.last_name or ''}").strip() or u.username,
+                "cpf": u.username,
+                "data_inativacao": u.data_inativacao.isoformat() if u.data_inativacao else None,
+            }
+            for u in desistencias_qs
+        ]
+
         # Converte para float para garantir serialização correta no JSON (evita Decimal como string)
         def _to_float(v):
             return float(v) if v is not None else 0.0
@@ -332,6 +356,9 @@ class DashboardFinanceiroAPIView(APIView):
             "total_salarios": _to_float(total_salarios),
             "total_salarios_pagos": _to_float(total_salarios_pagos),
             "saldo_final": _to_float(saldo_final),
+            "matriculas_no_mes": matriculas_no_mes,
+            "desistencias_no_mes": desistencias_no_mes,
+            "desistencias_alunos": desistencias_alunos,
             "mes_atual": mes,
             "ano_atual": ano,
             "meses": list(range(1, 13)),

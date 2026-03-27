@@ -81,12 +81,15 @@ def gerar_mensalidades_para_mes(ano: int, mes: int) -> int:
 
     Retorna o número de mensalidades criadas.
     Exclui alunos que só estão em CTs com sem_financeiro.
+
+    Critério de "aluno ativo" alinhado ao painel do gerente e à gestão de
+    usuários: ativo no CT (ativo=True) e conta liberada para login (is_active=True).
     """
     total_geradas = 0
     hoje = timezone.now().date()
     ultimo_dia = monthrange(ano, mes)[1]
 
-    alunos = Usuario.objects.filter(tipo='aluno', ativo=True)
+    alunos = Usuario.objects.filter(tipo='aluno', ativo=True, is_active=True)
 
     for aluno in alunos:
         if not _aluno_tem_ct_com_financeiro(aluno):
