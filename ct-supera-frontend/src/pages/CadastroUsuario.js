@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import api, { MEDIA_URL } from '../services/api';
 import {
@@ -329,6 +329,8 @@ function CadastroUsuario({ onUserChange }) {
   const parqModalContentRef = useRef(null);
   /** Evita fechar o tooltip no mesmo gesto que abre (mobile: click fantasma no document). */
   const tooltipOpenedAtRef = useRef(0);
+  /** Elemento do nome clicado — reposiciona o painel em scroll e mede após layout. */
+  const nameTooltipTriggerRef = useRef(null);
 
   // Defina fetchUsers usando useCallback
   const fetchAllPages = async (initialUrl) => {
@@ -556,11 +558,14 @@ function CadastroUsuario({ onUserChange }) {
     const vv = typeof window !== 'undefined' ? window.visualViewport : null;
     const viewH = vv ? vv.height : window.innerHeight;
     const viewW = vv ? vv.width : window.innerWidth;
-    const maxW = Math.min(320, viewW - 2 * margin);
+    const maxW = Math.min(300, viewW - 2 * margin);
     const preferredMaxH = 360;
 
-    // Horizontal: centrar sob o nome (rect é o span clicado); depois apertar à viewport.
-    let left = rect.left + rect.width / 2 - maxW / 2;
+    // Horizontal: colar à borda esquerda do nome; se não couber, alinhar pela direita do texto.
+    let left = rect.left;
+    if (left + maxW > viewW - margin) {
+      left = rect.right - maxW;
+    }
     left = Math.max(margin, Math.min(left, viewW - maxW - margin));
 
     // Vertical: colar ao nome (abaixo ou acima). Evita o clamp antigo (maxTop) que mandava o painel
@@ -568,13 +573,13 @@ function CadastroUsuario({ onUserChange }) {
     const belowStart = rect.bottom + gap;
     const spaceBelow = Math.max(0, viewH - belowStart - margin);
     const spaceAbove = Math.max(0, rect.top - margin);
-    const minComfortBelow = 72;
+    const minComfortBelow = 48;
 
     let top;
     let maxHeight;
 
     const preferBelow =
-      (spaceBelow >= minComfortBelow || spaceBelow >= spaceAbove) && belowStart + 72 <= viewH - margin;
+      (spaceBelow >= minComfortBelow || spaceBelow >= spaceAbove) && belowStart + 56 <= viewH - margin;
 
     if (preferBelow) {
       top = belowStart;
@@ -593,8 +598,8 @@ function CadastroUsuario({ onUserChange }) {
 
   const handleToggleUserInfo = (e, user) => {
     e.stopPropagation();
-    const rect = e.currentTarget.getBoundingClientRect();
     if (selectedUserInfo?.id === user.id) {
+      nameTooltipTriggerRef.current = null;
       setSelectedUserInfo(null);
       setUserTooltipAnchor(null);
       return;
@@ -602,14 +607,14 @@ function CadastroUsuario({ onUserChange }) {
     tooltipOpenedAtRef.current = Date.now();
     setSelectedPrecadastroInfo(null);
     setPrecadastroTooltipAnchor(null);
+    nameTooltipTriggerRef.current = e.currentTarget;
     setSelectedUserInfo(user);
-    setUserTooltipAnchor(computeTooltipAnchor(rect));
   };
 
   const handleTogglePrecadastroInfo = (e, user) => {
     e.stopPropagation();
-    const rect = e.currentTarget.getBoundingClientRect();
     if (selectedPrecadastroInfo?.id === user.id) {
+      nameTooltipTriggerRef.current = null;
       setSelectedPrecadastroInfo(null);
       setPrecadastroTooltipAnchor(null);
       return;
@@ -617,9 +622,49 @@ function CadastroUsuario({ onUserChange }) {
     tooltipOpenedAtRef.current = Date.now();
     setSelectedUserInfo(null);
     setUserTooltipAnchor(null);
+    nameTooltipTriggerRef.current = e.currentTarget;
     setSelectedPrecadastroInfo(user);
-    setPrecadastroTooltipAnchor(computeTooltipAnchor(rect));
   };
+
+  useLayoutEffect(() => {
+    const el = nameTooltipTriggerRef.current;
+    if (!el || !el.isConnected) return;
+    const pos = computeTooltipAnchor(el.getBoundingClientRect());
+    if (selectedUserInfo) {
+      setUserTooltipAnchor(pos);
+    } else if (selectedPrecadastroInfo) {
+      setPrecadastroTooltipAnchor(pos);
+    }
+  }, [selectedUserInfo, selectedPrecadastroInfo, computeTooltipAnchor]);
+
+  useEffect(() => {
+    if (!selectedUserInfo && !selectedPrecadastroInfo) return undefined;
+
+    const reposition = () => {
+      const el = nameTooltipTriggerRef.current;
+      if (!el || !el.isConnected) return;
+      const pos = computeTooltipAnchor(el.getBoundingClientRect());
+      if (selectedUserInfo) setUserTooltipAnchor(pos);
+      else if (selectedPrecadastroInfo) setPrecadastroTooltipAnchor(pos);
+    };
+
+    reposition();
+    window.addEventListener('resize', reposition);
+    document.addEventListener('scroll', reposition, true);
+    const vv = typeof window !== 'undefined' ? window.visualViewport : null;
+    if (vv) {
+      vv.addEventListener('resize', reposition);
+      vv.addEventListener('scroll', reposition);
+    }
+    return () => {
+      window.removeEventListener('resize', reposition);
+      document.removeEventListener('scroll', reposition, true);
+      if (vv) {
+        vv.removeEventListener('resize', reposition);
+        vv.removeEventListener('scroll', reposition);
+      }
+    };
+  }, [selectedUserInfo, selectedPrecadastroInfo, computeTooltipAnchor]);
 
   const parqQuestions = [
     {
@@ -1306,6 +1351,7 @@ function CadastroUsuario({ onUserChange }) {
   }, [activeTab, filtroCtSelecionado, filtroTurmaSelecionada, filtroBuscaNomeAluno]);
 
   useEffect(() => {
+    nameTooltipTriggerRef.current = null;
     setSelectedUserInfo(null);
     setUserTooltipAnchor(null);
     setSelectedPrecadastroInfo(null);
@@ -1315,6 +1361,7 @@ function CadastroUsuario({ onUserChange }) {
   useEffect(() => {
     if (!selectedUserInfo && !selectedPrecadastroInfo) return undefined;
     const clearTooltip = () => {
+      nameTooltipTriggerRef.current = null;
       setSelectedUserInfo(null);
       setUserTooltipAnchor(null);
       setSelectedPrecadastroInfo(null);
