@@ -557,7 +557,13 @@ function CadastroUsuario({ onUserChange }) {
     const viewH = vv ? vv.height : window.innerHeight;
     const viewW = vv ? vv.width : window.innerWidth;
     const maxW = Math.min(320, viewW - 2 * margin);
-    const left = Math.max(margin, Math.min(rect.left, viewW - maxW - margin));
+    // Horizontal: alinhar ao elemento clicado. O min(rect.left, viewW-maxW) antigo empurrava o painel
+    // para a esquerda quando o nome ficava à direita, longe do clique e às vezes fora do sítio certo.
+    let left = rect.left;
+    if (left + maxW > viewW - margin) {
+      left = rect.right - maxW;
+    }
+    left = Math.max(margin, Math.min(left, viewW - maxW - margin));
     // Alinhado ao maxHeight do painel: min(50vh, 360px)
     const estH = Math.min(360, Math.round(viewH * 0.5));
     const spaceBelow = viewH - rect.bottom - margin;

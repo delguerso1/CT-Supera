@@ -32,59 +32,21 @@ function ControleFinanceiro({ user, onDataChange }) {
   const [relatorioGerando, setRelatorioGerando] = useState(false);
   const itensPorPagina = 10;
 
-  const formatTurmasVinculadas = (arr) => {
-    if (!Array.isArray(arr) || !arr.length) return '';
-    return arr
-      .map((t) => {
-        const dias = (t.dias_semana_nomes || []).join(', ');
-        const partes = [t.ct_nome, t.horario, dias].filter(Boolean);
-        return partes.join(' — ');
-      })
-      .join(' | ');
-  };
-
+  /** Dados do relatório PDF de alunos (sem login, status, PAR-Q, contrato, ficha médica, foto, plano). */
   const rowAlunoCompleto = (a) => ({
     id: a.id,
-    username: a.username,
-    email: a.email,
-    first_name: a.first_name,
-    last_name: a.last_name,
     nome_completo: a.nome_completo,
-    tipo: a.tipo,
-    tipo_display: a.tipo_display,
+    email: a.email,
+    cpf: a.cpf,
     telefone: a.telefone,
     endereco: a.endereco,
     data_nascimento: a.data_nascimento,
-    ativo: a.ativo,
-    is_active: a.is_active,
-    cpf: a.cpf,
     dia_vencimento: a.dia_vencimento,
     valor_mensalidade: a.valor_mensalidade,
-    plano: a.plano,
     dias_habilitados_nomes: Array.isArray(a.dias_habilitados_nomes) ? a.dias_habilitados_nomes.join(', ') : '',
-    centros_treinamento: Array.isArray(a.centros_treinamento)
-      ? a.centros_treinamento.map((c) => c.nome || c.id).join(', ')
-      : '',
-    turmas_vinculadas: formatTurmasVinculadas(a.turmas_vinculadas),
     nome_responsavel: a.nome_responsavel,
     telefone_responsavel: a.telefone_responsavel,
     telefone_emergencia: a.telefone_emergencia,
-    ficha_medica: a.ficha_medica,
-    foto_perfil: a.foto_perfil,
-    parq_question_1: a.parq_question_1,
-    parq_question_2: a.parq_question_2,
-    parq_question_3: a.parq_question_3,
-    parq_question_4: a.parq_question_4,
-    parq_question_5: a.parq_question_5,
-    parq_question_6: a.parq_question_6,
-    parq_question_7: a.parq_question_7,
-    parq_question_8: a.parq_question_8,
-    parq_question_9: a.parq_question_9,
-    parq_question_10: a.parq_question_10,
-    parq_completed: a.parq_completed,
-    parq_completion_date: a.parq_completion_date,
-    contrato_aceito: a.contrato_aceito,
-    contrato_aceito_em: a.contrato_aceito_em,
   });
 
   const handleGerarRelatorioAlunos = async () => {
@@ -96,7 +58,10 @@ function ControleFinanceiro({ user, onDataChange }) {
         window.alert('Nenhum aluno encontrado.');
         return;
       }
-      const rows = lista.map(rowAlunoCompleto);
+      const rows = lista.map((a) => ({
+        ...rowAlunoCompleto(a),
+        _turmasRaw: Array.isArray(a.turmas_vinculadas) ? a.turmas_vinculadas : [],
+      }));
       downloadPdfRelatorioAlunos(rows);
     } catch (e) {
       window.alert(e.response?.data?.error || 'Erro ao gerar relatório de alunos.');
@@ -433,7 +398,7 @@ function ControleFinanceiro({ user, onDataChange }) {
             Relatórios (exportar PDF)
           </h3>
           <p style={{ margin: '0 0 12px', fontSize: 14, color: '#455a64', lineHeight: 1.45 }}>
-            O PDF de alunos inclui todos os campos disponíveis na API (cadastro, turmas, CTs, PAR-Q, etc.).
+            O PDF de alunos agrupa por Centro de Treinamento e turma; em cada turma, alunos em ordem alfabética. Inclui identificação, contato, CPF, mensalidade e responsáveis — sem login, status, plano, PAR-Q, contrato, ficha médica ou foto.
             O PDF financeiro usa o <strong>mês e ano selecionados</strong> acima: resumo, tabelas de mensalidades,
             despesas e salários do período.
           </p>

@@ -126,7 +126,14 @@ class MensalidadeListCreateView(ListCreateAPIView):
             queryset = queryset.filter(~Q(status='pago'), data_vencimento__gte=hoje)
         elif status_param == 'atrasado':
             queryset = queryset.filter(~Q(status='pago'), data_vencimento__lt=hoje)
-        return queryset.order_by('-data_vencimento', '-id')
+        return (
+            queryset.select_related('aluno')
+            .prefetch_related(
+                'aluno__turmas_aluno__ct',
+                'aluno__turmas_aluno__dias_semana',
+            )
+            .order_by('-data_vencimento', '-id')
+        )
 
 class MensalidadeRetrieveUpdateDestroyView(RetrieveUpdateDestroyAPIView):
     queryset = Mensalidade.objects.all()
