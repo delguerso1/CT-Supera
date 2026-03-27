@@ -93,7 +93,17 @@ const styles = {
   },
   menuIcon: {
     marginRight: '12px',
-    fontSize: '20px'
+    fontSize: '20px',
+    flexShrink: 0,
+    lineHeight: 1
+  },
+  menuItemLabel: {
+    flex: 1,
+    minWidth: 0,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+    lineHeight: 1.25
   },
   contentArea: {
     backgroundColor: 'white',
@@ -1132,7 +1142,7 @@ function DashboardGerente({ user }) {
             onClick={() => setActiveSection('dashboard')}
           >
             <span style={styles.menuIcon}>📊</span>
-            Dashboard
+            <span style={styles.menuItemLabel}>Dashboard</span>
           </div>
           <div
             style={{
@@ -1142,7 +1152,7 @@ function DashboardGerente({ user }) {
             onClick={() => setActiveSection('perfil')}
           >
             <span style={styles.menuIcon}>👤</span>
-            Meu Perfil
+            <span style={styles.menuItemLabel}>Meu Perfil</span>
           </div>
           <div
             style={{
@@ -1152,7 +1162,7 @@ function DashboardGerente({ user }) {
             onClick={() => setActiveSection('usuarios')}
           >
             <span style={styles.menuIcon}>👥</span>
-            Gestão de Usuários
+            <span style={styles.menuItemLabel}>Gestão de Usuários</span>
           </div>
           <div
             style={{
@@ -1160,9 +1170,10 @@ function DashboardGerente({ user }) {
               ...(activeSection === 'centros' && styles.activeMenuItem)
             }}
             onClick={() => setActiveSection('centros')}
+            title="Centros de Treinamento"
           >
             <span style={styles.menuIcon}>🏢</span>
-            Centros de Treinamento
+            <span style={styles.menuItemLabel}>Centros de Treinamento</span>
           </div>
           <div
             style={{
@@ -1172,7 +1183,7 @@ function DashboardGerente({ user }) {
             onClick={() => setActiveSection('financeiro')}
           >
             <span style={styles.menuIcon}>💰</span>
-            Controle Financeiro
+            <span style={styles.menuItemLabel}>Controle Financeiro</span>
           </div>
         </div>
       </div>

@@ -554,41 +554,39 @@ function CadastroUsuario({ onUserChange }) {
 
   const computeTooltipAnchor = useCallback((rect) => {
     const margin = 8;
-    const gap = 4;
+    const gap = 6;
     const vv = typeof window !== 'undefined' ? window.visualViewport : null;
     const viewH = vv ? vv.height : window.innerHeight;
     const viewW = vv ? vv.width : window.innerWidth;
     const maxW = Math.min(300, viewW - 2 * margin);
-    const preferredMaxH = 360;
+    const preferredMaxH = 340;
+    const minPanelH = 96;
+    /** Só abre por cima se não houver espaço mínimo abaixo — evita alternar acima/abaixo conforme o comprimento do nome. */
+    const minBelowToOpenUnder = 100;
 
-    // Horizontal: colar à borda esquerda do nome; se não couber, alinhar pela direita do texto.
+    // Horizontal padronizado: alinhar à esquerda do nome; se ultrapassar a viewport, encostar à direita do ecrã (igual para todos).
     let left = rect.left;
-    if (left + maxW > viewW - margin) {
-      left = rect.right - maxW;
-    }
-    left = Math.max(margin, Math.min(left, viewW - maxW - margin));
+    const leftMax = Math.max(margin, viewW - maxW - margin);
+    if (left > leftMax) left = leftMax;
+    if (left < margin) left = margin;
 
-    // Vertical: colar ao nome (abaixo ou acima). Evita o clamp antigo (maxTop) que mandava o painel
-    // para o topo do ecrã quando havia pouco espaço — ficava longe do clique no PC e no telemóvel.
     const belowStart = rect.bottom + gap;
     const spaceBelow = Math.max(0, viewH - belowStart - margin);
     const spaceAbove = Math.max(0, rect.top - margin);
-    const minComfortBelow = 48;
 
     let top;
     let maxHeight;
 
-    const preferBelow =
-      (spaceBelow >= minComfortBelow || spaceBelow >= spaceAbove) && belowStart + 56 <= viewH - margin;
+    const openBelow = spaceBelow >= minBelowToOpenUnder;
 
-    if (preferBelow) {
+    if (openBelow) {
       top = belowStart;
-      maxHeight = Math.min(preferredMaxH, Math.max(80, spaceBelow));
+      maxHeight = Math.min(preferredMaxH, Math.max(minPanelH, spaceBelow));
     } else {
-      maxHeight = Math.min(preferredMaxH, Math.max(80, spaceAbove - gap));
+      maxHeight = Math.min(preferredMaxH, Math.max(minPanelH, spaceAbove - gap));
       top = rect.top - gap - maxHeight;
       if (top < margin) {
-        maxHeight = Math.max(80, rect.top - margin - gap);
+        maxHeight = Math.max(minPanelH, rect.top - margin - gap);
         top = margin;
       }
     }
@@ -1528,12 +1526,13 @@ function CadastroUsuario({ onUserChange }) {
               Limpar busca
             </button>
           )}
-          <label style={{ fontWeight: '500', color: '#333' }}>
+          <label style={{ fontWeight: '500', color: '#333', whiteSpace: 'nowrap' }} htmlFor="filtro_ct_alunos">
             Filtrar por Centro de Treinamento:
           </label>
           {Array.isArray(centrosTreinamento) && centrosTreinamento.length > 0 ? (
             <>
               <select
+                id="filtro_ct_alunos"
                 value={filtroCtSelecionado}
                 onChange={(e) => {
                   setFiltroCtSelecionado(e.target.value);
@@ -1578,7 +1577,7 @@ function CadastroUsuario({ onUserChange }) {
           )}
           {filtroCtSelecionado && (
             <>
-              <label style={{ fontWeight: '500', color: '#333' }}>
+              <label style={{ fontWeight: '500', color: '#333', whiteSpace: 'nowrap' }} htmlFor="filtro_turma_alunos">
                 Filtrar por Turma:
               </label>
               {(() => {
@@ -1589,6 +1588,7 @@ function CadastroUsuario({ onUserChange }) {
                 return turmasDoCt.length > 0 ? (
                   <>
                     <select
+                      id="filtro_turma_alunos"
                       value={filtroTurmaSelecionada}
                       onChange={(e) => setFiltroTurmaSelecionada(e.target.value)}
                       style={{
@@ -2791,6 +2791,9 @@ function CadastroUsuario({ onUserChange }) {
             position: 'fixed',
             zIndex: 10050,
             ...styles.precadastroTooltip,
+            boxSizing: 'border-box',
+            width: precadastroTooltipAnchor.maxWidth,
+            minWidth: 0,
             top: precadastroTooltipAnchor.top,
             left: precadastroTooltipAnchor.left,
             maxWidth: precadastroTooltipAnchor.maxWidth,
@@ -2827,6 +2830,9 @@ function CadastroUsuario({ onUserChange }) {
             position: 'fixed',
             zIndex: 10050,
             ...styles.precadastroTooltip,
+            boxSizing: 'border-box',
+            width: userTooltipAnchor.maxWidth,
+            minWidth: 0,
             top: userTooltipAnchor.top,
             left: userTooltipAnchor.left,
             maxWidth: userTooltipAnchor.maxWidth,
