@@ -159,10 +159,38 @@ export const userService = {
   },
 };
 
+/** Caminho relativo para o próximo link de paginação DRF (mesmo baseURL do axios). */
+function apiNextRelativePath(nextUrl: string | null | undefined): string | null {
+  if (!nextUrl) return null;
+  const base = api.defaults.baseURL || '';
+  if (nextUrl.startsWith('http')) {
+    const stripped = nextUrl.replace(base, '').replace(/^\//, '');
+    return stripped || null;
+  }
+  return nextUrl.replace(/^\//, '');
+}
+
 export const turmaService = {
+  /** Agrega todas as páginas (API paginada; ?page_size= passado em params é respeitado pelo backend). */
   getTurmas: async (params?: any): Promise<Turma[]> => {
-    const response = await api.get('turmas/', { params });
-    return response.data.results || response.data;
+    const acc: Turma[] = [];
+    let path: string | null = 'turmas/';
+    let first = true;
+    while (path) {
+      const response = await api.get(path, { params: first ? params : undefined });
+      first = false;
+      const data = response.data;
+      if (Array.isArray(data)) {
+        return data;
+      }
+      if (data?.results && Array.isArray(data.results)) {
+        acc.push(...data.results);
+        path = apiNextRelativePath(data.next);
+      } else {
+        break;
+      }
+    }
+    return acc;
   },
 
   getTurmaById: async (id: number): Promise<Turma> => {
@@ -299,8 +327,7 @@ export const galeriaService = {
 
 export const professorService = {
   listarProfessores: async (): Promise<User[]> => {
-    const response = await api.get('usuarios/', { params: { tipo: 'professor' } });
-    return response.data.results || response.data;
+    return fetchAllPages('usuarios/', { tipo: 'professor' });
   },
 };
 
@@ -331,20 +358,27 @@ export const presencaService = {
   },
 };
 
-async function fetchAllPages(initialUrl: string): Promise<any[]> {
+async function fetchAllPages(
+  initialUrl: string,
+  firstRequestParams?: Record<string, unknown>
+): Promise<any[]> {
   let resultados: any[] = [];
   let url: string | null = initialUrl;
+  let first = true;
   while (url) {
-    const response = await api.get(url);
+    const response = await api.get(url, first && firstRequestParams ? { params: firstRequestParams } : undefined);
+    first = false;
     const data = response.data as {
       results?: any[];
       next?: string | null;
-    };
+    } | unknown[];
+    if (Array.isArray(data)) {
+      return data;
+    }
     if (data?.results) {
       resultados = resultados.concat(data.results);
-      url = data.next ? data.next.replace(api.defaults.baseURL || '', '') : null;
+      url = apiNextRelativePath(data.next);
     } else {
-      resultados = Array.isArray(data) ? data : [];
       url = null;
     }
   }
@@ -473,8 +507,7 @@ export const usuarioService = {
   },
 
   listarAlunos: async (params?: any): Promise<User[]> => {
-    const response = await api.get('usuarios/', { params: { ...params, tipo: 'aluno' } });
-    return response.data.results || response.data;
+    return fetchAllPages('usuarios/', { ...params, tipo: 'aluno' });
   },
 
   obterUsuario: async (id: number): Promise<User> => {

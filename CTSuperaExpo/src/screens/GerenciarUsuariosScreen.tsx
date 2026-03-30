@@ -141,7 +141,7 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = ({ embedded }) => {
       try {
         const [ctsRaw, turmasRes] = await Promise.all([
           ctService.listarCTs(),
-          turmaService.getTurmas({ page_size: 500 }),
+          turmaService.getTurmas({ page_size: 2000 }),
         ]);
         const ctsArr = Array.isArray(ctsRaw) ? ctsRaw : (ctsRaw as { results?: CentroTreinamento[] })?.results || [];
         const turmasArr = Array.isArray(turmasRes) ? turmasRes : (turmasRes as { results?: Turma[] })?.results || [];

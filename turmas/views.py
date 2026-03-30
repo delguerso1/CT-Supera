@@ -7,6 +7,7 @@ from django.shortcuts import get_object_or_404
 from usuarios.models import Usuario
 from .models import Turma, DiaSemana
 from .serializers import TurmaSerializer, UsuarioSerializer, DiaSemanaSerializer
+from .pagination import TurmaListPagination
 from django.db import models
 from financeiro.services import criar_mensalidade_ao_vincular_turma
 from datetime import date
@@ -37,6 +38,7 @@ class ListaCriarTurmasAPIView(ListCreateAPIView):
     """API para listar e criar turmas."""
     queryset = Turma.objects.all()
     serializer_class = TurmaSerializer
+    pagination_class = TurmaListPagination
 
     def get_permissions(self):
         if self.request.method == 'GET':

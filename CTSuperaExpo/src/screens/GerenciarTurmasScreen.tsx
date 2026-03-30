@@ -65,21 +65,19 @@ const GerenciarTurmasScreen: React.FC<NavigationProps> = ({ navigation, embedded
     try {
       setLoading(true);
       const [turmasRaw, ctsRaw, professoresData, diasSemanaData, alunosData] = await Promise.all([
-        turmaService.getTurmas({ incluir_inativas: true, page_size: 500 }),
+        turmaService.getTurmas({ incluir_inativas: true, page_size: 2000 }),
         ctService.listarCTs(),
         professorService.listarProfessores(),
         turmaService.getDiasSemana(),
         usuarioService.listarAlunos(),
       ]);
-      const turmasData = Array.isArray(turmasRaw) ? turmasRaw : (turmasRaw as { results?: Turma[] })?.results || [];
+      const turmasData = Array.isArray(turmasRaw) ? turmasRaw : [];
       const ctsData = Array.isArray(ctsRaw) ? ctsRaw : (ctsRaw as { results?: CentroTreinamento[] })?.results || [];
       setTurmas(turmasData);
       setCts(ctsData);
-      setProfessores(
-        Array.isArray(professoresData) ? professoresData : (professoresData as { results?: User[] })?.results || []
-      );
+      setProfessores(Array.isArray(professoresData) ? professoresData : []);
       setDiasSemana(diasSemanaData);
-      setAlunos(Array.isArray(alunosData) ? alunosData : (alunosData as { results?: User[] })?.results || []);
+      setAlunos(Array.isArray(alunosData) ? alunosData : []);
     } catch (error: any) {
       Alert.alert('Erro', error.response?.data?.error || 'Erro ao carregar dados.');
     } finally {
@@ -604,12 +602,14 @@ const GerenciarTurmasScreen: React.FC<NavigationProps> = ({ navigation, embedded
               </View>
 
               <View style={styles.switchContainer}>
-                <Text style={styles.label}>Turma Ativa</Text>
-                <Switch
-                  value={formData.ativo !== false}
-                  onValueChange={(value) => setFormData({ ...formData, ativo: value })}
-                  disabled={saving}
-                />
+                <Text style={styles.switchLabelCompact}>Turma ativa</Text>
+                <View style={styles.switchShrinkWrap}>
+                  <Switch
+                    value={formData.ativo !== false}
+                    onValueChange={(value) => setFormData({ ...formData, ativo: value })}
+                    disabled={saving}
+                  />
+                </View>
               </View>
 
               <View style={styles.modalActions}>
@@ -828,14 +828,15 @@ const styles = StyleSheet.create({
     color: '#999',
   },
   statusBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
   },
   statusText: {
     color: '#fff',
-    fontSize: 12,
-    fontWeight: 'bold',
+    fontSize: 10,
+    fontWeight: '600',
   },
   turmaActions: {
     flexDirection: 'row',
@@ -951,7 +952,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 16,
+    marginTop: 12,
+  },
+  switchLabelCompact: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    flex: 1,
+    paddingRight: 8,
+  },
+  switchShrinkWrap: {
+    transform: [{ scaleX: 0.82 }, { scaleY: 0.82 }],
   },
   modalActions: {
     flexDirection: 'row',

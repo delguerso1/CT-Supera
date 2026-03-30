@@ -59,7 +59,7 @@ const GerenciarCTsScreen: React.FC<NavigationProps> = ({ navigation, embedded })
       setLoading(true);
       const [ctsRaw, turmasRaw] = await Promise.all([
         ctService.listarCTs(),
-        turmaService.getTurmas({ page_size: 500 }),
+        turmaService.getTurmas({ page_size: 2000 }),
       ]);
       const ctsData = Array.isArray(ctsRaw) ? ctsRaw : (ctsRaw as { results?: CentroTreinamento[] })?.results || [];
       const turmasData = Array.isArray(turmasRaw) ? turmasRaw : (turmasRaw as { results?: { ct?: number }[] })?.results || [];
