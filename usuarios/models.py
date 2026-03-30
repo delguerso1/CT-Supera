@@ -441,7 +441,8 @@ class PushTokenExpo(models.Model):
         on_delete=models.CASCADE,
         related_name="push_tokens_expo",
     )
-    token = models.CharField(max_length=255, unique=True)
+    # Tokens Expo podem passar de 255 caracteres; truncar quebrava o registro silenciosamente no BD.
+    token = models.CharField(max_length=512, unique=True)
     atualizado_em = models.DateTimeField(auto_now=True)
     criado_em = models.DateTimeField(auto_now_add=True)
 

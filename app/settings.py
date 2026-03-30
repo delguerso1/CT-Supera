@@ -40,6 +40,7 @@ ALLOWED_HOSTS = [
     '13.59.11.161',
     '192.168.18.87',
     '192.168.18.11',
+    '192.168.100.53',
     os.getenv('DOMAIN_NAME', 'ctsupera.com.br'),
     os.getenv('SERVER_IP', '13.59.11.161'),
 ]

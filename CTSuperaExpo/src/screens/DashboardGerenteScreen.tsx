@@ -12,13 +12,13 @@ import {
   TextInput,
   Modal,
 } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 import { useAuth } from '../utils/AuthContext';
 import { funcionarioService, financeiroService, turmaService, usuarioService, userService, presencaService } from '../services/api';
 import {
   User,
   PainelGerente,
   Mensalidade,
-  PreCadastro,
   Despesa,
   Salario,
   FinanceiroDashboard,
@@ -34,7 +34,17 @@ import { colors } from '../theme';
 import { nomeAlunoMensalidade } from '../utils/nomeAlunoMensalidade';
 import { formatarErroApi } from '../utils/apiError';
 
-const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }) => {
+type DashboardGerenteProps = NavigationProps & {
+  embedded?: boolean;
+  shellActiveTop?: 'dashboard' | 'perfil' | 'financeiro' | 'relatorios';
+};
+
+const DashboardGerenteScreen: React.FC<DashboardGerenteProps> = ({
+  navigation,
+  route,
+  embedded,
+  shellActiveTop,
+}) => {
   const { user, logout } = useAuth();
   const [painelGerente, setPainelGerente] = useState<PainelGerente | null>(null);
   const [mensalidades, setMensalidades] = useState<Mensalidade[]>([]);
@@ -43,13 +53,10 @@ const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }
   const [dashboardFinanceiro, setDashboardFinanceiro] = useState<FinanceiroDashboard | null>(null);
   const [alunos, setAlunos] = useState<User[]>([]);
   const [turmas, setTurmas] = useState<Turma[]>([]);
-  const [filtroTurmaId, setFiltroTurmaId] = useState<number | null>(null);
-  const [showTurmaModal, setShowTurmaModal] = useState(false);
-  const [precadastros, setPrecadastros] = useState<PreCadastro[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadingFinanceiro, setLoadingFinanceiro] = useState(false);
-  const [activeSection, setActiveSection] = useState<'dashboard' | 'financeiro' | 'alunos' | 'relatorios' | 'perfil'>('dashboard');
+  const [activeSection, setActiveSection] = useState<'dashboard' | 'financeiro' | 'relatorios' | 'perfil'>('dashboard');
   const [mes, setMes] = useState(new Date().getMonth() + 1);
   const [ano, setAno] = useState(new Date().getFullYear());
   const [presencaRelatorio, setPresencaRelatorio] = useState<PresencaRelatorioResponse | null>(null);
@@ -63,6 +70,10 @@ const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }
   const [corrigindoPresenca, setCorrigindoPresenca] = useState<{ [key: number]: boolean }>({});
   const [filtroAlunoBusca, setFiltroAlunoBusca] = useState('');
   const [filtroTurmaBusca, setFiltroTurmaBusca] = useState('');
+  /** Acordeão na aba Relatórios: uma seção aberta por vez reduz poluição visual */
+  const [relatorioPainelAberto, setRelatorioPainelAberto] = useState<'presenca' | 'alunos' | 'turmas' | null>(
+    'presenca'
+  );
   const [showDespesaModal, setShowDespesaModal] = useState(false);
   const [editDespesa, setEditDespesa] = useState<Despesa | null>(null);
   const [savingDespesa, setSavingDespesa] = useState(false);
@@ -104,25 +115,28 @@ const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }
     }
   }, [user]);
 
-  // Detectar seção ativa baseada na rota
+  // Shell do gerente ou Tab Navigator: mesma seção (Dashboard / Perfil / Financeiro / Relatórios)
   useEffect(() => {
-    if (route?.name) {
-      setActiveSection(route.name.toLowerCase() as any);
+    if (shellActiveTop) {
+      setActiveSection(shellActiveTop);
+      return;
     }
-  }, [route?.name]);
+    const n = route?.name as string | undefined;
+    if (!n) return;
+    if (n === 'Dashboard') setActiveSection('dashboard');
+    else if (n === 'Perfil') setActiveSection('perfil');
+    else if (n === 'Financeiro') setActiveSection('financeiro');
+    else if (n === 'Relatórios') setActiveSection('relatorios');
+  }, [route?.name, shellActiveTop]);
 
   useEffect(() => {
-    if (activeSection === 'alunos' && user) {
-      loadTurmas();
-      loadAlunos();
-    }
     if (activeSection === 'financeiro' && user) {
       loadFinanceiroData();
     }
     if (activeSection === 'relatorios' && user) {
       loadRelatoriosData();
     }
-  }, [activeSection, user, mes, ano, filtroTurmaId]);
+  }, [activeSection, user, mes, ano]);
 
   const loadNotifStats = async () => {
     try {
@@ -211,9 +225,7 @@ const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }
 
   const loadAlunos = async () => {
     try {
-      const alunosData = await usuarioService.listarAlunos(
-        filtroTurmaId ? { turma: filtroTurmaId } : undefined
-      );
+      const alunosData = await usuarioService.listarAlunos();
       setAlunos(alunosData);
     } catch (error: any) {
       console.error('Erro ao carregar alunos:', error);
@@ -227,15 +239,6 @@ const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }
     } catch (error: any) {
       console.error('Erro ao carregar turmas:', error);
       setTurmas([]);
-    }
-  };
-
-  const loadPrecadastros = async () => {
-    try {
-      const precadastrosData = await funcionarioService.listarPrecadastros();
-      setPrecadastros(precadastrosData);
-    } catch (error: any) {
-      console.error('Erro ao carregar pré-cadastros:', error);
     }
   };
 
@@ -280,10 +283,6 @@ const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }
   const onRefresh = async () => {
     setRefreshing(true);
     await loadGerenteData();
-    if (activeSection === 'alunos') {
-      await loadTurmas();
-      await loadAlunos();
-    }
     if (activeSection === 'financeiro') await loadFinanceiroData();
     if (activeSection === 'relatorios') await loadRelatoriosData();
     setRefreshing(false);
@@ -303,20 +302,6 @@ const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }
   const getInitials = (name: string) => {
     if (!name) return '?';
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-  };
-
-  const formatResumoTurmasAluno = (aluno: User) => {
-    const lista = aluno.turmas_vinculadas;
-    if (!lista || lista.length === 0) {
-      return 'CT / Turma: nenhuma turma vinculada.';
-    }
-    return lista
-      .map((t) => {
-        const dias = (t.dias_semana_nomes || []).join(', ') || '-';
-        const inativo = t.ativo === false ? ' (turma inativa)' : '';
-        return `• ${t.ct_nome || 'CT'} — ${dias} às ${t.horario || '-'}${inativo}`;
-      })
-      .join('\n');
   };
 
   const formatCurrency = (value: number | string | undefined | null) => {
@@ -677,6 +662,11 @@ const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }
             E-mails de cobrança e avisos oficiais continuam pelo sistema web. Aqui você envia um aviso por push para
             alunos que instalaram o app e aceitaram notificações.
           </Text>
+          {notifStats == null && (
+            <Text style={styles.notifStatsWarn}>
+              Não foi possível carregar a contagem (rede ou permissão). Puxe para atualizar o painel.
+            </Text>
+          )}
           {notifStats != null && (
             <Text style={styles.notifStatsText}>
               Alunos com app registrado: {notifStats.alunos_com_app} ({notifStats.tokens_registrados}{' '}
@@ -733,7 +723,8 @@ const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }
                 ⚠️ {painelGerente.precadastros} Pré-cadastro(s) pendente(s)
               </Text>
               <Text style={styles.warningText}>
-                Existem pré-cadastros aguardando conversão em alunos.
+                Existem pré-cadastros aguardando conversão em alunos. Use a aba Usuários (pré-cadastros) para
+                gerenciar.
               </Text>
             </View>
           </View>
@@ -1001,6 +992,7 @@ const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }
                 <View style={styles.salarioInfo}>
                   <Text style={styles.salarioTitle}>{getProfessorNome(salario.professor)}</Text>
                   <Text style={styles.salarioDate}>
+                    {salario.competencia ? `Competência: ${formatDate(salario.competencia)}\n` : ''}
                     {salario.status === 'pago' && salario.data_pagamento
                       ? `Pago em ${formatDate(salario.data_pagamento)}`
                       : 'Pagamento pendente'}
@@ -1026,176 +1018,6 @@ const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }
                   )}
                 </View>
               </View>
-            ))
-          )}
-        </View>
-      </ScrollView>
-    );
-  };
-
-  const handleConverterPrecadastro = async (precadastro: PreCadastro) => {
-    Alert.alert(
-      'Converter Pré-cadastro',
-      `Deseja converter o pré-cadastro de ${precadastro.nome || precadastro.email} em aluno?`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Converter',
-          onPress: async () => {
-            try {
-              await funcionarioService.converterPrecadastro(precadastro.id);
-              Alert.alert('Sucesso', 'Pré-cadastro convertido em aluno com sucesso! Um convite de ativação foi enviado por e-mail.');
-              await loadPrecadastros();
-              await loadGerenteData();
-            } catch (error: any) {
-              Alert.alert('Erro', error.response?.data?.error || 'Erro ao converter pré-cadastro.');
-            }
-          },
-        },
-      ]
-    );
-  };
-
-  const renderAlunos = () => {
-    const alunosAtivos = alunos.filter(a => a.ativo).length;
-    const alunosInativos = alunos.filter(a => !a.ativo).length;
-    const turmaSelecionada = turmas.find(turma => turma.id === filtroTurmaId);
-
-    return (
-      <ScrollView
-        style={styles.content}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
-      >
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Filtro por Turma</Text>
-          <View style={styles.filterRow}>
-            <Text style={styles.filterLabel}>
-              {turmaSelecionada
-                ? `Turma ${turmaSelecionada.id} - ${turmaSelecionada.ct_nome || 'CT'} - ${turmaSelecionada.horario}`
-                : 'Todas as turmas'}
-            </Text>
-            <TouchableOpacity
-              style={styles.filterButton}
-              onPress={() => setShowTurmaModal(true)}
-            >
-              <Text style={styles.filterButtonText}>Selecionar turma</Text>
-            </TouchableOpacity>
-          </View>
-          {filtroTurmaId && (
-            <TouchableOpacity
-              style={styles.clearFilterButton}
-              onPress={() => setFiltroTurmaId(null)}
-            >
-              <Text style={styles.clearFilterText}>Limpar filtro</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Estatísticas</Text>
-          <View style={styles.statsGrid}>
-            <View style={styles.statCard}>
-              <Text style={styles.statTitle}>Total de Alunos</Text>
-              <Text style={styles.statValue}>{alunos.length}</Text>
-            </View>
-            
-            <View style={styles.statCard}>
-              <Text style={styles.statTitle}>Alunos Ativos</Text>
-              <Text style={[styles.statValue, { color: '#4caf50' }]}>
-                {alunosAtivos}
-              </Text>
-            </View>
-            
-            <View style={styles.statCard}>
-              <Text style={styles.statTitle}>Alunos Inativos</Text>
-              <Text style={[styles.statValue, { color: '#f44336' }]}>
-                {alunosInativos}
-              </Text>
-            </View>
-          </View>
-        </View>
-
-        {precadastros.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Pré-cadastros Pendentes ({precadastros.length})</Text>
-            {precadastros.map(precadastro => (
-              <View key={precadastro.id} style={styles.precadastroCard}>
-                <TouchableOpacity
-                  style={styles.precadastroHeader}
-                  onPress={() => {
-                    const nome = precadastro.nome || `${precadastro.first_name || ''} ${precadastro.last_name || ''}`.trim() || 'Sem nome';
-                    let msg = `E-mail: ${precadastro.email}\nTelefone: ${precadastro.telefone || '-'}\nCadastrado em: ${new Date(precadastro.criado_em).toLocaleDateString('pt-BR')}`;
-                    if (precadastro.origem === 'aula_experimental' && precadastro.data_aula_experimental) {
-                      msg += `\n\nData da aula experimental: ${new Date(precadastro.data_aula_experimental + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}`;
-                    }
-                    Alert.alert(nome, msg, [{ text: 'OK' }]);
-                  }}
-                >
-                  <View style={styles.precadastroInfo}>
-                    <Text style={[styles.precadastroNome, { color: colors.primary, textDecorationLine: 'underline' }]}>
-                      {precadastro.nome || `${precadastro.first_name || ''} ${precadastro.last_name || ''}`.trim() || 'Sem nome'}
-                    </Text>
-                    <Text style={styles.precadastroEmail}>{precadastro.email}</Text>
-                    {precadastro.telefone && (
-                      <Text style={styles.precadastroTelefone}>{precadastro.telefone}</Text>
-                    )}
-                  </View>
-                  <View style={[styles.statusBadge, { backgroundColor: '#ff9800' }]}>
-                    <Text style={styles.statusText}>Pendente</Text>
-                  </View>
-                </TouchableOpacity>
-                <Text style={styles.precadastroDate}>
-                  Cadastrado em: {new Date(precadastro.criado_em).toLocaleDateString('pt-BR')}
-                </Text>
-                <TouchableOpacity
-                  style={styles.converterButton}
-                  onPress={() => handleConverterPrecadastro(precadastro)}
-                >
-                  <Text style={styles.converterButtonText}>Converter em Aluno</Text>
-                </TouchableOpacity>
-              </View>
-            ))}
-          </View>
-        )}
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Lista de Alunos ({alunos.length})</Text>
-          {alunos.length === 0 ? (
-            <Text style={styles.noData}>Nenhum aluno encontrado.</Text>
-          ) : (
-            alunos.map(aluno => (
-              <TouchableOpacity
-                key={aluno.id}
-                style={styles.alunoCard}
-                onPress={() => {
-                  Alert.alert(
-                    aluno.first_name + ' ' + aluno.last_name,
-                    `Email: ${aluno.email}\n` +
-                    `Telefone: ${aluno.telefone || 'Não informado'}\n` +
-                    `Status: ${aluno.ativo ? 'Ativo' : 'Inativo'}\n\n` +
-                    `${formatResumoTurmasAluno(aluno)}`,
-                    [{ text: 'OK' }]
-                  );
-                }}
-              >
-                <View style={styles.alunoHeader}>
-                  <View style={styles.alunoInfo}>
-                    <Text style={styles.alunoNome}>
-                      {aluno.first_name} {aluno.last_name}
-                    </Text>
-                    <Text style={styles.alunoEmail}>{aluno.email}</Text>
-                  </View>
-                  <View style={[
-                    styles.statusBadge,
-                    { backgroundColor: aluno.ativo ? '#4caf50' : '#f44336' }
-                  ]}>
-                    <Text style={styles.statusText}>
-                      {aluno.ativo ? 'Ativo' : 'Inativo'}
-                    </Text>
-                  </View>
-                </View>
-              </TouchableOpacity>
             ))
           )}
         </View>
@@ -1448,244 +1270,346 @@ const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }
     );
     const alunosAtivos = alunos.filter(aluno => aluno.ativo).length;
     const alunosInativos = alunos.filter(aluno => !aluno.ativo).length;
+    const turmasAtivas = turmas.filter((t) => t.ativo !== false).length;
+    const turmasInativas = turmas.length - turmasAtivas;
+
+    const toggleRelatorioPainel = (k: 'presenca' | 'alunos' | 'turmas') => {
+      setRelatorioPainelAberto((prev) => (prev === k ? null : k));
+    };
+
+    const cabecalhoPainel = (
+      k: 'presenca' | 'alunos' | 'turmas',
+      titulo: string,
+      subtitulo: string
+    ) => {
+      const aberto = relatorioPainelAberto === k;
+      return (
+        <TouchableOpacity
+          style={styles.relatorioPainelHead}
+          onPress={() => toggleRelatorioPainel(k)}
+          activeOpacity={0.75}
+        >
+          <View style={styles.relatorioPainelHeadText}>
+            <Text style={styles.relatorioPainelTitle}>{titulo}</Text>
+            <Text style={styles.relatorioPainelSubtitle}>{subtitulo}</Text>
+          </View>
+          <MaterialIcons
+            name={aberto ? 'expand-less' : 'expand-more'}
+            size={28}
+            color={colors.primary}
+          />
+        </TouchableOpacity>
+      );
+    };
 
     return (
-      <ScrollView style={styles.content}>
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Relatórios Disponíveis</Text>
+      <ScrollView
+        style={styles.content}
+        contentContainerStyle={styles.relatorioScrollContent}
+        keyboardShouldPersistTaps="handled"
+      >
+        <Text style={styles.relatorioPageTitle}>Relatórios</Text>
+        <Text style={styles.relatorioPageHint}>
+          Toque em cada bloco para abrir ou fechar. O financeiro gera PDF; presenças exige datas e o botão
+          &quot;Gerar&quot;.
+        </Text>
 
-          <TouchableOpacity
-            style={styles.reportCard}
-            onPress={handleGerarRelatorioFinanceiro}
-          >
-            <Text style={styles.reportTitle}>Relatório Financeiro</Text>
-            <Text style={styles.reportDescription}>
-              Relatório detalhado de receitas e despesas
-            </Text>
-          </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.relatorioFinanceCard}
+          onPress={handleGerarRelatorioFinanceiro}
+          activeOpacity={0.85}
+        >
+          <MaterialIcons name="picture-as-pdf" size={26} color={colors.primary} />
+          <View style={styles.relatorioFinanceTextWrap}>
+            <Text style={styles.relatorioFinanceTitle}>Relatório financeiro</Text>
+            <Text style={styles.relatorioFinanceSub}>PDF com receitas, despesas e salários</Text>
+          </View>
+          <MaterialIcons name="chevron-right" size={22} color={colors.textMuted} />
+        </TouchableOpacity>
 
-          <View style={styles.reportCard}>
-            <Text style={styles.reportTitle}>Relatório de Presença</Text>
-            <Text style={styles.reportDescription}>
-              Estatísticas e correção de presenças registradas
-            </Text>
+        <View style={styles.relatorioPainel}>
+          {cabecalhoPainel('presenca', 'Presenças', 'Filtros, totais e correção de registros')}
+          {relatorioPainelAberto === 'presenca' && (
+            <View style={styles.relatorioPainelBody}>
+              <Text style={styles.relatorioBlockLabel}>Período</Text>
+              <View style={styles.relatorioDatesRow}>
+                <View style={styles.relatorioDateCol}>
+                  <Text style={styles.relatorioMiniLabel}>De</Text>
+                  <TextInput
+                    style={styles.relatorioInput}
+                    placeholder="AAAA-MM-DD"
+                    placeholderTextColor="#999"
+                    value={filtroPresencaInicio}
+                    onChangeText={setFiltroPresencaInicio}
+                  />
+                </View>
+                <View style={styles.relatorioDateCol}>
+                  <Text style={styles.relatorioMiniLabel}>Até</Text>
+                  <TextInput
+                    style={styles.relatorioInput}
+                    placeholder="AAAA-MM-DD"
+                    placeholderTextColor="#999"
+                    value={filtroPresencaFim}
+                    onChangeText={setFiltroPresencaFim}
+                  />
+                </View>
+              </View>
 
-            <View style={styles.reportFilters}>
-              <TextInput
-                style={styles.input}
-                placeholder="Data inicial (AAAA-MM-DD)"
-                value={filtroPresencaInicio}
-                onChangeText={setFiltroPresencaInicio}
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="Data final (AAAA-MM-DD)"
-                value={filtroPresencaFim}
-                onChangeText={setFiltroPresencaFim}
-              />
-              <TouchableOpacity
-                style={styles.filterButton}
-                onPress={() => setShowPresencaTurmaModal(true)}
-              >
-                <Text style={styles.filterButtonText}>
-                  {filtroPresencaTurmaId
-                    ? `Turma ${filtroPresencaTurmaId}`
-                    : 'Selecionar turma'}
-                </Text>
-              </TouchableOpacity>
-              {filtroPresencaTurmaId && (
+              <Text style={[styles.relatorioBlockLabel, styles.relatorioBlockLabelSpaced]}>Turma</Text>
+              <View style={styles.relatorioTurmaRow}>
                 <TouchableOpacity
-                  style={styles.clearFilterButton}
-                  onPress={() => setFiltroPresencaTurmaId(null)}
+                  style={styles.relatorioPrimaryOutlineBtn}
+                  onPress={() => setShowPresencaTurmaModal(true)}
                 >
-                  <Text style={styles.clearFilterText}>Limpar turma</Text>
+                  <Text style={styles.relatorioPrimaryOutlineBtnText}>
+                    {filtroPresencaTurmaId ? `Turma ${filtroPresencaTurmaId}` : 'Todas as turmas'}
+                  </Text>
                 </TouchableOpacity>
-              )}
+                {filtroPresencaTurmaId != null && (
+                  <TouchableOpacity
+                    style={styles.relatorioGhostBtn}
+                    onPress={() => setFiltroPresencaTurmaId(null)}
+                  >
+                    <Text style={styles.relatorioGhostBtnText}>Limpar</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              <Text style={[styles.relatorioBlockLabel, styles.relatorioBlockLabelSpaced]}>
+                Filtrar lista por nome
+              </Text>
               <TextInput
-                style={styles.input}
-                placeholder="Buscar aluno"
+                style={styles.relatorioInput}
+                placeholder="Nome do aluno (após gerar o relatório)"
+                placeholderTextColor="#999"
                 value={filtroPresencaBusca}
                 onChangeText={setFiltroPresencaBusca}
               />
-              <TouchableOpacity
-                style={styles.actionButton}
-                onPress={handleGerarRelatorioPresenca}
-              >
+
+              <TouchableOpacity style={styles.relatorioGerarBtn} onPress={handleGerarRelatorioPresenca}>
                 {loadingPresencaRelatorio ? (
                   <ActivityIndicator color="#fff" />
                 ) : (
-                  <Text style={styles.actionButtonText}>Gerar relatório</Text>
+                  <Text style={styles.relatorioGerarBtnText}>Gerar relatório de presenças</Text>
                 )}
               </TouchableOpacity>
-            </View>
 
-            {presencaRelatorio && (
-              <View style={styles.reportSummary}>
-                <Text style={styles.reportSummaryText}>
-                  Registros: {presencaRelatorio.total_registros}
-                </Text>
-                <Text style={styles.reportSummaryText}>
-                  Check-ins: {presencaRelatorio.total_checkins}
-                </Text>
-                <Text style={styles.reportSummaryText}>
-                  Confirmadas: {presencaRelatorio.total_confirmadas}
-                </Text>
-              </View>
-            )}
-
-            {presencaRelatorio && presencasFiltradas.length === 0 && (
-              <Text style={styles.noData}>Nenhum registro encontrado.</Text>
-            )}
-
-            {presencasFiltradas.map(item => (
-              <View key={item.id} style={styles.presencaCard}>
-                <View style={styles.presencaHeader}>
-                  <Text style={styles.presencaAluno}>{item.aluno_nome}</Text>
-                  <Text style={styles.presencaData}>{formatDate(item.data)}</Text>
-                </View>
-                <Text style={styles.presencaTurma}>Turma: {item.turma_nome}</Text>
-                <View style={styles.presencaStatusRow}>
-                  <View style={styles.presencaStatusItem}>
-                    <Text style={styles.presencaStatusLabel}>Check-in</Text>
-                    <Text style={[
-                      styles.presencaStatusValue,
-                      { color: item.checkin_realizado ? '#4caf50' : '#f44336' }
-                    ]}>
-                      {item.checkin_realizado ? 'Sim' : 'Não'}
-                    </Text>
+              {presencaRelatorio && (
+                <>
+                  <View style={styles.relatorioDivider} />
+                  <Text style={styles.relatorioResultsTitle}>
+                    Resultados
+                    {presencaRelatorio.presencas.length !== presencasFiltradas.length
+                      ? ` (${presencasFiltradas.length} de ${presencaRelatorio.presencas.length})`
+                      : ` (${presencasFiltradas.length})`}
+                  </Text>
+                  <View style={styles.relatorioKpiRow}>
+                    <View style={styles.relatorioKpi}>
+                      <Text style={styles.relatorioKpiVal}>{presencaRelatorio.total_registros}</Text>
+                      <Text style={styles.relatorioKpiLbl}>Registros</Text>
+                    </View>
+                    <View style={styles.relatorioKpi}>
+                      <Text style={styles.relatorioKpiVal}>{presencaRelatorio.total_checkins}</Text>
+                      <Text style={styles.relatorioKpiLbl}>Check-ins</Text>
+                    </View>
+                    <View style={styles.relatorioKpi}>
+                      <Text style={styles.relatorioKpiVal}>{presencaRelatorio.total_confirmadas}</Text>
+                      <Text style={styles.relatorioKpiLbl}>Confirmadas</Text>
+                    </View>
                   </View>
-                  <View style={styles.presencaStatusItem}>
-                    <Text style={styles.presencaStatusLabel}>Presença</Text>
-                    <Text style={[
-                      styles.presencaStatusValue,
-                      { color: item.presenca_confirmada ? '#4caf50' : '#f44336' }
-                    ]}>
-                      {item.presenca_confirmada ? 'Confirmada' : 'Pendente'}
-                    </Text>
-                  </View>
-                </View>
-                <TouchableOpacity
-                  style={[
-                    styles.corrigirButton,
-                    item.presenca_confirmada && styles.corrigirButtonOutline
-                  ]}
-                  onPress={() => handleCorrigirPresenca(item, !item.presenca_confirmada)}
-                  disabled={corrigindoPresenca[item.id]}
-                >
-                  <Text style={[
-                    styles.corrigirButtonText,
-                    item.presenca_confirmada && styles.corrigirButtonOutlineText
-                  ]}>
-                    {corrigindoPresenca[item.id]
-                      ? 'Atualizando...'
-                      : item.presenca_confirmada
-                        ? 'Desfazer Presença'
-                        : 'Confirmar Presença'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            ))}
-          </View>
 
-          <View style={styles.reportCard}>
-            <Text style={styles.reportTitle}>Relatório de Alunos</Text>
-            <Text style={styles.reportDescription}>
-              Resumo de alunos ativos e inativos
-            </Text>
-            {loadingRelatorios && (
-              <View style={styles.loadingInline}>
-                <ActivityIndicator size="small" color={colors.primary} />
-                <Text style={styles.loadingInlineText}>Carregando alunos...</Text>
-              </View>
-            )}
-            <View style={styles.reportSummary}>
-              <Text style={styles.reportSummaryText}>Total: {alunos.length}</Text>
-              <Text style={styles.reportSummaryText}>Ativos: {alunosAtivos}</Text>
-              <Text style={styles.reportSummaryText}>Inativos: {alunosInativos}</Text>
+                  {presencasFiltradas.length === 0 ? (
+                    <Text style={styles.noData}>Nenhum registro para os filtros atuais.</Text>
+                  ) : (
+                    presencasFiltradas.map((item) => (
+                      <View key={item.id} style={styles.presencaCard}>
+                        <View style={styles.presencaHeader}>
+                          <Text style={styles.presencaAluno}>{item.aluno_nome}</Text>
+                          <Text style={styles.presencaData}>{formatDate(item.data)}</Text>
+                        </View>
+                        <Text style={styles.presencaTurma}>Turma: {item.turma_nome}</Text>
+                        <View style={styles.presencaStatusRow}>
+                          <View style={styles.presencaStatusItem}>
+                            <Text style={styles.presencaStatusLabel}>Check-in</Text>
+                            <Text
+                              style={[
+                                styles.presencaStatusValue,
+                                { color: item.checkin_realizado ? '#4caf50' : '#f44336' },
+                              ]}
+                            >
+                              {item.checkin_realizado ? 'Sim' : 'Não'}
+                            </Text>
+                          </View>
+                          <View style={styles.presencaStatusItem}>
+                            <Text style={styles.presencaStatusLabel}>Presença</Text>
+                            <Text
+                              style={[
+                                styles.presencaStatusValue,
+                                { color: item.presenca_confirmada ? '#4caf50' : '#f44336' },
+                              ]}
+                            >
+                              {item.presenca_confirmada ? 'Confirmada' : 'Pendente'}
+                            </Text>
+                          </View>
+                        </View>
+                        <TouchableOpacity
+                          style={[
+                            styles.corrigirButton,
+                            item.presenca_confirmada && styles.corrigirButtonOutline,
+                          ]}
+                          onPress={() => handleCorrigirPresenca(item, !item.presenca_confirmada)}
+                          disabled={corrigindoPresenca[item.id]}
+                        >
+                          <Text
+                            style={[
+                              styles.corrigirButtonText,
+                              item.presenca_confirmada && styles.corrigirButtonOutlineText,
+                            ]}
+                          >
+                            {corrigindoPresenca[item.id]
+                              ? 'Atualizando...'
+                              : item.presenca_confirmada
+                                ? 'Desfazer presença'
+                                : 'Confirmar presença'}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    ))
+                  )}
+                </>
+              )}
             </View>
-            <TextInput
-              style={styles.input}
-              placeholder="Buscar aluno"
-              value={filtroAlunoBusca}
-              onChangeText={setFiltroAlunoBusca}
-            />
-            {alunosFiltrados.length === 0 ? (
-              <Text style={styles.noData}>Nenhum aluno encontrado.</Text>
-            ) : (
-              alunosFiltrados.slice(0, 20).map(aluno => (
-                <View key={aluno.id} style={styles.reportListItem}>
-                  <Text style={styles.reportListTitle}>
-                    {aluno.first_name} {aluno.last_name}
-                  </Text>
-                  <Text style={styles.reportListSubtitle}>
-                    {aluno.ativo ? 'Ativo' : 'Inativo'} • {aluno.email}
-                  </Text>
-                </View>
-              ))
-            )}
-          </View>
+          )}
+        </View>
 
-          <View style={styles.reportCard}>
-            <Text style={styles.reportTitle}>Relatório de Turmas</Text>
-            <Text style={styles.reportDescription}>
-              Resumo de turmas cadastradas e ocupação
-            </Text>
-            {loadingRelatorios && (
-              <View style={styles.loadingInline}>
-                <ActivityIndicator size="small" color={colors.primary} />
-                <Text style={styles.loadingInlineText}>Carregando turmas...</Text>
-              </View>
-            )}
-            <View style={styles.reportSummary}>
-              <Text style={styles.reportSummaryText}>Total: {turmas.length}</Text>
-              <Text style={styles.reportSummaryText}>
-                Ativas: {turmas.filter(turma => turma.ativo).length}
-              </Text>
-              <Text style={styles.reportSummaryText}>
-                Inativas: {turmas.filter(turma => !turma.ativo).length}
-              </Text>
-            </View>
-            <TextInput
-              style={styles.input}
-              placeholder="Buscar turma"
-              value={filtroTurmaBusca}
-              onChangeText={setFiltroTurmaBusca}
-            />
-            {turmasFiltradas.length === 0 ? (
-              <Text style={styles.noData}>Nenhuma turma encontrada.</Text>
-            ) : (
-              turmasFiltradas.slice(0, 20).map(turma => (
-                <View key={turma.id} style={styles.reportListItem}>
-                  <Text style={styles.reportListTitle}>
-                    Turma {turma.id} • {turma.ct_nome || 'CT'}
-                  </Text>
-                  <Text style={styles.reportListSubtitle}>
-                    {turma.horario} • {turma.alunos_count || 0} alunos • {turma.ativo ? 'Ativa' : 'Inativa'}
-                  </Text>
+        <View style={styles.relatorioPainel}>
+          {cabecalhoPainel('alunos', 'Alunos', 'Resumo e lista para consulta (até 20)')}
+          {relatorioPainelAberto === 'alunos' && (
+            <View style={styles.relatorioPainelBody}>
+              {loadingRelatorios && (
+                <View style={styles.loadingInline}>
+                  <ActivityIndicator size="small" color={colors.primary} />
+                  <Text style={styles.loadingInlineText}>Carregando alunos...</Text>
                 </View>
-              ))
-            )}
-          </View>
+              )}
+              <View style={styles.relatorioKpiRow}>
+                <View style={styles.relatorioKpi}>
+                  <Text style={styles.relatorioKpiVal}>{alunos.length}</Text>
+                  <Text style={styles.relatorioKpiLbl}>Total</Text>
+                </View>
+                <View style={styles.relatorioKpi}>
+                  <Text style={styles.relatorioKpiVal}>{alunosAtivos}</Text>
+                  <Text style={styles.relatorioKpiLbl}>Ativos</Text>
+                </View>
+                <View style={styles.relatorioKpi}>
+                  <Text style={styles.relatorioKpiVal}>{alunosInativos}</Text>
+                  <Text style={styles.relatorioKpiLbl}>Inativos</Text>
+                </View>
+              </View>
+              <Text style={[styles.relatorioBlockLabel, styles.relatorioBlockLabelSpaced]}>Buscar</Text>
+              <TextInput
+                style={styles.relatorioInput}
+                placeholder="Nome ou e-mail"
+                placeholderTextColor="#999"
+                value={filtroAlunoBusca}
+                onChangeText={setFiltroAlunoBusca}
+              />
+              <View style={styles.relatorioListShell}>
+                {alunosFiltrados.length === 0 ? (
+                  <Text style={styles.noData}>Nenhum aluno encontrado.</Text>
+                ) : (
+                  alunosFiltrados.slice(0, 20).map((aluno) => (
+                    <View key={aluno.id} style={styles.reportListItem}>
+                      <Text style={styles.reportListTitle}>
+                        {aluno.first_name} {aluno.last_name}
+                      </Text>
+                      <Text style={styles.reportListSubtitle}>
+                        {aluno.ativo ? 'Ativo' : 'Inativo'} • {aluno.email}
+                      </Text>
+                    </View>
+                  ))
+                )}
+              </View>
+            </View>
+          )}
+        </View>
+
+        <View style={styles.relatorioPainel}>
+          {cabecalhoPainel('turmas', 'Turmas', 'Resumo e lista para consulta (até 20)')}
+          {relatorioPainelAberto === 'turmas' && (
+            <View style={styles.relatorioPainelBody}>
+              {loadingRelatorios && (
+                <View style={styles.loadingInline}>
+                  <ActivityIndicator size="small" color={colors.primary} />
+                  <Text style={styles.loadingInlineText}>Carregando turmas...</Text>
+                </View>
+              )}
+              <View style={styles.relatorioKpiRow}>
+                <View style={styles.relatorioKpi}>
+                  <Text style={styles.relatorioKpiVal}>{turmas.length}</Text>
+                  <Text style={styles.relatorioKpiLbl}>Total</Text>
+                </View>
+                <View style={styles.relatorioKpi}>
+                  <Text style={styles.relatorioKpiVal}>{turmasAtivas}</Text>
+                  <Text style={styles.relatorioKpiLbl}>Ativas</Text>
+                </View>
+                <View style={styles.relatorioKpi}>
+                  <Text style={styles.relatorioKpiVal}>{turmasInativas}</Text>
+                  <Text style={styles.relatorioKpiLbl}>Inativas</Text>
+                </View>
+              </View>
+              <Text style={[styles.relatorioBlockLabel, styles.relatorioBlockLabelSpaced]}>Buscar</Text>
+              <TextInput
+                style={styles.relatorioInput}
+                placeholder="CT, horário ou dias"
+                placeholderTextColor="#999"
+                value={filtroTurmaBusca}
+                onChangeText={setFiltroTurmaBusca}
+              />
+              <View style={styles.relatorioListShell}>
+                {turmasFiltradas.length === 0 ? (
+                  <Text style={styles.noData}>Nenhuma turma encontrada.</Text>
+                ) : (
+                  turmasFiltradas.slice(0, 20).map((turma) => (
+                    <View key={turma.id} style={styles.reportListItem}>
+                      <Text style={styles.reportListTitle}>
+                        Turma {turma.id} • {turma.ct_nome || 'CT'}
+                      </Text>
+                      <Text style={styles.reportListSubtitle}>
+                        {turma.horario} • {turma.alunos_count || 0} alunos •{' '}
+                        {turma.ativo !== false ? 'Ativa' : 'Inativa'}
+                      </Text>
+                    </View>
+                  ))
+                )}
+              </View>
+            </View>
+          )}
         </View>
       </ScrollView>
     );
   };
 
+  const ScreenRoot = embedded ? View : SafeScreen;
+  const screenRootProps = embedded
+    ? { style: styles.container }
+    : { tabScreen: true as const, style: styles.container };
+
   if (loading) {
     return (
-      <SafeScreen tabScreen style={styles.container}>
+      <ScreenRoot {...screenRootProps}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={styles.loadingText}>Carregando...</Text>
         </View>
-      </SafeScreen>
+      </ScreenRoot>
     );
   }
 
   return (
-    <SafeScreen tabScreen style={styles.container}>
-      {/* Header */}
-      {painelGerente && (
+    <ScreenRoot {...screenRootProps}>
+      {/* Header — no shell embutido o cabeçalho fica em GerenteShellScreen */}
+      {!embedded && painelGerente && (
         <View style={styles.mainHeader}>
           <View style={styles.headerContent}>
             <View style={styles.profilePhoto}>
@@ -1715,57 +1639,9 @@ const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }
         </View>
       )}
 
-      {/* Navigation Tabs */}
-      <View style={styles.tabs}>
-        <TouchableOpacity
-          style={[styles.tab, activeSection === 'dashboard' && styles.activeTab]}
-          onPress={() => setActiveSection('dashboard')}
-        >
-          <Text style={[styles.tabText, activeSection === 'dashboard' && styles.activeTabText]}>
-            Dashboard
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeSection === 'financeiro' && styles.activeTab]}
-          onPress={() => setActiveSection('financeiro')}
-        >
-          <Text style={[styles.tabText, activeSection === 'financeiro' && styles.activeTabText]}>
-            Financeiro
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeSection === 'alunos' && styles.activeTab]}
-          onPress={() => {
-            setActiveSection('alunos');
-            loadPrecadastros();
-          }}
-        >
-          <Text style={[styles.tabText, activeSection === 'alunos' && styles.activeTabText]}>
-            Alunos
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeSection === 'relatorios' && styles.activeTab]}
-          onPress={() => setActiveSection('relatorios')}
-        >
-          <Text style={[styles.tabText, activeSection === 'relatorios' && styles.activeTabText]}>
-            Relatórios
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeSection === 'perfil' && styles.activeTab]}
-          onPress={() => setActiveSection('perfil')}
-        >
-          <Text style={[styles.tabText, activeSection === 'perfil' && styles.activeTabText]}>
-            Perfil
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Content */}
+      {/* Conteúdo por seção */}
       {activeSection === 'dashboard' && renderDashboard()}
       {activeSection === 'financeiro' && renderFinanceiro()}
-      {activeSection === 'alunos' && renderAlunos()}
       {activeSection === 'relatorios' && renderRelatorios()}
       {activeSection === 'perfil' && renderPerfil()}
 
@@ -1835,47 +1711,6 @@ const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }
           </View>
         </View>
       </Modal>
-      <Modal visible={showTurmaModal} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Selecionar turma</Text>
-            <ScrollView style={{ maxHeight: 320 }}>
-              <TouchableOpacity
-                style={styles.modalOption}
-                onPress={() => {
-                  setFiltroTurmaId(null);
-                  setShowTurmaModal(false);
-                }}
-              >
-                <Text style={styles.modalOptionText}>Todas as turmas</Text>
-              </TouchableOpacity>
-              {turmas.map(turma => (
-                <TouchableOpacity
-                  key={turma.id}
-                  style={styles.modalOption}
-                  onPress={() => {
-                    setFiltroTurmaId(turma.id ?? null);
-                    setShowTurmaModal(false);
-                  }}
-                >
-                  <Text style={styles.modalOptionText}>
-                    Turma {turma.id} - {turma.ct_nome || 'CT'} - {turma.horario}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-              {turmas.length === 0 && (
-                <Text style={styles.noData}>Nenhuma turma cadastrada.</Text>
-              )}
-            </ScrollView>
-            <TouchableOpacity
-              style={[styles.actionButton, styles.cancelButton, styles.inlineButton]}
-              onPress={() => setShowTurmaModal(false)}
-            >
-              <Text style={styles.actionButtonText}>Fechar</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
       <Modal visible={showPresencaTurmaModal} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
@@ -1917,7 +1752,7 @@ const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }
           </View>
         </View>
       </Modal>
-    </SafeScreen>
+    </ScreenRoot>
   );
 };
 
@@ -2096,6 +1931,15 @@ const styles = StyleSheet.create({
     color: colors.primary,
     marginBottom: 10,
     fontWeight: '600',
+  },
+  notifStatsWarn: {
+    fontSize: 12,
+    color: '#856404',
+    backgroundColor: '#fff3cd',
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 10,
+    lineHeight: 17,
   },
   notifMensagemInput: {
     minHeight: 100,
@@ -2582,6 +2426,200 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     flex: 1,
   },
+  relatorioScrollContent: {
+    paddingBottom: 32,
+  },
+  relatorioPageTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: colors.text,
+    marginBottom: 8,
+  },
+  relatorioPageHint: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    lineHeight: 19,
+    marginBottom: 16,
+  },
+  relatorioFinanceCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  relatorioFinanceTextWrap: {
+    flex: 1,
+    marginHorizontal: 12,
+  },
+  relatorioFinanceTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: colors.text,
+  },
+  relatorioFinanceSub: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    marginTop: 4,
+  },
+  relatorioPainel: {
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    overflow: 'hidden',
+  },
+  relatorioPainelHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    backgroundColor: colors.primaryMuted,
+  },
+  relatorioPainelHeadText: {
+    flex: 1,
+    paddingRight: 8,
+  },
+  relatorioPainelTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: colors.text,
+  },
+  relatorioPainelSubtitle: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    marginTop: 3,
+  },
+  relatorioPainelBody: {
+    paddingHorizontal: 14,
+    paddingTop: 12,
+    paddingBottom: 16,
+    backgroundColor: colors.surface,
+  },
+  relatorioBlockLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.primary,
+    letterSpacing: 0.4,
+    marginBottom: 8,
+    textTransform: 'uppercase',
+  },
+  relatorioBlockLabelSpaced: {
+    marginTop: 16,
+  },
+  relatorioDatesRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  relatorioDateCol: {
+    flex: 1,
+  },
+  relatorioMiniLabel: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginBottom: 4,
+  },
+  relatorioInput: {
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    fontSize: 15,
+    color: colors.text,
+    backgroundColor: '#fff',
+  },
+  relatorioTurmaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  relatorioPrimaryOutlineBtn: {
+    flex: 1,
+    minWidth: 140,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    borderRadius: 8,
+    paddingVertical: 11,
+    paddingHorizontal: 12,
+  },
+  relatorioPrimaryOutlineBtnText: {
+    color: colors.primary,
+    fontWeight: '600',
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  relatorioGhostBtn: {
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+  },
+  relatorioGhostBtnText: {
+    color: colors.primary,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  relatorioGerarBtn: {
+    backgroundColor: colors.primary,
+    marginTop: 16,
+    paddingVertical: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  relatorioGerarBtnText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 15,
+  },
+  relatorioDivider: {
+    height: 1,
+    backgroundColor: colors.borderStrong,
+    marginVertical: 18,
+  },
+  relatorioResultsTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: colors.text,
+    marginBottom: 12,
+  },
+  relatorioKpiRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 14,
+  },
+  relatorioKpi: {
+    flex: 1,
+    backgroundColor: colors.primaryMuted,
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 6,
+    alignItems: 'center',
+  },
+  relatorioKpiVal: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: colors.primary,
+  },
+  relatorioKpiLbl: {
+    fontSize: 10,
+    color: colors.textSecondary,
+    marginTop: 4,
+    textAlign: 'center',
+  },
+  relatorioListShell: {
+    backgroundColor: colors.background,
+    borderRadius: 8,
+    paddingHorizontal: 4,
+    paddingVertical: 4,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
   reportCard: {
     backgroundColor: '#f8f9fa',
     borderRadius: 8,
@@ -2750,29 +2788,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 14,
     opacity: 0.8,
-  },
-  tabs: {
-    flexDirection: 'row',
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderStrong,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  activeTab: {
-    borderBottomWidth: 2,
-    borderBottomColor: colors.primary,
-  },
-  tabText: {
-    fontSize: 14,
-    color: '#666',
-  },
-  activeTabText: {
-    color: colors.primary,
-    fontWeight: 'bold',
   },
   warningBox: {
     backgroundColor: '#fff3cd',

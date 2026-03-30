@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -12,8 +12,8 @@ import {
   Switch,
 } from 'react-native';
 import { useAuth } from '../utils/AuthContext';
-import { usuarioService, turmaService } from '../services/api';
-import { User, PreCadastro, Turma } from '../types';
+import { usuarioService, turmaService, ctService } from '../services/api';
+import { User, PreCadastro, Turma, CentroTreinamento } from '../types';
 import { NavigationProps } from '../types';
 import {
   apenasDigitosCpf,
@@ -39,9 +39,34 @@ import { colors } from '../theme';
 
 type TabKey = 'alunos' | 'professores' | 'gerentes' | 'precadastros';
 
-const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
+function sortUsersByName(list: User[]): User[] {
+  return [...list].sort((a, b) => {
+    const an = `${a.first_name || ''} ${a.last_name || ''}`.trim().toLocaleLowerCase();
+    const bn = `${b.first_name || ''} ${b.last_name || ''}`.trim().toLocaleLowerCase();
+    return an.localeCompare(bn, 'pt-BR');
+  });
+}
+
+function sortPreCadastrosByName(list: PreCadastro[]): PreCadastro[] {
+  return [...list].sort((a, b) => {
+    const an = (a.nome || `${a.first_name || ''} ${a.last_name || ''}`.trim()).toLocaleLowerCase();
+    const bn = (b.nome || `${b.first_name || ''} ${b.last_name || ''}`.trim()).toLocaleLowerCase();
+    return an.localeCompare(bn, 'pt-BR');
+  });
+}
+
+const GerenciarUsuariosScreen: React.FC<NavigationProps> = ({ embedded }) => {
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
+
+  const wrap = (children: React.ReactNode) =>
+    embedded ? (
+      <View style={styles.container}>{children}</View>
+    ) : (
+      <SafeScreen tabScreen style={styles.container}>
+        {children}
+      </SafeScreen>
+    );
   const formModalScrollRef = useRef<ScrollView>(null);
   const matriculaModalScrollRef = useRef<ScrollView>(null);
   const [activeTab, setActiveTab] = useState<TabKey>('alunos');
@@ -92,6 +117,50 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
   });
   const [turmasParaMatricula, setTurmasParaMatricula] = useState<Turma[]>([]);
   const [filtroStatusPrecadastro, setFiltroStatusPrecadastro] = useState<string>('');
+  const [ctsFiltroAlunos, setCtsFiltroAlunos] = useState<CentroTreinamento[]>([]);
+  const [turmasFiltroCatalogo, setTurmasFiltroCatalogo] = useState<Turma[]>([]);
+  const [filtroAlunoCtId, setFiltroAlunoCtId] = useState<number | null>(null);
+  const [filtroAlunoTurmaId, setFiltroAlunoTurmaId] = useState<number | null>(null);
+
+  const selecionarCtFiltroAlunos = (ctId: number | null) => {
+    setFiltroAlunoCtId(ctId);
+    setFiltroAlunoTurmaId(null);
+  };
+
+  useEffect(() => {
+    if (activeTab !== 'alunos') {
+      setFiltroAlunoCtId(null);
+      setFiltroAlunoTurmaId(null);
+    }
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (user?.tipo !== 'gerente' || activeTab !== 'alunos') return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const [ctsRaw, turmasRes] = await Promise.all([
+          ctService.listarCTs(),
+          turmaService.getTurmas({ page_size: 500 }),
+        ]);
+        const ctsArr = Array.isArray(ctsRaw) ? ctsRaw : (ctsRaw as { results?: CentroTreinamento[] })?.results || [];
+        const turmasArr = Array.isArray(turmasRes) ? turmasRes : (turmasRes as { results?: Turma[] })?.results || [];
+        if (cancelled) return;
+        setCtsFiltroAlunos(
+          [...ctsArr].sort((a, b) => (a.nome || '').localeCompare(b.nome || '', 'pt-BR'))
+        );
+        setTurmasFiltroCatalogo(turmasArr);
+      } catch {
+        if (!cancelled) {
+          setCtsFiltroAlunos([]);
+          setTurmasFiltroCatalogo([]);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, user?.tipo]);
 
   useEffect(() => {
     if (user?.tipo === 'gerente') {
@@ -122,13 +191,13 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
         const data = await usuarioService.listarPrecadastros(
           filtroStatusPrecadastro ? { status: filtroStatusPrecadastro } : undefined
         );
-        setPrecadastros(data);
+        setPrecadastros(sortPreCadastrosByName(data));
         setUsers([]);
       } else {
         const tipo = activeTab === 'alunos' ? 'aluno' : activeTab === 'professores' ? 'professor' : 'gerente';
         const response = await usuarioService.listarUsuarios({ tipo });
         const resolved = Array.isArray(response) ? response : response.results || response.data || [];
-        setUsers(resolved);
+        setUsers(sortUsersByName(resolved));
         setPrecadastros([]);
       }
     } catch (error: any) {
@@ -137,6 +206,35 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
       setLoading(false);
     }
   };
+
+  const turmasDoCtFiltro = useMemo(() => {
+    if (filtroAlunoCtId == null) return [];
+    return turmasFiltroCatalogo
+      .filter((t) => Number(t.ct) === Number(filtroAlunoCtId))
+      .sort((a, b) => {
+        const c = (a.horario || '').localeCompare(b.horario || '', 'pt-BR');
+        if (c !== 0) return c;
+        return (a.id || 0) - (b.id || 0);
+      });
+  }, [filtroAlunoCtId, turmasFiltroCatalogo]);
+
+  const usuariosListaExibicao = useMemo(() => {
+    if (activeTab !== 'alunos') return users;
+    let list = users;
+    if (filtroAlunoCtId != null) {
+      const idsTurmasNoCt = new Set(
+        turmasFiltroCatalogo
+          .filter((t) => Number(t.ct) === Number(filtroAlunoCtId))
+          .map((t) => t.id)
+          .filter((id): id is number => typeof id === 'number' && !Number.isNaN(id))
+      );
+      list = list.filter((u) => (u.turmas || []).some((tid) => idsTurmasNoCt.has(tid)));
+      if (filtroAlunoTurmaId != null) {
+        list = list.filter((u) => (u.turmas || []).includes(filtroAlunoTurmaId));
+      }
+    }
+    return list;
+  }, [activeTab, users, filtroAlunoCtId, filtroAlunoTurmaId, turmasFiltroCatalogo]);
 
   const resetForm = () => {
     setFormData({
@@ -610,11 +708,7 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
   };
 
   if (user?.tipo !== 'gerente') {
-    return (
-      <SafeScreen tabScreen style={styles.container}>
-        <Text style={styles.noData}>Acesso negado.</Text>
-      </SafeScreen>
-    );
+    return wrap(<Text style={styles.noData}>Acesso negado.</Text>);
   }
 
   const isoDnForm = normalizarDataNascimentoParaApi(formData.data_nascimento);
@@ -624,8 +718,8 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
     formData.data_nascimento.replace(/\D/g, '').length === 8 &&
     !isoDnForm;
 
-  return (
-    <SafeScreen tabScreen style={styles.container}>
+  return wrap(
+    <>
       <View style={styles.tabs}>
         {[
           { key: 'alunos', label: 'Alunos' },
@@ -682,6 +776,87 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
               ))}
             </ScrollView>
           </View>
+        )}
+
+        {activeTab === 'alunos' && (
+          <>
+            <View style={styles.filterRow}>
+              <Text style={styles.filterLabel}>CT:</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll}>
+                <TouchableOpacity
+                  style={[styles.filterChip, filtroAlunoCtId === null && styles.filterChipActive]}
+                  onPress={() => selecionarCtFiltroAlunos(null)}
+                >
+                  <Text
+                    style={[
+                      styles.filterChipText,
+                      filtroAlunoCtId === null && styles.filterChipTextActive,
+                    ]}
+                  >
+                    Todos
+                  </Text>
+                </TouchableOpacity>
+                {ctsFiltroAlunos.map((ct) => {
+                  const id = ct.id;
+                  if (id == null) return null;
+                  const ativo = filtroAlunoCtId === id;
+                  return (
+                    <TouchableOpacity
+                      key={id}
+                      style={[styles.filterChip, ativo && styles.filterChipActive]}
+                      onPress={() => selecionarCtFiltroAlunos(id)}
+                    >
+                      <Text
+                        style={[styles.filterChipText, ativo && styles.filterChipTextActive]}
+                        numberOfLines={1}
+                      >
+                        {ct.nome}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+            {filtroAlunoCtId != null && (
+              <View style={[styles.filterRow, styles.filterRowTight]}>
+                <Text style={styles.filterLabel}>Turma:</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll}>
+                  <TouchableOpacity
+                    style={[styles.filterChip, filtroAlunoTurmaId === null && styles.filterChipActive]}
+                    onPress={() => setFiltroAlunoTurmaId(null)}
+                  >
+                    <Text
+                      style={[
+                        styles.filterChipText,
+                        filtroAlunoTurmaId === null && styles.filterChipTextActive,
+                      ]}
+                    >
+                      Todas
+                    </Text>
+                  </TouchableOpacity>
+                  {turmasDoCtFiltro.map((t) => {
+                    const tid = t.id;
+                    if (tid == null) return null;
+                    const ativo = filtroAlunoTurmaId === tid;
+                    return (
+                      <TouchableOpacity
+                        key={tid}
+                        style={[styles.filterChip, ativo && styles.filterChipActive]}
+                        onPress={() => setFiltroAlunoTurmaId(tid)}
+                      >
+                        <Text
+                          style={[styles.filterChipText, ativo && styles.filterChipTextActive]}
+                          numberOfLines={1}
+                        >
+                          Turma {tid} · {t.horario || '-'}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            )}
+          </>
         )}
 
         {loading ? (
@@ -741,10 +916,14 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
                 ))
               )
             ) : (
-              users.length === 0 ? (
-                <Text style={styles.noData}>Nenhum usuário encontrado.</Text>
+              (activeTab === 'alunos' ? usuariosListaExibicao : users).length === 0 ? (
+                <Text style={styles.noData}>
+                  {activeTab === 'alunos' && filtroAlunoCtId != null
+                    ? 'Nenhum aluno encontrado para este CT/turma.'
+                    : 'Nenhum usuário encontrado.'}
+                </Text>
               ) : (
-                users.map((item) => (
+                (activeTab === 'alunos' ? usuariosListaExibicao : users).map((item) => (
                   <View key={item.id} style={styles.card}>
                     <Text style={styles.cardTitle}>
                       {item.first_name} {item.last_name}
@@ -1235,7 +1414,7 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
           </View>
         </View>
       </Modal>
-    </SafeScreen>
+    </>
   );
 };
 
@@ -1488,6 +1667,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 12,
     gap: 8,
+  },
+  filterRowTight: {
+    marginTop: 4,
   },
   filterLabel: {
     fontSize: 14,

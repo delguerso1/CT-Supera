@@ -530,7 +530,20 @@ export const usuarioService = {
   },
 
   registrarPushTokenExpo: async (token: string): Promise<void> => {
-    await api.post('usuarios/push-token/', { token });
+    try {
+      await api.post('usuarios/push-token/', { token });
+    } catch (err: unknown) {
+      const ax = err as {
+        response?: { status?: number; data?: unknown };
+        message?: string;
+      };
+      console.warn(
+        '[Push] POST usuarios/push-token/ falhou',
+        ax.response?.status,
+        ax.response?.data ?? ax.message
+      );
+      throw err;
+    }
   },
 
   getNotificacaoAppEstatisticas: async (): Promise<{

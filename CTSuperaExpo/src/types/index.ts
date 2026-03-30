@@ -133,7 +133,10 @@ export interface Salario {
   professor: number | User;
   valor: number;
   status: 'pendente' | 'pago';
-  data_pagamento?: string;
+  /** Primeiro dia do mês de competência (yyyy-mm-dd). */
+  competencia: string;
+  /** Preenchido ao marcar como pago. */
+  data_pagamento?: string | null;
   mes?: number;
   ano?: number;
 }
@@ -350,6 +353,8 @@ export interface ApiResponse<T> {
 export interface NavigationProps {
   navigation: any;
   route: any;
+  /** Renderização dentro do shell do gerente (sem SafeScreen próprio). */
+  embedded?: boolean;
 }
 
 export interface AuthContextType {

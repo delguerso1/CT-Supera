@@ -5,6 +5,17 @@ import { User, AuthContextType } from '../types';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+/** Garante `tipo` em minúsculas (API / AsyncStorage antigo podem variar). */
+function normalizeUserTipo(raw: User): User {
+  const t = String(raw.tipo ?? 'aluno')
+    .toLowerCase()
+    .trim();
+  let tipo: User['tipo'] = 'aluno';
+  if (t === 'gerente') tipo = 'gerente';
+  else if (t === 'professor') tipo = 'professor';
+  return { ...raw, tipo };
+}
+
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
@@ -33,7 +44,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       if (storedToken && storedUser) {
         setToken(storedToken);
-        setUser(JSON.parse(storedUser));
+        setUser(normalizeUserTipo(JSON.parse(storedUser)));
       }
     } catch (error) {
       console.error('Erro ao carregar dados de autenticação:', error);
@@ -47,11 +58,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setLoading(true);
       const response = await authService.login(username, password);
       
+      const userNorm = normalizeUserTipo(response.user);
       await AsyncStorage.setItem('token', response.token);
-      await AsyncStorage.setItem('user', JSON.stringify(response.user));
-      
+      await AsyncStorage.setItem('user', JSON.stringify(userNorm));
+
       setToken(response.token);
-      setUser(response.user);
+      setUser(userNorm);
     } catch (error) {
       console.error('Erro no login:', error);
       throw error;

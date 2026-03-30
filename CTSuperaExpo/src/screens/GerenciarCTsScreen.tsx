@@ -18,9 +18,19 @@ import { NavigationProps } from '../types';
 import SafeScreen from '../components/SafeScreen';
 import { colors } from '../theme';
 
-const GerenciarCTsScreen: React.FC<NavigationProps> = ({ navigation }) => {
+const GerenciarCTsScreen: React.FC<NavigationProps> = ({ navigation, embedded }) => {
   const { user } = useAuth();
+
+  const wrap = (children: React.ReactNode) =>
+    embedded ? (
+      <View style={styles.container}>{children}</View>
+    ) : (
+      <SafeScreen tabScreen style={styles.container}>
+        {children}
+      </SafeScreen>
+    );
   const [cts, setCts] = useState<CentroTreinamento[]>([]);
+  const [turmasCountPorCt, setTurmasCountPorCt] = useState<Record<number, number>>({});
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -47,7 +57,20 @@ const GerenciarCTsScreen: React.FC<NavigationProps> = ({ navigation }) => {
   const loadCTs = async () => {
     try {
       setLoading(true);
-      const ctsData = await ctService.listarCTs();
+      const [ctsRaw, turmasRaw] = await Promise.all([
+        ctService.listarCTs(),
+        turmaService.getTurmas({ page_size: 500 }),
+      ]);
+      const ctsData = Array.isArray(ctsRaw) ? ctsRaw : (ctsRaw as { results?: CentroTreinamento[] })?.results || [];
+      const turmasData = Array.isArray(turmasRaw) ? turmasRaw : (turmasRaw as { results?: { ct?: number }[] })?.results || [];
+      const counts: Record<number, number> = {};
+      for (const t of turmasData) {
+        const cid = t.ct != null ? Number(t.ct) : NaN;
+        if (!Number.isNaN(cid)) {
+          counts[cid] = (counts[cid] || 0) + 1;
+        }
+      }
+      setTurmasCountPorCt(counts);
       setCts(ctsData);
     } catch (error: any) {
       Alert.alert('Erro', error.response?.data?.error || 'Erro ao carregar centros de treinamento.');
@@ -164,28 +187,24 @@ const GerenciarCTsScreen: React.FC<NavigationProps> = ({ navigation }) => {
   };
 
   if (user?.tipo !== 'gerente') {
-    return (
-      <SafeScreen tabScreen style={styles.container}>
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>Acesso negado. Apenas gerentes podem gerenciar centros de treinamento.</Text>
-        </View>
-      </SafeScreen>
+    return wrap(
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>Acesso negado. Apenas gerentes podem gerenciar centros de treinamento.</Text>
+      </View>
     );
   }
 
   if (loading) {
-    return (
-      <SafeScreen tabScreen style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.loadingText}>Carregando...</Text>
-        </View>
-      </SafeScreen>
+    return wrap(
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={styles.loadingText}>Carregando...</Text>
+      </View>
     );
   }
 
-  return (
-    <SafeScreen tabScreen style={styles.container}>
+  return wrap(
+    <>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Centros de Treinamento</Text>
         <TouchableOpacity style={styles.addButton} onPress={handleCriarCT}>
@@ -207,9 +226,17 @@ const GerenciarCTsScreen: React.FC<NavigationProps> = ({ navigation }) => {
               <View style={styles.ctHeader}>
                 <View style={styles.ctInfo}>
                   <Text style={styles.ctNome}>{ct.nome}</Text>
-                  {ct.sem_financeiro && (
-                    <Text style={styles.ctDetail}>💰 Sem financeiro</Text>
-                  )}
+                  <Text style={styles.ctDetail}>
+                    Turmas: {ct.id != null ? turmasCountPorCt[ct.id] ?? 0 : 0}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.ctDetail,
+                      ct.sem_financeiro ? styles.ctFinanceOff : styles.ctFinanceOn,
+                    ]}
+                  >
+                    {ct.sem_financeiro ? 'Financeiro: desabilitado' : 'Financeiro: habilitado'}
+                  </Text>
                   {ct.endereco && (
                     <Text style={styles.ctDetail}>📍 {ct.endereco}</Text>
                   )}
@@ -337,7 +364,7 @@ const GerenciarCTsScreen: React.FC<NavigationProps> = ({ navigation }) => {
           </View>
         </View>
       </Modal>
-    </SafeScreen>
+    </>
   );
 };
 
@@ -441,6 +468,14 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     marginBottom: 4,
+  },
+  ctFinanceOn: {
+    color: '#2e7d32',
+    fontWeight: '600',
+  },
+  ctFinanceOff: {
+    color: '#c62828',
+    fontWeight: '600',
   },
   switchRow: {
     flexDirection: 'row',

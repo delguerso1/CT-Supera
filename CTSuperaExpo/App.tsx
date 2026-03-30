@@ -19,12 +19,7 @@ import RedefinirSenhaScreen from './src/screens/RedefinirSenhaScreen';
 import AtivarContaScreen from './src/screens/AtivarContaScreen';
 import DashboardAlunoScreen from './src/screens/DashboardAlunoScreen';
 import DashboardProfessorScreen from './src/screens/DashboardProfessorScreen';
-import DashboardGerenteScreen from './src/screens/DashboardGerenteScreen';
-import GerenciarTurmasScreen from './src/screens/GerenciarTurmasScreen';
-import GerenciarCTsScreen from './src/screens/GerenciarCTsScreen';
-import GerenciarSuperaNewsScreen from './src/screens/GerenciarSuperaNewsScreen';
-import GerenciarGaleriaScreen from './src/screens/GerenciarGaleriaScreen';
-import GerenciarUsuariosScreen from './src/screens/GerenciarUsuariosScreen';
+import GerenteShellScreen from './src/screens/GerenteShellScreen';
 
 export type RootStackParamList = {
   Login: undefined;
@@ -143,73 +138,6 @@ const ProfessorTabs = () => {
   );
 };
 
-const GerenteTabs = () => {
-  return (
-    <Tab.Navigator
-      screenOptions={({ route }) => ({
-        tabBarIcon: ({ color, size }) => {
-          let iconName = 'dashboard';
-
-          switch (route.name) {
-            case 'Dashboard':
-              iconName = 'dashboard';
-              break;
-            case 'Financeiro':
-              iconName = 'account-balance-wallet';
-              break;
-            case 'Alunos':
-              iconName = 'people';
-              break;
-            case 'Usuários':
-              iconName = 'people';
-              break;
-            case 'Turmas':
-              iconName = 'group';
-              break;
-            case 'CTs':
-              iconName = 'business';
-              break;
-            case 'News':
-              iconName = 'article';
-              break;
-            case 'Galeria':
-              iconName = 'photo-library';
-              break;
-            case 'Relatórios':
-              iconName = 'assessment';
-              break;
-            default:
-              iconName = 'dashboard';
-          }
-
-          return (
-            <MaterialIcons
-              name={iconName as keyof typeof MaterialIcons.glyphMap}
-              size={size}
-              color={color}
-            />
-          );
-        },
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.textMuted,
-        tabBarStyle: {
-          backgroundColor: colors.surface,
-          borderTopColor: colors.border,
-        },
-        headerShown: false,
-      })}
-    >
-      <Tab.Screen name="Dashboard" component={DashboardGerenteScreen} />
-      <Tab.Screen name="Financeiro" component={DashboardGerenteScreen} />
-      <Tab.Screen name="Usuários" component={GerenciarUsuariosScreen} />
-      <Tab.Screen name="Turmas" component={GerenciarTurmasScreen} />
-      <Tab.Screen name="CTs" component={GerenciarCTsScreen} />
-      <Tab.Screen name="News" component={GerenciarSuperaNewsScreen} />
-      <Tab.Screen name="Galeria" component={GerenciarGaleriaScreen} />
-      <Tab.Screen name="Relatórios" component={DashboardGerenteScreen} />
-    </Tab.Navigator>
-  );
-};
 
 const linking: LinkingOptions<RootStackParamList> = {
   prefixes: ['ctsupera://', 'https://ctsupera.com', 'https://www.ctsupera.com'],
@@ -235,23 +163,28 @@ const linking: LinkingOptions<RootStackParamList> = {
   },
 };
 
+/**
+ * Referência estável para o React Navigation (evita telas antigas presas ao cache).
+ * O tipo do usuário vem normalizado no AuthContext.
+ */
+function MainAppTabs() {
+  const { user } = useAuth();
+  if (!user) {
+    return <AlunoTabs />;
+  }
+  switch (user.tipo) {
+    case 'professor':
+      return <ProfessorTabs />;
+    case 'gerente':
+      return <GerenteShellScreen />;
+    case 'aluno':
+    default:
+      return <AlunoTabs />;
+  }
+}
+
 function AppNavigator() {
   const { user, loading } = useAuth();
-
-  const getDashboardComponent = () => {
-    if (!user) return AlunoTabs;
-
-    switch (user.tipo) {
-      case 'aluno':
-        return AlunoTabs;
-      case 'professor':
-        return ProfessorTabs;
-      case 'gerente':
-        return GerenteTabs;
-      default:
-        return AlunoTabs;
-    }
-  };
 
   if (loading) {
     return <LoadingScreen message="Carregando..." />;
@@ -259,9 +192,12 @@ function AppNavigator() {
 
   return (
     <NavigationContainer linking={linking}>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Navigator
+        key={user ? `session-${user.id}-${user.tipo}` : 'guest'}
+        screenOptions={{ headerShown: false }}
+      >
         {user ? (
-          <Stack.Screen name="MainApp" component={getDashboardComponent()} />
+          <Stack.Screen name="MainApp" component={MainAppTabs} />
         ) : (
           <>
             <Stack.Screen name="Login" component={LoginScreen} />

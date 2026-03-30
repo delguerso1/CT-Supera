@@ -495,18 +495,20 @@ export function downloadPdfRelatorioFinanceiro({
 
   startY = doc.lastAutoTable.finalY + 10;
 
-  const headS = ['ID', 'Professor', 'Valor', 'Data pagamento', 'Status'];
+  const headS = ['ID', 'Professor', 'Valor', 'Competência', 'Pago em', 'Status'];
   const bodyS = salList.map((s) => {
     const prof = typeof s.professor === 'object' && s.professor ? s.professor : null;
     const pid = prof ? prof.id : s.professor;
     const pnome = prof
       ? `${prof.first_name || ''} ${prof.last_name || ''}`.trim()
       : nomeProfessorPorId.get(pid) || nomeProfessorPorId.get(Number(pid)) || '—';
+    const pagoEm = s.status === 'pago' && s.data_pagamento ? String(s.data_pagamento) : '—';
     return [
       String(s.id),
       pnome,
       fmtMoney(s.valor),
-      String(s.data_pagamento || ''),
+      String(s.competencia || ''),
+      pagoEm,
       String(s.status || ''),
     ];
   });
@@ -516,7 +518,7 @@ export function downloadPdfRelatorioFinanceiro({
   autoTable(doc, {
     startY: startY + 2,
     head: [headS],
-    body: bodyS.length ? bodyS : [['—', 'Nenhum salário no período', '', '', '']],
+    body: bodyS.length ? bodyS : [['—', 'Nenhum salário no período', '', '', '', '']],
     theme: 'striped',
     headStyles: { fillColor: [46, 125, 50], fontSize: 8 },
     styles: { fontSize: 7, cellPadding: 1 },

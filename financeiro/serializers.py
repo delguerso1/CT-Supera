@@ -1,11 +1,38 @@
+from django.utils import timezone
 from rest_framework import serializers
 from .models import Salario, Despesa, Mensalidade, TransacaoC6Bank
 from usuarios.serializers import UsuarioSerializer
 
+
 class SalarioSerializer(serializers.ModelSerializer):
     class Meta:
         model = Salario
-        fields = ['id', 'professor', 'valor', 'data_pagamento', 'status']
+        fields = ['id', 'professor', 'valor', 'competencia', 'data_pagamento', 'status']
+
+    def create(self, validated_data):
+        from datetime import date
+
+        if 'competencia' not in validated_data:
+            h = timezone.now().date()
+            validated_data['competencia'] = date(h.year, h.month, 1)
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        new_status = validated_data.get('status', instance.status)
+        if new_status == 'pago' and instance.status != 'pago':
+            if validated_data.get('data_pagamento') is None and not instance.data_pagamento:
+                validated_data['data_pagamento'] = timezone.now().date()
+        return super().update(instance, validated_data)
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        prof = instance.professor
+        data['professor'] = {
+            'id': prof.id,
+            'first_name': prof.first_name or '',
+            'last_name': prof.last_name or '',
+        }
+        return data
 
 class DespesaSerializer(serializers.ModelSerializer):
     class Meta:

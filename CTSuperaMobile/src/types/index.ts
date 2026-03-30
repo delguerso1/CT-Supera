@@ -110,7 +110,8 @@ export interface Salario {
   professor: number | User;
   valor: number;
   status: 'pendente' | 'pago';
-  data_pagamento?: string;
+  competencia: string;
+  data_pagamento?: string | null;
   mes?: number;
   ano?: number;
 }

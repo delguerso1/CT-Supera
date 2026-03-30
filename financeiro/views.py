@@ -9,6 +9,7 @@ from django.db import transaction
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 from .models import Mensalidade, Despesa, Salario, TransacaoC6Bank
+from .salarios import ensure_salarios_competencia
 from .serializers import MensalidadeSerializer, DespesaSerializer, SalarioSerializer, TransacaoC6BankSerializer
 from .pagination import MensalidadePagination
 from .c6_client import c6_client, C6BankError, C6BankMethodNotAllowedError, C6BankInvalidRequestError
@@ -166,7 +167,6 @@ class SalarioListCreateView(ListCreateAPIView):
     serializer_class = SalarioSerializer
 
     def get_queryset(self):
-        queryset = Salario.objects.all()
         mes_param = self.request.query_params.get('mes')
         ano_param = self.request.query_params.get('ano')
         if mes_param and ano_param:
@@ -174,13 +174,22 @@ class SalarioListCreateView(ListCreateAPIView):
                 mes = int(mes_param)
                 ano = int(ano_param)
                 if 1 <= mes <= 12 and ano >= 2000:
-                    queryset = queryset.filter(data_pagamento__month=mes, data_pagamento__year=ano)
+                    ensure_salarios_competencia(mes, ano)
             except (TypeError, ValueError):
                 pass
-        return queryset.order_by('-data_pagamento', '-id')
+        queryset = Salario.objects.select_related('professor')
+        if mes_param and ano_param:
+            try:
+                mes = int(mes_param)
+                ano = int(ano_param)
+                if 1 <= mes <= 12 and ano >= 2000:
+                    queryset = queryset.filter(competencia__month=mes, competencia__year=ano)
+            except (TypeError, ValueError):
+                pass
+        return queryset.order_by('-competencia', '-id')
 
 class SalarioRetrieveUpdateDestroyView(RetrieveUpdateDestroyAPIView):
-    queryset = Salario.objects.all()
+    queryset = Salario.objects.select_related('professor')
     serializer_class = SalarioSerializer
 
 class PagarSalarioAPIView(APIView):
@@ -194,7 +203,8 @@ class PagarSalarioAPIView(APIView):
 
             # Atualiza o status do salário
             salario.status = 'pago'
-            salario.save()
+            salario.data_pagamento = timezone.now().date()
+            salario.save(update_fields=['status', 'data_pagamento'])
 
             serializer = SalarioSerializer(salario)
             return Response({'message': 'Salário pago com sucesso!', 'salario': serializer.data}, status=status.HTTP_200_OK)
@@ -320,9 +330,11 @@ class DashboardFinanceiroAPIView(APIView):
             mes = timezone.now().month
             ano = timezone.now().year
 
+        ensure_salarios_competencia(mes, ano)
+
         mensalidades = Mensalidade.objects.filter(data_vencimento__month=mes, data_vencimento__year=ano)
         despesas = Despesa.objects.filter(data__month=mes, data__year=ano)
-        salarios = Salario.objects.filter(data_pagamento__month=mes, data_pagamento__year=ano)
+        salarios = Salario.objects.filter(competencia__month=mes, competencia__year=ano)
 
         # Usa valor_pago quando houver (pagamento com multa/juros), senão valor base
         total_pago = mensalidades.filter(status="pago").aggregate(

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import {
   Switch,
   Modal,
   Platform,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { useAuth } from '../utils/AuthContext';
 import { userService, alunoService, pagamentoService } from '../services/api';
@@ -33,9 +34,14 @@ import {
   normalizarDataNascimentoParaApi,
   calcularIdade,
 } from '../utils/dataNascimento';
-import { registrarPushTokenAluno } from '../utils/registerExpoPush';
+import {
+  registrarPushTokenAluno,
+  iniciarListenerRegistroPushEmForeground,
+} from '../utils/registerExpoPush';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) => {
+  const insets = useSafeAreaInsets();
   const { user, logout } = useAuth();
   const [painelAluno, setPainelAluno] = useState<PainelAluno | null>(null);
   const [historicoPagamentos, setHistoricoPagamentos] = useState<HistoricoPagamentos | null>(null);
@@ -72,6 +78,9 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
     status?: string;
   } | null>(null);
   const [checkoutStatusLoading, setCheckoutStatusLoading] = useState(false);
+  /** Android: Alert aceita no máx. 3 botões — cartão sumia. Modal lista todas as opções. */
+  const [formaPagamentoModalVisible, setFormaPagamentoModalVisible] = useState(false);
+  const [mensalidadeFormaPagamento, setMensalidadeFormaPagamento] = useState<Mensalidade | null>(null);
   const [form, setForm] = useState({
     first_name: '',
     last_name: '',
@@ -118,11 +127,61 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
     }
   }, [user?.id, user?.tipo]);
 
+  /** Depois do painel carregar, o token de auth já está no Axios; reforça registro do push. */
+  useEffect(() => {
+    if (user?.tipo !== 'aluno' || !painelAluno) return;
+    const t = setTimeout(() => {
+      void registrarPushTokenAluno();
+    }, 800);
+    return () => clearTimeout(t);
+  }, [user?.tipo, user?.id, painelAluno?.usuario?.id]);
+
+  useEffect(() => {
+    if (user?.tipo !== 'aluno') return;
+    return iniciarListenerRegistroPushEmForeground();
+  }, [user?.tipo]);
+
   useEffect(() => {
     if (activeSection === 'pagamentos' && user) {
       loadHistoricoPagamentos();
     }
   }, [activeSection, user]);
+
+  /** Idade para o perfil: data do formulário (edição) ou cadastro / campo idade do painel. */
+  const idadePerfilAluno = useMemo(() => {
+    if (!painelAluno) return null;
+    const isoForm = normalizarDataNascimentoParaApi(form.data_nascimento);
+    if (isoForm) return calcularIdade(isoForm);
+    const saved = painelAluno.usuario.data_nascimento;
+    if (saved) {
+      const m = String(saved).match(/^(\d{4}-\d{2}-\d{2})/);
+      if (m) return calcularIdade(m[1]);
+    }
+    if (typeof painelAluno.idade === 'number') return painelAluno.idade;
+    return null;
+  }, [painelAluno, form.data_nascimento]);
+
+  /** Perfil: rolar até o campo focado para não ficar atrás do teclado. */
+  const perfilScrollRef = useRef<ScrollView>(null);
+  const perfilInfoSectionY = useRef(0);
+  const perfilFieldY = useRef<Record<string, number>>({});
+
+  const scrollPerfilFieldIntoView = useCallback((fieldKey: string) => {
+    const rel = perfilFieldY.current[fieldKey];
+    if (rel === undefined) return;
+    const y = perfilInfoSectionY.current + rel;
+    const doScroll = () => {
+      perfilScrollRef.current?.scrollTo({
+        y: Math.max(0, y - 16),
+        animated: true,
+      });
+    };
+    requestAnimationFrame(() => {
+      doScroll();
+      setTimeout(doScroll, 120);
+      setTimeout(doScroll, 320);
+    });
+  }, []);
 
   const loadAlunoData = async () => {
     try {
@@ -280,22 +339,26 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
   const handleSaveProfile = async () => {
     if (!painelAluno) return;
     if (form.data_nascimento.trim()) {
-      const isoDn = normalizarDataNascimentoParaApi(form.data_nascimento);
-      if (!isoDn) {
+      const isoDigitada = normalizarDataNascimentoParaApi(form.data_nascimento);
+      if (!isoDigitada) {
         Alert.alert('Atenção', 'Informe a data de nascimento completa e válida (DD/MM/AAAA).');
         return;
       }
-      const idade = calcularIdade(isoDn);
-      if (idade !== null && idade < 18) {
-        if (!form.nome_responsavel?.trim() || !form.telefone_responsavel?.trim()) {
-          Alert.alert('Atenção', 'Para menores de 18 anos, informe nome e telefone do responsável.');
-          return;
-        }
-      }
-      if (idade !== null && idade >= 18 && !form.telefone_emergencia?.trim()) {
-        Alert.alert('Atenção', 'Informe o telefone de emergência.');
+    }
+    const isoForm = normalizarDataNascimentoParaApi(form.data_nascimento);
+    const saved = painelAluno.usuario.data_nascimento;
+    const isoSalva = saved ? String(saved).match(/^(\d{4}-\d{2}-\d{2})/)?.[1] : undefined;
+    const isoEfetivo = isoForm || isoSalva || null;
+    const idade = isoEfetivo ? calcularIdade(isoEfetivo) : null;
+    if (idade !== null && idade < 18) {
+      if (!form.nome_responsavel?.trim() || !form.telefone_responsavel?.trim()) {
+        Alert.alert('Atenção', 'Para menores de 18 anos, informe nome e telefone do responsável.');
         return;
       }
+    }
+    if (idade !== null && idade >= 18 && !form.telefone_emergencia?.trim()) {
+      Alert.alert('Atenção', 'Informe o telefone de emergência.');
+      return;
     }
     try {
       setSavingProfile(true);
@@ -606,9 +669,23 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
     if (!painelAluno) return null;
     const aluno = painelAluno.usuario;
     const baseUrl = CONFIG.API_BASE_URL.replace('/api/', '');
+    /** Header (~90) + abas (~50): compensação do teclado no iOS. */
+    const perfilKeyboardOffsetIOS = insets.top + 118;
 
     return (
-      <ScrollView style={styles.content}>
+      <KeyboardAvoidingView
+        style={styles.perfilKeyboardRoot}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? perfilKeyboardOffsetIOS : 0}
+      >
+        <ScrollView
+          ref={perfilScrollRef}
+          style={styles.perfilScrollView}
+          contentContainerStyle={styles.perfilScrollInner}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
+          showsVerticalScrollIndicator
+        >
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Foto de Perfil</Text>
           <View style={styles.photoRow}>
@@ -703,52 +780,92 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
           )}
         </View>
 
-        <View style={styles.section}>
+        <View
+          style={styles.section}
+          onLayout={(e) => {
+            perfilInfoSectionY.current = e.nativeEvent.layout.y;
+          }}
+        >
           <Text style={styles.sectionTitle}>Informações Pessoais</Text>
           {editMode ? (
             <>
-              <View style={styles.formGroup}>
+              <View
+                style={styles.formGroup}
+                onLayout={(e) => {
+                  perfilFieldY.current.nome = e.nativeEvent.layout.y;
+                }}
+              >
                 <Text style={styles.formLabel}>Nome</Text>
                 <TextInput
                   style={styles.formInput}
                   value={form.first_name}
                   onChangeText={(value) => handleFormChange('first_name', value)}
+                  onFocus={() => scrollPerfilFieldIntoView('nome')}
                 />
               </View>
-              <View style={styles.formGroup}>
+              <View
+                style={styles.formGroup}
+                onLayout={(e) => {
+                  perfilFieldY.current.sobrenome = e.nativeEvent.layout.y;
+                }}
+              >
                 <Text style={styles.formLabel}>Sobrenome</Text>
                 <TextInput
                   style={styles.formInput}
                   value={form.last_name}
                   onChangeText={(value) => handleFormChange('last_name', value)}
+                  onFocus={() => scrollPerfilFieldIntoView('sobrenome')}
                 />
               </View>
-              <View style={styles.formGroup}>
+              <View
+                style={styles.formGroup}
+                onLayout={(e) => {
+                  perfilFieldY.current.email = e.nativeEvent.layout.y;
+                }}
+              >
                 <Text style={styles.formLabel}>Email</Text>
                 <TextInput
                   style={styles.formInput}
                   keyboardType="email-address"
                   value={form.email}
                   onChangeText={(value) => handleFormChange('email', value)}
+                  onFocus={() => scrollPerfilFieldIntoView('email')}
                 />
               </View>
-              <View style={styles.formGroup}>
+              <View
+                style={styles.formGroup}
+                onLayout={(e) => {
+                  perfilFieldY.current.telefone = e.nativeEvent.layout.y;
+                }}
+              >
                 <Text style={styles.formLabel}>Telefone</Text>
                 <TextInput
                   style={styles.formInput}
                   value={form.telefone}
                   onChangeText={(value) => handleFormChange('telefone', value)}
+                  onFocus={() => scrollPerfilFieldIntoView('telefone')}
                 />
               </View>
-              <View style={styles.formGroup}>
+              <View
+                style={styles.formGroup}
+                onLayout={(e) => {
+                  perfilFieldY.current.endereco = e.nativeEvent.layout.y;
+                }}
+              >
                 <Text style={styles.formLabel}>Endereço</Text>
                 <TextInput
                   style={styles.formInput}
                   value={form.endereco}
                   onChangeText={(value) => handleFormChange('endereco', value)}
+                  onFocus={() => scrollPerfilFieldIntoView('endereco')}
                 />
               </View>
-              <View style={styles.formGroup}>
+              <View
+                style={styles.formGroup}
+                onLayout={(e) => {
+                  perfilFieldY.current.dataNascimento = e.nativeEvent.layout.y;
+                }}
+              >
                 <Text style={styles.formLabel}>Data de Nascimento (DD/MM/AAAA)</Text>
                 <TextInput
                   style={styles.formInput}
@@ -759,32 +876,75 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
                   onChangeText={(value) =>
                     setForm((prev) => ({ ...prev, data_nascimento: formatarDataBrMascara(value) }))
                   }
+                  onFocus={() => scrollPerfilFieldIntoView('dataNascimento')}
                 />
               </View>
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Nome do Responsável</Text>
-                <TextInput
-                  style={styles.formInput}
-                  value={form.nome_responsavel}
-                  onChangeText={(value) => handleFormChange('nome_responsavel', value)}
-                />
-              </View>
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Telefone do Responsável</Text>
-                <TextInput
-                  style={styles.formInput}
-                  value={form.telefone_responsavel}
-                  onChangeText={(value) => handleFormChange('telefone_responsavel', value)}
-                />
-              </View>
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Telefone de Emergência</Text>
-                <TextInput
-                  style={styles.formInput}
-                  value={form.telefone_emergencia}
-                  onChangeText={(value) => handleFormChange('telefone_emergencia', value)}
-                />
-              </View>
+              {idadePerfilAluno === null && (
+                <Text style={styles.perfilIdadeHint}>
+                  Informe a data de nascimento para cadastrar dados do responsável (menores) ou telefone de
+                  emergência (18 anos ou mais).
+                </Text>
+              )}
+              {idadePerfilAluno !== null && idadePerfilAluno < 18 && (
+                <Text style={styles.perfilIdadeHint}>
+                  Menor de idade — informe nome e telefone do responsável.
+                </Text>
+              )}
+              {idadePerfilAluno !== null && idadePerfilAluno >= 18 && (
+                <Text style={styles.perfilIdadeHint}>
+                  Maior de idade — informe um telefone de emergência.
+                </Text>
+              )}
+              {idadePerfilAluno !== null && idadePerfilAluno < 18 && (
+                <>
+                  <View
+                    style={styles.formGroup}
+                    onLayout={(e) => {
+                      perfilFieldY.current.nomeResp = e.nativeEvent.layout.y;
+                    }}
+                  >
+                    <Text style={styles.formLabel}>Nome do Responsável</Text>
+                    <TextInput
+                      style={styles.formInput}
+                      value={form.nome_responsavel}
+                      onChangeText={(value) => handleFormChange('nome_responsavel', value)}
+                      onFocus={() => scrollPerfilFieldIntoView('nomeResp')}
+                    />
+                  </View>
+                  <View
+                    style={styles.formGroup}
+                    onLayout={(e) => {
+                      perfilFieldY.current.telResp = e.nativeEvent.layout.y;
+                    }}
+                  >
+                    <Text style={styles.formLabel}>Telefone do Responsável</Text>
+                    <TextInput
+                      style={styles.formInput}
+                      keyboardType="phone-pad"
+                      value={form.telefone_responsavel}
+                      onChangeText={(value) => handleFormChange('telefone_responsavel', value)}
+                      onFocus={() => scrollPerfilFieldIntoView('telResp')}
+                    />
+                  </View>
+                </>
+              )}
+              {idadePerfilAluno !== null && idadePerfilAluno >= 18 && (
+                <View
+                  style={styles.formGroup}
+                  onLayout={(e) => {
+                    perfilFieldY.current.telEmerg = e.nativeEvent.layout.y;
+                  }}
+                >
+                  <Text style={styles.formLabel}>Telefone de Emergência</Text>
+                  <TextInput
+                    style={styles.formInput}
+                    keyboardType="phone-pad"
+                    value={form.telefone_emergencia}
+                    onChangeText={(value) => handleFormChange('telefone_emergencia', value)}
+                    onFocus={() => scrollPerfilFieldIntoView('telEmerg')}
+                  />
+                </View>
+              )}
               <View style={styles.formActions}>
                 <TouchableOpacity
                   style={[styles.formButton, styles.formButtonSecondary]}
@@ -820,18 +980,24 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
                   {isoParaBrDisplay(aluno.data_nascimento) || '-'}
                 </Text>
               </View>
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Nome do Responsável:</Text>
-                <Text style={styles.infoValue}>{aluno.nome_responsavel || '-'}</Text>
-              </View>
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Telefone do Responsável:</Text>
-                <Text style={styles.infoValue}>{aluno.telefone_responsavel || '-'}</Text>
-              </View>
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Telefone de Emergência:</Text>
-                <Text style={styles.infoValue}>{aluno.telefone_emergencia || '-'}</Text>
-              </View>
+              {idadePerfilAluno !== null && idadePerfilAluno < 18 && (
+                <>
+                  <View style={styles.infoRow}>
+                    <Text style={styles.infoLabel}>Nome do Responsável:</Text>
+                    <Text style={styles.infoValue}>{aluno.nome_responsavel || '-'}</Text>
+                  </View>
+                  <View style={styles.infoRow}>
+                    <Text style={styles.infoLabel}>Telefone do Responsável:</Text>
+                    <Text style={styles.infoValue}>{aluno.telefone_responsavel || '-'}</Text>
+                  </View>
+                </>
+              )}
+              {idadePerfilAluno !== null && idadePerfilAluno >= 18 && (
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoLabel}>Telefone de Emergência:</Text>
+                  <Text style={styles.infoValue}>{aluno.telefone_emergencia || '-'}</Text>
+                </View>
+              )}
               {painelAluno.turma && (
                 <View style={styles.infoRow}>
                   <Text style={styles.infoLabel}>Turma:</Text>
@@ -844,7 +1010,8 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
             </>
           )}
         </View>
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
     );
   };
 
@@ -1070,16 +1237,18 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
   };
 
   const handlePagarMensalidade = (mensalidade: Mensalidade) => {
-    Alert.alert(
-      'Forma de Pagamento',
-      `Escolha a forma de pagamento para a mensalidade de R$ ${Number(mensalidade.valor_efetivo ?? mensalidade.valor).toFixed(2)}`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        { text: 'PIX', onPress: () => gerarPix(mensalidade) },
-        { text: 'Boleto', onPress: () => gerarBoleto(mensalidade) },
-        { text: 'Cartão', onPress: () => criarCheckout(mensalidade) },
-      ]
-    );
+    setMensalidadeFormaPagamento(mensalidade);
+    setFormaPagamentoModalVisible(true);
+  };
+
+  const escolherFormaPagamento = (acao: 'pix' | 'boleto' | 'cartao') => {
+    const m = mensalidadeFormaPagamento;
+    setFormaPagamentoModalVisible(false);
+    setMensalidadeFormaPagamento(null);
+    if (!m) return;
+    if (acao === 'pix') void gerarPix(m);
+    else if (acao === 'boleto') void gerarBoleto(m);
+    else void criarCheckout(m);
   };
 
   const gerarPix = async (mensalidade: Mensalidade) => {
@@ -1457,6 +1626,53 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
       {activeSection === 'checkin' && renderCheckin()}
       {activeSection === 'pagamentos' && renderPagamentos()}
 
+      <Modal visible={formaPagamentoModalVisible} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { marginBottom: Math.max(insets.bottom, 8) }]}>
+            <Text style={styles.modalTitle}>Forma de pagamento</Text>
+            <Text style={styles.modalSubtitle}>
+              {`Mensalidade de R$ ${
+                mensalidadeFormaPagamento
+                  ? Number(
+                      mensalidadeFormaPagamento.valor_efetivo ?? mensalidadeFormaPagamento.valor
+                    ).toFixed(2)
+                  : '—'
+              }`}
+            </Text>
+            <Text style={styles.modalHint}>
+              Cartão de crédito abre o checkout seguro do banco no navegador.
+            </Text>
+            <TouchableOpacity
+              style={styles.paymentOptionButton}
+              onPress={() => escolherFormaPagamento('pix')}
+            >
+              <Text style={styles.paymentOptionButtonText}>PIX</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.paymentOptionButton}
+              onPress={() => escolherFormaPagamento('boleto')}
+            >
+              <Text style={styles.paymentOptionButtonText}>Boleto</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.paymentOptionButton, styles.paymentOptionButtonHighlight]}
+              onPress={() => escolherFormaPagamento('cartao')}
+            >
+              <Text style={styles.paymentOptionButtonText}>Cartão de crédito</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.modalButtonStack, styles.modalButtonStackSecondary]}
+              onPress={() => {
+                setFormaPagamentoModalVisible(false);
+                setMensalidadeFormaPagamento(null);
+              }}
+            >
+              <Text style={styles.modalButtonText}>Cancelar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       <Modal visible={pixModalVisible} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
@@ -1518,7 +1734,7 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
               </TouchableOpacity>
             </View>
             <TouchableOpacity
-              style={[styles.modalButton, styles.modalButtonSecondary, styles.modalCloseButton]}
+              style={[styles.modalButtonStack, styles.modalButtonStackSecondary]}
               onPress={handleDownloadBoletoPdf}
               disabled={boletoDownloading}
             >
@@ -1527,7 +1743,7 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.modalButton, styles.modalButtonSecondary, styles.modalCloseButton]}
+              style={[styles.modalButtonStack, styles.modalButtonStackSecondary]}
               onPress={() => {
                 setBoletoModalVisible(false);
                 setBoletoData(null);
@@ -1547,13 +1763,20 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
               Abra o link para efetuar o pagamento e depois consulte o status.
             </Text>
             <TouchableOpacity
-              style={styles.modalButton}
-              onPress={() => Linking.openURL(checkoutData?.payment_url || '')}
+              style={[styles.modalButtonStack, styles.modalButtonStackPrimary]}
+              onPress={() => {
+                const url = checkoutData?.payment_url?.trim();
+                if (!url) {
+                  Alert.alert('Erro', 'Link de pagamento indisponível. Tente gerar novamente.');
+                  return;
+                }
+                Linking.openURL(url);
+              }}
             >
               <Text style={styles.modalButtonText}>Abrir pagamento</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.modalButton, styles.modalButtonSecondary, styles.modalCloseButton]}
+              style={[styles.modalButtonStack, styles.modalButtonStackSecondary]}
               onPress={handleConsultarCheckoutStatus}
               disabled={checkoutStatusLoading}
             >
@@ -1562,7 +1785,7 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.modalButton, styles.modalButtonSecondary, styles.modalCloseButton]}
+              style={[styles.modalButtonStack, styles.modalButtonStackSecondary]}
               onPress={() => {
                 setCheckoutModalVisible(false);
                 setCheckoutData(null);
@@ -1662,6 +1885,17 @@ const styles = StyleSheet.create({
   activeTabText: {
     color: colors.primary,
     fontWeight: 'bold',
+  },
+  perfilKeyboardRoot: {
+    flex: 1,
+  },
+  perfilScrollView: {
+    flex: 1,
+  },
+  perfilScrollInner: {
+    flexGrow: 1,
+    padding: 16,
+    paddingBottom: 280,
   },
   content: {
     flex: 1,
@@ -1873,6 +2107,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666',
     marginBottom: 6,
+  },
+  perfilIdadeHint: {
+    fontSize: 13,
+    color: colors.textMuted,
+    marginBottom: 12,
+    lineHeight: 18,
   },
   formInput: {
     borderWidth: 1,
@@ -2124,13 +2364,40 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: colors.primary,
+    color: '#1F6C86',
     marginBottom: 8,
   },
   modalSubtitle: {
     fontSize: 14,
-    color: '#666',
+    color: '#333333',
+    marginBottom: 8,
+  },
+  modalHint: {
+    fontSize: 12,
+    color: '#555555',
     marginBottom: 16,
+    lineHeight: 18,
+  },
+  paymentOptionButton: {
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    borderRadius: 10,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    marginBottom: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 52,
+  },
+  paymentOptionButtonHighlight: {
+    borderColor: colors.primary,
+    backgroundColor: '#e8f4f8',
+  },
+  paymentOptionButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1F6C86',
   },
   qrContainer: {
     alignItems: 'center',
@@ -2146,6 +2413,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
+  /** Linha com dois botões (ex.: PIX modal) */
   modalButton: {
     flex: 1,
     backgroundColor: colors.primary,
@@ -2159,9 +2427,32 @@ const styles = StyleSheet.create({
     marginRight: 0,
     marginLeft: 8,
   },
+  /**
+   * Botões empilhados em coluna: evitar flex:1 sem pai com altura definida —
+   * no Android o layout pode colapsar e o texto some.
+   */
+  modalButtonStack: {
+    alignSelf: 'stretch',
+    borderRadius: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 10,
+    minHeight: 48,
+  },
+  modalButtonStackPrimary: {
+    backgroundColor: colors.primary,
+    marginTop: 16,
+  },
+  modalButtonStackSecondary: {
+    backgroundColor: '#757575',
+    marginLeft: 0,
+    marginRight: 0,
+  },
   modalButtonText: {
-    color: '#fff',
-    fontSize: 14,
+    color: '#ffffff',
+    fontSize: 15,
     fontWeight: 'bold',
   },
   boletoLine: {

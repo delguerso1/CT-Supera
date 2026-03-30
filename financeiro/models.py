@@ -139,11 +139,27 @@ class Despesa(models.Model):
 class Salario(models.Model):
     professor = models.ForeignKey(Usuario, on_delete=models.CASCADE, limit_choices_to={"tipo": "professor"})
     valor = models.DecimalField(max_digits=10, decimal_places=2)
-    data_pagamento = models.DateField()
+    competencia = models.DateField(
+        help_text="Primeiro dia do mês de competência (ex.: 01/03/2026 para março/2026).",
+    )
+    data_pagamento = models.DateField(
+        null=True,
+        blank=True,
+        help_text="Data em que o pagamento foi efetivado (preenchido ao marcar como pago).",
+    )
     status = models.CharField(max_length=20, choices=[('pendente', 'Pendente'), ('pago', 'Pago')], default='pendente')
 
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["professor", "competencia"],
+                name="financeiro_salario_unique_professor_competencia",
+            )
+        ]
+
     def __str__(self):
-        return f"{self.professor.get_full_name()} - R${self.valor} em {self.data_pagamento} ({self.status})"
+        comp = self.competencia.strftime("%m/%Y") if self.competencia else "?"
+        return f"{self.professor.get_full_name()} - R${self.valor} ({comp}) ({self.status})"
 
 
 class TransacaoPix(models.Model):

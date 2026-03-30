@@ -557,7 +557,7 @@ class MensalidadeSerializer(serializers.ModelSerializer):
 class SalarioSerializer(serializers.ModelSerializer):
     class Meta:
         model = Salario
-        fields = ['id', 'professor', 'valor', 'data_pagamento', 'status']
+        fields = ['id', 'professor', 'valor', 'competencia', 'data_pagamento', 'status']
 
 class DefinirSenhaSerializer(serializers.Serializer):
     """Serializer para definição de senha via API"""

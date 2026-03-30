@@ -95,6 +95,10 @@ CORS_ALLOW_HEADERS = [
     'x-requested-with',
 ]
 
+# Atrás do Nginx com TLS: o Gunicorn recebe HTTP; este header indica HTTPS ao cliente.
+# O nginx deve enviar: proxy_set_header X-Forwarded-Proto $scheme;
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
 # Configurações de segurança para produção
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True

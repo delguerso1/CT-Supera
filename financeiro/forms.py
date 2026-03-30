@@ -41,14 +41,16 @@ MensalidadeFormSet = modelformset_factory(
 class SalarioForm(forms.ModelForm):
     class Meta:
         model = Salario
-        fields = ['professor', 'valor', 'data_pagamento', 'status']
+        fields = ['professor', 'valor', 'competencia', 'data_pagamento', 'status']
         widgets = {
+            'competencia': forms.DateInput(attrs={'type': 'date'}),
             'data_pagamento': forms.DateInput(attrs={'type': 'date'}),
         }
         labels = {
             'professor': 'Professor',
             'valor': 'Valor',
-            'data_pagamento': 'Data de Pagamento',
+            'competencia': 'Competência (mês)',
+            'data_pagamento': 'Data efetiva do pagamento (ao marcar pago)',
         }
 
 

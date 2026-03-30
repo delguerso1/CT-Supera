@@ -44,8 +44,18 @@ class ListaCriarTurmasAPIView(ListCreateAPIView):
         return [IsAuthenticated()] 
 
     def get_queryset(self):
-        queryset = Turma.objects.filter(ativo=True)  # Filtra apenas turmas ativas
-        
+        queryset = Turma.objects.all()
+        incluir = str(self.request.query_params.get('incluir_inativas', '')).lower() in (
+            '1', 'true', 'yes',
+        )
+        user = self.request.user
+        is_gerente = (
+            user.is_authenticated
+            and getattr(user, 'tipo', None) == 'gerente'
+        )
+        if not (incluir and is_gerente):
+            queryset = queryset.filter(ativo=True)
+
         # Filtra por CT se especificado
         ct_id = self.request.query_params.get('ct')
         if ct_id:
@@ -83,8 +93,9 @@ class ListaAlunosTurmaAPIView(APIView):
     def get(self, request, turma_id):
         turma = get_object_or_404(Turma, id=turma_id)
 
-        # Verifica se a turma está ativa
-        if not turma.ativo:
+        user = request.user
+        is_gerente = user.is_authenticated and getattr(user, 'tipo', None) == 'gerente'
+        if not turma.ativo and not is_gerente:
             return Response({"error": "Esta turma está inativa."}, status=status.HTTP_400_BAD_REQUEST)
 
         # Filtra apenas alunos ativos e inclui todos os campos necessários

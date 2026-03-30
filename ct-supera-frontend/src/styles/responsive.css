@@ -77,21 +77,25 @@
   }
 
   /* HomePage mobile */
-  .hero {
+  .hero,
+  .home-hero {
     padding: 2rem 1rem !important;
   }
   
-  .hero-title {
+  .hero-title,
+  .home-hero__title {
     font-size: 2rem !important;
     margin-bottom: 0.5rem !important;
   }
   
-  .hero-subtitle {
+  .hero-subtitle,
+  .home-hero__subtitle {
     font-size: 1rem !important;
     margin-bottom: 1.5rem !important;
   }
   
-  .section-title {
+  .section-title,
+  .home-section__title {
     font-size: 1.5rem !important;
     margin-bottom: 1rem !important;
   }
@@ -742,7 +746,8 @@
   }
 
   /* HomePage mobile melhorias */
-  .hero {
+  .hero,
+  .home-hero {
     padding: 2.5rem 1rem !important;
   }
 
@@ -784,11 +789,13 @@
     padding: 0 1rem !important;
   }
   
-  .hero-title {
+  .hero-title,
+  .home-hero__title {
     font-size: 2.25rem !important;
   }
   
-  .section-title {
+  .section-title,
+  .home-section__title {
     font-size: 1.75rem !important;
   }
   
@@ -889,16 +896,19 @@
 
 /* Landscape mobile */
 @media (max-width: 768px) and (orientation: landscape) {
-  .hero {
+  .hero,
+  .home-hero {
     padding: 1.5rem 1rem !important;
   }
   
-  .hero-title {
+  .hero-title,
+  .home-hero__title {
     font-size: 1.75rem !important;
     margin-bottom: 0.5rem !important;
   }
   
-  .hero-subtitle {
+  .hero-subtitle,
+  .home-hero__subtitle {
     font-size: 0.95rem !important;
     margin-bottom: 1rem !important;
   }
@@ -929,11 +939,13 @@
 
 /* Melhorias para telas muito pequenas (iPhone SE, etc) */
 @media (max-width: 375px) {
-  .hero-title {
+  .hero-title,
+  .home-hero__title {
     font-size: 1.75rem !important;
   }
 
-  .section-title {
+  .section-title,
+  .home-section__title {
     font-size: 1.35rem !important;
   }
 

@@ -666,18 +666,20 @@ function ControleFinanceiro({ user, onDataChange }) {
             <tr style={{ background: '#c8e6c9' }}>
               <th style={{ padding: 10, textAlign: 'left' }}>Professor</th>
               <th style={{ padding: 10, textAlign: 'right' }}>Valor</th>
-              <th style={{ padding: 10, textAlign: 'center' }}>Data Pagamento</th>
+              <th style={{ padding: 10, textAlign: 'center' }}>Competência</th>
+              <th style={{ padding: 10, textAlign: 'center' }}>Pago em</th>
               <th style={{ padding: 10, textAlign: 'center' }}>Status</th>
             </tr>
           </thead>
           <tbody>
             {salarios.length === 0 && (
               <tr>
-                <td colSpan={4} style={{ color: '#888', textAlign: 'center', padding: 16 }}>
+                <td colSpan={5} style={{ color: '#888', textAlign: 'center', padding: 16 }}>
                   Nenhum salário encontrado para este mês.
                   <br />
                   <small style={{ fontSize: '12px' }}>
-                    Salários são criados automaticamente quando professores são cadastrados com salário definido.
+                    Ao abrir o mês no financeiro, o sistema gera parcelas pendentes para professores ativos com
+                    salário cadastrado.
                   </small>
                 </td>
               </tr>
@@ -686,7 +688,12 @@ function ControleFinanceiro({ user, onDataChange }) {
               <tr key={s.id} style={{ borderBottom: '1px solid #eee' }}>
                 <td style={{ padding: 10 }}>{typeof s.professor === 'object' ? s.professor.first_name + ' ' + s.professor.last_name : s.professor}</td>
                 <td style={{ padding: 10, textAlign: 'right' }}>{formatCurrency(s.valor)}</td>
-                <td style={{ padding: 10, textAlign: 'center' }}>{formatDate(s.data_pagamento)}</td>
+                <td style={{ padding: 10, textAlign: 'center' }}>
+                  {s.competencia ? formatDate(s.competencia) : '—'}
+                </td>
+                <td style={{ padding: 10, textAlign: 'center' }}>
+                  {s.status === 'pago' && s.data_pagamento ? formatDate(s.data_pagamento) : '—'}
+                </td>
                 <td style={{ padding: 10, textAlign: 'center' }}>
                   {formatStatus(s.status)}
                   {s.status === 'pendente' && (

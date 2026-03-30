@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -24,8 +24,17 @@ interface DiaSemana {
   nome: string;
 }
 
-const GerenciarTurmasScreen: React.FC<NavigationProps> = ({ navigation }) => {
+const GerenciarTurmasScreen: React.FC<NavigationProps> = ({ navigation, embedded }) => {
   const { user } = useAuth();
+
+  const wrap = (children: React.ReactNode) =>
+    embedded ? (
+      <View style={styles.container}>{children}</View>
+    ) : (
+      <SafeScreen tabScreen style={styles.container}>
+        {children}
+      </SafeScreen>
+    );
   const [turmas, setTurmas] = useState<Turma[]>([]);
   const [cts, setCts] = useState<CentroTreinamento[]>([]);
   const [professores, setProfessores] = useState<User[]>([]);
@@ -55,18 +64,22 @@ const GerenciarTurmasScreen: React.FC<NavigationProps> = ({ navigation }) => {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [turmasData, ctsData, professoresData, diasSemanaData, alunosData] = await Promise.all([
-        turmaService.getTurmas(),
+      const [turmasRaw, ctsRaw, professoresData, diasSemanaData, alunosData] = await Promise.all([
+        turmaService.getTurmas({ incluir_inativas: true, page_size: 500 }),
         ctService.listarCTs(),
         professorService.listarProfessores(),
         turmaService.getDiasSemana(),
         usuarioService.listarAlunos(),
       ]);
+      const turmasData = Array.isArray(turmasRaw) ? turmasRaw : (turmasRaw as { results?: Turma[] })?.results || [];
+      const ctsData = Array.isArray(ctsRaw) ? ctsRaw : (ctsRaw as { results?: CentroTreinamento[] })?.results || [];
       setTurmas(turmasData);
       setCts(ctsData);
-      setProfessores(professoresData);
+      setProfessores(
+        Array.isArray(professoresData) ? professoresData : (professoresData as { results?: User[] })?.results || []
+      );
       setDiasSemana(diasSemanaData);
-      setAlunos(alunosData);
+      setAlunos(Array.isArray(alunosData) ? alunosData : (alunosData as { results?: User[] })?.results || []);
     } catch (error: any) {
       Alert.alert('Erro', error.response?.data?.error || 'Erro ao carregar dados.');
     } finally {
@@ -108,6 +121,63 @@ const GerenciarTurmasScreen: React.FC<NavigationProps> = ({ navigation }) => {
     return Number(c) || 0;
   };
 
+  const secoesTurmas = useMemo(() => {
+    const normCts = Array.isArray(cts) ? cts : [];
+    const sortedCts = [...normCts].sort((a, b) =>
+      (a.nome || '').localeCompare(b.nome || '', 'pt-BR')
+    );
+
+    const porCtId = new Map<number, Turma[]>();
+    const semCentro: Turma[] = [];
+
+    for (const t of turmas) {
+      const id = ctIdDaTurma(t);
+      if (id === 0) {
+        semCentro.push(t);
+        continue;
+      }
+      if (!porCtId.has(id)) porCtId.set(id, []);
+      porCtId.get(id)!.push(t);
+    }
+
+    const sortTurmas = (arr: Turma[]) =>
+      [...arr].sort((a, b) => {
+        const c = String(a.horario || '').localeCompare(String(b.horario || ''), 'pt-BR');
+        return c !== 0 ? c : (a.id || 0) - (b.id || 0);
+      });
+
+    const visto = new Set<number>();
+    const out: { titulo: string; ctId: number; lista: Turma[] }[] = [];
+
+    for (const ct of sortedCts) {
+      const id = ct.id;
+      if (id == null) continue;
+      const bruto = porCtId.get(id);
+      if (!bruto?.length) continue;
+      out.push({ titulo: ct.nome, ctId: id, lista: sortTurmas(bruto) });
+      visto.add(id);
+    }
+
+    const idsRestantes = [...porCtId.keys()]
+      .filter((id) => !visto.has(id))
+      .sort((a, b) => a - b);
+    for (const id of idsRestantes) {
+      const bruto = porCtId.get(id)!;
+      const titulo = bruto[0]?.ct_nome || `CT #${id}`;
+      out.push({ titulo, ctId: id, lista: sortTurmas(bruto) });
+    }
+
+    if (semCentro.length > 0) {
+      out.push({
+        titulo: 'Sem centro definido',
+        ctId: -1,
+        lista: sortTurmas(semCentro),
+      });
+    }
+
+    return out;
+  }, [turmas, cts]);
+
   const handleEditarTurma = (turma: Turma) => {
     setFormData({
       id: turma.id,
@@ -131,7 +201,7 @@ const GerenciarTurmasScreen: React.FC<NavigationProps> = ({ navigation }) => {
   const handleExcluirTurma = (turma: Turma) => {
     Alert.alert(
       'Excluir Turma',
-      `Deseja realmente excluir a turma ${turma.ct_nome}?`,
+      `Deseja realmente excluir a turma ${turma.id} (${turma.horario || '-'}) — ${turma.ct_nome || 'CT'}?`,
       [
         { text: 'Cancelar', style: 'cancel' },
         {
@@ -301,28 +371,24 @@ const GerenciarTurmasScreen: React.FC<NavigationProps> = ({ navigation }) => {
   };
 
   if (user?.tipo !== 'gerente') {
-    return (
-      <SafeScreen tabScreen style={styles.container}>
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>Acesso negado. Apenas gerentes podem gerenciar turmas.</Text>
-        </View>
-      </SafeScreen>
+    return wrap(
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>Acesso negado. Apenas gerentes podem gerenciar turmas.</Text>
+      </View>
     );
   }
 
   if (loading) {
-    return (
-      <SafeScreen tabScreen style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.loadingText}>Carregando...</Text>
-        </View>
-      </SafeScreen>
+    return wrap(
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={styles.loadingText}>Carregando...</Text>
+      </View>
     );
   }
 
-  return (
-    <SafeScreen tabScreen style={styles.container}>
+  return wrap(
+    <>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Gerenciar Turmas</Text>
         <TouchableOpacity style={styles.addButton} onPress={handleCriarTurma}>
@@ -336,46 +402,58 @@ const GerenciarTurmasScreen: React.FC<NavigationProps> = ({ navigation }) => {
             <Text style={styles.emptyText}>Nenhuma turma encontrada.</Text>
           </View>
         ) : (
-          turmas.map((turma) => (
-            <View key={turma.id} style={styles.turmaCard}>
-              <View style={styles.turmaHeader}>
-                <View style={styles.turmaInfo}>
-                  <Text style={styles.turmaTitle}>{turma.ct_nome || `Turma ${turma.id}`}</Text>
-                  <Text style={styles.turmaSubtitle}>
-                    {turma.dias_semana_nomes?.join(', ') || '-'} às {turma.horario}
-                  </Text>
-                  <Text style={styles.turmaDetails}>
-                    Professor:{' '}
-                    {turma.professor_nomes?.length
-                      ? turma.professor_nomes.join(', ')
-                      : turma.professor_nome || 'Não atribuído'}{' '}
-                    | Alunos: {turma.alunos_count || 0}/{turma.capacidade_maxima}
-                  </Text>
-                </View>
-                <View style={[styles.statusBadge, { backgroundColor: turma.ativo ? '#4caf50' : '#f44336' }]}>
-                  <Text style={styles.statusText}>{turma.ativo ? 'Ativa' : 'Inativa'}</Text>
-                </View>
+          secoesTurmas.map((sec) => (
+            <View key={`ct-${sec.ctId}`} style={styles.ctSection}>
+              <View style={styles.ctSectionHeader}>
+                <Text style={styles.ctSectionTitle}>{sec.titulo}</Text>
               </View>
-              <View style={styles.turmaActions}>
-                <TouchableOpacity
-                  style={[styles.actionButton, styles.editButton]}
-                  onPress={() => handleEditarTurma(turma)}
-                >
-                  <Text style={styles.actionButtonText}>Editar</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.actionButton, styles.alunosButton]}
-                  onPress={() => handleGerenciarAlunos(turma)}
-                >
-                  <Text style={styles.actionButtonText}>Alunos</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.actionButton, styles.deleteButton]}
-                  onPress={() => handleExcluirTurma(turma)}
-                >
-                  <Text style={styles.actionButtonText}>Excluir</Text>
-                </TouchableOpacity>
-              </View>
+              {sec.lista.map((turma) => {
+                const turmaInativa = turma.ativo === false;
+                return (
+                  <View key={turma.id} style={[styles.turmaCard, turmaInativa && styles.turmaCardInativa]}>
+                    <View style={styles.turmaHeader}>
+                      <View style={styles.turmaInfo}>
+                        <Text style={styles.turmaTitle}>
+                          Turma {turma.id} · {turma.horario || '—'}
+                        </Text>
+                        <Text style={styles.turmaSubtitle}>
+                          {turma.dias_semana_nomes?.join(', ') || '-'}
+                        </Text>
+                        <Text style={styles.turmaDetails}>
+                          Professor:{' '}
+                          {turma.professor_nomes?.length
+                            ? turma.professor_nomes.join(', ')
+                            : turma.professor_nome || 'Não atribuído'}{' '}
+                          | Alunos: {turma.alunos_count || 0}/{turma.capacidade_maxima}
+                        </Text>
+                      </View>
+                      <View style={[styles.statusBadge, { backgroundColor: turma.ativo !== false ? '#4caf50' : '#f44336' }]}>
+                        <Text style={styles.statusText}>{turma.ativo !== false ? 'Ativa' : 'Inativa'}</Text>
+                      </View>
+                    </View>
+                    <View style={styles.turmaActions}>
+                      <TouchableOpacity
+                        style={[styles.actionButton, styles.editButton]}
+                        onPress={() => handleEditarTurma(turma)}
+                      >
+                        <Text style={styles.actionButtonText}>Editar</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.actionButton, styles.alunosButton]}
+                        onPress={() => handleGerenciarAlunos(turma)}
+                      >
+                        <Text style={styles.actionButtonText}>Alunos</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.actionButton, styles.deleteButton]}
+                        onPress={() => handleExcluirTurma(turma)}
+                      >
+                        <Text style={styles.actionButtonText}>Excluir</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                );
+              })}
             </View>
           ))
         )}
@@ -564,15 +642,23 @@ const GerenciarTurmasScreen: React.FC<NavigationProps> = ({ navigation }) => {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>
-              Gerenciar Alunos - {turmaSelecionada?.ct_nome}
+              Gerenciar Alunos - {turmaSelecionada?.ct_nome || 'Turma'}
             </Text>
+            {turmaSelecionada?.ativo === false && (
+              <Text style={styles.modalHintMuted}>
+                Turma inativa: você pode ver os alunos. Reative a turma em Editar para alterar vínculos.
+              </Text>
+            )}
 
             <ScrollView style={styles.alunosList}>
               {alunos.map((aluno) => (
                 <TouchableOpacity
                   key={aluno.id}
                   style={styles.alunoItem}
-                  onPress={() => toggleAluno(aluno.id)}
+                  disabled={turmaSelecionada?.ativo === false}
+                  onPress={() => {
+                    if (turmaSelecionada?.ativo !== false) toggleAluno(aluno.id);
+                  }}
                 >
                   <View style={styles.alunoInfo}>
                     <TouchableOpacity onPress={() => handleMostrarInfoAluno(aluno)} activeOpacity={0.7}>
@@ -605,9 +691,13 @@ const GerenciarTurmasScreen: React.FC<NavigationProps> = ({ navigation }) => {
                   <Text style={[styles.modalButtonText, { color: '#333' }]}>Cancelar</Text>
                 </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.modalButton, styles.saveButton, saving && styles.buttonDisabled]}
+                style={[
+                  styles.modalButton,
+                  styles.saveButton,
+                  (saving || turmaSelecionada?.ativo === false) && styles.buttonDisabled,
+                ]}
                 onPress={handleSalvarAlunos}
-                disabled={saving}
+                disabled={saving || turmaSelecionada?.ativo === false}
               >
                 {saving ? (
                   <ActivityIndicator color="#fff" />
@@ -619,7 +709,7 @@ const GerenciarTurmasScreen: React.FC<NavigationProps> = ({ navigation }) => {
           </View>
         </View>
       </Modal>
-    </SafeScreen>
+    </>
   );
 };
 
@@ -653,6 +743,21 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     padding: 16,
+  },
+  ctSection: {
+    marginBottom: 20,
+  },
+  ctSectionHeader: {
+    backgroundColor: colors.primaryMuted,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    marginBottom: 10,
+  },
+  ctSectionTitle: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: colors.primary,
   },
   loadingContainer: {
     flex: 1,
@@ -693,6 +798,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+  },
+  turmaCardInativa: {
+    opacity: 0.92,
+    borderLeftWidth: 4,
+    borderLeftColor: '#f44336',
   },
   turmaHeader: {
     flexDirection: 'row',
@@ -761,6 +871,12 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 20,
     padding: 20,
     maxHeight: '90%',
+  },
+  modalHintMuted: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginBottom: 10,
+    lineHeight: 17,
   },
   modalTitle: {
     fontSize: 20,

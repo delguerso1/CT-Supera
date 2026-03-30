@@ -21,8 +21,17 @@ import CONFIG from '../config';
 import SafeScreen from '../components/SafeScreen';
 import { colors } from '../theme';
 
-const GerenciarSuperaNewsScreen: React.FC<NavigationProps> = ({ navigation }) => {
+const GerenciarSuperaNewsScreen: React.FC<NavigationProps> = ({ navigation, embedded }) => {
   const { user } = useAuth();
+
+  const wrap = (children: React.ReactNode) =>
+    embedded ? (
+      <View style={styles.container}>{children}</View>
+    ) : (
+      <SafeScreen tabScreen style={styles.container}>
+        {children}
+      </SafeScreen>
+    );
   const [noticias, setNoticias] = useState<SuperaNews[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -169,28 +178,24 @@ const GerenciarSuperaNewsScreen: React.FC<NavigationProps> = ({ navigation }) =>
   };
 
   if (user?.tipo !== 'gerente') {
-    return (
-      <SafeScreen tabScreen style={styles.container}>
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>Acesso negado. Apenas gerentes podem gerenciar notícias.</Text>
-        </View>
-      </SafeScreen>
+    return wrap(
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>Acesso negado. Apenas gerentes podem gerenciar notícias.</Text>
+      </View>
     );
   }
 
   if (loading) {
-    return (
-      <SafeScreen tabScreen style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.loadingText}>Carregando...</Text>
-        </View>
-      </SafeScreen>
+    return wrap(
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={styles.loadingText}>Carregando...</Text>
+      </View>
     );
   }
 
-  return (
-    <SafeScreen tabScreen style={styles.container}>
+  return wrap(
+    <>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Supera News</Text>
         <TouchableOpacity style={styles.addButton} onPress={handleCriarNoticia}>
@@ -328,7 +333,7 @@ const GerenciarSuperaNewsScreen: React.FC<NavigationProps> = ({ navigation }) =>
           </View>
         </View>
       </Modal>
-    </SafeScreen>
+    </>
   );
 };
 

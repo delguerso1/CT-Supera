@@ -835,6 +835,7 @@ const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }
                 <View style={styles.salarioInfo}>
                   <Text style={styles.salarioTitle}>{getProfessorNome(salario.professor)}</Text>
                   <Text style={styles.salarioDate}>
+                    {salario.competencia ? `Competência: ${formatDate(salario.competencia)}\n` : ''}
                     {salario.status === 'pago' && salario.data_pagamento
                       ? `Pago em ${formatDate(salario.data_pagamento)}`
                       : 'Pagamento pendente'}

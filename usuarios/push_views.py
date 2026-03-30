@@ -20,18 +20,45 @@ class RegistrarPushTokenExpoAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        token = (request.data.get("token") or "").strip()
+        token = (
+            request.data.get("token") or request.data.get("expoPushToken") or ""
+        ).strip()
         if not token or not (
             token.startswith("ExponentPushToken") or token.startswith("ExpoPushToken")
         ):
+            logger.warning(
+                "push-token inválido user_id=%s prefixo=%r",
+                getattr(request.user, "pk", None),
+                (token[:48] + "…") if len(token) > 48 else token,
+            )
             return Response(
                 {"error": "Token Expo inválido. Esperado ExponentPushToken[...]."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         # Um token pertence a um aparelho; reatribui se já existir (troca de usuário no mesmo aparelho é raro)
-        PushTokenExpo.objects.update_or_create(
-            token=token,
-            defaults={"usuario": request.user},
+        try:
+            PushTokenExpo.objects.update_or_create(
+                token=token,
+                defaults={"usuario": request.user},
+            )
+        except Exception:
+            logger.exception(
+                "Falha ao salvar PushTokenExpo user_id=%s tipo=%s len_token=%s",
+                request.user.pk,
+                getattr(request.user, "tipo", ""),
+                len(token),
+            )
+            return Response(
+                {
+                    "error": "Não foi possível salvar o token no servidor. Verifique se o deploy aplicou as migrações mais recentes.",
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+        logger.info(
+            "Push token registrado user_id=%s tipo=%s len_token=%s",
+            request.user.pk,
+            getattr(request.user, "tipo", ""),
+            len(token),
         )
         return Response({"ok": True}, status=status.HTTP_200_OK)
 
