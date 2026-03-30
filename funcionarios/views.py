@@ -337,7 +337,7 @@ class PainelGerenteAPIView(APIView):
             # Pré-cadastros pendentes
             precadastros = PreCadastro.objects.filter(status='pendente').count()
 
-            # Aulas experimentais: futuras e já ocorridas
+            # Aulas experimentais (só status pendente, alinhado à listagem de pré-cadastros)
             aulas_experimentais_futuras = PreCadastro.objects.filter(
                 origem='aula_experimental',
                 status='pendente',
@@ -345,6 +345,7 @@ class PainelGerenteAPIView(APIView):
             ).count()
             aulas_experimentais_ocorridas = PreCadastro.objects.filter(
                 origem='aula_experimental',
+                status='pendente',
                 data_aula_experimental__isnull=False,
                 data_aula_experimental__lte=hoje
             ).count()

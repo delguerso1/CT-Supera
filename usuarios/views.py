@@ -41,6 +41,9 @@ def _telefone_br_so_digitos(valor):
 class ListarPrecadastrosAPIView(ListCreateAPIView):
     """API para listar pré-cadastros. Por padrão retorna apenas pendentes. Suporta ?status=cancelado."""
     serializer_class = PreCadastroSerializer
+    # Sem paginação: o default do projeto (PAGE_SIZE=10) cortava a lista e o painel do gerente
+    # mostrava a contagem total (count no modelo), gerando divergência com a aba Usuários.
+    pagination_class = None
 
     def get_queryset(self):
         qs = PreCadastro.objects.all().order_by('-criado_em')
