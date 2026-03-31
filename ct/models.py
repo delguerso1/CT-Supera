@@ -1,5 +1,6 @@
 from django.db import models
 from django.conf import settings
+from django.core.validators import FileExtensionValidator
 
 class CentroDeTreinamento(models.Model):
     nome = models.CharField(max_length=100, unique=True)
@@ -58,3 +59,36 @@ class GaleriaFoto(models.Model):
         verbose_name = "Foto da Galeria"
         verbose_name_plural = "Fotos da Galeria"
         ordering = ['-data_criacao']
+
+
+class CandidaturaTrabalho(models.Model):
+    """Candidaturas enviadas pela página Trabalhe conosco (público)."""
+
+    TIPO_PROFESSOR = 'professor'
+    TIPO_ESTAGIARIO = 'estagiario'
+    TIPO_CHOICES = [
+        (TIPO_PROFESSOR, 'Professor(a)'),
+        (TIPO_ESTAGIARIO, 'Estagiário(a)'),
+    ]
+
+    nome_completo = models.CharField(max_length=200)
+    email = models.EmailField()
+    telefone = models.CharField(max_length=20)
+    tipo_vaga = models.CharField(max_length=20, choices=TIPO_CHOICES)
+    interesse_praia = models.BooleanField(default=True)
+    interesse_quadra = models.BooleanField(default=True)
+    periodo_ed_fis = models.CharField(max_length=80, blank=True)
+    mensagem = models.TextField(blank=True)
+    curriculo = models.FileField(
+        upload_to='candidaturas/',
+        validators=[FileExtensionValidator(allowed_extensions=['pdf'])],
+    )
+    data_envio = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f'{self.nome_completo} — {self.get_tipo_vaga_display()} ({self.data_envio:%d/%m/%Y})'
+
+    class Meta:
+        verbose_name = 'Candidatura (Trabalhe conosco)'
+        verbose_name_plural = 'Candidaturas (Trabalhe conosco)'
+        ordering = ['-data_envio']

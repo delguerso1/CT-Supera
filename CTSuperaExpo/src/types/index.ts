@@ -107,6 +107,22 @@ export interface GaleriaFoto {
   ativo?: boolean;
 }
 
+/** Candidatura — Trabalhe conosco (lista para gerente) */
+export interface CandidaturaTrabalho {
+  id: number;
+  nome_completo: string;
+  email: string;
+  telefone: string;
+  tipo_vaga: string;
+  tipo_vaga_display?: string;
+  interesse_praia: boolean;
+  interesse_quadra: boolean;
+  periodo_ed_fis?: string;
+  mensagem?: string;
+  data_envio: string;
+  curriculo_url?: string | null;
+}
+
 export interface Mensalidade {
   id: number;
   /** ID ou objeto (API aninha UsuarioSerializer em listagens) */

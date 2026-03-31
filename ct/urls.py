@@ -2,7 +2,8 @@ from django.urls import path
 from .views import (
     ListaCTAPIView, CriarCTAPIView, EditarCTAPIView, ExcluirCTAPIView, DetalheCTAPIView,
     ListarSuperaNewsAPIView, CriarSuperaNewsAPIView, EditarSuperaNewsAPIView, ExcluirSuperaNewsAPIView,
-    ListarGaleriaFotosAPIView, CriarGaleriaFotoAPIView, EditarGaleriaFotoAPIView, ExcluirGaleriaFotoAPIView
+    ListarGaleriaFotosAPIView, CriarGaleriaFotoAPIView, EditarGaleriaFotoAPIView, ExcluirGaleriaFotoAPIView,
+    CandidaturaTrabalhoAPIView,
 )
 
 urlpatterns = [
@@ -46,4 +47,7 @@ urlpatterns = [
     
     # Excluir foto
     path('galeria/excluir/<int:pk>/', ExcluirGaleriaFotoAPIView.as_view(), name='excluir_galeria_foto'),
+
+    # Trabalhe conosco (público)
+    path('trabalhe-conosco/', CandidaturaTrabalhoAPIView.as_view(), name='candidatura_trabalho'),
 ]

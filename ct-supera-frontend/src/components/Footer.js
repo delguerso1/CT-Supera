@@ -48,6 +48,7 @@ function Footer() {
         <a href="/supera-news" style={styles.link}>Supera News</a>
         <a href="/alunos" style={styles.link}>Alunos</a>
         <a href="/galeria" style={styles.link}>Galeria de Fotos</a>
+        <a href="/trabalhe-conosco" style={styles.link}>Trabalhe conosco</a>
         <a href="/agendamento" style={styles.link}>Agende sua Aula</a>
       </div>
       <div style={styles.copyright}>

@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import CentroDeTreinamento, SuperaNews, GaleriaFoto
+from .models import CentroDeTreinamento, SuperaNews, GaleriaFoto, CandidaturaTrabalho
 
 @admin.register(CentroDeTreinamento)
 class CentroDeTreinamentoAdmin(admin.ModelAdmin):
@@ -22,3 +22,19 @@ class GaleriaFotoAdmin(admin.ModelAdmin):
     search_fields = ("titulo", "descricao")
     list_filter = ("ativo", "data_criacao", "autor")
     readonly_fields = ("data_criacao", "data_atualizacao")
+
+
+@admin.register(CandidaturaTrabalho)
+class CandidaturaTrabalhoAdmin(admin.ModelAdmin):
+    list_display = (
+        "nome_completo",
+        "email",
+        "tipo_vaga",
+        "interesse_praia",
+        "interesse_quadra",
+        "data_envio",
+    )
+    list_filter = ("tipo_vaga", "data_envio", "interesse_praia", "interesse_quadra")
+    search_fields = ("nome_completo", "email", "telefone", "mensagem")
+    readonly_fields = ("data_envio",)
+    ordering = ("-data_envio",)

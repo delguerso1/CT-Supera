@@ -4,6 +4,7 @@ import api, { MEDIA_URL } from '../services/api';
 import CadastroUsuario from '../pages/CadastroUsuario';
 import ControleFinanceiro from '../pages/ControleFinanceiro';
 import CadastroCentroTreinamento from '../pages/CadastroCentroTreinamento';
+import GerenciarCandidaturasTrabalho from '../pages/GerenciarCandidaturasTrabalho';
 
 // Hook para detectar tamanho da tela
 const useResponsive = () => {
@@ -1067,6 +1068,16 @@ function DashboardGerente({ user }) {
     </div>
   );
 
+  const renderCandidatosTrabalho = () => (
+    <div>
+      <h2 style={styles.contentTitle}>
+        <span>📋</span>
+        Candidatos — Trabalhe conosco
+      </h2>
+      <GerenciarCandidaturasTrabalho />
+    </div>
+  );
+
   if (loading) return <div style={styles.container}>Carregando...</div>;
   if (error) {
     return (
@@ -1167,6 +1178,17 @@ function DashboardGerente({ user }) {
           <div
             style={{
               ...styles.menuItem,
+              ...(activeSection === 'candidatos-trabalho' && styles.activeMenuItem)
+            }}
+            onClick={() => setActiveSection('candidatos-trabalho')}
+            title="Candidaturas Trabalhe conosco"
+          >
+            <span style={styles.menuIcon}>📋</span>
+            <span style={styles.menuItemLabel}>Trabalhe conosco</span>
+          </div>
+          <div
+            style={{
+              ...styles.menuItem,
               ...(activeSection === 'centros' && styles.activeMenuItem)
             }}
             onClick={() => setActiveSection('centros')}
@@ -1202,6 +1224,7 @@ function DashboardGerente({ user }) {
           {activeSection === 'dashboard' && renderDashboard()}
           {activeSection === 'perfil' && renderMeuPerfil()}
           {activeSection === 'usuarios' && renderUsuarios()}
+          {activeSection === 'candidatos-trabalho' && renderCandidatosTrabalho()}
           {activeSection === 'centros' && renderCentros()}
           {activeSection === 'financeiro' && renderFinanceiro()}
         </div>

@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import CentroDeTreinamento, SuperaNews, GaleriaFoto
+from .models import CentroDeTreinamento, SuperaNews, GaleriaFoto, CandidaturaTrabalho
 from turmas.models import DiaSemana
 
 class CentroDeTreinamentoSerializer(serializers.ModelSerializer):
@@ -52,3 +52,70 @@ class GaleriaFotoSerializer(serializers.ModelSerializer):
         fields = ['id', 'titulo', 'descricao', 'imagem', 'autor', 'autor_nome',
                   'data_criacao', 'data_atualizacao', 'ativo']
         read_only_fields = ['autor', 'data_criacao', 'data_atualizacao']
+
+
+MAX_CURRICULO_BYTES = 5 * 1024 * 1024
+
+
+class CandidaturaTrabalhoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CandidaturaTrabalho
+        fields = [
+            'id',
+            'nome_completo',
+            'email',
+            'telefone',
+            'tipo_vaga',
+            'interesse_praia',
+            'interesse_quadra',
+            'periodo_ed_fis',
+            'mensagem',
+            'curriculo',
+            'data_envio',
+        ]
+        read_only_fields = ['id', 'data_envio']
+
+    def validate_curriculo(self, value):
+        if value.size > MAX_CURRICULO_BYTES:
+            raise serializers.ValidationError('O arquivo deve ter no máximo 5 MB.')
+        return value
+
+    def validate(self, attrs):
+        if not attrs.get('interesse_praia') and not attrs.get('interesse_quadra'):
+            raise serializers.ValidationError({
+                'non_field_errors': ['Informe interesse em ao menos uma modalidade (praia ou quadra).']
+            })
+        return attrs
+
+
+class CandidaturaTrabalhoListSerializer(serializers.ModelSerializer):
+    """Leitura para gerentes (painel / app)."""
+
+    tipo_vaga_display = serializers.CharField(source='get_tipo_vaga_display', read_only=True)
+    curriculo_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = CandidaturaTrabalho
+        fields = [
+            'id',
+            'nome_completo',
+            'email',
+            'telefone',
+            'tipo_vaga',
+            'tipo_vaga_display',
+            'interesse_praia',
+            'interesse_quadra',
+            'periodo_ed_fis',
+            'mensagem',
+            'data_envio',
+            'curriculo_url',
+        ]
+
+    def get_curriculo_url(self, obj):
+        if not obj.curriculo:
+            return None
+        request = self.context.get('request')
+        path = obj.curriculo.url
+        if request:
+            return request.build_absolute_uri(path)
+        return path

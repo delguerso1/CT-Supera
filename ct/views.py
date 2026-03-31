@@ -1,10 +1,16 @@
 from django.shortcuts import get_object_or_404
-from .models import CentroDeTreinamento, SuperaNews, GaleriaFoto
+from .models import CentroDeTreinamento, SuperaNews, GaleriaFoto, CandidaturaTrabalho
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
-from .serializers import CentroDeTreinamentoSerializer, SuperaNewsSerializer, GaleriaFotoSerializer
+from .serializers import (
+    CentroDeTreinamentoSerializer,
+    SuperaNewsSerializer,
+    GaleriaFotoSerializer,
+    CandidaturaTrabalhoSerializer,
+    CandidaturaTrabalhoListSerializer,
+)
 from rest_framework.generics import RetrieveAPIView
 from rest_framework.parsers import MultiPartParser, FormParser
 
@@ -190,3 +196,39 @@ class ExcluirGaleriaFotoAPIView(APIView):
         foto = get_object_or_404(GaleriaFoto, id=pk)
         foto.delete()
         return Response({"message": "Foto excluída com sucesso!"}, status=status.HTTP_200_OK)
+
+
+class CandidaturaTrabalhoAPIView(APIView):
+    """
+    POST: candidatura pública (Trabalhe conosco).
+    GET: lista candidaturas — apenas gerentes autenticados.
+    """
+
+    parser_classes = [MultiPartParser, FormParser]
+
+    def get_permissions(self):
+        if self.request.method == 'GET':
+            return [IsAuthenticated()]
+        return []
+
+    def get(self, request):
+        if request.user.tipo != 'gerente':
+            return Response({'error': 'Permissão negada.'}, status=status.HTTP_403_FORBIDDEN)
+        qs = CandidaturaTrabalho.objects.all().order_by('-data_envio')
+        serializer = CandidaturaTrabalhoListSerializer(
+            qs, many=True, context={'request': request}
+        )
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def post(self, request):
+        serializer = CandidaturaTrabalhoSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(
+                {
+                    'message': 'Candidatura recebida com sucesso.',
+                    'id': serializer.instance.id,
+                },
+                status=status.HTTP_201_CREATED,
+            )
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

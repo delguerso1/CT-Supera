@@ -23,7 +23,8 @@ import {
   PainelGerente,
   CentroTreinamento,
   SuperaNews,
-  GaleriaFoto
+  GaleriaFoto,
+  CandidaturaTrabalho
 } from '../types';
 import CONFIG from '../config';
 
@@ -322,6 +323,13 @@ export const galeriaService = {
 
   excluirFoto: async (id: number): Promise<void> => {
     await api.delete(`cts/galeria/excluir/${id}/`);
+  },
+};
+
+export const candidaturaTrabalhoService = {
+  listar: async (): Promise<CandidaturaTrabalho[]> => {
+    const response = await api.get('cts/trabalhe-conosco/');
+    return response.data;
   },
 };
 

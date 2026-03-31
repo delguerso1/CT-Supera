@@ -295,6 +295,9 @@ function Navbar() {
           <Link to="/galeria" style={styles.navLink}>
             Galeria de Fotos
           </Link>
+          <Link to="/trabalhe-conosco" style={styles.navLink}>
+            Trabalhe conosco
+          </Link>
         </div>
 
         {/* Botões desktop */}
@@ -424,6 +427,13 @@ function Navbar() {
             onClick={() => setShowMobileMenu(false)}
           >
             Galeria de Fotos
+          </Link>
+          <Link 
+            to="/trabalhe-conosco" 
+            style={styles.mobileNavLink}
+            onClick={() => setShowMobileMenu(false)}
+          >
+            Trabalhe conosco
           </Link>
           <div style={{ display: 'flex', justifyContent: 'center', padding: '0.5rem 0' }}>
             <a 

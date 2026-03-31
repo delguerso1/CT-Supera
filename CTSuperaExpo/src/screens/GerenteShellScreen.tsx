@@ -15,9 +15,10 @@ import GerenciarCTsScreen from './GerenciarCTsScreen';
 import GerenciarTurmasScreen from './GerenciarTurmasScreen';
 import GerenciarSuperaNewsScreen from './GerenciarSuperaNewsScreen';
 import GerenciarGaleriaScreen from './GerenciarGaleriaScreen';
+import GerenciarCandidaturasTrabalhoScreen from './GerenciarCandidaturasTrabalhoScreen';
 
 type TopKey = 'dashboard' | 'perfil' | 'usuarios' | 'financeiro' | 'relatorios';
-type BottomKey = 'cts' | 'turmas' | 'news' | 'galeria';
+type BottomKey = 'cts' | 'turmas' | 'news' | 'galeria' | 'candidatos';
 
 type FocusState = { area: 'top' | 'bottom'; tab: TopKey | BottomKey };
 
@@ -34,6 +35,7 @@ const BOTTOM_TABS: { key: BottomKey; label: string }[] = [
   { key: 'turmas', label: 'Turmas' },
   { key: 'news', label: 'News' },
   { key: 'galeria', label: 'Galeria' },
+  { key: 'candidatos', label: 'Candidatos' },
 ];
 
 const noopNav = { navigate: () => {} };
@@ -65,6 +67,8 @@ function iconBottom(key: BottomKey): keyof typeof MaterialIcons.glyphMap {
       return 'article';
     case 'galeria':
       return 'photo-library';
+    case 'candidatos':
+      return 'assignment-ind';
     default:
       return 'circle';
   }
@@ -230,6 +234,13 @@ const GerenteShellScreen: React.FC = () => {
             <View style={styles.page} collapsable={false}>
               {shouldMountNeighborPage(3, bottomMountCenter) ? (
                 <GerenciarGaleriaScreen embedded navigation={noopNav} route={{}} />
+              ) : (
+                <View style={styles.pagePlaceholder} />
+              )}
+            </View>
+            <View style={styles.page} collapsable={false}>
+              {shouldMountNeighborPage(4, bottomMountCenter) ? (
+                <GerenciarCandidaturasTrabalhoScreen embedded navigation={noopNav} route={{}} />
               ) : (
                 <View style={styles.pagePlaceholder} />
               )}

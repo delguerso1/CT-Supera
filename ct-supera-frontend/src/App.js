@@ -15,6 +15,7 @@ import CadastroTurmas from './pages/CadastroTurmas';
 import EsqueciMinhaSenha from './pages/EsqueciMinhaSenha';
 import RedefinirSenha from './pages/RedefinirSenha';
 import AtivarConta from './pages/AtivarConta';
+import TrabalheConoscoPage from './pages/TrabalheConoscoPage';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import './App.css';
@@ -84,6 +85,7 @@ function App() {
           <Route path="/alunos" element={<FormacaoAtletas />} />
           <Route path="/formacao-atletas" element={<Navigate to="/alunos" replace />} />
           <Route path="/galeria" element={<GaleriaFotos />} />
+          <Route path="/trabalhe-conosco" element={<TrabalheConoscoPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/esqueci-senha" element={<EsqueciMinhaSenha />} />
           <Route path="/redefinir-senha/:uidb64/:token" element={<RedefinirSenha />} />
