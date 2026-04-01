@@ -43,10 +43,34 @@ class MensalidadeSerializer(serializers.ModelSerializer):
     aluno = UsuarioSerializer(read_only=True)
     valor_efetivo = serializers.SerializerMethodField()
     aluno_nome = serializers.SerializerMethodField()
+    forma_pagamento_label = serializers.SerializerMethodField()
 
     class Meta:
         model = Mensalidade
         fields = '__all__'
+
+    def get_forma_pagamento_label(self, obj):
+        """PIX/Boleto/Cartão pela transação C6 aprovada; senão baixa manual na secretaria."""
+        if getattr(obj, 'status', None) != 'pago':
+            return ''
+        approved = [t for t in obj.transacoes_c6.all() if t.status == 'aprovado']
+        if not approved:
+            return 'Baixa manual'
+        approved.sort(
+            key=lambda t: (
+                t.data_aprovacao.timestamp() if t.data_aprovacao else 0,
+                t.id,
+            ),
+            reverse=True,
+        )
+        tx = approved[0]
+        labels = {
+            'pix': 'PIX',
+            'boleto': 'Boleto',
+            'cartao': 'Cartão de crédito',
+            'transferencia': 'Transferência',
+        }
+        return labels.get(tx.tipo, tx.tipo or '—')
 
     def get_aluno_nome(self, obj):
         if not getattr(obj, 'aluno_id', None):

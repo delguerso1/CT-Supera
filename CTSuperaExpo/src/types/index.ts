@@ -134,6 +134,8 @@ export interface Mensalidade {
   data_vencimento: string;
   status: 'pendente' | 'pago' | 'atrasado';
   data_pagamento?: string;
+  /** Rótulo amigável: PIX, Boleto, Cartão ou Baixa manual (API). */
+  forma_pagamento_label?: string;
 }
 
 export interface Despesa {

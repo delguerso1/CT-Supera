@@ -241,6 +241,20 @@ function ControleFinanceiro({ user, onDataChange }) {
     return new Date(year, month - 1, day).toLocaleDateString('pt-BR');
   }
 
+  /** Data e hora do pagamento (mensalidade com data_pagamento ISO). */
+  function formatDateTime(dateStr) {
+    if (!dateStr) return '—';
+    const d = new Date(dateStr);
+    if (Number.isNaN(d.getTime())) return '—';
+    return d.toLocaleString('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  }
+
   function formatCurrency(value) {
     return Number(value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   }
@@ -561,13 +575,15 @@ function ControleFinanceiro({ user, onDataChange }) {
               <th style={{ padding: 10, textAlign: 'right' }}>Valor</th>
               <th style={{ padding: 10, textAlign: 'center' }}>Vencimento</th>
               <th style={{ padding: 10, textAlign: 'center' }}>Status</th>
+              <th style={{ padding: 10, textAlign: 'center' }}>Pago em</th>
+              <th style={{ padding: 10, textAlign: 'left' }}>Forma de pagamento</th>
               <th style={{ padding: 10, textAlign: 'center' }}>Ações</th>
             </tr>
           </thead>
           <tbody>
             {mensalidadesPaginadas.length === 0 && (
               <tr>
-                <td colSpan={5} style={{ color: '#888', textAlign: 'center', padding: 16 }}>Nenhuma mensalidade encontrada.</td>
+                <td colSpan={7} style={{ color: '#888', textAlign: 'center', padding: 16 }}>Nenhuma mensalidade encontrada.</td>
               </tr>
             )}
             {mensalidadesPaginadas.map(m => (
@@ -578,6 +594,12 @@ function ControleFinanceiro({ user, onDataChange }) {
                 <td style={{ padding: 10, textAlign: 'right' }}>{formatCurrency(m.valor_efetivo ?? m.valor)}</td>
                 <td style={{ padding: 10, textAlign: 'center' }}>{formatDate(m.data_vencimento)}</td>
                 <td style={{ padding: 10, textAlign: 'center' }}>{formatStatus(m.status)}</td>
+                <td style={{ padding: 10, textAlign: 'center', fontSize: 13 }}>
+                  {m.status === 'pago' && m.data_pagamento ? formatDateTime(m.data_pagamento) : '—'}
+                </td>
+                <td style={{ padding: 10, fontSize: 13 }}>
+                  {m.status === 'pago' && m.forma_pagamento_label ? m.forma_pagamento_label : '—'}
+                </td>
                 <td style={{ padding: 10, textAlign: 'center' }}>
                   {(m.status === 'pendente' || m.status === 'atrasado') && (
                     <button

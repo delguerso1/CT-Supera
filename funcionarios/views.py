@@ -369,18 +369,53 @@ class PainelGerenteAPIView(APIView):
                     'data': aluno.date_joined.isoformat()
                 })
 
-            # Últimas mensalidades pagas
-            ultimas_mensalidades = Mensalidade.objects.filter(
-                status="pago",
-                data_vencimento__gte=timezone.now() - timedelta(days=7)
-            ).order_by('-data_vencimento')[:5]
+            # Pré-cadastros criados nos últimos 7 dias (feed alinhado ao painel)
+            for pc in PreCadastro.objects.filter(
+                criado_em__gte=timezone.now() - timedelta(days=7)
+            ).order_by('-criado_em')[:5]:
+                nome_pc = (pc.first_name or '').strip() or '—'
+                atividades.append({
+                    'id': f'precadastro_{pc.id}',
+                    'type': 'precadastro',
+                    'description': f'Pré-cadastro recebido - {nome_pc}',
+                    'data': pc.criado_em.isoformat()
+                })
+
+            # Mensalidades pagas recentes: usar data_pagamento (quando o pagamento ocorreu),
+            # não data_vencimento — senão pagamentos de títulos antigos não apareciam no feed.
+            limite_pag = timezone.now() - timedelta(days=14)
+            limite_venc = timezone.now().date() - timedelta(days=14)
+            cand_mens = list(
+                Mensalidade.objects.filter(status="pago")
+                .filter(
+                    Q(data_pagamento__gte=limite_pag)
+                    | Q(data_pagamento__isnull=True, data_vencimento__gte=limite_venc)
+                )
+                .select_related("aluno")[:80]
+            )
+
+            def _ts_mensalidade_atividade(m):
+                if m.data_pagamento:
+                    return m.data_pagamento
+                return timezone.make_aware(
+                    datetime.combine(m.data_vencimento, datetime.min.time())
+                )
+
+            cand_mens.sort(key=_ts_mensalidade_atividade, reverse=True)
+            ultimas_mensalidades = cand_mens[:5]
 
             for mensalidade in ultimas_mensalidades:
+                nome_aluno = getattr(mensalidade.aluno, "first_name", None) or "Aluno"
+                data_evt = (
+                    mensalidade.data_pagamento.isoformat()
+                    if mensalidade.data_pagamento
+                    else mensalidade.data_vencimento.isoformat()
+                )
                 atividades.append({
                     'id': f'mensalidade_{mensalidade.id}',
                     'type': 'mensalidade',
-                    'description': f'Mensalidade paga - {mensalidade.aluno.first_name}',
-                    'data': mensalidade.data_vencimento.isoformat()
+                    'description': f'Mensalidade paga - {nome_aluno}',
+                    'data': data_evt,
                 })
 
             # Ordena todas as atividades por data

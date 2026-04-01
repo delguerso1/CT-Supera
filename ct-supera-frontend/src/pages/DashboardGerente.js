@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api, { MEDIA_URL } from '../services/api';
 import CadastroUsuario from '../pages/CadastroUsuario';
@@ -422,6 +422,7 @@ function DashboardGerente({ user }) {
   const [loadingListaInativos, setLoadingListaInativos] = useState(false);
   const [erroListaInativos, setErroListaInativos] = useState('');
   const navigate = useNavigate();
+  const prevActiveSectionRef = useRef(null);
 
   const abrirModalAlunosInativos = async () => {
     setErroListaInativos('');
@@ -440,10 +441,13 @@ function DashboardGerente({ user }) {
     }
   };
 
-  const fetchDashboardData = useCallback(async () => {
+  const fetchDashboardData = useCallback(async (options = {}) => {
+    const silent = Boolean(options.silent);
     try {
-      setLoading(true);
-      setError(null);
+      if (!silent) {
+        setLoading(true);
+        setError(null);
+      }
 
       const token = localStorage.getItem('token');
 
@@ -497,11 +501,13 @@ function DashboardGerente({ user }) {
       } else if (error.response?.status === 401) {
         setError('Sua sessão expirou. Por favor, faça login novamente.');
         navigate('/login');
-      } else {
+      } else if (!silent) {
         setError(error.response?.data?.error || 'Erro ao carregar dados do dashboard. Por favor, tente novamente.');
       }
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   }, [user, navigate]);
 
@@ -520,6 +526,19 @@ function DashboardGerente({ user }) {
 
     fetchDashboardData();
   }, [user, navigate, fetchDashboardData]);
+
+  useEffect(() => {
+    const prev = prevActiveSectionRef.current;
+    prevActiveSectionRef.current = activeSection;
+    if (
+      prev != null &&
+      activeSection === 'dashboard' &&
+      prev !== 'dashboard' &&
+      user?.tipo === 'gerente'
+    ) {
+      fetchDashboardData({ silent: true });
+    }
+  }, [activeSection, user, fetchDashboardData]);
 
   const handleFotoChange = (e) => {
     const file = e.target.files[0];
@@ -727,7 +746,7 @@ function DashboardGerente({ user }) {
             {recentActivities.map(activity => (
               <div key={activity.id} style={styles.activityItem}>
                 <div style={styles.activityIcon}>
-                  {activity.type === 'aluno' ? '👤' : '💰'}
+                  {activity.type === 'aluno' ? '👤' : activity.type === 'precadastro' ? '📝' : '💰'}
                 </div>
                 <div style={styles.activityContent}>
                   <div style={styles.activityDescription}>

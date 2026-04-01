@@ -132,12 +132,13 @@ class MensalidadeListCreateView(ListCreateAPIView):
             .prefetch_related(
                 'aluno__turmas_aluno__ct',
                 'aluno__turmas_aluno__dias_semana',
+                'transacoes_c6',
             )
             .order_by('-data_vencimento', '-id')
         )
 
 class MensalidadeRetrieveUpdateDestroyView(RetrieveUpdateDestroyAPIView):
-    queryset = Mensalidade.objects.all()
+    queryset = Mensalidade.objects.select_related('aluno').prefetch_related('transacoes_c6')
     serializer_class = MensalidadeSerializer
 
 # Despesas API

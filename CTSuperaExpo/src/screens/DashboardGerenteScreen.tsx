@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -57,6 +57,7 @@ const DashboardGerenteScreen: React.FC<DashboardGerenteProps> = ({
   const [refreshing, setRefreshing] = useState(false);
   const [loadingFinanceiro, setLoadingFinanceiro] = useState(false);
   const [activeSection, setActiveSection] = useState<'dashboard' | 'financeiro' | 'relatorios' | 'perfil'>('dashboard');
+  const prevActiveSectionRef = useRef<typeof activeSection | null>(null);
   const [mes, setMes] = useState(new Date().getMonth() + 1);
   const [ano, setAno] = useState(new Date().getFullYear());
   const [presencaRelatorio, setPresencaRelatorio] = useState<PresencaRelatorioResponse | null>(null);
@@ -115,6 +116,19 @@ const DashboardGerenteScreen: React.FC<DashboardGerenteProps> = ({
     }
   }, [user]);
 
+  useEffect(() => {
+    const prev = prevActiveSectionRef.current;
+    prevActiveSectionRef.current = activeSection;
+    if (
+      prev != null &&
+      activeSection === 'dashboard' &&
+      prev !== 'dashboard' &&
+      user
+    ) {
+      void loadGerenteData({ silent: true, suppressErrorAlert: true });
+    }
+  }, [activeSection, user]);
+
   // Shell do gerente ou Tab Navigator: mesma seção (Dashboard / Perfil / Financeiro / Relatórios)
   useEffect(() => {
     if (shellActiveTop) {
@@ -147,9 +161,12 @@ const DashboardGerenteScreen: React.FC<DashboardGerenteProps> = ({
     }
   };
 
-  const loadGerenteData = async () => {
+  const loadGerenteData = async (opts?: { silent?: boolean; suppressErrorAlert?: boolean }) => {
+    const silent = Boolean(opts?.silent);
     try {
-      setLoading(true);
+      if (!silent) {
+        setLoading(true);
+      }
       const painelData = await funcionarioService.getPainelGerente();
       setPainelGerente(painelData);
       setProfileForm({
@@ -163,9 +180,13 @@ const DashboardGerenteScreen: React.FC<DashboardGerenteProps> = ({
       await loadNotifStats();
     } catch (error: any) {
       console.error('Erro ao carregar painel do gerente:', error);
-      Alert.alert('Erro', error.response?.data?.error || 'Erro ao carregar dados do gerente.');
+      if (!opts?.suppressErrorAlert) {
+        Alert.alert('Erro', error.response?.data?.error || 'Erro ao carregar dados do gerente.');
+      }
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   };
 
@@ -282,7 +303,7 @@ const DashboardGerenteScreen: React.FC<DashboardGerenteProps> = ({
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadGerenteData();
+    await loadGerenteData({ silent: true });
     if (activeSection === 'financeiro') await loadFinanceiroData();
     if (activeSection === 'relatorios') await loadRelatoriosData();
     setRefreshing(false);
@@ -324,6 +345,19 @@ const DashboardGerenteScreen: React.FC<DashboardGerenteProps> = ({
     const parsed = new Date(value);
     if (Number.isNaN(parsed.getTime())) return value;
     return parsed.toLocaleDateString('pt-BR');
+  };
+
+  const formatDateTime = (value?: string) => {
+    if (!value) return '—';
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return '—';
+    return parsed.toLocaleString('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
   };
 
   const normalizeSearch = (value: string) =>
@@ -928,11 +962,16 @@ const DashboardGerenteScreen: React.FC<DashboardGerenteProps> = ({
                 <Text style={styles.mensalidadeDate}>
                   Vencimento: {formatDate(mensalidade.data_vencimento)}
                 </Text>
-                {mensalidade.data_pagamento && (
+                {mensalidade.status === 'pago' && mensalidade.data_pagamento && (
                   <Text style={styles.mensalidadeDate}>
-                    Pago em: {formatDate(mensalidade.data_pagamento)}
+                    Pago em: {formatDateTime(mensalidade.data_pagamento)}
                   </Text>
                 )}
+                {mensalidade.status === 'pago' && mensalidade.forma_pagamento_label ? (
+                  <Text style={styles.mensalidadeDate}>
+                    Forma: {mensalidade.forma_pagamento_label}
+                  </Text>
+                ) : null}
                 {(mensalidade.status === 'pendente' || mensalidade.status === 'atrasado') && (
                   <TouchableOpacity
                     style={[styles.actionButton, styles.payButton, { marginTop: 8 }]}

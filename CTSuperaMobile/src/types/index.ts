@@ -92,9 +92,11 @@ export interface Mensalidade {
   aluno: number;
   aluno_nome?: string;
   valor: number | string;
+  valor_efetivo?: number | string;
   data_vencimento: string;
   status: 'pendente' | 'pago' | 'atrasado';
   data_pagamento?: string;
+  forma_pagamento_label?: string;
 }
 
 export interface Despesa {

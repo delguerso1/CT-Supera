@@ -57,11 +57,20 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
   const [loadingFotoPerfil, setLoadingFotoPerfil] = useState(false);
   const [pixModalVisible, setPixModalVisible] = useState(false);
   const [pixData, setPixData] = useState<{
+    transacao_id: number;
     codigo_pix: string;
     qr_code?: string;
     valor?: string;
     data_expiracao?: string;
   } | null>(null);
+  const [pixStatusLoading, setPixStatusLoading] = useState(false);
+  /** Polling de status PIX (igual ao site); limpar ao fechar modal ou desmontar. */
+  const pixPollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pixPollMaxTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const boletoPollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const boletoPollMaxTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const checkoutPollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const checkoutPollMaxTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [boletoModalVisible, setBoletoModalVisible] = useState(false);
   const [boletoData, setBoletoData] = useState<{
     transacao_id: number;
@@ -142,6 +151,35 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
   }, [user?.tipo]);
 
   useEffect(() => {
+    return () => {
+      if (pixPollIntervalRef.current) {
+        clearInterval(pixPollIntervalRef.current);
+        pixPollIntervalRef.current = null;
+      }
+      if (pixPollMaxTimeoutRef.current) {
+        clearTimeout(pixPollMaxTimeoutRef.current);
+        pixPollMaxTimeoutRef.current = null;
+      }
+      if (boletoPollIntervalRef.current) {
+        clearInterval(boletoPollIntervalRef.current);
+        boletoPollIntervalRef.current = null;
+      }
+      if (boletoPollMaxTimeoutRef.current) {
+        clearTimeout(boletoPollMaxTimeoutRef.current);
+        boletoPollMaxTimeoutRef.current = null;
+      }
+      if (checkoutPollIntervalRef.current) {
+        clearInterval(checkoutPollIntervalRef.current);
+        checkoutPollIntervalRef.current = null;
+      }
+      if (checkoutPollMaxTimeoutRef.current) {
+        clearTimeout(checkoutPollMaxTimeoutRef.current);
+        checkoutPollMaxTimeoutRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     if (activeSection === 'pagamentos' && user) {
       loadHistoricoPagamentos();
     }
@@ -183,9 +221,11 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
     });
   }, []);
 
-  const loadAlunoData = async () => {
+  const loadAlunoData = async (opts?: { silent?: boolean }) => {
     try {
-      setLoading(true);
+      if (!opts?.silent) {
+        setLoading(true);
+      }
       const painelData = await alunoService.getPainelAluno();
       setPainelAluno(painelData);
       const usuario = painelData.usuario;
@@ -214,9 +254,13 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
       });
     } catch (error: any) {
       console.error('Erro ao carregar painel do aluno:', error);
-      Alert.alert('Erro', error.response?.data?.error || 'Erro ao carregar dados do aluno.');
+      if (!opts?.silent) {
+        Alert.alert('Erro', error.response?.data?.error || 'Erro ao carregar dados do aluno.');
+      }
     } finally {
-      setLoading(false);
+      if (!opts?.silent) {
+        setLoading(false);
+      }
     }
   };
 
@@ -1251,10 +1295,160 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
     else void criarCheckout(m);
   };
 
+  const pararPollingPix = () => {
+    if (pixPollIntervalRef.current) {
+      clearInterval(pixPollIntervalRef.current);
+      pixPollIntervalRef.current = null;
+    }
+    if (pixPollMaxTimeoutRef.current) {
+      clearTimeout(pixPollMaxTimeoutRef.current);
+      pixPollMaxTimeoutRef.current = null;
+    }
+  };
+
+  const pararPollingBoleto = () => {
+    if (boletoPollIntervalRef.current) {
+      clearInterval(boletoPollIntervalRef.current);
+      boletoPollIntervalRef.current = null;
+    }
+    if (boletoPollMaxTimeoutRef.current) {
+      clearTimeout(boletoPollMaxTimeoutRef.current);
+      boletoPollMaxTimeoutRef.current = null;
+    }
+  };
+
+  const pararPollingCheckout = () => {
+    if (checkoutPollIntervalRef.current) {
+      clearInterval(checkoutPollIntervalRef.current);
+      checkoutPollIntervalRef.current = null;
+    }
+    if (checkoutPollMaxTimeoutRef.current) {
+      clearTimeout(checkoutPollMaxTimeoutRef.current);
+      checkoutPollMaxTimeoutRef.current = null;
+    }
+  };
+
+  const aplicarRespostaStatusPix = async (
+    transacao: { status?: string } | undefined,
+    statusTopo: string | undefined
+  ) => {
+    const st = transacao?.status || statusTopo;
+    if (st === 'aprovado') {
+      pararPollingPix();
+      setPixModalVisible(false);
+      setPixData(null);
+      Alert.alert('Pagamento confirmado', 'Sua mensalidade foi registrada como paga.');
+      await loadHistoricoPagamentos();
+      await loadAlunoData({ silent: true });
+      return true;
+    }
+    if (st === 'expirado') {
+      pararPollingPix();
+      setPixModalVisible(false);
+      setPixData(null);
+      Alert.alert('PIX expirado', 'Gere um novo PIX para pagar.');
+      await loadHistoricoPagamentos();
+      return true;
+    }
+    return false;
+  };
+
+  const consultarStatusPixUmaVez = async (transacaoId: number) => {
+    const data = await pagamentoService.consultarStatusPix(transacaoId);
+    return aplicarRespostaStatusPix(data.transacao, data.status);
+  };
+
+  const aplicarRespostaBoleto = async (data: {
+    transacao?: { status?: string };
+    status?: string;
+  }): Promise<boolean> => {
+    const st = (data.transacao?.status || data.status || '').toLowerCase();
+    if (st === 'aprovado') {
+      pararPollingBoleto();
+      setBoletoModalVisible(false);
+      setBoletoData(null);
+      Alert.alert('Pagamento confirmado', 'Boleto compensado. Mensalidade registrada como paga.');
+      await loadHistoricoPagamentos();
+      await loadAlunoData({ silent: true });
+      return true;
+    }
+    if (st === 'cancelado') {
+      pararPollingBoleto();
+      setBoletoModalVisible(false);
+      setBoletoData(null);
+      Alert.alert('Boleto cancelado', 'Gere um novo boleto se precisar pagar de novo.');
+      await loadHistoricoPagamentos();
+      await loadAlunoData({ silent: true });
+      return true;
+    }
+    if (st === 'expirado') {
+      pararPollingBoleto();
+      setBoletoModalVisible(false);
+      setBoletoData(null);
+      Alert.alert('Boleto expirado', 'Gere um novo boleto para pagar.');
+      await loadHistoricoPagamentos();
+      await loadAlunoData({ silent: true });
+      return true;
+    }
+    return false;
+  };
+
+  const aplicarRespostaCheckout = async (data: {
+    transacao?: { status?: string };
+    status?: string;
+  }): Promise<boolean> => {
+    const st = (data.transacao?.status || data.status || '').toLowerCase();
+    if (st === 'aprovado') {
+      pararPollingCheckout();
+      setCheckoutModalVisible(false);
+      setCheckoutData(null);
+      Alert.alert('Pagamento confirmado', 'Cartão aprovado. Mensalidade registrada como paga.');
+      await loadHistoricoPagamentos();
+      await loadAlunoData({ silent: true });
+      return true;
+    }
+    if (st === 'cancelado') {
+      pararPollingCheckout();
+      setCheckoutModalVisible(false);
+      setCheckoutData(null);
+      Alert.alert('Pagamento cancelado', 'Você pode iniciar um novo pagamento com cartão.');
+      await loadHistoricoPagamentos();
+      await loadAlunoData({ silent: true });
+      return true;
+    }
+    if (st === 'expirado') {
+      pararPollingCheckout();
+      setCheckoutModalVisible(false);
+      setCheckoutData(null);
+      Alert.alert('Checkout expirado', 'Gere um novo link de pagamento.');
+      await loadHistoricoPagamentos();
+      await loadAlunoData({ silent: true });
+      return true;
+    }
+    return false;
+  };
+
+  const consultarBoletoUmaVez = async (transacaoId: number) => {
+    const data = await pagamentoService.consultarBoleto(transacaoId);
+    return aplicarRespostaBoleto(data);
+  };
+
+  const consultarCheckoutUmaVez = async (transacaoId: number) => {
+    const data = await pagamentoService.consultarCheckout(transacaoId);
+    return aplicarRespostaCheckout(data);
+  };
+
   const gerarPix = async (mensalidade: Mensalidade) => {
     try {
       const response = await pagamentoService.gerarPix(mensalidade.id);
+      const transacaoId = response.transacao?.id;
+      if (transacaoId == null || Number.isNaN(Number(transacaoId))) {
+        Alert.alert('Erro', 'Resposta incompleta ao gerar PIX. Tente novamente.');
+        return;
+      }
+      pararPollingPix();
       setPixData({
+        transacao_id: transacaoId,
         codigo_pix: response.transacao.codigo_pix,
         qr_code: response.transacao.qr_code,
         valor: response.transacao.valor,
@@ -1262,6 +1456,20 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
       });
       setPixModalVisible(true);
       await loadHistoricoPagamentos();
+
+      const intervalo = setInterval(() => {
+        void (async () => {
+          try {
+            await consultarStatusPixUmaVez(transacaoId);
+          } catch (err) {
+            console.error('Erro ao verificar status do PIX:', err);
+          }
+        })();
+      }, 5000);
+      pixPollIntervalRef.current = intervalo;
+      pixPollMaxTimeoutRef.current = setTimeout(() => {
+        pararPollingPix();
+      }, 30 * 60 * 1000);
     } catch (error: any) {
       Alert.alert('Erro', error.response?.data?.error || 'Erro ao gerar PIX.');
     }
@@ -1270,18 +1478,35 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
   const gerarBoleto = async (mensalidade: Mensalidade) => {
     try {
       const response = await pagamentoService.gerarBoleto(mensalidade.id);
+      const transacaoId = response.transacao?.id;
       const linhaDigitavel =
         response.boleto?.digitable_line || response.transacao?.boleto_codigo;
       if (!linhaDigitavel) {
         Alert.alert('Boleto Gerado', 'Boleto criado, mas a linha digitável não foi retornada.');
+      } else if (transacaoId == null || Number.isNaN(Number(transacaoId))) {
+        Alert.alert('Erro', 'Resposta incompleta ao gerar boleto. Tente novamente.');
       } else {
+        pararPollingBoleto();
         setBoletoData({
-          transacao_id: response.transacao.id,
+          transacao_id: transacaoId,
           linha_digitavel: linhaDigitavel,
           valor: response.transacao?.valor,
           data_vencimento: response.transacao?.data_vencimento,
         });
         setBoletoModalVisible(true);
+        const intervalo = setInterval(() => {
+          void (async () => {
+            try {
+              await consultarBoletoUmaVez(transacaoId);
+            } catch (err) {
+              console.error('Erro ao verificar status do boleto:', err);
+            }
+          })();
+        }, 15000);
+        boletoPollIntervalRef.current = intervalo;
+        boletoPollMaxTimeoutRef.current = setTimeout(() => {
+          pararPollingBoleto();
+        }, 30 * 60 * 1000);
       }
       await loadHistoricoPagamentos();
     } catch (error: any) {
@@ -1300,13 +1525,29 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
 
       if (!paymentUrl || !transacaoId) {
         Alert.alert('Checkout Criado', 'Checkout gerado, mas o link não foi retornado.');
+      } else if (Number.isNaN(Number(transacaoId))) {
+        Alert.alert('Erro', 'Resposta incompleta ao criar checkout. Tente novamente.');
       } else {
+        pararPollingCheckout();
         setCheckoutData({
           transacao_id: transacaoId,
           payment_url: paymentUrl,
           status: response.transacao?.status || response.checkout?.status,
         });
         setCheckoutModalVisible(true);
+        const intervalo = setInterval(() => {
+          void (async () => {
+            try {
+              await consultarCheckoutUmaVez(transacaoId);
+            } catch (err) {
+              console.error('Erro ao verificar status do checkout:', err);
+            }
+          })();
+        }, 5000);
+        checkoutPollIntervalRef.current = intervalo;
+        checkoutPollMaxTimeoutRef.current = setTimeout(() => {
+          pararPollingCheckout();
+        }, 30 * 60 * 1000);
       }
       await loadHistoricoPagamentos();
     } catch (error: any) {
@@ -1320,6 +1561,48 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
     Alert.alert('Sucesso', 'Código PIX copiado.');
   };
 
+  const handleConsultarPixStatus = async () => {
+    if (!pixData?.transacao_id) return;
+    try {
+      setPixStatusLoading(true);
+      const ok = await consultarStatusPixUmaVez(pixData.transacao_id);
+      if (!ok) {
+        Alert.alert(
+          'Status',
+          'Pagamento ainda pendente ou em processamento. Aguarde alguns segundos e toque de novo, ou pague o PIX e aguarde a confirmação automática.'
+        );
+      }
+    } catch (error: any) {
+      Alert.alert('Erro', error.response?.data?.error || 'Erro ao consultar status do PIX.');
+    } finally {
+      setPixStatusLoading(false);
+    }
+  };
+
+  const fecharModalPix = async () => {
+    pararPollingPix();
+    setPixModalVisible(false);
+    setPixData(null);
+    await loadHistoricoPagamentos();
+    await loadAlunoData({ silent: true });
+  };
+
+  const fecharModalBoleto = async () => {
+    pararPollingBoleto();
+    setBoletoModalVisible(false);
+    setBoletoData(null);
+    await loadHistoricoPagamentos();
+    await loadAlunoData({ silent: true });
+  };
+
+  const fecharModalCheckout = async () => {
+    pararPollingCheckout();
+    setCheckoutModalVisible(false);
+    setCheckoutData(null);
+    await loadHistoricoPagamentos();
+    await loadAlunoData({ silent: true });
+  };
+
   const handleCopiarLinhaDigitavel = async () => {
     if (!boletoData?.linha_digitavel) return;
     await Clipboard.setStringAsync(boletoData.linha_digitavel);
@@ -1331,10 +1614,14 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
     try {
       setBoletoStatusLoading(true);
       const response = await pagamentoService.consultarBoleto(boletoData.transacao_id);
-      Alert.alert(
-        'Status do Boleto',
-        `Status: ${response.status || response.transacao?.status || 'indisponível'}`
-      );
+      const ok = await aplicarRespostaBoleto(response);
+      if (!ok) {
+        const label = response.status || response.transacao?.status || 'indisponível';
+        Alert.alert(
+          'Status do boleto',
+          `Status: ${label}. Se já pagou, aguarde a compensação ou toque de novo em alguns minutos.`
+        );
+      }
     } catch (error: any) {
       Alert.alert('Erro', error.response?.data?.error || 'Erro ao consultar boleto.');
     } finally {
@@ -1378,10 +1665,16 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
     try {
       setCheckoutStatusLoading(true);
       const response = await pagamentoService.consultarCheckout(checkoutData.transacao_id);
-      const status = response.status || response.checkout?.status || response.transacao?.status;
-      Alert.alert('Status do Checkout', `Status: ${status || 'indisponível'}`);
-      await loadHistoricoPagamentos();
-      await loadAlunoData();
+      const ok = await aplicarRespostaCheckout(response);
+      if (!ok) {
+        const status = response.status || response.checkout?.status || response.transacao?.status;
+        Alert.alert(
+          'Status do pagamento',
+          `Status: ${status || 'indisponível'}. Após pagar no navegador, toque de novo para atualizar.`
+        );
+        await loadHistoricoPagamentos();
+        await loadAlunoData({ silent: true });
+      }
     } catch (error: any) {
       Alert.alert('Erro', error.response?.data?.error || 'Erro ao consultar checkout.');
     } finally {
@@ -1696,10 +1989,16 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.modalButton, styles.modalButtonSecondary]}
-                onPress={() => {
-                  setPixModalVisible(false);
-                  setPixData(null);
-                }}
+                onPress={handleConsultarPixStatus}
+                disabled={pixStatusLoading}
+              >
+                <Text style={styles.modalButtonText}>
+                  {pixStatusLoading ? 'Consultando...' : 'Já paguei — verificar'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalButtonSecondary]}
+                onPress={() => void fecharModalPix()}
               >
                 <Text style={styles.modalButtonText}>Fechar</Text>
               </TouchableOpacity>
@@ -1729,7 +2028,7 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
                 disabled={boletoStatusLoading}
               >
                 <Text style={styles.modalButtonText}>
-                  {boletoStatusLoading ? 'Consultando...' : 'Consultar status'}
+                  {boletoStatusLoading ? 'Consultando...' : 'Já paguei — verificar'}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -1744,10 +2043,7 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.modalButtonStack, styles.modalButtonStackSecondary]}
-              onPress={() => {
-                setBoletoModalVisible(false);
-                setBoletoData(null);
-              }}
+              onPress={() => void fecharModalBoleto()}
             >
               <Text style={styles.modalButtonText}>Fechar</Text>
             </TouchableOpacity>
@@ -1781,15 +2077,12 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
               disabled={checkoutStatusLoading}
             >
               <Text style={styles.modalButtonText}>
-                {checkoutStatusLoading ? 'Consultando...' : 'Consultar status'}
+                {checkoutStatusLoading ? 'Consultando...' : 'Já paguei — verificar'}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.modalButtonStack, styles.modalButtonStackSecondary]}
-              onPress={() => {
-                setCheckoutModalVisible(false);
-                setCheckoutData(null);
-              }}
+              onPress={() => void fecharModalCheckout()}
             >
               <Text style={styles.modalButtonText}>Fechar</Text>
             </TouchableOpacity>
