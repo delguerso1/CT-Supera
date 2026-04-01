@@ -30,6 +30,32 @@ import re
 logger = logging.getLogger(__name__)
 
 
+def _salvar_cpf_no_precadastro_ou_erro(precadastro, cpf):
+    """
+    Persiste o CPF no pré-cadastro antes de converter.
+    IntegrityError aqui ficava fora do try da conversão e gerava 500 genérico no cliente.
+    """
+    precadastro.cpf = cpf
+    try:
+        precadastro.save()
+    except IntegrityError:
+        logger.warning(
+            "IntegrityError ao salvar CPF no pré-cadastro id=%s",
+            precadastro.pk,
+            exc_info=True,
+        )
+        return Response(
+            {
+                "error": (
+                    "Não foi possível usar este CPF neste pré-cadastro: já existe outro registro "
+                    "com o mesmo CPF. Verifique duplicidade entre pré-cadastros ou se o aluno já está cadastrado."
+                )
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    return None
+
+
 def _telefone_br_so_digitos(valor):
     """Retorna 10 ou 11 dígitos ou None (mesma regra do pré-cadastro)."""
     if not valor:
@@ -346,26 +372,51 @@ class FinalizarAgendamentoAPIView(APIView):
                 }, status=status.HTTP_400_BAD_REQUEST)
 
         if ja_aluno_bool:
-            precadastro.cpf = cpf
-            precadastro.save()
+            resp_cpf = _salvar_cpf_no_precadastro_ou_erro(precadastro, cpf)
+            if resp_cpf is not None:
+                return resp_cpf
 
             aluno = precadastro.usuario
             if aluno:
-                aluno.dia_vencimento = dia_vencimento
-                aluno.valor_mensalidade = valor_mensalidade
-                aluno.save()
-                if dias_habilitados is not None:
-                    aluno.dias_habilitados.set(dias_habilitados)
-                aluno.atualizar_mensalidades_pendentes()
-                if precadastro.turma:
-                    precadastro.turma.alunos.add(aluno)
-                    from financeiro.services import criar_mensalidade_ao_vincular_turma
-                    criar_mensalidade_ao_vincular_turma(aluno, precadastro.turma)
+                try:
+                    aluno.dia_vencimento = dia_vencimento
+                    aluno.valor_mensalidade = valor_mensalidade
+                    aluno.save()
+                    if dias_habilitados is not None:
+                        aluno.dias_habilitados.set(dias_habilitados)
+                    aluno.atualizar_mensalidades_pendentes()
+                    if precadastro.turma:
+                        precadastro.turma.alunos.add(aluno)
+                        from financeiro.services import criar_mensalidade_ao_vincular_turma
+                        criar_mensalidade_ao_vincular_turma(aluno, precadastro.turma)
 
-                precadastro.status = 'matriculado'
-                precadastro.save()
+                    precadastro.status = 'matriculado'
+                    precadastro.save()
 
-                return Response({"message": "Pré-cadastro convertido em aluno com sucesso!"}, status=status.HTTP_200_OK)
+                    return Response({"message": "Pré-cadastro convertido em aluno com sucesso!"}, status=status.HTTP_200_OK)
+                except IntegrityError:
+                    logger.warning(
+                        "IntegrityError ao finalizar agendamento (já aluno, vínculo existente) precadastro=%s",
+                        precadastro.pk,
+                        exc_info=True,
+                    )
+                    return Response(
+                        {
+                            "error": (
+                                "Conflito ao salvar (CPF, turma ou vínculo duplicado). "
+                                "Verifique se o aluno já está na turma ou se há cadastro duplicado."
+                            )
+                        },
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+                except Exception as e:
+                    logger.exception(
+                        "Erro ao finalizar agendamento (já aluno, aluno já vinculado ao pré-cadastro)"
+                    )
+                    return Response(
+                        {"error": f"Erro ao finalizar agendamento: {str(e)}"},
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
 
             try:
                 usuario_aluno = precadastro.converter_para_aluno(
@@ -384,8 +435,9 @@ class FinalizarAgendamentoAPIView(APIView):
             except Exception as e:
                 return Response({"error": f"Erro ao finalizar agendamento: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
 
-        precadastro.cpf = cpf
-        precadastro.save()
+        resp_cpf = _salvar_cpf_no_precadastro_ou_erro(precadastro, cpf)
+        if resp_cpf is not None:
+            return resp_cpf
         try:
             usuario_aluno = precadastro.converter_para_aluno(
                 request.user,
