@@ -30,7 +30,7 @@ def criar_mensalidade_ao_vincular_turma(aluno, turma, valor_primeira_mensalidade
     """
     Cria mensalidade quando aluno é vinculado a uma turma, se:
     - O CT da turma não tem sem_financeiro
-    - O aluno ainda não possui mensalidade (evita duplicação)
+    - Ainda não existe mensalidade para o mesmo mês/ano de vencimento (evita duplicação)
     - valor_primeira_mensalidade: valor opcional (matrícula + uniforme + mensalidade proporcional do mês)
     - dia_vencimento_primeira: dia do mês (1-31) para vencimento da primeira mensalidade
 
@@ -38,8 +38,6 @@ def criar_mensalidade_ao_vincular_turma(aluno, turma, valor_primeira_mensalidade
     """
     if turma.ct.sem_financeiro:
         return None
-    if Mensalidade.objects.filter(aluno=aluno).exists():
-        return None  # Já possui mensalidade, não duplicar
 
     valor = valor_primeira_mensalidade or aluno.valor_mensalidade or Decimal("150.00")
     dia_venc = dia_vencimento_primeira if dia_vencimento_primeira is not None else (aluno.dia_vencimento or 10)
@@ -48,7 +46,8 @@ def criar_mensalidade_ao_vincular_turma(aluno, turma, valor_primeira_mensalidade
     except (TypeError, ValueError):
         dia_venc = 10
 
-    hoje = timezone.now().date()
+    # Data "hoje" no fuso configurado (evita deslocar vencimento vs. calendário BR em servidores UTC)
+    hoje = timezone.localdate()
     ultimo_dia = monthrange(hoje.year, hoje.month)[1]
     dia_venc = min(max(1, dia_venc), ultimo_dia)
     data_vencimento = hoje.replace(day=dia_venc)
@@ -86,7 +85,7 @@ def gerar_mensalidades_para_mes(ano: int, mes: int) -> int:
     usuários: ativo no CT (ativo=True) e conta liberada para login (is_active=True).
     """
     total_geradas = 0
-    hoje = timezone.now().date()
+    hoje = timezone.localdate()
     ultimo_dia = monthrange(ano, mes)[1]
 
     alunos = Usuario.objects.filter(tipo='aluno', ativo=True, is_active=True)

@@ -521,7 +521,7 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
                   </View>
                 </View>
                 <Text style={styles.mensalidadeDate}>
-                  Vencimento: {new Date(mensalidade.data_vencimento).toLocaleDateString('pt-BR')}
+                  Vencimento: {formatDate(mensalidade.data_vencimento)}
                 </Text>
               </View>
             ))}
@@ -1252,7 +1252,7 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
                   </View>
                 </View>
                 <Text style={styles.mensalidadeDate}>
-                  Vencimento: {new Date(mensalidade.data_vencimento).toLocaleDateString('pt-BR')}
+                  Vencimento: {formatDate(mensalidade.data_vencimento)}
                 </Text>
                 <TouchableOpacity
                   style={styles.pagarButton}
@@ -1279,7 +1279,7 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
                   </View>
                 </View>
                 <Text style={styles.mensalidadeDate}>
-                  Vencimento: {new Date(mensalidade.data_vencimento).toLocaleDateString('pt-BR')}
+                  Vencimento: {formatDate(mensalidade.data_vencimento)}
                 </Text>
                 <TouchableOpacity
                   style={styles.pagarButton}
@@ -1306,7 +1306,7 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
                   </View>
                 </View>
                 <Text style={styles.mensalidadeDate}>
-                  Vencimento: {new Date(mensalidade.data_vencimento).toLocaleDateString('pt-BR')}
+                  Vencimento: {formatDate(mensalidade.data_vencimento)}
                 </Text>
                 {mensalidade.data_pagamento && (
                   <Text style={styles.mensalidadeDate}>

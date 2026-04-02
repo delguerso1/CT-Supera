@@ -8,7 +8,7 @@ from usuarios.models import Usuario
 
 
 def _hoje_br():
-    return timezone.now().date()
+    return timezone.localdate()
 
 CATEGORIAS_DESPESAS = [
     ("salario", "Salário de Funcionário"),

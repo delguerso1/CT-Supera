@@ -390,7 +390,9 @@ class FinalizarAgendamentoAPIView(APIView):
                     if turma_ref:
                         turma_ref.alunos.add(aluno)
                         from financeiro.services import criar_mensalidade_ao_vincular_turma
-                        criar_mensalidade_ao_vincular_turma(aluno, turma_ref)
+                        criar_mensalidade_ao_vincular_turma(
+                            aluno, turma_ref, dia_vencimento_primeira=dia_vencimento
+                        )
 
                     precadastro.delete()
 
@@ -432,7 +434,9 @@ class FinalizarAgendamentoAPIView(APIView):
                     turma_ref.alunos.add(usuario_aluno)
                     from financeiro.services import criar_mensalidade_ao_vincular_turma
                     # Ramo ja_aluno: sem 1ª parcela composta (só mensalidade via aluno.valor_mensalidade)
-                    criar_mensalidade_ao_vincular_turma(usuario_aluno, turma_ref)
+                    criar_mensalidade_ao_vincular_turma(
+                        usuario_aluno, turma_ref, dia_vencimento_primeira=dia_vencimento
+                    )
                 return Response({"message": "Pré-cadastro convertido em aluno com sucesso!"}, status=status.HTTP_200_OK)
             except Exception as e:
                 return Response({"error": f"Erro ao finalizar agendamento: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)

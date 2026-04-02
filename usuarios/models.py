@@ -431,7 +431,7 @@ class Usuario(AbstractUser):
         from financeiro.models import Mensalidade
         from django.utils import timezone
         from calendar import monthrange
-        hoje = timezone.now().date()
+        hoje = timezone.localdate()
         mensalidades = Mensalidade.objects.filter(
             aluno=self,
             status__in=['pendente', 'atrasado'],
