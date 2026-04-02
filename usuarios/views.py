@@ -376,22 +376,23 @@ class FinalizarAgendamentoAPIView(APIView):
             if resp_cpf is not None:
                 return resp_cpf
 
+            turma_ref = precadastro.turma
             aluno = precadastro.usuario
             if aluno:
                 try:
                     aluno.dia_vencimento = dia_vencimento
                     aluno.valor_mensalidade = valor_mensalidade
+                    aluno.matriculado_em = timezone.now()
                     aluno.save()
                     if dias_habilitados is not None:
                         aluno.dias_habilitados.set(dias_habilitados)
                     aluno.atualizar_mensalidades_pendentes()
-                    if precadastro.turma:
-                        precadastro.turma.alunos.add(aluno)
+                    if turma_ref:
+                        turma_ref.alunos.add(aluno)
                         from financeiro.services import criar_mensalidade_ao_vincular_turma
-                        criar_mensalidade_ao_vincular_turma(aluno, precadastro.turma)
+                        criar_mensalidade_ao_vincular_turma(aluno, turma_ref)
 
-                    precadastro.status = 'matriculado'
-                    precadastro.save()
+                    precadastro.delete()
 
                     return Response({"message": "Pré-cadastro convertido em aluno com sucesso!"}, status=status.HTTP_200_OK)
                 except IntegrityError:
@@ -419,6 +420,7 @@ class FinalizarAgendamentoAPIView(APIView):
                     )
 
             try:
+                turma_ref = precadastro.turma
                 usuario_aluno = precadastro.converter_para_aluno(
                     request.user,
                     dia_vencimento=dia_vencimento,
@@ -426,11 +428,11 @@ class FinalizarAgendamentoAPIView(APIView):
                     plano=None,
                     dias_habilitados=dias_habilitados
                 )
-                if usuario_aluno and precadastro.turma:
-                    precadastro.turma.alunos.add(usuario_aluno)
+                if usuario_aluno and turma_ref:
+                    turma_ref.alunos.add(usuario_aluno)
                     from financeiro.services import criar_mensalidade_ao_vincular_turma
                     # Ramo ja_aluno: sem 1ª parcela composta (só mensalidade via aluno.valor_mensalidade)
-                    criar_mensalidade_ao_vincular_turma(usuario_aluno, precadastro.turma)
+                    criar_mensalidade_ao_vincular_turma(usuario_aluno, turma_ref)
                 return Response({"message": "Pré-cadastro convertido em aluno com sucesso!"}, status=status.HTTP_200_OK)
             except Exception as e:
                 return Response({"error": f"Erro ao finalizar agendamento: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
@@ -439,6 +441,7 @@ class FinalizarAgendamentoAPIView(APIView):
         if resp_cpf is not None:
             return resp_cpf
         try:
+            turma_ref = precadastro.turma
             usuario_aluno = precadastro.converter_para_aluno(
                 request.user,
                 dia_vencimento=dia_vencimento,
@@ -447,11 +450,11 @@ class FinalizarAgendamentoAPIView(APIView):
                 dias_habilitados=dias_habilitados
             )
             mensalidade_criada = None
-            if usuario_aluno and precadastro.turma:
-                precadastro.turma.alunos.add(usuario_aluno)
+            if usuario_aluno and turma_ref:
+                turma_ref.alunos.add(usuario_aluno)
                 from financeiro.services import criar_mensalidade_ao_vincular_turma
                 mensalidade_criada = criar_mensalidade_ao_vincular_turma(
-                    usuario_aluno, precadastro.turma,
+                    usuario_aluno, turma_ref,
                     valor_primeira_mensalidade=valor_primeira_mensalidade,
                     dia_vencimento_primeira=dia_vencimento_primeira
                 )

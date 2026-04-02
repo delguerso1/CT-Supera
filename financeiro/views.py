@@ -14,7 +14,6 @@ from .serializers import MensalidadeSerializer, DespesaSerializer, SalarioSerial
 from .pagination import MensalidadePagination
 from .c6_client import c6_client, C6BankError, C6BankMethodNotAllowedError, C6BankInvalidRequestError
 from django.shortcuts import get_object_or_404
-from usuarios.models import PreCadastro
 from django.conf import settings
 from datetime import timedelta
 from django.views.decorators.csrf import csrf_exempt
@@ -346,9 +345,9 @@ class DashboardFinanceiroAPIView(APIView):
         total_salarios_pagos = salarios.filter(status="pago").aggregate(Sum("valor"))["valor__sum"] or 0
         saldo_final = total_pago - total_despesas - total_salarios
 
-        # Novas matrículas = pré-cadastros que passaram a matriculado no mês (fluxo lead → aluno)
-        matriculas_no_mes = PreCadastro.objects.filter(
-            status="matriculado",
+        # Novas matrículas = alunos com data de efetivação da matrícula no mês (pré-cadastro removido após conversão)
+        matriculas_no_mes = User.objects.filter(
+            tipo="aluno",
             matriculado_em__year=ano,
             matriculado_em__month=mes,
         ).count()

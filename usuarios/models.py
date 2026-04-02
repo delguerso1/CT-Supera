@@ -84,114 +84,124 @@ class PreCadastro(models.Model):
         super().save(*args, **kwargs)
 
     def converter_para_aluno(self, usuario, dia_vencimento=None, valor_mensalidade=None, plano=None, dias_habilitados=None):
-        """Transforma o PreCadastro diretamente em um Usuario (Aluno). Apenas professores ou gerentes podem finalizar."""
+        """Cria ou reutiliza o aluno a partir deste pré-cadastro e remove o registro de pré-cadastro."""
         if usuario.tipo not in ['professor', 'gerente']:
             raise PermissionDenied("⚠️ Apenas professores e gerentes podem finalizar o agendamento.")
 
-        if not self.usuario:
-            cpf_digits = ''.join(c for c in str(self.cpf or '') if c.isdigit())
-            if len(cpf_digits) != 11:
-                raise ValidationError(
-                    "⚠️ Informe um CPF válido com 11 dígitos antes de matricular."
-                )
-            self.cpf = cpf_digits
+        # Legado: ainda havia vínculo pré-cadastro ↔ aluno — remove só o pré-cadastro
+        if self.usuario_id:
+            u = self.usuario
+            pk_del = self.pk
+            if pk_del:
+                PreCadastro.objects.filter(pk=pk_del).delete()
+            return u
 
-            # Reingresso / ex-aluno: já existe cadastro com este CPF — vincula em vez de criar (evita UNIQUE em username/cpf).
-            existente = Usuario.objects.filter(tipo='aluno', cpf=cpf_digits).first()
-            if existente:
-                existente.dia_vencimento = dia_vencimento
-                existente.valor_mensalidade = valor_mensalidade
-                if plano is not None:
-                    existente.plano = plano
-                existente.ativo = True
-                if dias_habilitados:
-                    existente.dias_habilitados.set(dias_habilitados)
-                existente.save()
-                if hasattr(existente, 'atualizar_mensalidades_pendentes'):
-                    existente.atualizar_mensalidades_pendentes()
-                self.usuario = existente
-                self.status = 'matriculado'
-                self.save(update_fields=['usuario', 'status', 'cpf'])
-                logger.info(
-                    'Pré-cadastro %s vinculado ao aluno existente id=%s (CPF %s)',
-                    self.pk,
-                    existente.pk,
-                    cpf_digits,
-                )
-                return existente
-
-            def _formatar_nome(valor):
-                if not valor:
-                    return valor
-                partes = [p for p in valor.strip().split(' ') if p]
-                partes_formatadas = []
-                for parte in partes:
-                    subpartes = [sp for sp in parte.split('-') if sp]
-                    subpartes_formatadas = [
-                        sp[0].upper() + sp[1:].lower() if sp else ''
-                        for sp in subpartes
-                    ]
-                    partes_formatadas.append('-'.join(subpartes_formatadas))
-                return ' '.join(partes_formatadas)
-
-            # Verifica a idade do aluno
-            idade = None
-            if self.data_nascimento:
-                hoje = date.today()
-                idade = hoje.year - self.data_nascimento.year - (
-                    (hoje.month, hoje.day) < (self.data_nascimento.month, self.data_nascimento.day)
-                )
-
-            # Telefone do responsável (menores) é opcional; maiores precisam de telefone (emergência)
-            telefone_responsavel = None
-            telefone_emergencia = None
-
-            if idade is not None and idade < 18:
-                pass
-            else:
-                if not self.telefone:
-                    raise ValidationError(
-                        "⚠️ Alunos maiores de idade devem informar o telefone (usado como telefone de emergência)."
-                    )
-                telefone_emergencia = self.telefone
-
-            # Cria o usuário aluno inativo (será ativado via link)
-            usuario_aluno = Usuario.objects.create_user(
-                username=cpf_digits,
-                email=self.email if self.email else "",
-                password=None,  # Não define senha - usuário definirá via link
-                tipo="aluno",
-                first_name=_formatar_nome(self.first_name),
-                last_name=_formatar_nome(self.last_name or ""),
-                telefone=self.telefone or "",
-                cpf=cpf_digits,
-                data_nascimento=self.data_nascimento,
-                telefone_responsavel=telefone_responsavel,
-                telefone_emergencia=telefone_emergencia,
-                dia_vencimento=dia_vencimento,
-                valor_mensalidade=valor_mensalidade,
-                plano=plano,
+        cpf_digits = ''.join(c for c in str(self.cpf or '') if c.isdigit())
+        if len(cpf_digits) != 11:
+            raise ValidationError(
+                "⚠️ Informe um CPF válido com 11 dígitos antes de matricular."
             )
-            usuario_aluno.is_active = False  # Usuário inativo até ativar via link
-            usuario_aluno.set_unusable_password()  # Não define senha válida
-            usuario_aluno.save()
-            if dias_habilitados:
-                usuario_aluno.dias_habilitados.set(dias_habilitados)
-            self.usuario = usuario_aluno
-            self.status = 'matriculado'  # Atualiza o status para matriculado
-            self.save()
+        self.cpf = cpf_digits
+        agora = django_timezone.now()
 
-            # Enviar e-mail de ativação ao aluno
-            if usuario_aluno.email:
-                try:
-                    enviar_convite_aluno(usuario_aluno)
-                    logger.info(f"Convite de ativação enviado para {usuario_aluno.email}")
-                except Exception as e:
-                    logger.error(f"Erro ao enviar convite de ativação para {usuario_aluno.email}: {e}")
-                    # Não falha o cadastro se o e-mail não for enviado
-                    # O usuário pode solicitar novo convite posteriormente
-            return usuario_aluno
-        return self.usuario
+        # Reingresso / ex-aluno: já existe cadastro com este CPF — atualiza e apaga o pré-cadastro
+        existente = Usuario.objects.filter(tipo='aluno', cpf=cpf_digits).first()
+        if existente:
+            existente.dia_vencimento = dia_vencimento
+            existente.valor_mensalidade = valor_mensalidade
+            if plano is not None:
+                existente.plano = plano
+            existente.ativo = True
+            existente.matriculado_em = agora
+            if dias_habilitados:
+                existente.dias_habilitados.set(dias_habilitados)
+            existente.save()
+            if hasattr(existente, 'atualizar_mensalidades_pendentes'):
+                existente.atualizar_mensalidades_pendentes()
+            pk_del = self.pk
+            if pk_del:
+                PreCadastro.objects.filter(pk=pk_del).delete()
+            logger.info(
+                'Pré-cadastro %s convertido: aluno existente id=%s (CPF %s), pré-cadastro removido',
+                pk_del,
+                existente.pk,
+                cpf_digits,
+            )
+            return existente
+
+        def _formatar_nome(valor):
+            if not valor:
+                return valor
+            partes = [p for p in valor.strip().split(' ') if p]
+            partes_formatadas = []
+            for parte in partes:
+                subpartes = [sp for sp in parte.split('-') if sp]
+                subpartes_formatadas = [
+                    sp[0].upper() + sp[1:].lower() if sp else ''
+                    for sp in subpartes
+                ]
+                partes_formatadas.append('-'.join(subpartes_formatadas))
+            return ' '.join(partes_formatadas)
+
+        # Verifica a idade do aluno
+        idade = None
+        if self.data_nascimento:
+            hoje = date.today()
+            idade = hoje.year - self.data_nascimento.year - (
+                (hoje.month, hoje.day) < (self.data_nascimento.month, self.data_nascimento.day)
+            )
+
+        # Telefone do responsável (menores) é opcional; maiores precisam de telefone (emergência)
+        telefone_responsavel = None
+        telefone_emergencia = None
+
+        if idade is not None and idade < 18:
+            pass
+        else:
+            if not self.telefone:
+                raise ValidationError(
+                    "⚠️ Alunos maiores de idade devem informar o telefone (usado como telefone de emergência)."
+                )
+            telefone_emergencia = self.telefone
+
+        # Cria o usuário aluno inativo (será ativado via link)
+        usuario_aluno = Usuario.objects.create_user(
+            username=cpf_digits,
+            email=self.email if self.email else "",
+            password=None,  # Não define senha - usuário definirá via link
+            tipo="aluno",
+            first_name=_formatar_nome(self.first_name),
+            last_name=_formatar_nome(self.last_name or ""),
+            telefone=self.telefone or "",
+            cpf=cpf_digits,
+            data_nascimento=self.data_nascimento,
+            telefone_responsavel=telefone_responsavel,
+            telefone_emergencia=telefone_emergencia,
+            dia_vencimento=dia_vencimento,
+            valor_mensalidade=valor_mensalidade,
+            plano=plano,
+            matriculado_em=agora,
+        )
+        usuario_aluno.is_active = False  # Usuário inativo até ativar via link
+        usuario_aluno.set_unusable_password()  # Não define senha válida
+        usuario_aluno.save()
+        if dias_habilitados:
+            usuario_aluno.dias_habilitados.set(dias_habilitados)
+
+        pk_del = self.pk
+        if pk_del:
+            PreCadastro.objects.filter(pk=pk_del).delete()
+
+        # Enviar e-mail de ativação ao aluno
+        if usuario_aluno.email:
+            try:
+                enviar_convite_aluno(usuario_aluno)
+                logger.info(f"Convite de ativação enviado para {usuario_aluno.email}")
+            except Exception as e:
+                logger.error(f"Erro ao enviar convite de ativação para {usuario_aluno.email}: {e}")
+                # Não falha o cadastro se o e-mail não for enviado
+                # O usuário pode solicitar novo convite posteriormente
+        return usuario_aluno
 
 
 class Usuario(AbstractUser):
@@ -218,6 +228,11 @@ class Usuario(AbstractUser):
         null=True,
         blank=True,
         help_text="Data em que o aluno foi inativado (desistência). Preenchida automaticamente ao marcar ativo=False.",
+    )
+    matriculado_em = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Momento em que a matrícula foi efetivada (pré-cadastro → aluno). Usado em relatórios financeiros.",
     )
     data_nascimento = models.DateField(null=True, blank=True)
     nome_responsavel = models.CharField(max_length=100, blank=True, null=True)

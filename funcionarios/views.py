@@ -522,11 +522,12 @@ class ConverterPrecadastroAPIView(APIView):
         precadastro.cpf = cpf_digits
         precadastro.save(update_fields=['cpf'])
 
+        agora = timezone.now()
         existente = Usuario.objects.filter(tipo='aluno', cpf=cpf_digits).first()
         if existente:
-            precadastro.usuario = existente
-            precadastro.status = "matriculado"
-            precadastro.save(update_fields=['usuario', 'status'])
+            existente.matriculado_em = agora
+            existente.save(update_fields=['matriculado_em'])
+            precadastro.delete()
             return Response(
                 {"message": "Pré-cadastro vinculado ao aluno já cadastrado (mesmo CPF)."},
                 status=status.HTTP_200_OK,
@@ -546,14 +547,13 @@ class ConverterPrecadastroAPIView(APIView):
             telefone=precadastro.telefone,
             cpf=cpf_digits,
             data_nascimento=precadastro.data_nascimento,
+            matriculado_em=agora,
             is_active=False  # Usuário inativo até ativar via link
         )
         usuario.set_unusable_password()  # Não define senha válida
         usuario.save()
 
-        precadastro.usuario = usuario
-        precadastro.status = "matriculado"
-        precadastro.save()
+        precadastro.delete()
 
         # Envia convite de ativação (NÃO envia senha por e-mail)
         if usuario.email:
