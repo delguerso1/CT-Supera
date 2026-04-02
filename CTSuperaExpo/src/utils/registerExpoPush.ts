@@ -15,6 +15,31 @@ function logPush(message: string, err?: unknown) {
   }
 }
 
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function enviarTokenAoServidorComRetentativas(token: string): Promise<boolean> {
+  const tentativas = 3;
+  let ultimo: unknown;
+  for (let i = 0; i < tentativas; i++) {
+    try {
+      await usuarioService.registrarPushTokenExpo(token);
+      return true;
+    } catch (e) {
+      ultimo = e;
+      if (i < tentativas - 1) {
+        await delay(1500 * (i + 1));
+      }
+    }
+  }
+  logPush(
+    `Falha ao registrar push após ${tentativas} tentativas (rede ou servidor). O gerente pode ver 0 alunos até o próximo login ou reabrir o app.`,
+    ultimo
+  );
+  return false;
+}
+
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
@@ -79,8 +104,10 @@ export async function registrarPushTokenAluno(): Promise<void> {
       token &&
       (token.startsWith('ExponentPushToken') || token.startsWith('ExpoPushToken'))
     ) {
-      await usuarioService.registrarPushTokenExpo(token);
-      logPush('Token Expo enviado ao servidor com sucesso (usuarios/push-token/).');
+      const ok = await enviarTokenAoServidorComRetentativas(token);
+      if (ok) {
+        logPush('Token Expo enviado ao servidor com sucesso (usuarios/push-token/).');
+      }
     } else {
       logPush(`Token com formato inesperado (não enviado ao servidor): ${String(token).slice(0, 40)}…`);
     }

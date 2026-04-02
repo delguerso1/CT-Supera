@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authService } from '../services/api';
 import { User, AuthContextType } from '../types';
+import { registrarPushTokenAluno } from './registerExpoPush';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -64,6 +65,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       setToken(response.token);
       setUser(userNorm);
+      if (userNorm.tipo === 'aluno') {
+        setTimeout(() => {
+          void registrarPushTokenAluno();
+        }, 400);
+      }
     } catch (error) {
       console.error('Erro no login:', error);
       throw error;

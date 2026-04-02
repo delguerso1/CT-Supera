@@ -58,10 +58,12 @@ api.interceptors.response.use(
   },
   async (error) => {
     if (error.response?.status === 401) {
-      // Token expirado ou inválido
-      await AsyncStorage.removeItem('token');
-      await AsyncStorage.removeItem('user');
-      // Aqui você pode redirecionar para a tela de login
+      const reqUrl = String(error.config?.url ?? '');
+      // Registro de push não deve derrubar a sessão (evita logout em falha pontual de rota/auth).
+      if (!reqUrl.includes('usuarios/push-token')) {
+        await AsyncStorage.removeItem('token');
+        await AsyncStorage.removeItem('user');
+      }
     }
     return Promise.reject(error);
   }
@@ -572,7 +574,7 @@ export const usuarioService = {
 
   registrarPushTokenExpo: async (token: string): Promise<void> => {
     try {
-      await api.post('usuarios/push-token/', { token });
+      await api.post('usuarios/push-token/', { token }, { timeout: 25000 });
     } catch (err: unknown) {
       const ax = err as {
         response?: { status?: number; data?: unknown };
@@ -590,6 +592,7 @@ export const usuarioService = {
   getNotificacaoAppEstatisticas: async (): Promise<{
     alunos_com_app: number;
     tokens_registrados: number;
+    dispositivos_no_servidor?: number;
   }> => {
     const response = await api.get('usuarios/notificacoes-app/estatisticas/');
     return response.data;

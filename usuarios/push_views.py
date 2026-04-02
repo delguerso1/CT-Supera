@@ -20,6 +20,13 @@ class RegistrarPushTokenExpoAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
+        if getattr(request.user, "tipo", None) != "aluno":
+            return Response(
+                {
+                    "error": "Apenas contas de aluno podem registrar dispositivo para este aviso.",
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
         token = (
             request.data.get("token") or request.data.get("expoPushToken") or ""
         ).strip()
@@ -74,20 +81,24 @@ class NotificacaoAppEstatisticasAPIView(APIView):
                 {"error": "Apenas gerentes podem consultar esta estatística."},
                 status=status.HTTP_403_FORBIDDEN,
             )
+        # Conta apenas alunos com conta liberada (is_active). Não exige usuario.ativo:
+        # aluno pode aparecer “Inativo” no CT e ainda usar o app até o fluxo bloquear.
+        base = {"usuario__tipo": "aluno", "usuario__is_active": True}
         # Alunos distintos com pelo menos um token
         alunos_com_app = (
-            PushTokenExpo.objects.filter(usuario__tipo="aluno", usuario__is_active=True)
+            PushTokenExpo.objects.filter(**base)
             .values("usuario")
             .distinct()
             .count()
         )
-        tokens_total = PushTokenExpo.objects.filter(
-            usuario__tipo="aluno", usuario__is_active=True
-        ).count()
+        tokens_total = PushTokenExpo.objects.filter(**base).count()
+        # Diagnóstico: linhas na tabela (qualquer perfil) — se > 0 e alunos_com_app = 0, tokens podem estar em conta não-aluno.
+        dispositivos_no_servidor = PushTokenExpo.objects.count()
         return Response(
             {
                 "alunos_com_app": alunos_com_app,
                 "tokens_registrados": tokens_total,
+                "dispositivos_no_servidor": dispositivos_no_servidor,
             }
         )
 

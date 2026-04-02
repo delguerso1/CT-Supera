@@ -105,7 +105,11 @@ const DashboardGerenteScreen: React.FC<DashboardGerenteProps> = ({
   });
   const [notifTitulo, setNotifTitulo] = useState('');
   const [notifMensagem, setNotifMensagem] = useState('');
-  const [notifStats, setNotifStats] = useState<{ alunos_com_app: number; tokens_registrados: number } | null>(null);
+  const [notifStats, setNotifStats] = useState<{
+    alunos_com_app: number;
+    tokens_registrados: number;
+    dispositivos_no_servidor?: number;
+  } | null>(null);
   const [sendingNotif, setSendingNotif] = useState(false);
   const [aumentoMensalidadeValor, setAumentoMensalidadeValor] = useState('');
   const [aumentoMensalidadeLoading, setAumentoMensalidadeLoading] = useState(false);
@@ -694,7 +698,8 @@ const DashboardGerenteScreen: React.FC<DashboardGerenteProps> = ({
           <Text style={styles.sectionTitle}>Notificação no app (alunos)</Text>
           <Text style={styles.notifHint}>
             E-mails de cobrança e avisos oficiais continuam pelo sistema web. Aqui você envia um aviso por push para
-            alunos que instalaram o app e aceitaram notificações.
+            alunos que instalaram o app (APK/AAB de produção), fizeram login como aluno e aceitaram notificações. O
+            registro do aparelho ocorre ao abrir o painel do aluno (ou logo após o login).
           </Text>
           {notifStats == null && (
             <Text style={styles.notifStatsWarn}>
@@ -702,10 +707,25 @@ const DashboardGerenteScreen: React.FC<DashboardGerenteProps> = ({
             </Text>
           )}
           {notifStats != null && (
-            <Text style={styles.notifStatsText}>
-              Alunos com app registrado: {notifStats.alunos_com_app} ({notifStats.tokens_registrados}{' '}
-              dispositivo(s))
-            </Text>
+            <>
+              <Text style={styles.notifStatsText}>
+                Alunos com app registrado: {notifStats.alunos_com_app} ({notifStats.tokens_registrados}{' '}
+                dispositivo(s))
+              </Text>
+              {typeof notifStats.dispositivos_no_servidor === 'number' && (
+                <Text style={styles.notifStatsText}>
+                  Registros de dispositivo no servidor (qualquer perfil): {notifStats.dispositivos_no_servidor}
+                </Text>
+              )}
+              {notifStats.alunos_com_app === 0 &&
+                typeof notifStats.dispositivos_no_servidor === 'number' &&
+                notifStats.dispositivos_no_servidor > 0 && (
+                  <Text style={styles.notifStatsWarn}>
+                    Há tokens salvos, mas nenhum vinculado a aluno ativo. Quem abriu o app precisa estar logado como
+                    aluno (não professor/gerente) e com conta ativa.
+                  </Text>
+                )}
+            </>
           )}
           <TextInput
             style={styles.input}

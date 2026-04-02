@@ -21,7 +21,7 @@ const prodBaseUrl = 'https://ctsupera.com.br/api/';
 export const CONFIG = {
   API_BASE_URL: envUrl || (__DEV__ ? devBaseUrl : prodBaseUrl),
   APP_NAME: 'CT Supera',
-  VERSION: '1.0.0',
+  VERSION: '1.0.5',
 
   COLORS: {
     primary: colors.primary,
