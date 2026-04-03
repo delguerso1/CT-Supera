@@ -170,7 +170,7 @@ const styles = {
     },
   },
   // Media queries para responsividade
-  '@media (max-width: 768px)': {
+  '@media (max-width: 1024px)': {
     navLinks: {
       display: 'none',
     },

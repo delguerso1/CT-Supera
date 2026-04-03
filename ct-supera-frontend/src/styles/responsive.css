@@ -12,8 +12,8 @@
   }
 }
 
-/* Mobile First - Base styles for mobile */
-@media (max-width: 768px) {
+/* Mobile First — até tablets em pé/paisagem comum (inclui iPad até 1024px CSS) */
+@media (max-width: 1024px) {
   /* Navbar mobile - melhorias */
   .nav-links {
     display: none !important;
@@ -799,23 +799,6 @@
     font-size: 1.75rem !important;
   }
   
-  /* Dashboard tablet */
-  .dashboard-container {
-    flex-direction: row !important;
-  }
-  
-  .dashboard-sidebar {
-    position: fixed !important;
-    width: 240px !important;
-    height: 100vh !important;
-    padding: 1rem !important;
-  }
-  
-  .dashboard-main-content {
-    margin-left: 240px !important;
-    padding: 1rem !important;
-  }
-  
   .stats-grid {
     grid-template-columns: repeat(2, 1fr) !important;
     gap: 1rem !important;
@@ -894,8 +877,8 @@
   }
 }
 
-/* Landscape mobile */
-@media (max-width: 768px) and (orientation: landscape) {
+/* Landscape em telas até tablet */
+@media (max-width: 1024px) and (orientation: landscape) {
   .hero,
   .home-hero {
     padding: 1.5rem 1rem !important;
