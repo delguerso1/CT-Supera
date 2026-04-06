@@ -19,6 +19,22 @@ const useResponsive = () => {
   return { isMobile, isTablet };
 };
 
+/** Data ISO (YYYY-MM-DD) sem interpretar como UTC — evita exibir o dia anterior em pt-BR. */
+function formatLocalDateBR(value) {
+  if (value == null || value === '') return '';
+  const str = String(value).split('T')[0];
+  const parts = str.split('-');
+  if (parts.length === 3 && parts.every((p) => p.length > 0)) {
+    const [y, m, d] = parts.map(Number);
+    if (!Number.isNaN(y) && !Number.isNaN(m) && !Number.isNaN(d)) {
+      return new Date(y, m - 1, d).toLocaleDateString('pt-BR');
+    }
+  }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return String(value);
+  return parsed.toLocaleDateString('pt-BR');
+}
+
 const styles = {
   container: {
     display: 'flex',
@@ -1669,23 +1685,34 @@ function DashboardAluno({ user }) {
               </tr>
             </thead>
             <tbody>
-              {historicoAulas.map(aula => (
+              {historicoAulas.map(aula => {
+                const presente =
+                  aula.presente ?? aula.presenca_confirmada ?? aula.checkin_realizado;
+                const turmaLabel = aula.turma_nome || aula.turma || aula.turma_id || '-';
+                const professorLabel = aula.professor_nome || aula.professor || '-';
+                return (
                 <tr key={aula.id}>
                   <td style={styles.td}>
-                    {new Date(aula.data).toLocaleDateString()}
+                    <span>{formatLocalDateBR(aula.data)}</span>
+                    {aula.dia_semana_registro && (
+                      <span style={{ display: 'block', fontSize: '12px', color: '#666', marginTop: '4px' }}>
+                        {aula.dia_semana_registro}
+                      </span>
+                    )}
                   </td>
-                  <td style={styles.td}>{aula.turma}</td>
-                  <td style={styles.td}>{aula.professor}</td>
+                  <td style={styles.td}>{turmaLabel}</td>
+                  <td style={styles.td}>{professorLabel}</td>
                   <td style={styles.td}>
                     <span style={{
                       ...styles.statusBadge,
-                      ...(aula.presente ? styles.statusPresent : styles.statusAbsent)
+                      ...(presente ? styles.statusPresent : styles.statusAbsent)
                     }}>
-                      {aula.presente ? 'Presente' : 'Ausente'}
+                      {presente ? 'Presente' : 'Ausente'}
                     </span>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>

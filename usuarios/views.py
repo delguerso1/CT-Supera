@@ -3,6 +3,7 @@ from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIV
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework import status
+from rest_framework.exceptions import ParseError
 from rest_framework.authtoken.models import Token
 from django.shortcuts import get_object_or_404
 from django.contrib.auth import authenticate, login, logout
@@ -507,8 +508,19 @@ class LoginAPIView(APIView):
 
     def post(self, request):
         try:
+            # request.data dispara o parser JSON; corpo inválido não deve virar 500 genérico.
+            try:
+                parsed = request.data
+            except ParseError as e:
+                logger.warning("Login: corpo JSON inválido: %s", e)
+                return Response(
+                    {
+                        "error": "Corpo JSON inválido. Use aspas duplas nas chaves, ex.: {\"cpf\":\"...\",\"password\":\"...\"}.",
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
             # Aceita dados de request.data (JSON) ou request.POST (form)
-            data = dict(request.data) if request.data else dict(request.POST)
+            data = dict(parsed) if parsed else dict(request.POST)
             # Fallback: tenta parsear o body como JSON manualmente (para casos de Content-Type incorreto)
             if not data and request.body:
                 import json

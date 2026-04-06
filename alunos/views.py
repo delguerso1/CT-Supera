@@ -1,6 +1,7 @@
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from financeiro.models import Mensalidade
-from datetime import date, timedelta
+from datetime import timedelta
 from funcionarios.models import Presenca
 from turmas.models import Turma
 from rest_framework.views import APIView
@@ -9,13 +10,54 @@ from rest_framework.permissions import IsAuthenticated
 from .serializers import MensalidadeSerializer, UsuarioSerializer
 from rest_framework import status
 
+_DIAS_SEMANA_NOMES = (
+    "Segunda-feira",
+    "Terça-feira",
+    "Quarta-feira",
+    "Quinta-feira",
+    "Sexta-feira",
+    "Sábado",
+    "Domingo",
+)
+
+
+def _serialize_presenca_historico_aluno(presenca: Presenca) -> dict:
+    """
+    Histórico exibido no painel do aluno: inclui rótulos legíveis e dia da semana
+    da data (calendário local do servidor), alinhado ao que o app já espera.
+    """
+    turma = presenca.turma
+    prof = turma.professores.first() if turma else None
+    if prof:
+        professor_nome = (prof.get_full_name() or "").strip() or prof.username
+    else:
+        professor_nome = "-"
+    dias_turma = ", ".join(d.nome for d in turma.dias_semana.all()) if turma else ""
+    presente = presenca.presenca_confirmada or presenca.checkin_realizado
+    return {
+        "id": presenca.id,
+        "data": presenca.data.isoformat(),
+        "turma_id": turma.id,
+        "turma": str(turma),
+        "turma_nome": str(turma),
+        "dias_semana_turma": dias_turma,
+        "professor": professor_nome,
+        "professor_nome": professor_nome,
+        "checkin_realizado": presenca.checkin_realizado,
+        "presenca_confirmada": presenca.presenca_confirmada,
+        "presente": presente,
+        "dia_semana_registro": _DIAS_SEMANA_NOMES[presenca.data.weekday()],
+    }
+
+
 class HistoricoPagamentosAPIView(APIView):
     """API para exibir o histórico de pagamentos do aluno."""
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
         aluno = request.user
-        hoje = date.today()
+        # Calendário do fuso configurado (America/Sao_Paulo), não o relógio UTC do SO
+        hoje = timezone.localdate()
         nao_pagas = Mensalidade.objects.filter(aluno=aluno).exclude(status="pago")
         mensalidades_vencidas = nao_pagas.filter(data_vencimento__lt=hoje)
         mensalidades_vincendas = nao_pagas.filter(data_vencimento__gte=hoje)
@@ -51,7 +93,7 @@ class PagamentoEmDiaAPIView(APIView):
 
     def get(self, request):
         usuario = request.user
-        hoje = date.today()
+        hoje = timezone.localdate()
         # Em dia: não há mensalidade não paga já vencida (atrasada)
         pagamento_ok = not Mensalidade.objects.filter(
             aluno=usuario
@@ -64,16 +106,7 @@ class PainelAlunoAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def _dia_semana_nome(self, data):
-        nomes = [
-            "Segunda-feira",
-            "Terça-feira",
-            "Quarta-feira",
-            "Quinta-feira",
-            "Sexta-feira",
-            "Sábado",
-            "Domingo"
-        ]
-        return nomes[data.weekday()]
+        return _DIAS_SEMANA_NOMES[data.weekday()]
 
     def _validar_regras_checkin(self, aluno, turma, hoje):
         if not aluno.dias_habilitados.exists():
@@ -101,18 +134,22 @@ class PainelAlunoAPIView(APIView):
 
     def get(self, request):
         usuario = request.user
-        historico_aulas = Presenca.objects.filter(usuario=usuario).order_by('-data')
+        historico_aulas = (
+            Presenca.objects.filter(usuario=usuario)
+            .select_related("turma", "turma__ct")
+            .prefetch_related("turma__professores", "turma__dias_semana")
+            .order_by("-data")
+        )
         historico_pagamentos = Mensalidade.objects.filter(aluno=usuario).order_by('-data_vencimento')
         turma = Turma.objects.filter(alunos=usuario).first()
         turma_nome = getattr(turma, "nome", None) if turma else None
 
-        # Verificar status de hoje
-        hoje = date.today()
+        # Verificar status de hoje (mesmo calendário BR que Mensalidade.status_efetivo)
+        hoje = timezone.localdate()
         presenca_hoje = Presenca.objects.filter(usuario=usuario, data=hoje).first()
         
         # Calcular a idade do aluno
         if usuario.data_nascimento:
-            hoje = date.today()
             idade = hoje.year - usuario.data_nascimento.year - (
                 (hoje.month, hoje.day) < (usuario.data_nascimento.month, usuario.data_nascimento.day)
             )
@@ -129,7 +166,9 @@ class PainelAlunoAPIView(APIView):
 
         return Response({
             "usuario": UsuarioSerializer(usuario).data,
-            "historico_aulas": historico_aulas.values(),
+            "historico_aulas": [
+                _serialize_presenca_historico_aluno(p) for p in historico_aulas
+            ],
             "historico_pagamentos": MensalidadeSerializer(historico_pagamentos, many=True).data,
             "pagamento_ok": not Mensalidade.objects.filter(
                 aluno=usuario
@@ -151,7 +190,7 @@ class RealizarCheckinAPIView(APIView):
 
     def post(self, request):
         usuario = request.user
-        hoje = date.today()
+        hoje = timezone.localdate()
         mensalidades_nao_pagas_atrasadas = Mensalidade.objects.filter(
             aluno=usuario
         ).exclude(status="pago").filter(data_vencimento__lt=hoje).order_by('data_vencimento')
@@ -164,8 +203,6 @@ class RealizarCheckinAPIView(APIView):
                     many=True
                 ).data
             }, status=status.HTTP_403_FORBIDDEN)
-
-        hoje = date.today()
 
         # Verifica se já fez check-in hoje
         presenca_existente = Presenca.objects.filter(usuario=usuario, data=hoje).first()

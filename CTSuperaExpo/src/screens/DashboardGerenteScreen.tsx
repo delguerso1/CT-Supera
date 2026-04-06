@@ -698,8 +698,10 @@ const DashboardGerenteScreen: React.FC<DashboardGerenteProps> = ({
           <Text style={styles.sectionTitle}>Notificação no app (alunos)</Text>
           <Text style={styles.notifHint}>
             E-mails de cobrança e avisos oficiais continuam pelo sistema web. Aqui você envia um aviso por push para
-            alunos que instalaram o app (APK/AAB de produção), fizeram login como aluno e aceitaram notificações. O
-            registro do aparelho ocorre ao abrir o painel do aluno (ou logo após o login).
+            todos os perfis de aluno com aparelho registrado (inclui aluno inativado no CT ou conta desativada no
+            sistema, se ainda houver token salvo). É preciso ter instalado o app (APK/AAB de produção), ter feito login
+            como aluno e aceitado notificações. O registro do aparelho ocorre ao abrir o painel do aluno (ou logo após o
+            login).
           </Text>
           {notifStats == null && (
             <Text style={styles.notifStatsWarn}>
@@ -721,8 +723,8 @@ const DashboardGerenteScreen: React.FC<DashboardGerenteProps> = ({
                 typeof notifStats.dispositivos_no_servidor === 'number' &&
                 notifStats.dispositivos_no_servidor > 0 && (
                   <Text style={styles.notifStatsWarn}>
-                    Há tokens salvos, mas nenhum vinculado a aluno ativo. Quem abriu o app precisa estar logado como
-                    aluno (não professor/gerente) e com conta ativa.
+                    Há tokens salvos, mas nenhum vinculado a perfil de aluno. Quem abriu o app precisa estar logado como
+                    aluno (não professor/gerente).
                   </Text>
                 )}
             </>

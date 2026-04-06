@@ -81,9 +81,9 @@ class NotificacaoAppEstatisticasAPIView(APIView):
                 {"error": "Apenas gerentes podem consultar esta estatística."},
                 status=status.HTTP_403_FORBIDDEN,
             )
-        # Conta apenas alunos com conta liberada (is_active). Não exige usuario.ativo:
-        # aluno pode aparecer “Inativo” no CT e ainda usar o app até o fluxo bloquear.
-        base = {"usuario__tipo": "aluno", "usuario__is_active": True}
+        # Todos os alunos com token (inclui conta Django inativa e aluno “inativo” no CT),
+        # para o painel refletir o mesmo público do envio em massa.
+        base = {"usuario__tipo": "aluno"}
         # Alunos distintos com pelo menos um token
         alunos_com_app = (
             PushTokenExpo.objects.filter(**base)
@@ -137,10 +137,9 @@ class EnviarNotificacaoAlunosAppAPIView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        qs = PushTokenExpo.objects.filter(
-            usuario__tipo="aluno",
-            usuario__is_active=True,
-        ).values_list("token", flat=True)
+        qs = PushTokenExpo.objects.filter(usuario__tipo="aluno").values_list(
+            "token", flat=True
+        )
         tokens = list(dict.fromkeys(qs))  # únicos, preserva ordem
         if not tokens:
             return Response(

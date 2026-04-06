@@ -8,6 +8,7 @@ import requests
 import json
 import logging
 import base64
+import time
 from datetime import datetime, timedelta
 from django.conf import settings
 from django.core.cache import cache
@@ -1739,57 +1740,87 @@ class C6BankClient:
         Returns:
             bytes: Conteúdo do PDF em bytes
         """
+        if bank_slip_id is None or str(bank_slip_id).strip() == '':
+            raise Exception("bank_slip_id é obrigatório para obter o PDF")
+        
+        slip_id = str(bank_slip_id).strip()
+        headers_extra = {}
+        if partner_software_name:
+            headers_extra['partner-software-name'] = partner_software_name
+        if partner_software_version:
+            headers_extra['partner-software-version'] = partner_software_version
+        
+        logger.info(f"Obtendo PDF do boleto: {slip_id}")
+        
+        last_error = None
+        
+        # 1) GET /v1/bank_slips/{id}/pdf — em alguns casos o arquivo só fica disponível após alguns segundos
+        for attempt in range(3):
+            try:
+                endpoint = f"{self.bankslip_base_url}/{slip_id}/pdf"
+                access_token = self._get_access_token()
+                if endpoint.startswith('http://') or endpoint.startswith('https://'):
+                    url = endpoint
+                else:
+                    url = f"{self.base_url}{endpoint}"
+                headers = {
+                    'Authorization': f'Bearer {access_token}',
+                    'Accept': 'application/pdf',
+                }
+                headers.update(headers_extra)
+                cert_tuple = self.cert_config.get('cert') if self.cert_config.get('cert') else None
+                response = requests.get(
+                    url,
+                    headers=headers,
+                    cert=cert_tuple,
+                    timeout=60,
+                )
+                if not (200 <= response.status_code < 300):
+                    raise self._parse_rfc7807_error(response)
+                content = response.content
+                if content and content[:4] == b'%PDF':
+                    logger.info(f"PDF do boleto obtido com sucesso (tentativa {attempt + 1})")
+                    return content
+                logger.warning(
+                    f"Resposta do endpoint /pdf não é PDF válido (tentativa {attempt + 1}), "
+                    f"tamanho={len(content or b'')}, início={content[:80]!r}"
+                )
+            except C6BankError as e:
+                last_error = e
+                logger.warning(f"Erro C6 ao obter PDF via /pdf (tentativa {attempt + 1}): {e}")
+            except Exception as e:
+                last_error = e
+                logger.warning(f"Erro ao obter PDF via /pdf (tentativa {attempt + 1}): {e}")
+            if attempt < 2:
+                time.sleep(2.0)
+        
+        # 2) Fallback: bank_slip_response pode incluir base64_pdf_file (bankslip-api.yaml)
         try:
-            endpoint = f"{self.bankslip_base_url}/{bank_slip_id}/pdf"
-            
-            # Headers opcionais
-            headers_extra = {}
-            if partner_software_name:
-                headers_extra['partner-software-name'] = partner_software_name
-            if partner_software_version:
-                headers_extra['partner-software-version'] = partner_software_version
-            
-            logger.info(f"Obtendo PDF do boleto: {bank_slip_id}")
-            
-            # Para PDF, precisa fazer requisição sem JSON
-            access_token = self._get_access_token()
-            
-            if endpoint.startswith('http://') or endpoint.startswith('https://'):
-                url = endpoint
-            else:
-                url = f"{self.base_url}{endpoint}"
-            headers = {
-                'Authorization': f'Bearer {access_token}',
-                'Accept': 'application/pdf'
-            }
-            
-            # Adiciona headers opcionais
-            headers.update(headers_extra)
-            
-            cert_tuple = self.cert_config.get('cert') if self.cert_config.get('cert') else None
-            
-            response = requests.get(
-                url,
-                headers=headers,
-                cert=cert_tuple,
-                timeout=30
+            slip = self.get_bank_slip(
+                slip_id,
+                partner_software_name=partner_software_name,
+                partner_software_version=partner_software_version,
             )
-            
-            # Verifica se a resposta não foi bem-sucedida (não é 2XX)
-            if not (200 <= response.status_code < 300):
-                # Trata erros RFC 7807
-                raise self._parse_rfc7807_error(response)
-            
-            # Se chegou aqui, a resposta foi bem-sucedida (2XX)
-            logger.info(f"PDF do boleto obtido com sucesso")
-            return response.content
-                
-        except C6BankError:
-            # Re-lança erros RFC 7807
-            raise
+            b64 = slip.get('base64_pdf_file')
+            if b64:
+                if isinstance(b64, str):
+                    b64 = ''.join(b64.split())
+                raw = base64.b64decode(b64, validate=False)
+                if raw.startswith(b'%PDF'):
+                    logger.info("PDF do boleto obtido via base64_pdf_file (consulta GET)")
+                    return raw
+                logger.warning("base64_pdf_file decodificado não parece ser um PDF válido")
         except Exception as e:
-            logger.error(f"Erro ao obter PDF do boleto: {str(e)}")
-            raise Exception(f"Erro ao obter PDF do boleto: {str(e)}")
+            logger.warning(f"Fallback base64_pdf_file falhou: {e}")
+            if last_error is None:
+                last_error = e
+        
+        if isinstance(last_error, C6BankError):
+            raise last_error
+        if last_error is not None:
+            logger.error(f"Erro ao obter PDF do boleto: {str(last_error)}")
+            raise Exception(f"Erro ao obter PDF do boleto: {str(last_error)}")
+        raise Exception("Não foi possível obter o PDF do boleto (endpoint /pdf e fallback base64)")
     
     def test_connection(self):
         """
