@@ -9,7 +9,23 @@ export function formatarErroApi(error: unknown): string {
   }
   if (typeof data === 'string') return data;
   const d = data as Record<string, unknown>;
-  if (typeof d.error === 'string') return d.error;
+  if (typeof d.error === 'string') {
+    let msg = d.error;
+    const det = d.detalhes as { erros?: unknown[]; tickets_ok?: number } | undefined;
+    if (det?.erros && Array.isArray(det.erros) && det.erros.length) {
+      const extra = det.erros
+        .slice(0, 5)
+        .map((x) => String(x))
+        .join('\n');
+      if (extra.trim()) {
+        msg = `${msg}\n\nDetalhes (Expo):\n${extra}`;
+      }
+    }
+    if (typeof d.destinatarios_tokens === 'number' && d.destinatarios_tokens > 0) {
+      msg = `${msg}\n\nDispositivos na fila: ${d.destinatarios_tokens}`;
+    }
+    return msg;
+  }
   if (d.detail != null) {
     if (typeof d.detail === 'string') return d.detail;
     if (Array.isArray(d.detail)) return (d.detail as string[]).join('\n');

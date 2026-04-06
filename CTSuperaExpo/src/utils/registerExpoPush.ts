@@ -80,10 +80,12 @@ Notifications.setNotificationHandler({
  * Solicita permissão e envia o token Expo ao backend (apenas alunos devem chamar).
  * Em simulador / sem serviço push, sai silenciosamente.
  * Re-tenta ao voltar o app ao primeiro plano (útil após o aluno conceder permissão).
+ *
+ * @returns `true` se o token foi enviado e aceito pelo servidor; caso contrário `false`.
  */
-export async function registrarPushTokenAluno(): Promise<void> {
+export async function registrarPushTokenAluno(): Promise<boolean> {
   if (!Device.isDevice) {
-    return;
+    return false;
   }
 
   const { status: existing } = await Notifications.getPermissionsAsync();
@@ -93,10 +95,10 @@ export async function registrarPushTokenAluno(): Promise<void> {
     finalStatus = status;
   }
   if (finalStatus !== 'granted') {
-    if (__DEV__) {
-      logPush('Permissão de notificação não concedida; o gerente verá 0 alunos com app registrado.');
-    }
-    return;
+    logPush(
+      'Permissão de notificação não concedida; o gerente verá 0 alunos com app registrado.'
+    );
+    return false;
   }
 
   if (Platform.OS === 'android') {
@@ -110,7 +112,7 @@ export async function registrarPushTokenAluno(): Promise<void> {
     const projectId = resolverEasProjectId();
     if (!projectId) {
       logPush('Sem EAS Project ID. Token Expo não é gerado.');
-      return;
+      return false;
     }
 
     const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
@@ -123,14 +125,18 @@ export async function registrarPushTokenAluno(): Promise<void> {
       if (ok) {
         logPush('Token Expo enviado ao servidor com sucesso (usuarios/push-token/).');
       }
-    } else {
-      logPush(`Token com formato inesperado (não enviado ao servidor): ${String(token).slice(0, 40)}…`);
+      return ok;
     }
+    logPush(
+      `Token com formato inesperado (não enviado ao servidor): ${String(token).slice(0, 40)}…`
+    );
+    return false;
   } catch (e) {
     logPush(
       'Não foi possível obter/registrar o token. Em Android, push no Expo Go é limitado; use APK/AAB (dev ou loja).',
       e
     );
+    return false;
   }
 }
 

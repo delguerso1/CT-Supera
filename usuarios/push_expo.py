@@ -44,11 +44,14 @@ def enviar_lote_expo_push(tokens: list[str], titulo: str, corpo: str) -> dict[st
     for i in range(0, len(tokens), MAX_MESSAGES_PER_REQUEST):
         chunk = tokens[i : i + MAX_MESSAGES_PER_REQUEST]
         # Payload mínimo: "priority" inválido já gerou 400 na Expo em alguns ambientes.
+        # channelId alinha com setNotificationChannelAsync('default') no app Android; sound ajuda iOS.
         messages = [
             {
                 "to": t,
                 "title": titulo,
                 "body": corpo,
+                "sound": "default",
+                "channelId": "default",
             }
             for t in chunk
         ]

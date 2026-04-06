@@ -34,6 +34,8 @@ import {
   normalizarDataNascimentoParaApi,
   calcularIdade,
 } from '../utils/dataNascimento';
+import * as Device from 'expo-device';
+import * as Notifications from 'expo-notifications';
 import {
   registrarPushTokenAluno,
   iniciarListenerRegistroPushEmForeground,
@@ -71,6 +73,9 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
   const boletoPollMaxTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const checkoutPollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const checkoutPollMaxTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Avisos de push: um para permissão negada e outro para falha no servidor (independentes). */
+  const pushAvisoPermissaoRef = useRef(false);
+  const pushAvisoServidorRef = useRef(false);
   const [boletoModalVisible, setBoletoModalVisible] = useState(false);
   const [boletoData, setBoletoData] = useState<{
     transacao_id: number;
@@ -139,10 +144,35 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
   /** Depois do painel carregar, o token de auth já está no Axios; reforça registro do push. */
   useEffect(() => {
     if (user?.tipo !== 'aluno' || !painelAluno) return;
+    let cancel = false;
     const t = setTimeout(() => {
-      void registrarPushTokenAluno();
+      void (async () => {
+        const ok = await registrarPushTokenAluno();
+        if (cancel || ok || !Device.isDevice) return;
+        const { status } = await Notifications.getPermissionsAsync();
+        if (status !== 'granted') {
+          if (!pushAvisoPermissaoRef.current) {
+            pushAvisoPermissaoRef.current = true;
+            Alert.alert(
+              'Notificações',
+              'Permita notificações para o app CT Supera nas configurações do celular, para o gerente poder enviar avisos.'
+            );
+          }
+          return;
+        }
+        if (!pushAvisoServidorRef.current) {
+          pushAvisoServidorRef.current = true;
+          Alert.alert(
+            'Avisos do gerente',
+            'Este aparelho não conseguiu registrar na central. Verifique sua internet e tente fechar e abrir o app. Se continuar, confira no Expo (expo.dev → projeto CT Supera) se há credenciais de push: FCM no Android e chave Apple no iOS.'
+          );
+        }
+      })();
     }, 800);
-    return () => clearTimeout(t);
+    return () => {
+      cancel = true;
+      clearTimeout(t);
+    };
   }, [user?.tipo, user?.id, painelAluno?.usuario?.id]);
 
   useEffect(() => {
