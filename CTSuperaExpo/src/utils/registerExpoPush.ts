@@ -3,6 +3,7 @@ import * as Device from 'expo-device';
 import Constants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
 import { usuarioService } from '../services/api';
+import { EAS_PROJECT_ID_FALLBACK } from '../config';
 
 let lastForegroundPushAttempt = 0;
 const FOREGROUND_PUSH_DEBOUNCE_MS = 5000;
@@ -38,6 +39,31 @@ async function enviarTokenAoServidorComRetentativas(token: string): Promise<bool
     ultimo
   );
   return false;
+}
+
+/** EAS projectId: env → Constants (várias formas no SDK 49+) → fallback do app (evita 0 tokens no servidor). */
+function resolverEasProjectId(): string {
+  const fromEnv =
+    typeof process !== 'undefined' ? process.env?.EXPO_PUBLIC_EAS_PROJECT_ID?.trim() : '';
+  if (fromEnv) return fromEnv;
+
+  const exCfg = Constants.expoConfig?.extra as { eas?: { projectId?: string } } | undefined;
+  const fromExpoConfig = exCfg?.eas?.projectId?.trim();
+  if (fromExpoConfig) return fromExpoConfig;
+
+  const legacy = Constants as {
+    easConfig?: { projectId?: string };
+    manifest?: { extra?: { eas?: { projectId?: string } } };
+    manifest2?: { extra?: { eas?: { projectId?: string } } };
+  };
+  const fromEasConfig = legacy.easConfig?.projectId?.trim();
+  if (fromEasConfig) return fromEasConfig;
+  const fromManifest = legacy.manifest?.extra?.eas?.projectId?.trim();
+  if (fromManifest) return fromManifest;
+  const fromManifest2 = legacy.manifest2?.extra?.eas?.projectId?.trim();
+  if (fromManifest2) return fromManifest2;
+
+  return EAS_PROJECT_ID_FALLBACK.trim();
 }
 
 Notifications.setNotificationHandler({
@@ -81,20 +107,9 @@ export async function registrarPushTokenAluno(): Promise<void> {
   }
 
   try {
-    const envPid =
-      typeof process !== 'undefined' ? process.env?.EXPO_PUBLIC_EAS_PROJECT_ID : undefined;
-    const projectId = (
-      envPid ||
-      (Constants.expoConfig?.extra as { eas?: { projectId?: string } } | undefined)?.eas
-        ?.projectId ||
-      (Constants as { easConfig?: { projectId?: string } }).easConfig?.projectId ||
-      ''
-    ).trim();
-
+    const projectId = resolverEasProjectId();
     if (!projectId) {
-      logPush(
-        'Sem EAS Project ID (EXPO_PUBLIC_EAS_PROJECT_ID ou app.json extra.eas.projectId). Token Expo não é gerado.'
-      );
+      logPush('Sem EAS Project ID. Token Expo não é gerado.');
       return;
     }
 

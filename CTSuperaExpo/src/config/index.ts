@@ -18,6 +18,9 @@ const devBaseUrl =
 
 const prodBaseUrl = 'https://ctsupera.com.br/api/';
 
+/** Mesmo UUID de `app.json` → `extra.eas.projectId` e `eas.json` (uso quando o binário não expõe `extra` em `Constants.expoConfig`). */
+export const EAS_PROJECT_ID_FALLBACK = 'f1baab53-bbd8-436a-b0ed-18389f501f59';
+
 export const CONFIG = {
   API_BASE_URL: envUrl || (__DEV__ ? devBaseUrl : prodBaseUrl),
   APP_NAME: 'CT Supera',
