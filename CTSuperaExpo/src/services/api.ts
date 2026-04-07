@@ -16,6 +16,7 @@ import {
   CheckoutPayment,
   VerificarCheckinResponse,
   RegistrarPresencaResponse,
+  ObservacaoAulaResponse,
   PresencaRelatorioResponse,
   PresencaRelatorioItem,
   HistoricoAulasProfessorResponse,
@@ -366,6 +367,18 @@ export const presencaService = {
     const response = await api.patch(`funcionarios/corrigir-presenca/${presencaId}/`, data);
     return response.data;
   },
+
+  getObservacaoAula: async (turmaId: number, dataIso: string): Promise<ObservacaoAulaResponse> => {
+    const response = await api.get(`funcionarios/observacao-aula/${turmaId}/`, {
+      params: { data: dataIso },
+    });
+    return response.data;
+  },
+
+  salvarObservacaoAula: async (turmaId: number, texto: string): Promise<ObservacaoAulaResponse> => {
+    const response = await api.put(`funcionarios/observacao-aula/${turmaId}/`, { texto });
+    return response.data;
+  },
 };
 
 async function fetchAllPages(
@@ -547,9 +560,12 @@ export const usuarioService = {
     return response.data;
   },
 
-  listarPrecadastros: async (params?: { status?: string }): Promise<PreCadastro[]> => {
-    const query = params?.status ? `?status=${encodeURIComponent(params.status)}` : '';
-    const response = await api.get(`usuarios/precadastros/${query}`);
+  listarPrecadastros: async (params?: { status?: string; origem?: string }): Promise<PreCadastro[]> => {
+    const search = new URLSearchParams();
+    if (params?.status) search.set('status', params.status);
+    if (params?.origem) search.set('origem', params.origem);
+    const q = search.toString();
+    const response = await api.get(`usuarios/precadastros/${q ? `?${q}` : ''}`);
     return response.data.results || response.data;
   },
 

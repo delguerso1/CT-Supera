@@ -24,7 +24,8 @@ import {
   FinanceiroDashboard,
   Turma,
   PresencaRelatorioResponse,
-  PresencaRelatorioItem
+  PresencaRelatorioItem,
+  ObservacaoAulaResponse,
 } from '../types';
 import { NavigationProps } from '../types';
 import CONFIG from '../config';
@@ -33,6 +34,11 @@ import SafeScreen from '../components/SafeScreen';
 import { colors } from '../theme';
 import { nomeAlunoMensalidade } from '../utils/nomeAlunoMensalidade';
 import { formatarErroApi } from '../utils/apiError';
+import {
+  formatarDataBrMascara,
+  isoParaBrDisplay,
+  normalizarDataNascimentoParaApi,
+} from '../utils/dataNascimento';
 
 type DashboardGerenteProps = NavigationProps & {
   embedded?: boolean;
@@ -69,6 +75,15 @@ const DashboardGerenteScreen: React.FC<DashboardGerenteProps> = ({
   const [filtroPresencaBusca, setFiltroPresencaBusca] = useState('');
   const [showPresencaTurmaModal, setShowPresencaTurmaModal] = useState(false);
   const [corrigindoPresenca, setCorrigindoPresenca] = useState<{ [key: number]: boolean }>({});
+  const [filtroObservacaoData, setFiltroObservacaoData] = useState(() => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  });
+  const [observacaoGerente, setObservacaoGerente] = useState<ObservacaoAulaResponse | null>(null);
+  const [loadingObservacaoGerente, setLoadingObservacaoGerente] = useState(false);
   const [filtroAlunoBusca, setFiltroAlunoBusca] = useState('');
   const [filtroTurmaBusca, setFiltroTurmaBusca] = useState('');
   /** Acordeão na aba Relatórios: uma seção aberta por vez reduz poluição visual */
@@ -156,6 +171,33 @@ const DashboardGerenteScreen: React.FC<DashboardGerenteProps> = ({
     }
   }, [activeSection, user, mes, ano]);
 
+  useEffect(() => {
+    if (
+      activeSection !== 'relatorios' ||
+      relatorioPainelAberto !== 'presenca' ||
+      filtroPresencaTurmaId == null ||
+      !user
+    ) {
+      setObservacaoGerente(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        setLoadingObservacaoGerente(true);
+        const r = await presencaService.getObservacaoAula(filtroPresencaTurmaId, filtroObservacaoData);
+        if (!cancelled) setObservacaoGerente(r);
+      } catch {
+        if (!cancelled) setObservacaoGerente(null);
+      } finally {
+        if (!cancelled) setLoadingObservacaoGerente(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeSection, relatorioPainelAberto, filtroPresencaTurmaId, filtroObservacaoData, user]);
+
   const loadNotifStats = async () => {
     try {
       const s = await usuarioService.getNotificacaoAppEstatisticas();
@@ -179,7 +221,7 @@ const DashboardGerenteScreen: React.FC<DashboardGerenteProps> = ({
         email: painelData.email || '',
         telefone: painelData.telefone || '',
         endereco: painelData.endereco || '',
-        data_nascimento: painelData.data_nascimento || '',
+        data_nascimento: isoParaBrDisplay(painelData.data_nascimento),
       });
       await loadNotifStats();
     } catch (error: any) {
@@ -608,15 +650,23 @@ const DashboardGerenteScreen: React.FC<DashboardGerenteProps> = ({
         email: painelGerente.email || '',
         telefone: painelGerente.telefone || '',
         endereco: painelGerente.endereco || '',
-        data_nascimento: painelGerente.data_nascimento || '',
+        data_nascimento: isoParaBrDisplay(painelGerente.data_nascimento),
       });
     }
   };
 
   const handleSaveProfile = async () => {
     if (!painelGerente) return;
+    if (profileForm.data_nascimento.trim()) {
+      const isoDigitada = normalizarDataNascimentoParaApi(profileForm.data_nascimento);
+      if (!isoDigitada) {
+        Alert.alert('Atenção', 'Informe a data de nascimento completa e válida (DD/MM/AAAA).');
+        return;
+      }
+    }
     try {
       setSavingProfile(true);
+      const dnIso = normalizarDataNascimentoParaApi(profileForm.data_nascimento);
       const payload: Partial<User> = {
         id: painelGerente.id,
         first_name: profileForm.first_name,
@@ -624,7 +674,7 @@ const DashboardGerenteScreen: React.FC<DashboardGerenteProps> = ({
         email: profileForm.email,
         telefone: profileForm.telefone,
         endereco: profileForm.endereco,
-        data_nascimento: profileForm.data_nascimento || undefined,
+        data_nascimento: dnIso ?? undefined,
         username: painelGerente.username || painelGerente.cpf || painelGerente.email,
         cpf: painelGerente.cpf,
         tipo: 'gerente',
@@ -635,7 +685,7 @@ const DashboardGerenteScreen: React.FC<DashboardGerenteProps> = ({
       setEditProfile(false);
       await loadGerenteData();
     } catch (error: any) {
-      Alert.alert('Erro', error.response?.data?.detail || 'Erro ao atualizar perfil.');
+      Alert.alert('Erro', formatarErroApi(error) || 'Erro ao atualizar perfil.');
     } finally {
       setSavingProfile(false);
     }
@@ -1183,11 +1233,17 @@ const DashboardGerenteScreen: React.FC<DashboardGerenteProps> = ({
                 />
               </View>
               <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Data de Nascimento (AAAA-MM-DD)</Text>
+                <Text style={styles.formLabel}>Data de nascimento</Text>
                 <TextInput
                   style={styles.formInput}
+                  placeholder="DD/MM/AAAA"
+                  placeholderTextColor={colors.textMuted}
+                  keyboardType="number-pad"
+                  maxLength={10}
                   value={profileForm.data_nascimento}
-                  onChangeText={(value) => setProfileForm(prev => ({ ...prev, data_nascimento: value }))}
+                  onChangeText={(value) =>
+                    setProfileForm((prev) => ({ ...prev, data_nascimento: formatarDataBrMascara(value) }))
+                  }
                 />
               </View>
               <View style={styles.formActions}>
@@ -1436,6 +1492,40 @@ const DashboardGerenteScreen: React.FC<DashboardGerenteProps> = ({
                 )}
               </View>
 
+              {filtroPresencaTurmaId != null && (
+                <View style={styles.relatorioObservacaoBox}>
+                  <Text style={[styles.relatorioBlockLabel, styles.relatorioBlockLabelSpaced]}>
+                    Observação do professor (leitura)
+                  </Text>
+                  <Text style={styles.relatorioMiniLabel}>Data (AAAA-MM-DD)</Text>
+                  <TextInput
+                    style={styles.relatorioInput}
+                    placeholder="AAAA-MM-DD"
+                    placeholderTextColor="#999"
+                    value={filtroObservacaoData}
+                    onChangeText={setFiltroObservacaoData}
+                    autoCapitalize="none"
+                  />
+                  {loadingObservacaoGerente ? (
+                    <ActivityIndicator size="small" color={colors.primary} style={{ marginTop: 8 }} />
+                  ) : (
+                    <Text style={styles.relatorioObservacaoText}>
+                      {observacaoGerente?.texto?.trim()
+                        ? observacaoGerente.texto
+                        : 'Nenhuma observação para esta turma nesta data.'}
+                    </Text>
+                  )}
+                  {observacaoGerente?.autor_nome && observacaoGerente?.texto?.trim() ? (
+                    <Text style={styles.relatorioObservacaoMeta}>
+                      Por {observacaoGerente.autor_nome}
+                      {observacaoGerente.atualizado_em
+                        ? ` · ${new Date(observacaoGerente.atualizado_em).toLocaleString('pt-BR')}`
+                        : ''}
+                    </Text>
+                  ) : null}
+                </View>
+              )}
+
               <Text style={[styles.relatorioBlockLabel, styles.relatorioBlockLabelSpaced]}>
                 Filtrar lista por nome
               </Text>
@@ -1633,9 +1723,18 @@ const DashboardGerenteScreen: React.FC<DashboardGerenteProps> = ({
                 ) : (
                   turmasFiltradas.slice(0, 20).map((turma) => (
                     <View key={turma.id} style={styles.reportListItem}>
-                      <Text style={styles.reportListTitle}>
-                        Turma {turma.id} • {turma.ct_nome || 'CT'}
-                      </Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' }}>
+                        <Text style={[styles.reportListTitle, { marginRight: 8 }]}>
+                          Turma {turma.id} • {turma.ct_nome || 'CT'}
+                        </Text>
+                        {turma.alerta_inadimplente_presenca ? (
+                          <View style={styles.alertaInadimplenteBadge}>
+                            <Text style={styles.alertaInadimplenteBadgeText}>
+                              Inadimplente + presença
+                            </Text>
+                          </View>
+                        ) : null}
+                      </View>
                       <Text style={styles.reportListSubtitle}>
                         {turma.horario} • {turma.alunos_count || 0} alunos •{' '}
                         {turma.ativo !== false ? 'Ativa' : 'Inativa'}
@@ -2601,6 +2700,25 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 8,
   },
+  relatorioObservacaoBox: {
+    marginTop: 12,
+    padding: 12,
+    backgroundColor: '#f5f9fc',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e3f2fd',
+  },
+  relatorioObservacaoText: {
+    marginTop: 8,
+    fontSize: 14,
+    color: colors.text,
+    lineHeight: 20,
+  },
+  relatorioObservacaoMeta: {
+    marginTop: 8,
+    fontSize: 12,
+    color: colors.textMuted,
+  },
   relatorioPrimaryOutlineBtn: {
     flex: 1,
     minWidth: 140,
@@ -2725,6 +2843,19 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666',
     marginTop: 2,
+  },
+  alertaInadimplenteBadge: {
+    backgroundColor: '#ffebee',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#c62828',
+  },
+  alertaInadimplenteBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#b71c1c',
   },
   presencaCard: {
     backgroundColor: '#fff',

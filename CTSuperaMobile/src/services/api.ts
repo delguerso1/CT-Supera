@@ -16,6 +16,7 @@ import {
   CheckoutPayment,
   VerificarCheckinResponse,
   RegistrarPresencaResponse,
+  ObservacaoAulaResponse,
   PresencaRelatorioResponse,
   PresencaRelatorioItem,
   HistoricoAulasProfessorResponse,
@@ -349,6 +350,18 @@ export const presencaService = {
     data: Partial<Pick<PresencaRelatorioItem, 'checkin_realizado' | 'presenca_confirmada'>>
   ): Promise<PresencaRelatorioItem> => {
     const response = await api.patch(`funcionarios/corrigir-presenca/${presencaId}/`, data);
+    return response.data;
+  },
+
+  getObservacaoAula: async (turmaId: number, dataIso: string): Promise<ObservacaoAulaResponse> => {
+    const response = await api.get(`funcionarios/observacao-aula/${turmaId}/`, {
+      params: { data: dataIso },
+    });
+    return response.data;
+  },
+
+  salvarObservacaoAula: async (turmaId: number, texto: string): Promise<ObservacaoAulaResponse> => {
+    const response = await api.put(`funcionarios/observacao-aula/${turmaId}/`, { texto });
     return response.data;
   },
 };

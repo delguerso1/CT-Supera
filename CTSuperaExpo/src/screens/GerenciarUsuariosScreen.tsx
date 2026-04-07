@@ -55,6 +55,21 @@ function sortPreCadastrosByName(list: PreCadastro[]): PreCadastro[] {
   });
 }
 
+/** Filtro na aba Alunos: login (`username`) e busca parcial por dígitos (CPF costuma ser o usuário). */
+function alunoCorrespondeBuscaUsuario(u: User, qRaw: string): boolean {
+  const q = qRaw.trim().toLowerCase();
+  if (!q) return true;
+  const username = String(u.username || '').toLowerCase();
+  if (username.includes(q)) return true;
+  const qDigits = q.replace(/\D/g, '');
+  if (qDigits.length >= 1) {
+    const userDigits = String(u.username || '').replace(/\D/g, '');
+    const cpfDigits = String(u.cpf || '').replace(/\D/g, '');
+    if (userDigits.includes(qDigits) || cpfDigits.includes(qDigits)) return true;
+  }
+  return false;
+}
+
 const GerenciarUsuariosScreen: React.FC<NavigationProps> = ({ embedded }) => {
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
@@ -117,10 +132,13 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = ({ embedded }) => {
   });
   const [turmasParaMatricula, setTurmasParaMatricula] = useState<Turma[]>([]);
   const [filtroStatusPrecadastro, setFiltroStatusPrecadastro] = useState<string>('');
+  /** Filtro de origem na API (vazio = todas as origens). `pendente` = pré-cadastros do formulário (site). */
+  const [filtroOrigemPrecadastro, setFiltroOrigemPrecadastro] = useState<string>('');
   const [ctsFiltroAlunos, setCtsFiltroAlunos] = useState<CentroTreinamento[]>([]);
   const [turmasFiltroCatalogo, setTurmasFiltroCatalogo] = useState<Turma[]>([]);
   const [filtroAlunoCtId, setFiltroAlunoCtId] = useState<number | null>(null);
   const [filtroAlunoTurmaId, setFiltroAlunoTurmaId] = useState<number | null>(null);
+  const [filtroBuscaAlunoUsuario, setFiltroBuscaAlunoUsuario] = useState('');
 
   const selecionarCtFiltroAlunos = (ctId: number | null) => {
     setFiltroAlunoCtId(ctId);
@@ -131,6 +149,7 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = ({ embedded }) => {
     if (activeTab !== 'alunos') {
       setFiltroAlunoCtId(null);
       setFiltroAlunoTurmaId(null);
+      setFiltroBuscaAlunoUsuario('');
     }
   }, [activeTab]);
 
@@ -166,7 +185,7 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = ({ embedded }) => {
     if (user?.tipo === 'gerente') {
       fetchUsers();
     }
-  }, [activeTab, user, filtroStatusPrecadastro]);
+  }, [activeTab, user, filtroStatusPrecadastro, filtroOrigemPrecadastro]);
 
   useEffect(() => {
     if (!showForm) return;
@@ -188,8 +207,11 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = ({ embedded }) => {
     try {
       setLoading(true);
       if (activeTab === 'precadastros') {
+        const precParams: { status?: string; origem?: string } = {};
+        if (filtroStatusPrecadastro) precParams.status = filtroStatusPrecadastro;
+        if (filtroOrigemPrecadastro) precParams.origem = filtroOrigemPrecadastro;
         const data = await usuarioService.listarPrecadastros(
-          filtroStatusPrecadastro ? { status: filtroStatusPrecadastro } : undefined
+          Object.keys(precParams).length ? precParams : undefined
         );
         setPrecadastros(sortPreCadastrosByName(data));
         setUsers([]);
@@ -233,8 +255,22 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = ({ embedded }) => {
         list = list.filter((u) => (u.turmas || []).includes(filtroAlunoTurmaId));
       }
     }
+    if (filtroBuscaAlunoUsuario.trim()) {
+      list = list.filter((u) => alunoCorrespondeBuscaUsuario(u, filtroBuscaAlunoUsuario));
+    }
     return list;
-  }, [activeTab, users, filtroAlunoCtId, filtroAlunoTurmaId, turmasFiltroCatalogo]);
+  }, [activeTab, users, filtroAlunoCtId, filtroAlunoTurmaId, turmasFiltroCatalogo, filtroBuscaAlunoUsuario]);
+
+  const formModalTitle = useMemo(() => {
+    const map: Record<TabKey, [string, string]> = {
+      alunos: ['Novo aluno', 'Editar aluno'],
+      precadastros: ['Novo pré-cadastro', 'Editar pré-cadastro'],
+      professores: ['Novo professor', 'Editar professor'],
+      gerentes: ['Novo gerente', 'Editar gerente'],
+    };
+    const [novo, editar] = map[activeTab];
+    return editingUser ? editar : novo;
+  }, [activeTab, editingUser]);
 
   const resetForm = () => {
     setFormData({
@@ -717,6 +753,7 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = ({ embedded }) => {
     !!formData.data_nascimento.trim() &&
     formData.data_nascimento.replace(/\D/g, '').length === 8 &&
     !isoDnForm;
+  const isProfessorOuGerente = activeTab === 'professores' || activeTab === 'gerentes';
 
   return wrap(
     <>
@@ -752,34 +789,77 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = ({ embedded }) => {
         </View>
 
         {activeTab === 'precadastros' && (
-          <View style={styles.filterRow}>
-            <Text style={styles.filterLabel}>Status:</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll}>
-              {['', 'cancelado'].map((s) => (
-                <TouchableOpacity
-                  key={s || 'pendentes'}
-                  style={[
-                    styles.filterChip,
-                    filtroStatusPrecadastro === s && styles.filterChipActive,
-                  ]}
-                  onPress={() => setFiltroStatusPrecadastro(s)}
-                >
-                  <Text
+          <>
+            <View style={styles.filterRow}>
+              <Text style={styles.filterLabel}>Situação:</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll}>
+                {['', 'cancelado'].map((s) => (
+                  <TouchableOpacity
+                    key={s || 'status-pendentes'}
                     style={[
-                      styles.filterChipText,
-                      filtroStatusPrecadastro === s && styles.filterChipTextActive,
+                      styles.filterChip,
+                      filtroStatusPrecadastro === s && styles.filterChipActive,
                     ]}
+                    onPress={() => setFiltroStatusPrecadastro(s)}
                   >
-                    {s === '' ? 'Pendentes' : 'Cancelados'}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
+                    <Text
+                      style={[
+                        styles.filterChipText,
+                        filtroStatusPrecadastro === s && styles.filterChipTextActive,
+                      ]}
+                    >
+                      {s === '' ? 'Pendentes' : 'Cancelados'}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+            <View style={[styles.filterRow, styles.filterRowTight]}>
+              <Text style={styles.filterLabel}>Origem:</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll}>
+                {(
+                  [
+                    { key: '', label: 'Todos' },
+                    { key: 'pendente', label: 'Pendentes' },
+                    { key: 'ex_aluno', label: 'Ex-aluno' },
+                    { key: 'aula_experimental', label: 'Aula experimental' },
+                  ] as const
+                ).map(({ key, label }) => (
+                  <TouchableOpacity
+                    key={key || 'origem-todos'}
+                    style={[styles.filterChip, filtroOrigemPrecadastro === key && styles.filterChipActive]}
+                    onPress={() => setFiltroOrigemPrecadastro(key)}
+                  >
+                    <Text
+                      style={[
+                        styles.filterChipText,
+                        filtroOrigemPrecadastro === key && styles.filterChipTextActive,
+                      ]}
+                    >
+                      {label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          </>
         )}
 
         {activeTab === 'alunos' && (
           <>
+            <View style={styles.filterRow}>
+              <Text style={styles.filterLabel}>Buscar:</Text>
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Nome de usuário (login)"
+                placeholderTextColor={colors.textMuted}
+                value={filtroBuscaAlunoUsuario}
+                onChangeText={setFiltroBuscaAlunoUsuario}
+                autoCapitalize="none"
+                autoCorrect={false}
+                clearButtonMode="while-editing"
+              />
+            </View>
             <View style={styles.filterRow}>
               <Text style={styles.filterLabel}>CT:</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll}>
@@ -918,7 +998,9 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = ({ embedded }) => {
             ) : (
               (activeTab === 'alunos' ? usuariosListaExibicao : users).length === 0 ? (
                 <Text style={styles.noData}>
-                  {activeTab === 'alunos' && filtroAlunoCtId != null
+                  {activeTab === 'alunos' && filtroBuscaAlunoUsuario.trim()
+                    ? 'Nenhum aluno encontrado para esta busca.'
+                    : activeTab === 'alunos' && filtroAlunoCtId != null
                     ? 'Nenhum aluno encontrado para este CT/turma.'
                     : 'Nenhum usuário encontrado.'}
                 </Text>
@@ -929,6 +1011,9 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = ({ embedded }) => {
                       {item.first_name} {item.last_name}
                     </Text>
                     <Text style={styles.cardSubtitle}>{item.email}</Text>
+                    {activeTab === 'alunos' && (
+                      <Text style={styles.cardSubtitle}>Usuário: {item.username || '—'}</Text>
+                    )}
                     <Text style={styles.cardSubtitle}>CPF: {item.cpf}</Text>
                     {activeTab === 'alunos' && (
                       <Text style={styles.cardSubtitle}>
@@ -965,38 +1050,60 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = ({ embedded }) => {
       <Modal visible={showForm} animationType="slide" transparent>
         <View style={[styles.modalOverlay, { paddingTop: insets.top + 8 }]}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>
-              {editingUser ? 'Editar registro' : 'Novo registro'}
-            </Text>
+            <Text style={styles.modalTitle}>{formModalTitle}</Text>
             <ScrollView
               ref={formModalScrollRef}
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator
             >
+              {isProfessorOuGerente && (
+                <Text style={styles.sectionTitle}>Dados pessoais</Text>
+              )}
+              <Text style={styles.fieldLabel}>
+                Nome{isProfessorOuGerente ? ' *' : ''}
+              </Text>
               <TextInput
                 style={styles.input}
-                placeholder="Nome"
+                placeholder="Digite o nome"
+                placeholderTextColor={colors.textMuted}
                 value={formData.first_name}
                 onChangeText={(value) => setFormData(prev => ({ ...prev, first_name: value }))}
               />
+              <Text style={styles.fieldLabel}>Sobrenome</Text>
               <TextInput
                 style={styles.input}
-                placeholder="Sobrenome"
+                placeholder="Digite o sobrenome"
+                placeholderTextColor={colors.textMuted}
                 value={formData.last_name}
                 onChangeText={(value) => setFormData(prev => ({ ...prev, last_name: value }))}
               />
+              <Text style={styles.fieldLabel}>
+                CPF
+                {activeTab === 'precadastros'
+                  ? ' (opcional)'
+                  : isProfessorOuGerente
+                    ? ' *'
+                    : ''}
+              </Text>
               <TextInput
                 style={styles.input}
-                placeholder="CPF"
+                placeholder="000.000.000-00"
+                placeholderTextColor={colors.textMuted}
                 value={formData.cpf}
                 onChangeText={(value) =>
                   setFormData(prev => ({ ...prev, cpf: formatarCpfMascara(value) }))
                 }
               />
+              <Text style={styles.fieldLabel}>
+                E-mail{isProfessorOuGerente ? ' *' : ''}
+              </Text>
               <TextInput
                 style={styles.input}
-                placeholder="Email"
+                placeholder="email@exemplo.com"
+                placeholderTextColor={colors.textMuted}
                 keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
                 value={formData.email}
                 onChangeText={(value) => setFormData(prev => ({ ...prev, email: value }))}
               />
@@ -1005,13 +1112,21 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = ({ embedded }) => {
                   Menores podem usar o mesmo e-mail do responsável ou de irmãos. Maiores de idade: e-mail único.
                 </Text>
               )}
+              {isProfessorOuGerente && (
+                <Text style={styles.hintEmail}>
+                  O e-mail é obrigatório para o convite de acesso ao sistema.
+                </Text>
+              )}
+              <Text style={styles.fieldLabel}>
+                Telefone{activeTab === 'precadastros' ? ' *' : ''}
+              </Text>
+              {activeTab === 'precadastros' && (
+                <Text style={styles.hintEmail}>DDD + número (apenas dígitos).</Text>
+              )}
               <TextInput
                 style={styles.input}
-                placeholder={
-                  activeTab === 'precadastros'
-                    ? 'Telefone (DDD + número, só números)'
-                    : 'Telefone'
-                }
+                placeholder="(00) 00000-0000"
+                placeholderTextColor={colors.textMuted}
                 keyboardType="number-pad"
                 maxLength={activeTab === 'precadastros' ? 15 : undefined}
                 value={formData.telefone}
@@ -1025,9 +1140,11 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = ({ embedded }) => {
                   }))
                 }
               />
+              <Text style={styles.fieldLabel}>Endereço</Text>
               <TextInput
                 style={styles.input}
-                placeholder="Endereço"
+                placeholder="Rua, número, bairro, cidade"
+                placeholderTextColor={colors.textMuted}
                 value={formData.endereco}
                 onChangeText={(value) => setFormData(prev => ({ ...prev, endereco: value }))}
               />
@@ -1035,6 +1152,7 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = ({ embedded }) => {
               <TextInput
                 style={styles.input}
                 placeholder="DD/MM/AAAA"
+                placeholderTextColor={colors.textMuted}
                 keyboardType="number-pad"
                 maxLength={10}
                 value={formData.data_nascimento}
@@ -1060,37 +1178,49 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = ({ embedded }) => {
                 <>
                   {idadeAluno !== null && idadeAluno < 18 ? (
                     <>
+                      <Text style={styles.fieldLabel}>Nome do responsável *</Text>
                       <TextInput
                         style={styles.input}
-                        placeholder="Nome do responsável *"
+                        placeholder="Nome completo"
+                        placeholderTextColor={colors.textMuted}
                         value={formData.nome_responsavel}
                         onChangeText={(value) => setFormData(prev => ({ ...prev, nome_responsavel: value }))}
                       />
+                      <Text style={styles.fieldLabel}>Telefone do responsável *</Text>
                       <TextInput
                         style={styles.input}
-                        placeholder="Telefone do responsável *"
+                        placeholder="Telefone com DDD"
+                        placeholderTextColor={colors.textMuted}
                         value={formData.telefone_responsavel}
                         onChangeText={(value) => setFormData(prev => ({ ...prev, telefone_responsavel: value }))}
                       />
                     </>
                   ) : idadeAluno !== null && idadeAluno >= 18 ? (
-                    <TextInput
-                      style={styles.input}
-                      placeholder="Telefone de emergência *"
-                      value={formData.telefone_emergencia}
-                      onChangeText={(value) => setFormData(prev => ({ ...prev, telefone_emergencia: value }))}
-                    />
+                    <>
+                      <Text style={styles.fieldLabel}>Telefone de emergência *</Text>
+                      <TextInput
+                        style={styles.input}
+                        placeholder="Telefone com DDD"
+                        placeholderTextColor={colors.textMuted}
+                        value={formData.telefone_emergencia}
+                        onChangeText={(value) => setFormData(prev => ({ ...prev, telefone_emergencia: value }))}
+                      />
+                    </>
                   ) : null}
+                  <Text style={styles.fieldLabel}>Dia de vencimento (1, 5 ou 10)</Text>
                   <TextInput
                     style={styles.input}
-                    placeholder="Dia de vencimento (1, 5, 10)"
+                    placeholder="Ex.: 5"
+                    placeholderTextColor={colors.textMuted}
                     keyboardType="numeric"
                     value={diaVencimento}
                     onChangeText={setDiaVencimento}
                   />
+                  <Text style={styles.fieldLabel}>Valor da mensalidade</Text>
                   <TextInput
                     style={styles.input}
-                    placeholder="Valor da mensalidade"
+                    placeholder="Ex.: 150"
+                    placeholderTextColor={colors.textMuted}
                     keyboardType="numeric"
                     value={valorMensalidade}
                     onChangeText={setValorMensalidade}
@@ -1151,16 +1281,21 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = ({ embedded }) => {
 
               {activeTab === 'professores' && (
                 <>
+                  <Text style={styles.sectionTitle}>Dados profissionais</Text>
+                  <Text style={styles.fieldLabel}>Salário</Text>
                   <TextInput
                     style={styles.input}
-                    placeholder="Salário"
+                    placeholder="Ex.: 3500 ou 3.500,00"
+                    placeholderTextColor={colors.textMuted}
                     keyboardType="numeric"
                     value={salarioProfessor}
                     onChangeText={setSalarioProfessor}
                   />
+                  <Text style={styles.fieldLabel}>Chave PIX</Text>
                   <TextInput
                     style={styles.input}
-                    placeholder="Chave PIX"
+                    placeholder="CPF, e-mail ou chave aleatória"
+                    placeholderTextColor={colors.textMuted}
                     value={pixProfessor}
                     onChangeText={setPixProfessor}
                   />
@@ -1675,6 +1810,18 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     color: colors.text,
+  },
+  searchInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    fontSize: 14,
+    color: colors.text,
+    backgroundColor: '#fff',
+    minHeight: 40,
   },
   filterScroll: {
     flex: 1,

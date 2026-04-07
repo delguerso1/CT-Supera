@@ -411,9 +411,18 @@ const GerenciarTurmasScreen: React.FC<NavigationProps> = ({ navigation, embedded
                   <View key={turma.id} style={[styles.turmaCard, turmaInativa && styles.turmaCardInativa]}>
                     <View style={styles.turmaHeader}>
                       <View style={styles.turmaInfo}>
-                        <Text style={styles.turmaTitle}>
-                          Turma {turma.id} · {turma.horario || '—'}
-                        </Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' }}>
+                          <Text style={[styles.turmaTitle, { marginRight: 8 }]}>
+                            Turma {turma.id} · {turma.horario || '—'}
+                          </Text>
+                          {turma.alerta_inadimplente_presenca ? (
+                            <View style={styles.alertaInadimplenteBadge}>
+                              <Text style={styles.alertaInadimplenteBadgeText}>
+                                Inadimplente + presença
+                              </Text>
+                            </View>
+                          ) : null}
+                        </View>
                         <Text style={styles.turmaSubtitle}>
                           {turma.dias_semana_nomes?.join(', ') || '-'}
                         </Text>
@@ -837,6 +846,21 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 10,
     fontWeight: '600',
+  },
+  alertaInadimplenteBadge: {
+    backgroundColor: '#ffebee',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#c62828',
+    marginBottom: 4,
+    alignSelf: 'flex-start',
+  },
+  alertaInadimplenteBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#b71c1c',
   },
   turmaActions: {
     flexDirection: 'row',

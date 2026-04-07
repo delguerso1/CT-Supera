@@ -27,11 +27,14 @@ function RegistrarPresenca({ turmaId, onSuccess }) {
     fetchAlunos();
   }, [turmaId]);
 
+  const normId = (id) => String(id);
+
   const handleToggle = (alunoId) => {
+    const id = normId(alunoId);
     setPresenca(prev =>
-      prev.includes(alunoId)
-        ? prev.filter(id => id !== alunoId)
-        : [...prev, alunoId]
+      prev.some((x) => normId(x) === id)
+        ? prev.filter((x) => normId(x) !== id)
+        : [...prev, id]
     );
   };
 
@@ -65,8 +68,9 @@ function RegistrarPresenca({ turmaId, onSuccess }) {
       {warning && <div style={{ color: 'orange', marginBottom: 10 }}>{warning}</div>}
       
       <div style={{ marginBottom: 15 }}>
-        <small style={{ color: '#666' }}>
-          💡 Alunos: só é possível registrar presença para quem fez check-in. Aula experimental: marque comparecimento.
+        <small style={{ color: '#666', lineHeight: 1.45, display: 'block' }}>
+          💡 O check-in no app é feito pelo aluno. Aqui você confirma quem compareceu à aula; pode marcar presença
+          mesmo sem check-in no app (ex.: sem celular ou inadimplente). Aula experimental: marque o comparecimento.
         </small>
       </div>
 
@@ -84,9 +88,10 @@ function RegistrarPresenca({ turmaId, onSuccess }) {
               <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <input
                   type="checkbox"
-                  checked={presenca.includes(aluno.id)}
+                  checked={presenca.some((x) => normId(x) === normId(aluno.id))}
                   onChange={() => handleToggle(aluno.id)}
                   disabled={!aluno.pode_confirmar_presenca}
+                  aria-label={`Presença: ${aluno.nome || ''}`}
                 />
                 <span style={{ flex: 1 }}>
                   {aluno.nome}{aluno.username ? ` (${aluno.username})` : ''}
@@ -109,7 +114,7 @@ function RegistrarPresenca({ turmaId, onSuccess }) {
                     backgroundColor: aluno.checkin_realizado ? '#4caf50' : '#ff9800',
                     color: 'white'
                   }}>
-                    {aluno.checkin_realizado ? '✅ Check-in' : '⏳ Sem check-in'}
+                    {aluno.checkin_realizado ? '✅ Check-in no app' : '⏳ Sem check-in no app'}
                   </span>
                 )}
                 {aluno.presenca_confirmada && (

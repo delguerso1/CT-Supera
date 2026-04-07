@@ -3,7 +3,7 @@ from turmas.models import Turma
 from datetime import date
 from usuarios.models import Usuario, PreCadastro
 from financeiro.models import Mensalidade
-from .models import Presenca
+from .models import Presenca, ObservacaoAula, MAX_OBSERVACAO_AULA_CHARS
 from .serializers import UsuarioSerializer, PreCadastroSerializer, PresencaSerializer, TurmaSerializer
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -20,7 +20,11 @@ logger = logging.getLogger(__name__)
 
 
 class VerificarCheckinAlunosAPIView(APIView):
-    """API para verificar quais alunos fizeram check-in em uma turma. Inclui pré-cadastros com aula experimental no dia."""
+    """API para verificar quais alunos fizeram check-in em uma turma. Inclui pré-cadastros com aula experimental no dia.
+
+    ``pode_confirmar_presenca``: o professor pode registrar presença hoje se ainda não estiver confirmada,
+    **independentemente de check-in** (check-in continua obrigatório só no app do aluno quando em dia).
+    """
     permission_classes = [IsAuthenticated]
 
     def get(self, request, turma_id):
@@ -37,14 +41,15 @@ class VerificarCheckinAlunosAPIView(APIView):
                 data=hoje,
                 turma=turma
             ).first()
+            ja_confirmada = presenca.presenca_confirmada if presenca else False
             status_alunos.append({
                 "id": str(aluno.id),
                 "nome": f"{aluno.first_name} {aluno.last_name}",
                 "username": aluno.username,
                 "tipo": "aluno",
                 "checkin_realizado": presenca.checkin_realizado if presenca else False,
-                "presenca_confirmada": presenca.presenca_confirmada if presenca else False,
-                "pode_confirmar_presenca": presenca.checkin_realizado if presenca else False,
+                "presenca_confirmada": ja_confirmada,
+                "pode_confirmar_presenca": not ja_confirmada,
             })
 
         # Pré-cadastros com aula experimental nesta turma e data
@@ -55,14 +60,15 @@ class VerificarCheckinAlunosAPIView(APIView):
             status='pendente'
         )
         for pc in precadastros:
+            ja_exp = bool(pc.compareceu_aula_experimental)
             status_alunos.append({
                 "id": f"precadastro_{pc.id}",
                 "nome": f"{pc.first_name} {pc.last_name or ''}".strip(),
                 "username": pc.email,
                 "tipo": "aula_experimental",
                 "checkin_realizado": False,
-                "presenca_confirmada": pc.compareceu_aula_experimental,
-                "pode_confirmar_presenca": True,
+                "presenca_confirmada": ja_exp,
+                "pode_confirmar_presenca": not ja_exp,
             })
 
         return Response({
@@ -588,4 +594,104 @@ class HistoricoAulasProfessorAPIView(APIView):
 
         return Response({"historico": historico}, status=status.HTTP_200_OK)
 
+
+def _usuario_pode_acessar_turma_observacao(user, turma):
+    if not user.is_authenticated:
+        return False
+    if getattr(user, "tipo", None) == "gerente":
+        return True
+    if getattr(user, "tipo", None) == "professor":
+        return turma.professores.filter(id=user.id).exists()
+    return False
+
+
+class ObservacaoAulaAPIView(APIView):
+    """
+    Uma observação interna por turma por dia (professor escreve; gerente só lê).
+    GET: professor ou gerente. PUT: apenas professor da turma, apenas no mesmo dia (data=hoje).
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, turma_id):
+        turma = get_object_or_404(Turma, id=turma_id)
+        if not _usuario_pode_acessar_turma_observacao(request.user, turma):
+            return Response({"error": "Permissão negada."}, status=status.HTTP_403_FORBIDDEN)
+
+        data_param = request.query_params.get("data")
+        if data_param:
+            dt = parse_date(data_param)
+            if not dt:
+                return Response({"error": "Data inválida. Use AAAA-MM-DD."}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            dt = timezone.localdate()
+
+        obs = (
+            ObservacaoAula.objects.filter(turma=turma, data=dt)
+            .select_related("autor")
+            .first()
+        )
+        hoje = timezone.localdate()
+        pode_editar = (
+            getattr(request.user, "tipo", None) == "professor"
+            and dt == hoje
+            and turma.professores.filter(id=request.user.id).exists()
+        )
+
+        return Response(
+            {
+                "turma_id": turma.id,
+                "data": dt.isoformat(),
+                "texto": obs.texto if obs else None,
+                "autor_nome": (obs.autor.get_full_name() or obs.autor.username) if obs else None,
+                "atualizado_em": obs.atualizado_em.isoformat() if obs else None,
+                "pode_editar": pode_editar,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+    def put(self, request, turma_id):
+        if getattr(request.user, "tipo", None) != "professor":
+            return Response({"error": "Apenas professores podem registrar observações."}, status=status.HTTP_403_FORBIDDEN)
+
+        turma = get_object_or_404(Turma, id=turma_id)
+        if not turma.professores.filter(id=request.user.id).exists():
+            return Response({"error": "Você não é professor desta turma."}, status=status.HTTP_403_FORBIDDEN)
+
+        hoje = timezone.localdate()
+        texto = request.data.get("texto", "")
+        if not isinstance(texto, str):
+            return Response({"error": "Texto inválido."}, status=status.HTTP_400_BAD_REQUEST)
+        texto = texto.strip()
+        if len(texto) < 1:
+            return Response(
+                {"error": f"Informe o texto da observação (1 a {MAX_OBSERVACAO_AULA_CHARS} caracteres)."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if len(texto) > MAX_OBSERVACAO_AULA_CHARS:
+            return Response(
+                {"error": f"Texto máximo: {MAX_OBSERVACAO_AULA_CHARS} caracteres."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        ObservacaoAula.objects.update_or_create(
+            turma=turma,
+            data=hoje,
+            defaults={
+                "texto": texto,
+                "autor_id": request.user.id,
+            },
+        )
+        obs = ObservacaoAula.objects.filter(turma=turma, data=hoje).select_related("autor").first()
+        return Response(
+            {
+                "turma_id": turma.id,
+                "data": hoje.isoformat(),
+                "texto": obs.texto,
+                "autor_nome": obs.autor.get_full_name() or obs.autor.username,
+                "atualizado_em": obs.atualizado_em.isoformat(),
+                "pode_editar": True,
+            },
+            status=status.HTTP_200_OK,
+        )
 

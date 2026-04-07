@@ -4,12 +4,13 @@ from .views import (
     AtualizarDadosGerenteAPIView, PainelGerenteAPIView, ListaAlunosInativosPainelAPIView,
     ListarPrecadastrosAPIView, ConverterPrecadastroAPIView,
     HistoricoAulasProfessorAPIView, VerificarCheckinAlunosAPIView,
-    RelatorioPresencaAPIView, CorrigirPresencaAPIView
+    RelatorioPresencaAPIView, CorrigirPresencaAPIView, ObservacaoAulaAPIView,
 )
 
 urlpatterns = [
     path('registrar-presenca/<int:turma_id>/', RegistrarPresencaAPIView.as_view(), name='registrar_presenca_api'),
     path('verificar-checkin/<int:turma_id>/', VerificarCheckinAlunosAPIView.as_view(), name='verificar_checkin_alunos_api'),
+    path('observacao-aula/<int:turma_id>/', ObservacaoAulaAPIView.as_view(), name='observacao_aula_api'),
     path('relatorio-presenca/', RelatorioPresencaAPIView.as_view(), name='relatorio_presenca_api'),
     path('corrigir-presenca/<int:presenca_id>/', CorrigirPresencaAPIView.as_view(), name='corrigir_presenca_api'),
     path('painel-professor/', PainelProfessorAPIView.as_view(), name='painel_professor_api'),

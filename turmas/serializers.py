@@ -16,6 +16,7 @@ class TurmaSerializer(serializers.ModelSerializer):
     vagas_disponiveis = serializers.SerializerMethodField()
     tem_vagas = serializers.SerializerMethodField()
     ct_nome = serializers.SerializerMethodField()
+    alerta_inadimplente_presenca = serializers.SerializerMethodField()
 
     ct = serializers.PrimaryKeyRelatedField(
         queryset=CentroDeTreinamento.objects.all()
@@ -36,7 +37,8 @@ class TurmaSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'ct', 'ct_nome', 'dias_semana', 'dias_semana_nomes', 'horario', 'capacidade_maxima',
             'aceita_kids', 'aceita_teen', 'aceita_adultos', 'professores', 'professor_nomes',
-            'alunos', 'alunos_count', 'vagas_disponiveis', 'tem_vagas', 'ativo'
+            'alunos', 'alunos_count', 'vagas_disponiveis', 'tem_vagas', 'ativo',
+            'alerta_inadimplente_presenca',
         ]
         depth = 1
 
@@ -64,6 +66,12 @@ class TurmaSerializer(serializers.ModelSerializer):
 
     def get_ct_nome(self, obj):
         return obj.ct.nome if obj.ct else ""
+
+    def get_alerta_inadimplente_presenca(self, obj):
+        m = self.context.get('alerta_inadimplente_map')
+        if not m:
+            return False
+        return bool(m.get(obj.id, False))
 
     # Para criação/edição, sobrescrever o comportamento
     def to_internal_value(self, data):

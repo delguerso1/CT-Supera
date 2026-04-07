@@ -70,6 +70,8 @@ export interface Turma {
   alunos_count?: number;
   ativo?: boolean;
   alunos?: User[];
+  /** Gerente: aluno inadimplente com presença confirmada pelo professor na janela recente (API) */
+  alerta_inadimplente_presenca?: boolean;
 }
 
 export interface CentroTreinamento {
@@ -239,11 +241,14 @@ export interface Presenca {
 }
 
 export interface AlunoPresenca {
-  id: number;
+  /** ID do aluno (string) ou `precadastro_<id>` para aula experimental */
+  id: number | string;
   nome: string;
   username: string;
+  tipo?: 'aluno' | 'aula_experimental';
   checkin_realizado: boolean;
   presenca_confirmada: boolean;
+  /** Pode marcar presença hoje se ainda não confirmada (não depende de check-in no app) */
   pode_confirmar_presenca: boolean;
 }
 
@@ -257,6 +262,16 @@ export interface RegistrarPresencaResponse {
   message: string;
   warning?: string;
   alunos_sem_checkin?: string[];
+}
+
+/** Observação interna por turma/dia (professor escreve; gerente lê) */
+export interface ObservacaoAulaResponse {
+  turma_id: number;
+  data: string;
+  texto: string | null;
+  autor_nome: string | null;
+  atualizado_em: string | null;
+  pode_editar: boolean;
 }
 
 export interface PresencaRelatorioItem {

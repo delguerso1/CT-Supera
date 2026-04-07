@@ -14,9 +14,18 @@ import {
 } from 'react-native';
 import { useAuth } from '../utils/AuthContext';
 import { funcionarioService, turmaService, presencaService } from '../services/api';
-import { User, Turma, AlunoPresenca, VerificarCheckinResponse, HistoricoAulasProfessorItem } from '../types';
+import {
+  User,
+  Turma,
+  AlunoPresenca,
+  VerificarCheckinResponse,
+  HistoricoAulasProfessorItem,
+  ObservacaoAulaResponse,
+} from '../types';
 import { NavigationProps } from '../types';
 import CONFIG from '../config';
+
+const MAX_OBSERVACAO_AULA_CHARS = 1000;
 
 const DashboardProfessorScreen: React.FC<NavigationProps> = ({ navigation, route }) => {
   const { user, logout } = useAuth();
@@ -26,12 +35,16 @@ const DashboardProfessorScreen: React.FC<NavigationProps> = ({ navigation, route
   const [activeSection, setActiveSection] = useState<'dashboard' | 'turmas' | 'presenca' | 'historico' | 'perfil'>('dashboard');
   const [selectedTurma, setSelectedTurma] = useState<Turma | null>(null);
   const [checkinData, setCheckinData] = useState<VerificarCheckinResponse | null>(null);
-  const [presencasSelecionadas, setPresencasSelecionadas] = useState<{ [key: number]: boolean }>({});
+  const [presencasSelecionadas, setPresencasSelecionadas] = useState<Record<string, boolean>>({});
   const [loadingCheckin, setLoadingCheckin] = useState(false);
   const [loadingPresenca, setLoadingPresenca] = useState(false);
   const [historicoAulas, setHistoricoAulas] = useState<HistoricoAulasProfessorItem[]>([]);
   const [loadingHistorico, setLoadingHistorico] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [observacaoDraft, setObservacaoDraft] = useState('');
+  const [observacaoInfo, setObservacaoInfo] = useState<ObservacaoAulaResponse | null>(null);
+  const [loadingObservacao, setLoadingObservacao] = useState(false);
+  const [savingObservacao, setSavingObservacao] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -212,21 +225,61 @@ const DashboardProfessorScreen: React.FC<NavigationProps> = ({ navigation, route
     </ScrollView>
   );
 
+  const loadObservacaoAula = async (turmaId: number, dataIso: string) => {
+    try {
+      setLoadingObservacao(true);
+      const r = await presencaService.getObservacaoAula(turmaId, dataIso);
+      setObservacaoInfo(r);
+      setObservacaoDraft(r.texto ?? '');
+    } catch (error: any) {
+      setObservacaoInfo(null);
+      setObservacaoDraft('');
+      Alert.alert('Erro', error.response?.data?.error || 'Erro ao carregar observação da aula.');
+    } finally {
+      setLoadingObservacao(false);
+    }
+  };
+
+  const salvarObservacaoAula = async () => {
+    if (!selectedTurma?.id || !checkinData) return;
+    const t = observacaoDraft.trim();
+    if (t.length < 1 || t.length > MAX_OBSERVACAO_AULA_CHARS) {
+      Alert.alert('Observação', `Informe entre 1 e ${MAX_OBSERVACAO_AULA_CHARS} caracteres.`);
+      return;
+    }
+    try {
+      setSavingObservacao(true);
+      const r = await presencaService.salvarObservacaoAula(selectedTurma.id, t);
+      setObservacaoInfo(r);
+      setObservacaoDraft(r.texto ?? '');
+      Alert.alert('Sucesso', 'Observação salva.');
+    } catch (error: any) {
+      Alert.alert('Erro', error.response?.data?.error || 'Erro ao salvar observação.');
+    } finally {
+      setSavingObservacao(false);
+    }
+  };
+
   const handleSelecionarTurma = async (turma: Turma) => {
     try {
       setLoadingCheckin(true);
       setSelectedTurma(turma);
       setSearchQuery('');
+      setObservacaoInfo(null);
+      setObservacaoDraft('');
       const data = await presencaService.verificarCheckin(turma.id);
       setCheckinData(data);
+
+      await loadObservacaoAula(turma.id, data.data);
       
       // Inicializa as presenças selecionadas com confirmadas e pendentes
-      const inicialPresencas: { [key: number]: boolean } = {};
+      const inicialPresencas: Record<string, boolean> = {};
       data.alunos.forEach(aluno => {
+        const k = String(aluno.id);
         if (aluno.presenca_confirmada) {
-          inicialPresencas[aluno.id] = true;
+          inicialPresencas[k] = true;
         } else if (aluno.pode_confirmar_presenca) {
-          inicialPresencas[aluno.id] = true;
+          inicialPresencas[k] = true;
         }
       });
       setPresencasSelecionadas(inicialPresencas);
@@ -237,10 +290,11 @@ const DashboardProfessorScreen: React.FC<NavigationProps> = ({ navigation, route
     }
   };
 
-  const togglePresenca = (alunoId: number) => {
+  const togglePresenca = (alunoId: number | string) => {
+    const key = String(alunoId);
     setPresencasSelecionadas(prev => ({
       ...prev,
-      [alunoId]: !prev[alunoId],
+      [key]: !prev[key],
     }));
   };
 
@@ -256,15 +310,15 @@ const DashboardProfessorScreen: React.FC<NavigationProps> = ({ navigation, route
       aluno =>
         !aluno.presenca_confirmada &&
         aluno.pode_confirmar_presenca &&
-        presencasSelecionadas[aluno.id]
+        presencasSelecionadas[String(aluno.id)]
     ).length;
 
   const clearSelections = () => {
     if (!checkinData) return;
-    const cleared: { [key: number]: boolean } = {};
+    const cleared: Record<string, boolean> = {};
     checkinData.alunos.forEach(aluno => {
       if (aluno.presenca_confirmada) {
-        cleared[aluno.id] = true;
+        cleared[String(aluno.id)] = true;
       }
     });
     setPresencasSelecionadas(cleared);
@@ -272,10 +326,10 @@ const DashboardProfessorScreen: React.FC<NavigationProps> = ({ navigation, route
 
   const selectAllPendentes = () => {
     if (!checkinData) return;
-    const selecionadas: { [key: number]: boolean } = {};
+    const selecionadas: Record<string, boolean> = {};
     checkinData.alunos.forEach(aluno => {
       if (aluno.presenca_confirmada || aluno.pode_confirmar_presenca) {
-        selecionadas[aluno.id] = true;
+        selecionadas[String(aluno.id)] = true;
       }
     });
     setPresencasSelecionadas(selecionadas);
@@ -289,9 +343,9 @@ const DashboardProfessorScreen: React.FC<NavigationProps> = ({ navigation, route
         aluno =>
           !aluno.presenca_confirmada &&
           aluno.pode_confirmar_presenca &&
-          presencasSelecionadas[aluno.id]
+          presencasSelecionadas[String(aluno.id)]
       )
-      .map(aluno => aluno.id.toString());
+      .map(aluno => String(aluno.id));
 
     if (alunosIds.length === 0) {
       Alert.alert('Atenção', 'Selecione pelo menos um aluno ou aula experimental.');
@@ -392,7 +446,11 @@ const DashboardProfessorScreen: React.FC<NavigationProps> = ({ navigation, route
     const alunosNormais = alunosFiltrados.filter((a: any) => a.tipo !== 'aula_experimental');
     const alunosComCheckin = alunosNormais.filter(a => a.checkin_realizado);
     const alunosSemCheckin = alunosNormais.filter(a => !a.checkin_realizado);
-    const selectedCount = getSelectedCount([...alunosComCheckin, ...alunosAulaExperimental]);
+    const selectedCount = getSelectedCount([
+      ...alunosComCheckin,
+      ...alunosSemCheckin,
+      ...alunosAulaExperimental,
+    ]);
 
     return (
       <ScrollView style={styles.content}>
@@ -411,10 +469,65 @@ const DashboardProfessorScreen: React.FC<NavigationProps> = ({ navigation, route
                 setSelectedTurma(null);
                 setCheckinData(null);
                 setPresencasSelecionadas({});
+                setObservacaoInfo(null);
+                setObservacaoDraft('');
               }}
             >
               <Text style={styles.backButtonText}>Trocar Turma</Text>
             </TouchableOpacity>
+          </View>
+
+          <View style={[styles.infoBox, styles.presencaLegendaMargin]}>
+            <Text style={styles.infoText}>
+              O check-in no app é feito pelo aluno. Aqui você confirma quem compareceu à aula; pode marcar
+              presença mesmo sem check-in no app (ex.: sem celular ou inadimplente).
+            </Text>
+          </View>
+
+          <View style={styles.observacaoSection}>
+            <Text style={styles.observacaoTitle}>Observação da aula (interna)</Text>
+            <Text style={styles.observacaoHint}>
+              Visível ao gerente. Edição apenas no dia da aula. {MAX_OBSERVACAO_AULA_CHARS} caracteres no máximo.
+            </Text>
+            {loadingObservacao ? (
+              <ActivityIndicator size="small" color="#1a237e" style={{ marginVertical: 8 }} />
+            ) : observacaoInfo?.pode_editar ? (
+              <>
+                <TextInput
+                  style={styles.observacaoInput}
+                  multiline
+                  maxLength={MAX_OBSERVACAO_AULA_CHARS}
+                  value={observacaoDraft}
+                  onChangeText={setObservacaoDraft}
+                  placeholder="Ex.: dinâmica aplicada, aluno com limitação, etc."
+                  placeholderTextColor="#999"
+                />
+                <Text style={styles.observacaoCounter}>
+                  {observacaoDraft.trim().length}/{MAX_OBSERVACAO_AULA_CHARS}
+                </Text>
+                <TouchableOpacity
+                  style={[styles.observacaoSaveBtn, savingObservacao && styles.registrarButtonDisabled]}
+                  onPress={salvarObservacaoAula}
+                  disabled={savingObservacao}
+                >
+                  <Text style={styles.observacaoSaveBtnText}>Salvar observação</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <Text style={styles.observacaoReadonly}>
+                {observacaoInfo?.texto
+                  ? observacaoInfo.texto
+                  : 'Nenhuma observação registrada para hoje.'}
+              </Text>
+            )}
+            {observacaoInfo?.autor_nome && observacaoInfo.texto ? (
+              <Text style={styles.observacaoMeta}>
+                Por {observacaoInfo.autor_nome}
+                {observacaoInfo.atualizado_em
+                  ? ` · ${new Date(observacaoInfo.atualizado_em).toLocaleString('pt-BR')}`
+                  : ''}
+              </Text>
+            ) : null}
           </View>
 
           <View style={styles.searchContainer}>
@@ -452,11 +565,12 @@ const DashboardProfessorScreen: React.FC<NavigationProps> = ({ navigation, route
                     </View>
                   </View>
                   <Switch
-                    value={presencasSelecionadas[aluno.id] || false}
+                    value={presencasSelecionadas[String(aluno.id)] || false}
                     onValueChange={() => togglePresenca(aluno.id)}
                     disabled={aluno.presenca_confirmada || !aluno.pode_confirmar_presenca}
                     trackColor={{ false: '#ccc', true: '#4caf50' }}
-                    thumbColor={presencasSelecionadas[aluno.id] ? '#fff' : '#f4f3f4'}
+                    thumbColor={presencasSelecionadas[String(aluno.id)] ? '#fff' : '#f4f3f4'}
+                    accessibilityLabel={`Presença na aula experimental: ${aluno.nome}`}
                   />
                 </View>
               ))}
@@ -475,16 +589,17 @@ const DashboardProfessorScreen: React.FC<NavigationProps> = ({ navigation, route
                     <View style={styles.alunoStatusRow}>
                       <View style={[styles.statusDot, { backgroundColor: '#4caf50' }]} />
                       <Text style={styles.alunoStatus}>
-                        {aluno.presenca_confirmada ? 'Presença confirmada' : 'Check-in realizado'}
+                        {aluno.presenca_confirmada ? 'Presença confirmada' : 'Check-in no app'}
                       </Text>
                     </View>
                   </View>
                   <Switch
-                    value={presencasSelecionadas[aluno.id] || false}
+                    value={presencasSelecionadas[String(aluno.id)] || false}
                     onValueChange={() => togglePresenca(aluno.id)}
                     disabled={aluno.presenca_confirmada || !aluno.pode_confirmar_presenca}
                     trackColor={{ false: '#ccc', true: '#4caf50' }}
-                    thumbColor={presencasSelecionadas[aluno.id] ? '#fff' : '#f4f3f4'}
+                    thumbColor={presencasSelecionadas[String(aluno.id)] ? '#fff' : '#f4f3f4'}
+                    accessibilityLabel={`Presença confirmada: ${aluno.nome}`}
                   />
                 </View>
               ))}
@@ -494,28 +609,39 @@ const DashboardProfessorScreen: React.FC<NavigationProps> = ({ navigation, route
           {alunosSemCheckin.length > 0 && (
             <View style={styles.alunosSection}>
               <Text style={styles.alunosSectionTitle}>
-                Alunos sem Check-in ({alunosSemCheckin.length})
+                Alunos sem Check-in no app ({alunosSemCheckin.length})
               </Text>
               {alunosSemCheckin.map(aluno => (
-                <View key={aluno.id} style={styles.alunoItem}>
+                <View key={aluno.id} style={[styles.alunoItem, { backgroundColor: '#fff8f0' }]}>
                   <View style={styles.alunoInfo}>
                     <Text style={styles.alunoNome}>{aluno.nome}</Text>
                     <View style={styles.alunoStatusRow}>
-                      <View style={[styles.statusDot, { backgroundColor: '#f44336' }]} />
-                      <Text style={styles.alunoStatus}>Sem check-in</Text>
+                      <View
+                        style={[
+                          styles.statusDot,
+                          { backgroundColor: aluno.presenca_confirmada ? '#4caf50' : '#ff9800' },
+                        ]}
+                      />
+                      <Text style={styles.alunoStatus}>
+                        {aluno.presenca_confirmada
+                          ? 'Presença confirmada'
+                          : 'Sem check-in no app — pode registrar presença'}
+                      </Text>
                     </View>
                   </View>
                   <Switch
-                    value={false}
-                    onValueChange={() => {}}
-                    disabled={true}
+                    value={presencasSelecionadas[String(aluno.id)] || false}
+                    onValueChange={() => togglePresenca(aluno.id)}
+                    disabled={aluno.presenca_confirmada || !aluno.pode_confirmar_presenca}
                     trackColor={{ false: '#ccc', true: '#4caf50' }}
+                    thumbColor={presencasSelecionadas[String(aluno.id)] ? '#fff' : '#f4f3f4'}
+                    accessibilityLabel={`Presença sem check-in no app: ${aluno.nome}`}
                   />
                 </View>
               ))}
-              <View style={styles.warningBox}>
-                <Text style={styles.warningText}>
-                  ⚠️ Alunos sem check-in não podem ter presença registrada.
+              <View style={styles.infoBox}>
+                <Text style={styles.infoText}>
+                  Inclua quem estiver na aula nesta lista, mesmo sem check-in no app.
                 </Text>
               </View>
             </View>
@@ -1162,15 +1288,75 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666',
   },
-  warningBox: {
-    backgroundColor: '#fff3cd',
+  presencaLegendaMargin: {
+    marginBottom: 12,
+  },
+  observacaoSection: {
+    marginBottom: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  observacaoTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#333',
+    marginBottom: 4,
+  },
+  observacaoHint: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 8,
+  },
+  observacaoInput: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 8,
+    padding: 10,
+    minHeight: 88,
+    textAlignVertical: 'top',
+    fontSize: 14,
+    color: '#333',
+    backgroundColor: '#fafafa',
+  },
+  observacaoCounter: {
+    fontSize: 11,
+    color: '#999',
+    textAlign: 'right',
+    marginTop: 4,
+  },
+  observacaoSaveBtn: {
+    marginTop: 10,
+    alignSelf: 'flex-start',
+    backgroundColor: '#1a237e',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+  },
+  observacaoSaveBtnText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  observacaoReadonly: {
+    fontSize: 14,
+    color: '#444',
+    lineHeight: 20,
+  },
+  observacaoMeta: {
+    fontSize: 11,
+    color: '#888',
+    marginTop: 8,
+  },
+  infoBox: {
+    backgroundColor: '#e3f2fd',
     borderRadius: 8,
     padding: 12,
     marginTop: 12,
   },
-  warningText: {
+  infoText: {
     fontSize: 14,
-    color: '#856404',
+    color: '#1565c0',
   },
   registrarButton: {
     backgroundColor: '#1a237e',

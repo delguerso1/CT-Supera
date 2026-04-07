@@ -81,11 +81,40 @@ class ListaCriarTurmasAPIView(ListCreateAPIView):
         
         return queryset
 
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        page = self.paginate_queryset(queryset)
+        turmas_page = page if page is not None else queryset
+        ids = list(turmas_page.values_list('id', flat=True))
+        alerta_map = {}
+        user = request.user
+        if user.is_authenticated and getattr(user, 'tipo', None) == 'gerente':
+            from turmas.alertas import compute_alerta_inadimplente_presenca_por_turma
+
+            alerta_map = compute_alerta_inadimplente_presenca_por_turma(ids)
+        serializer = self.get_serializer(
+            turmas_page,
+            many=True,
+            context={**self.get_serializer_context(), 'alerta_inadimplente_map': alerta_map},
+        )
+        if page is not None:
+            return self.get_paginated_response(serializer.data)
+        return Response(serializer.data)
+
 class EditarExcluirTurmaAPIView(RetrieveUpdateDestroyAPIView):
     """API para editar, excluir ou visualizar uma turma."""
     permission_classes = [IsAuthenticated]
     queryset = Turma.objects.all()
     serializer_class = TurmaSerializer
+
+    def get_serializer_context(self):
+        ctx = super().get_serializer_context()
+        pk = self.kwargs.get('pk')
+        if pk and self.request.user.is_authenticated and getattr(self.request.user, 'tipo', None) == 'gerente':
+            from turmas.alertas import compute_alerta_inadimplente_presenca_por_turma
+
+            ctx['alerta_inadimplente_map'] = compute_alerta_inadimplente_presenca_por_turma([int(pk)])
+        return ctx
 
 
 class ListaAlunosTurmaAPIView(APIView):
@@ -103,8 +132,15 @@ class ListaAlunosTurmaAPIView(APIView):
         # Filtra apenas alunos ativos e inclui todos os campos necessários
         alunos = turma.alunos.filter(ativo=True)
         
-        # Serializa os dados da turma e dos alunos
-        turma_data = TurmaSerializer(turma).data
+        alerta_map = {}
+        if is_gerente:
+            from turmas.alertas import compute_alerta_inadimplente_presenca_por_turma
+
+            alerta_map = compute_alerta_inadimplente_presenca_por_turma([turma.id])
+        turma_data = TurmaSerializer(
+            turma,
+            context={'request': request, 'alerta_inadimplente_map': alerta_map},
+        ).data
         alunos_data = UsuarioSerializer(alunos, many=True).data
 
         return Response({

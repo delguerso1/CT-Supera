@@ -13,6 +13,7 @@ from .salarios import ensure_salarios_competencia
 from .serializers import MensalidadeSerializer, DespesaSerializer, SalarioSerializer, TransacaoC6BankSerializer
 from .pagination import MensalidadePagination
 from .c6_client import c6_client, C6BankError, C6BankMethodNotAllowedError, C6BankInvalidRequestError
+from .c6_checkout_sync import sincronizar_transacao_checkout_c6
 from django.shortcuts import get_object_or_404
 from django.conf import settings
 from datetime import timedelta
@@ -1075,41 +1076,9 @@ class ConsultarCheckoutStatusAPIView(APIView):
                     'error': 'Checkout não possui ID válido.'
                 }, status=status.HTTP_400_BAD_REQUEST)
 
-            checkout_data = c6_client.get_checkout(transacao.txid)
-            status_checkout = str(checkout_data.get('status', '')).upper()
-
-            transacao.resposta_api = checkout_data
-            if checkout_data.get('url'):
-                transacao.payment_url = checkout_data.get('url')
-
-            if status_checkout in ['PAID', 'APPROVED', 'AUTHORIZED', 'CONFIRMED', 'SUCCEEDED']:
-                if transacao.status != 'aprovado':
-                    transacao.status = 'aprovado'
-                    transacao.data_aprovacao = timezone.now()
-                    transacao.save()
-
-                mensalidade = transacao.mensalidade
-                if mensalidade.status != 'pago':
-                    mensalidade.status = 'pago'
-                    mensalidade.valor_pago = transacao.valor  # Valor com multa/juros
-                    mensalidade.save()
-                    proxima = Mensalidade.criar_proxima_mensalidade(mensalidade)
-                    if proxima:
-                        logger.info(
-                            "Mensalidade %s criada para %s/%s após pagamento",
-                            proxima.id,
-                            str(proxima.data_vencimento.month).zfill(2),
-                            proxima.data_vencimento.year
-                        )
-            elif status_checkout in ['CANCELLED', 'CANCELED']:
-                transacao.status = 'cancelado'
-                transacao.data_cancelamento = timezone.now()
-                transacao.save()
-            elif status_checkout in ['EXPIRED']:
-                transacao.status = 'expirado'
-                transacao.save()
-            else:
-                transacao.save()
+            resultado = sincronizar_transacao_checkout_c6(transacao)
+            checkout_data = resultado['checkout_data']
+            transacao = resultado['transacao']
 
             return Response({
                 'status': transacao.status,
@@ -1122,6 +1091,86 @@ class ConsultarCheckoutStatusAPIView(APIView):
             return Response({
                 'error': f'Erro ao consultar checkout: {str(e)}'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@method_decorator(csrf_exempt, name='dispatch')
+class C6BankWebhookCheckoutAPIView(APIView):
+    """
+    Webhook C6 Bank para CHECKOUT (pagamento com cartão / página hospedada).
+
+    URL: /api/financeiro/c6/webhook-checkout/
+
+    Formato: WebhookNotification (webhook-api.yaml) com ``service`` = ``CHECKOUT``;
+    ``external_id`` é o ID do checkout (mesmo valor salvo em ``TransacaoC6Bank.txid``).
+
+    Cadastro no C6 (API ``POST /v1/webhooks/``, escopo ``webhook.write``), exemplo::
+
+        {"url": "https://SEU_DOMINIO/api/financeiro/c6/webhook-checkout/", "service": "CHECKOUT"}
+
+    O webhook de PIX (array BACEN) permanece em ``/api/financeiro/c6/webhook/``.
+    """
+    permission_classes = []
+    authentication_classes = []
+
+    def post(self, request):
+        try:
+            data = request.data
+            if isinstance(data, str):
+                data = json.loads(data)
+
+            service = str(data.get('service', '') or '').upper().strip()
+            if service != 'CHECKOUT':
+                logger.info('Webhook C6 checkout: ignorado (service=%s)', service)
+                return JsonResponse({'status': 'ignored', 'reason': 'not_checkout'}, status=200)
+
+            external_id = data.get('external_id') or data.get('id')
+            if not external_id and data.get('information'):
+                try:
+                    info_raw = data['information']
+                    if isinstance(info_raw, str):
+                        info_parsed = json.loads(info_raw)
+                    else:
+                        info_parsed = info_raw
+                    if isinstance(info_parsed, dict):
+                        external_id = info_parsed.get('id') or info_parsed.get('external_id')
+                except (json.JSONDecodeError, TypeError, ValueError):
+                    pass
+            if not external_id:
+                logger.warning('Webhook C6 checkout sem external_id: %s', data)
+                return JsonResponse({'status': 'ignored', 'reason': 'no_external_id'}, status=200)
+
+            external_id = str(external_id).strip()
+            transacao = TransacaoC6Bank.objects.filter(
+                tipo='cartao',
+                txid=external_id,
+            ).first()
+
+            if not transacao:
+                logger.warning(
+                    'Webhook C6 checkout: transação local não encontrada (txid=%s)',
+                    external_id,
+                )
+                return JsonResponse({'status': 'ok', 'message': 'transacao_nao_encontrada'}, status=200)
+
+            wh_status = str(data.get('status', '') or '').upper().strip()
+            logger.info(
+                'Webhook C6 checkout: txid=%s transacao_id=%s notify_status=%s',
+                external_id,
+                transacao.id,
+                wh_status,
+            )
+
+            resultado = sincronizar_transacao_checkout_c6(transacao)
+            transacao = resultado['transacao']
+
+            return JsonResponse({
+                'status': 'processed',
+                'transacao_id': transacao.id,
+                'transacao_status': transacao.status,
+            })
+        except Exception as e:
+            logger.exception('Erro no webhook C6 checkout: %s', e)
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
 
 
 @method_decorator(csrf_exempt, name='dispatch')

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import api, { MEDIA_URL } from '../services/api';
 
 // Hook para detectar tamanho da tela
@@ -442,6 +442,9 @@ function DashboardAluno({ user }) {
   const [mensalidadesPendentes, setMensalidadesPendentes] = useState([]);
   const [transacaoPix, setTransacaoPix] = useState(null);
   const [transacaoBoleto, setTransacaoBoleto] = useState(null);
+  /** Checkout cartão C6: polling até a API marcar transação/mensalidade (o backend não recebe webhook de checkout). */
+  const [transacaoCheckoutCartao, setTransacaoCheckoutCartao] = useState(null);
+  const checkoutCartaoIntervalRef = useRef(null);
   const [pagamentoLoading, setPagamentoLoading] = useState(false);
   const [pagamentoBancarioLoading, setPagamentoBancarioLoading] = useState(false);
   const [pagamentoBoletoLoading, setPagamentoBoletoLoading] = useState(false);
@@ -530,6 +533,15 @@ function DashboardAluno({ user }) {
     }
     fetchData();
   }, [user?.id]);
+
+  useEffect(() => {
+    return () => {
+      if (checkoutCartaoIntervalRef.current) {
+        clearInterval(checkoutCartaoIntervalRef.current);
+        checkoutCartaoIntervalRef.current = null;
+      }
+    };
+  }, []);
 
   const handleEdit = () => {
     setEditMode(true);
@@ -783,6 +795,7 @@ function DashboardAluno({ user }) {
             setTransacaoPix(null);
             const resp = await api.get('alunos/painel-aluno/');
             setHistoricoMensalidades(resp.data.historico_pagamentos);
+            setMensalidadesPendentes(resp.data.mensalidades_pendentes || []);
           } else if (transacao.status === 'expirado') {
             clearInterval(checkStatus);
             setErro('Pagamento PIX expirado. Por favor, gere um novo pagamento.');
@@ -810,16 +823,63 @@ function DashboardAluno({ user }) {
       setPagamentoBancarioLoading(true);
       setErro('');
       setSuccess('');
-
-      const response = await api.post(`financeiro/pagamento-bancario/gerar/${mensalidadeId}/`);
-      
-      if (response.data.payment_url) {
-        window.open(response.data.payment_url, '_blank');
-        setSuccess('Redirecionando para o pagamento bancário...');
-      } else {
-        setErro('Erro ao gerar link de pagamento bancário.');
+      setTransacaoCheckoutCartao(null);
+      if (checkoutCartaoIntervalRef.current) {
+        clearInterval(checkoutCartaoIntervalRef.current);
+        checkoutCartaoIntervalRef.current = null;
       }
 
+      const response = await api.post(`financeiro/pagamento-bancario/gerar/${mensalidadeId}/`);
+      const tx = response.data.transacao;
+      const paymentUrl = response.data.payment_url;
+
+      if (!tx) {
+        setErro(response.data.error || 'Resposta inválida ao gerar pagamento com cartão.');
+        return;
+      }
+
+      setTransacaoCheckoutCartao(tx);
+      if (paymentUrl) {
+        window.open(paymentUrl, '_blank');
+      }
+      setSuccess(
+        'Página de pagamento aberta em outra aba. Você pode fechar esta janela: o sistema confirma o cartão pelo banco (webhook) ou na próxima sincronização. Se mantiver esta aberta, atualizamos assim que detectarmos o pagamento.'
+      );
+
+      checkoutCartaoIntervalRef.current = setInterval(async () => {
+        try {
+          const statusResponse = await api.get(`financeiro/checkout/status/${tx.id}/`);
+          const st = statusResponse.data.transacao?.status || statusResponse.data.status;
+
+          if (st === 'aprovado') {
+            if (checkoutCartaoIntervalRef.current) {
+              clearInterval(checkoutCartaoIntervalRef.current);
+              checkoutCartaoIntervalRef.current = null;
+            }
+            setTransacaoCheckoutCartao(null);
+            setSuccess('Pagamento com cartão aprovado!');
+            const resp = await api.get('alunos/painel-aluno/');
+            setHistoricoMensalidades(resp.data.historico_pagamentos || []);
+            setMensalidadesPendentes(resp.data.mensalidades_pendentes || []);
+          } else if (st === 'cancelado' || st === 'expirado' || st === 'rejeitado') {
+            if (checkoutCartaoIntervalRef.current) {
+              clearInterval(checkoutCartaoIntervalRef.current);
+              checkoutCartaoIntervalRef.current = null;
+            }
+            setTransacaoCheckoutCartao(null);
+            setErro('Pagamento não concluído ou cancelado. Você pode gerar um novo link quando quiser.');
+          }
+        } catch (err) {
+          console.error('Erro ao verificar status do checkout (cartão):', err);
+        }
+      }, 5000);
+
+      setTimeout(() => {
+        if (checkoutCartaoIntervalRef.current) {
+          clearInterval(checkoutCartaoIntervalRef.current);
+          checkoutCartaoIntervalRef.current = null;
+        }
+      }, 30 * 60 * 1000);
     } catch (err) {
       console.error('Erro ao gerar pagamento bancário:', err);
       setErro(err.response?.data?.error || 'Erro ao gerar pagamento bancário.');
@@ -1728,6 +1788,25 @@ function DashboardAluno({ user }) {
         <span>💳</span>
         Pagamentos
       </h2>
+
+      {transacaoCheckoutCartao && (
+        <div
+          style={{
+            ...styles.checkinCard,
+            backgroundColor: '#e3f2fd',
+            borderColor: '#1F6C86',
+            marginBottom: 16,
+          }}
+        >
+          <div style={{ ...styles.checkinTitle, color: '#1F6C86' }}>
+            <span>⏳</span>
+            Aguardando confirmação do pagamento com cartão
+          </div>
+          <p style={{ margin: '8px 0 0', fontSize: 14, color: '#333' }}>
+            Não precisa manter esta aba aberta: o pagamento é confirmado no servidor automaticamente. Se você ficar aqui, a lista também atualiza em alguns segundos (até 30 min).
+          </p>
+        </div>
+      )}
       
       {mensalidadesPendentes.length > 0 && (
         <div style={{...styles.checkinCard, backgroundColor: '#fff3e0', borderColor: '#ff9800'}}>

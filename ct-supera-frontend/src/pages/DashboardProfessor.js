@@ -352,6 +352,10 @@ function DashboardProfessor({ user }) {
   const [alunosPresenca, setAlunosPresenca] = useState([]);
   const [loadingPresenca, setLoadingPresenca] = useState(false);
   const [presencas, setPresencas] = useState({});
+  const [observacaoMeta, setObservacaoMeta] = useState(null);
+  const [observacaoTexto, setObservacaoTexto] = useState('');
+  const [loadingObservacao, setLoadingObservacao] = useState(false);
+  const [savingObservacao, setSavingObservacao] = useState(false);
   const [fotoPerfil, setFotoPerfil] = useState(null);
   const [fotoPreview, setFotoPreview] = useState(null);
   const [uploadingFoto, setUploadingFoto] = useState(false);
@@ -554,15 +558,41 @@ function DashboardProfessor({ user }) {
     }
   };
 
+  const MAX_OBSERVACAO_AULA_CHARS = 1000;
+
+  const fecharModalPresenca = () => {
+    setTurmaPresenca(null);
+    setPresencas({});
+    setAlunosPresenca([]);
+    setObservacaoMeta(null);
+    setObservacaoTexto('');
+  };
+
   const handleAbrirModalPresenca = async (turma) => {
     setTurmaPresenca(turma);
     setPresencas({});
     setAlunosPresenca([]);
+    setObservacaoMeta(null);
+    setObservacaoTexto('');
     try {
       setLoadingPresenca(true);
       setErro('');
       const resp = await api.get(`funcionarios/verificar-checkin/${turma.id}/`);
       setAlunosPresenca(resp.data.alunos || []);
+      try {
+        setLoadingObservacao(true);
+        const obsResp = await api.get(`funcionarios/observacao-aula/${turma.id}/`, {
+          params: { data: resp.data.data },
+        });
+        setObservacaoMeta(obsResp.data);
+        setObservacaoTexto(obsResp.data.texto || '');
+      } catch (e) {
+        console.error('Erro ao carregar observação:', e);
+        setObservacaoMeta(null);
+        setObservacaoTexto('');
+      } finally {
+        setLoadingObservacao(false);
+      }
     } catch (err) {
       console.error('Erro ao carregar alunos:', err);
       setErro('Erro ao carregar alunos da turma.');
@@ -572,17 +602,40 @@ function DashboardProfessor({ user }) {
     }
   };
 
+  const handleSalvarObservacaoAula = async () => {
+    if (!turmaPresenca?.id) return;
+    const t = observacaoTexto.trim();
+    if (t.length < 1 || t.length > MAX_OBSERVACAO_AULA_CHARS) {
+      setErro(`Observação: informe entre 1 e ${MAX_OBSERVACAO_AULA_CHARS} caracteres.`);
+      return;
+    }
+    try {
+      setSavingObservacao(true);
+      setErro('');
+      const r = await api.put(`funcionarios/observacao-aula/${turmaPresenca.id}/`, { texto: t });
+      setObservacaoMeta(r.data);
+      setObservacaoTexto(r.data.texto || '');
+      setSuccess('Observação salva.');
+    } catch (err) {
+      console.error(err);
+      setErro(err.response?.data?.error || 'Erro ao salvar observação.');
+    } finally {
+      setSavingObservacao(false);
+    }
+  };
+
   const handlePresencaChange = (alunoId, checked) => {
+    const id = String(alunoId);
     setPresencas(prev => ({
       ...prev,
-      [alunoId]: checked
+      [id]: checked
     }));
   };
 
   const handleRegistrarPresenca = async () => {
     if (!turmaPresenca) return;
 
-    const alunosIds = Object.keys(presencas).filter(id => presencas[id]).map(String);
+    const alunosIds = Object.keys(presencas).filter(id => presencas[id] === true).map(String);
     if (alunosIds.length === 0) {
       setErro('Selecione pelo menos um aluno ou aula experimental.');
       return;
@@ -593,9 +646,7 @@ function DashboardProfessor({ user }) {
       const response = await api.post(`funcionarios/registrar-presenca/${turmaPresenca.id}/`, {
         presenca: alunosIds
       });
-      setTurmaPresenca(null);
-      setPresencas({});
-      setAlunosPresenca([]);
+      fecharModalPresenca();
       setSuccess(response.data.message || 'Presenças registradas com sucesso!');
       if (response.data.warning) {
         setSuccess(prev => `${prev} ${response.data.warning}`);
@@ -1229,9 +1280,71 @@ function DashboardProfessor({ user }) {
             
             <div style={{ marginTop: '20px' }}>
               <h3 style={{ marginBottom: '16px' }}>Alunos</h3>
-              <p style={{ fontSize: '13px', color: '#666', marginBottom: '12px' }}>
-                💡 Selecione os alunos presentes. Você pode registrar presença mesmo sem check-in do aluno.
+              <p style={{ fontSize: '13px', color: '#666', marginBottom: '12px', lineHeight: 1.45 }}>
+                💡 O check-in no app é feito pelo aluno. Aqui você confirma quem compareceu à aula; pode marcar
+                presença mesmo sem check-in no app (ex.: sem celular ou inadimplente).
               </p>
+              <div style={{ marginBottom: '16px', paddingBottom: '12px', borderBottom: '1px solid #eee' }}>
+                <h4 style={{ margin: '0 0 8px 0', fontSize: '15px' }}>Observação da aula (interna)</h4>
+                <p style={{ fontSize: '12px', color: '#666', marginBottom: '8px' }}>
+                  Visível ao gerente. Edição apenas no dia da aula. Máximo {MAX_OBSERVACAO_AULA_CHARS} caracteres.
+                </p>
+                {loadingObservacao ? (
+                  <p style={{ fontSize: '13px', color: '#666' }}>Carregando observação...</p>
+                ) : observacaoMeta?.pode_editar ? (
+                  <>
+                    <textarea
+                      value={observacaoTexto}
+                      onChange={e => setObservacaoTexto(e.target.value)}
+                      maxLength={MAX_OBSERVACAO_AULA_CHARS}
+                      rows={4}
+                      style={{
+                        width: '100%',
+                        padding: '8px',
+                        fontSize: '14px',
+                        borderRadius: '6px',
+                        border: '1px solid #ccc',
+                        boxSizing: 'border-box',
+                      }}
+                      placeholder="Ex.: dinâmica aplicada, aluno com limitação, etc."
+                    />
+                    <div style={{ fontSize: '11px', color: '#888', marginTop: '4px', textAlign: 'right' }}>
+                      {observacaoTexto.trim().length}/{MAX_OBSERVACAO_AULA_CHARS}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleSalvarObservacaoAula}
+                      disabled={savingObservacao}
+                      style={{
+                        marginTop: '8px',
+                        padding: '8px 16px',
+                        background: '#1F6C86',
+                        color: '#fff',
+                        border: 'none',
+                        borderRadius: '6px',
+                        cursor: savingObservacao ? 'wait' : 'pointer',
+                        opacity: savingObservacao ? 0.7 : 1,
+                      }}
+                    >
+                      {savingObservacao ? 'Salvando...' : 'Salvar observação'}
+                    </button>
+                  </>
+                ) : (
+                  <p style={{ fontSize: '14px', color: '#444', whiteSpace: 'pre-wrap' }}>
+                    {observacaoMeta?.texto?.trim()
+                      ? observacaoMeta.texto
+                      : 'Nenhuma observação registrada para hoje.'}
+                  </p>
+                )}
+                {observacaoMeta?.autor_nome && observacaoMeta?.texto?.trim() ? (
+                  <p style={{ fontSize: '12px', color: '#888', marginTop: '8px' }}>
+                    Por {observacaoMeta.autor_nome}
+                    {observacaoMeta.atualizado_em
+                      ? ` · ${new Date(observacaoMeta.atualizado_em).toLocaleString('pt-BR')}`
+                      : ''}
+                  </p>
+                ) : null}
+              </div>
               {loadingPresenca ? (
                 <p style={styles.noData}>Carregando alunos...</p>
               ) : alunosPresenca.length > 0 ? (
@@ -1247,10 +1360,11 @@ function DashboardProfessor({ user }) {
                         <input
                           type="checkbox"
                           id={`aluno-${aluno.id}`}
-                          checked={presencas[aluno.id] || false}
+                          checked={presencas[String(aluno.id)] || false}
                           onChange={e => handlePresencaChange(aluno.id, e.target.checked)}
                           disabled={aluno.presenca_confirmada}
                           style={styles.checkbox}
+                          aria-label={`Presença: ${aluno.nome || ''}`}
                         />
                         <label
                           htmlFor={`aluno-${aluno.id}`}
@@ -1270,7 +1384,13 @@ function DashboardProfessor({ user }) {
                             backgroundColor: aluno.presenca_confirmada ? '#4caf50' : isAulaExperimental ? '#ff9800' : (aluno.checkin_realizado ? '#2196f3' : '#ff9800'),
                             color: 'white'
                           }}>
-                            {aluno.presenca_confirmada ? '✅ Confirmada' : isAulaExperimental ? 'Aula experimental' : (aluno.checkin_realizado ? 'Check-in OK' : 'Sem check-in')}
+                            {aluno.presenca_confirmada
+                              ? '✅ Confirmada'
+                              : isAulaExperimental
+                                ? 'Aula experimental'
+                                : aluno.checkin_realizado
+                                  ? 'Check-in no app'
+                                  : 'Sem check-in no app'}
                           </span>
                         </label>
                       </div>
@@ -1284,17 +1404,17 @@ function DashboardProfessor({ user }) {
 
             <div style={{ marginTop: '24px', display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
               <button
-                onClick={() => setTurmaPresenca(null)}
+                onClick={fecharModalPresenca}
                 style={styles.cancelButton}
               >
                 Cancelar
               </button>
               <button
                 onClick={handleRegistrarPresenca}
-                disabled={Object.keys(presencas).length === 0}
+                disabled={!Object.values(presencas).some(v => v === true)}
                 style={{
                   ...styles.actionButton,
-                  opacity: Object.keys(presencas).length === 0 ? 0.5 : 1
+                  opacity: !Object.values(presencas).some(v => v === true) ? 0.5 : 1
                 }}
               >
                 Registrar Presença

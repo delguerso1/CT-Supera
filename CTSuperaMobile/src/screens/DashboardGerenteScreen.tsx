@@ -25,7 +25,8 @@ import {
   FinanceiroDashboard,
   Turma,
   PresencaRelatorioResponse,
-  PresencaRelatorioItem
+  PresencaRelatorioItem,
+  ObservacaoAulaResponse,
 } from '../types';
 import { NavigationProps } from '../types';
 import CONFIG from '../config';
@@ -59,6 +60,15 @@ const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }
   const [filtroPresencaBusca, setFiltroPresencaBusca] = useState('');
   const [showPresencaTurmaModal, setShowPresencaTurmaModal] = useState(false);
   const [corrigindoPresenca, setCorrigindoPresenca] = useState<{ [key: number]: boolean }>({});
+  const [filtroObservacaoData, setFiltroObservacaoData] = useState(() => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  });
+  const [observacaoGerente, setObservacaoGerente] = useState<ObservacaoAulaResponse | null>(null);
+  const [loadingObservacaoGerente, setLoadingObservacaoGerente] = useState(false);
   const [filtroAlunoBusca, setFiltroAlunoBusca] = useState('');
   const [filtroTurmaBusca, setFiltroTurmaBusca] = useState('');
   const [showDespesaModal, setShowDespesaModal] = useState(false);
@@ -128,6 +138,28 @@ const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }
       loadRelatoriosData();
     }
   }, [activeSection, user, mes, ano, filtroTurmaId]);
+
+  useEffect(() => {
+    if (activeSection !== 'relatorios' || filtroPresencaTurmaId == null || !user) {
+      setObservacaoGerente(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        setLoadingObservacaoGerente(true);
+        const r = await presencaService.getObservacaoAula(filtroPresencaTurmaId, filtroObservacaoData);
+        if (!cancelled) setObservacaoGerente(r);
+      } catch {
+        if (!cancelled) setObservacaoGerente(null);
+      } finally {
+        if (!cancelled) setLoadingObservacaoGerente(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeSection, filtroPresencaTurmaId, filtroObservacaoData, user]);
 
   const loadGerenteData = async (opts?: { silent?: boolean; suppressErrorAlert?: boolean }) => {
     const silent = Boolean(opts?.silent);
@@ -1374,6 +1406,36 @@ const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }
                   <Text style={styles.clearFilterText}>Limpar turma</Text>
                 </TouchableOpacity>
               )}
+              {filtroPresencaTurmaId != null && (
+                <View style={styles.observacaoGerenteBox}>
+                  <Text style={styles.observacaoGerenteLabel}>Observação do professor (leitura)</Text>
+                  <Text style={styles.observacaoGerenteHint}>Data (AAAA-MM-DD)</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="AAAA-MM-DD"
+                    value={filtroObservacaoData}
+                    onChangeText={setFiltroObservacaoData}
+                    autoCapitalize="none"
+                  />
+                  {loadingObservacaoGerente ? (
+                    <ActivityIndicator size="small" color="#1a237e" style={{ marginTop: 8 }} />
+                  ) : (
+                    <Text style={styles.observacaoGerenteText}>
+                      {observacaoGerente?.texto?.trim()
+                        ? observacaoGerente.texto
+                        : 'Nenhuma observação para esta turma nesta data.'}
+                    </Text>
+                  )}
+                  {observacaoGerente?.autor_nome && observacaoGerente?.texto?.trim() ? (
+                    <Text style={styles.observacaoGerenteMeta}>
+                      Por {observacaoGerente.autor_nome}
+                      {observacaoGerente.atualizado_em
+                        ? ` · ${new Date(observacaoGerente.atualizado_em).toLocaleString('pt-BR')}`
+                        : ''}
+                    </Text>
+                  ) : null}
+                </View>
+              )}
               <TextInput
                 style={styles.input}
                 placeholder="Buscar aluno"
@@ -1529,9 +1591,18 @@ const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }
             ) : (
               turmasFiltradas.slice(0, 20).map(turma => (
                 <View key={turma.id} style={styles.reportListItem}>
-                  <Text style={styles.reportListTitle}>
-                    Turma {turma.id} • {turma.ct_nome || 'CT'}
-                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <Text style={[styles.reportListTitle, { marginRight: 8 }]}>
+                      Turma {turma.id} • {turma.ct_nome || 'CT'}
+                    </Text>
+                    {turma.alerta_inadimplente_presenca ? (
+                      <View style={styles.alertaInadimplenteBadge}>
+                        <Text style={styles.alertaInadimplenteBadgeText}>
+                          Inadimplente + presença
+                        </Text>
+                      </View>
+                    ) : null}
+                  </View>
                   <Text style={styles.reportListSubtitle}>
                     {turma.horario} • {turma.alunos_count || 0} alunos • {turma.ativo ? 'Ativa' : 'Inativa'}
                   </Text>
@@ -2398,6 +2469,36 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
   },
+  observacaoGerenteBox: {
+    marginTop: 8,
+    padding: 12,
+    backgroundColor: '#f5f9fc',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e3f2fd',
+  },
+  observacaoGerenteLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 4,
+  },
+  observacaoGerenteHint: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 4,
+  },
+  observacaoGerenteText: {
+    marginTop: 8,
+    fontSize: 14,
+    color: '#333',
+    lineHeight: 20,
+  },
+  observacaoGerenteMeta: {
+    marginTop: 8,
+    fontSize: 12,
+    color: '#666',
+  },
   reportFilters: {
     marginTop: 12,
   },
@@ -2426,6 +2527,19 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666',
     marginTop: 2,
+  },
+  alertaInadimplenteBadge: {
+    backgroundColor: '#ffebee',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#c62828',
+  },
+  alertaInadimplenteBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#b71c1c',
   },
   presencaCard: {
     backgroundColor: '#fff',

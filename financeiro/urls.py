@@ -9,6 +9,7 @@ from .views import (
     # Integração C6 Bank
     C6BankTestConnectionAPIView, C6BankCreatePixPaymentAPIView, C6BankCheckPaymentStatusAPIView,
     C6BankTransactionListAPIView, C6BankTransactionDetailAPIView, C6BankWebhookAPIView,
+    C6BankWebhookCheckoutAPIView,
     CriarPagamentoBancarioAPIView, ConsultarCheckoutStatusAPIView,
     # API Bank Slip - Boletos
     GerarBoletoAPIView, ConsultarBoletoAPIView, AlterarBoletoAPIView,
@@ -60,6 +61,7 @@ urlpatterns = [
     path('c6/transactions/', C6BankTransactionListAPIView.as_view(), name='c6_transaction_list'),
     path('c6/transactions/<int:pk>/', C6BankTransactionDetailAPIView.as_view(), name='c6_transaction_detail'),
     path('c6/webhook/', C6BankWebhookAPIView.as_view(), name='c6_webhook'),
+    path('c6/webhook-checkout/', C6BankWebhookCheckoutAPIView.as_view(), name='c6_webhook_checkout'),
     
     # ========================================
     # API BANK SLIP - BOLETOS BANCÁRIOS
