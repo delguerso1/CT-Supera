@@ -9,7 +9,7 @@ import { colors } from '../theme';
 import { useAuth } from '../utils/AuthContext';
 import { funcionarioService } from '../services/api';
 import { PainelGerente } from '../types';
-import DashboardGerenteScreen from './DashboardGerenteScreen';
+import DashboardGerenteScreen, { type GerenteNavigateTarget } from './DashboardGerenteScreen';
 import GerenciarUsuariosScreen from './GerenciarUsuariosScreen';
 import GerenciarCTsScreen from './GerenciarCTsScreen';
 import GerenciarTurmasScreen from './GerenciarTurmasScreen';
@@ -21,6 +21,8 @@ type TopKey = 'dashboard' | 'perfil' | 'usuarios' | 'financeiro' | 'relatorios';
 type BottomKey = 'cts' | 'turmas' | 'news' | 'galeria' | 'candidatos';
 
 type FocusState = { area: 'top' | 'bottom'; tab: TopKey | BottomKey };
+
+type UsuariosTabKey = 'alunos' | 'professores' | 'gerentes' | 'precadastros';
 
 const TOP_TABS: { key: TopKey; label: string }[] = [
   { key: 'dashboard', label: 'Dashboard' },
@@ -93,6 +95,24 @@ const GerenteShellScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const [painel, setPainel] = useState<PainelGerente | null>(null);
   const [focus, setFocus] = useState<FocusState>({ area: 'top', tab: 'dashboard' });
+  const [pendingUsuariosTab, setPendingUsuariosTab] = useState<UsuariosTabKey | null>(null);
+  const [pendingRelatorioPanel, setPendingRelatorioPanel] = useState<
+    'presenca' | 'alunos' | 'turmas' | null
+  >(null);
+
+  const handleGerenteNavigate = (target: GerenteNavigateTarget) => {
+    setPendingUsuariosTab(null);
+    setPendingRelatorioPanel(null);
+    if (target.area === 'top') {
+      if (target.tab === 'usuarios' && target.usuariosTab) {
+        setPendingUsuariosTab(target.usuariosTab);
+      }
+      if (target.tab === 'relatorios' && target.openRelatorioPanel) {
+        setPendingRelatorioPanel(target.openRelatorioPanel);
+      }
+    }
+    setFocus({ area: target.area, tab: target.tab });
+  };
 
   const topPagerRef = useRef<PagerView>(null);
   const bottomPagerRef = useRef<PagerView>(null);
@@ -187,13 +207,22 @@ const GerenteShellScreen: React.FC = () => {
               <View key={key} style={styles.page} collapsable={false}>
                 {shouldMountNeighborPage(i, topMountCenter) ? (
                   key === 'usuarios' ? (
-                    <GerenciarUsuariosScreen embedded navigation={noopNav} route={{}} />
+                    <GerenciarUsuariosScreen
+                      embedded
+                      navigation={noopNav}
+                      route={{}}
+                      pendingTab={pendingUsuariosTab}
+                      onPendingTabConsumed={() => setPendingUsuariosTab(null)}
+                    />
                   ) : (
                     <DashboardGerenteScreen
                       embedded
                       shellActiveTop={key as 'dashboard' | 'perfil' | 'financeiro' | 'relatorios'}
                       navigation={noopNav}
                       route={{}}
+                      onGerenteNavigate={handleGerenteNavigate}
+                      pendingRelatorioPanel={key === 'relatorios' ? pendingRelatorioPanel : null}
+                      onPendingRelatorioPanelConsumed={() => setPendingRelatorioPanel(null)}
                     />
                   )
                 ) : (

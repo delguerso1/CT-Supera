@@ -127,6 +127,7 @@ const LoginScreen: React.FC<NavigationProps> = ({ navigation }) => {
               value={username}
               onChangeText={(t) => setUsername(formatarCpfMascara(t))}
               placeholder="000.000.000-00"
+              placeholderTextColor={colors.textMuted}
               keyboardType="numeric"
               maxLength={14}
               autoCapitalize="none"
@@ -140,8 +141,13 @@ const LoginScreen: React.FC<NavigationProps> = ({ navigation }) => {
               value={password}
               onChangeText={setPassword}
               placeholder="Digite sua senha"
+              placeholderTextColor={colors.textMuted}
               secureTextEntry
               editable={!loading}
+              textContentType="password"
+              autoComplete="password"
+              autoCapitalize="none"
+              autoCorrect={false}
             />
 
             <TouchableOpacity
@@ -236,6 +242,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginBottom: 20,
     backgroundColor: colors.surface,
+    /** Obrigatório com secureTextEntry: sem `color`, o Android pode desenhar os pontos invisíveis (branco sobre branco). */
+    color: colors.text,
   },
   button: {
     backgroundColor: colors.primary,

@@ -70,7 +70,16 @@ function alunoCorrespondeBuscaUsuario(u: User, qRaw: string): boolean {
   return false;
 }
 
-const GerenciarUsuariosScreen: React.FC<NavigationProps> = ({ embedded }) => {
+type GerenciarUsuariosProps = NavigationProps & {
+  pendingTab?: TabKey | null;
+  onPendingTabConsumed?: () => void;
+};
+
+const GerenciarUsuariosScreen: React.FC<GerenciarUsuariosProps> = ({
+  embedded,
+  pendingTab,
+  onPendingTabConsumed,
+}) => {
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
 
@@ -85,6 +94,13 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = ({ embedded }) => {
   const formModalScrollRef = useRef<ScrollView>(null);
   const matriculaModalScrollRef = useRef<ScrollView>(null);
   const [activeTab, setActiveTab] = useState<TabKey>('alunos');
+
+  useEffect(() => {
+    if (pendingTab) {
+      setActiveTab(pendingTab);
+      onPendingTabConsumed?.();
+    }
+  }, [pendingTab, onPendingTabConsumed]);
   const [users, setUsers] = useState<User[]>([]);
   const [precadastros, setPrecadastros] = useState<PreCadastro[]>([]);
   const [loading, setLoading] = useState(true);

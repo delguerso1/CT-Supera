@@ -40,9 +40,26 @@ import {
   normalizarDataNascimentoParaApi,
 } from '../utils/dataNascimento';
 
+/** Navegação a partir do dashboard embutido no shell do gerente (abas topo/fundo). */
+export type GerenteNavigateTarget =
+  | {
+      area: 'top';
+      tab: 'dashboard' | 'perfil' | 'usuarios' | 'financeiro' | 'relatorios';
+      usuariosTab?: 'alunos' | 'professores' | 'gerentes' | 'precadastros';
+      openRelatorioPanel?: 'presenca' | 'alunos' | 'turmas';
+    }
+  | {
+      area: 'bottom';
+      tab: 'cts' | 'turmas' | 'news' | 'galeria' | 'candidatos';
+    };
+
 type DashboardGerenteProps = NavigationProps & {
   embedded?: boolean;
   shellActiveTop?: 'dashboard' | 'perfil' | 'financeiro' | 'relatorios';
+  onGerenteNavigate?: (target: GerenteNavigateTarget) => void;
+  /** Definido pelo shell ao abrir Relatórios a partir de um card do dashboard */
+  pendingRelatorioPanel?: 'presenca' | 'alunos' | 'turmas' | null;
+  onPendingRelatorioPanelConsumed?: () => void;
 };
 
 const DashboardGerenteScreen: React.FC<DashboardGerenteProps> = ({
@@ -50,6 +67,9 @@ const DashboardGerenteScreen: React.FC<DashboardGerenteProps> = ({
   route,
   embedded,
   shellActiveTop,
+  onGerenteNavigate,
+  pendingRelatorioPanel,
+  onPendingRelatorioPanelConsumed,
 }) => {
   const { user, logout } = useAuth();
   const [painelGerente, setPainelGerente] = useState<PainelGerente | null>(null);
@@ -161,6 +181,14 @@ const DashboardGerenteScreen: React.FC<DashboardGerenteProps> = ({
     else if (n === 'Financeiro') setActiveSection('financeiro');
     else if (n === 'Relatórios') setActiveSection('relatorios');
   }, [route?.name, shellActiveTop]);
+
+  /** Abre o painel correto em Relatórios quando o utilizador toca num card no dashboard */
+  useEffect(() => {
+    if (pendingRelatorioPanel && activeSection === 'relatorios') {
+      setRelatorioPainelAberto(pendingRelatorioPanel);
+      onPendingRelatorioPanelConsumed?.();
+    }
+  }, [pendingRelatorioPanel, activeSection, onPendingRelatorioPanelConsumed]);
 
   useEffect(() => {
     if (activeSection === 'financeiro' && user) {
@@ -694,6 +722,27 @@ const DashboardGerenteScreen: React.FC<DashboardGerenteProps> = ({
   const renderDashboard = () => {
     if (!painelGerente) return null;
 
+    const StatShell: React.FC<{
+      children: React.ReactNode;
+      onPress?: () => void;
+      accessibilityLabel?: string;
+    }> = ({ children, onPress, accessibilityLabel }) => {
+      if (onGerenteNavigate && onPress) {
+        return (
+          <TouchableOpacity
+            style={[styles.statCard, styles.statCardTouchable]}
+            onPress={onPress}
+            activeOpacity={0.72}
+            accessibilityRole="button"
+            accessibilityLabel={accessibilityLabel}
+          >
+            {children}
+          </TouchableOpacity>
+        );
+      }
+      return <View style={styles.statCard}>{children}</View>;
+    };
+
     return (
       <ScrollView
         style={styles.content}
@@ -702,46 +751,83 @@ const DashboardGerenteScreen: React.FC<DashboardGerenteProps> = ({
         }
       >
         <View style={styles.statsGrid}>
-          <View style={styles.statCard}>
+          <StatShell
+            onPress={() =>
+              onGerenteNavigate?.({
+                area: 'top',
+                tab: 'relatorios',
+                openRelatorioPanel: 'alunos',
+              })
+            }
+            accessibilityLabel="Ver relatório de alunos com resumo ativos e inativos"
+          >
             <Text style={styles.statTitle}>Alunos</Text>
             <Text style={styles.statValue}>{painelGerente.alunos_ativos || 0}</Text>
             <Text style={styles.statSubtitle}>Ativos</Text>
             <Text style={[styles.statSubtitle, { marginTop: 4 }]}>{painelGerente.alunos_inativos || 0} inativos</Text>
-          </View>
-          
-          <View style={styles.statCard}>
+          </StatShell>
+
+          <StatShell
+            onPress={() =>
+              onGerenteNavigate?.({
+                area: 'top',
+                tab: 'usuarios',
+                usuariosTab: 'professores',
+              })
+            }
+            accessibilityLabel="Abrir gestão de professores"
+          >
             <Text style={styles.statTitle}>Professores</Text>
             <Text style={styles.statValue}>{painelGerente.professores || 0}</Text>
-          </View>
-          
-          <View style={styles.statCard}>
+          </StatShell>
+
+          <StatShell
+            onPress={() =>
+              onGerenteNavigate?.({
+                area: 'top',
+                tab: 'relatorios',
+                openRelatorioPanel: 'turmas',
+              })
+            }
+            accessibilityLabel="Ver relatório de turmas com resumo e lista"
+          >
             <Text style={styles.statTitle}>Turmas</Text>
             <Text style={styles.statValue}>{painelGerente.turmas?.length || 0}</Text>
-          </View>
+          </StatShell>
         </View>
 
         <View style={styles.statsGrid}>
-          <View style={styles.statCard}>
+          <StatShell
+            onPress={() => onGerenteNavigate?.({ area: 'top', tab: 'financeiro' })}
+            accessibilityLabel="Abrir financeiro e mensalidades pendentes"
+          >
             <Text style={styles.statTitle}>Mensalidades Pendentes</Text>
             <Text style={styles.statValue}>{painelGerente.mensalidades_pendentes || 0}</Text>
             <Text style={styles.statSubtitle}>Mês corrente</Text>
-          </View>
-          
-          <View style={styles.statCard}>
+          </StatShell>
+
+          <StatShell
+            onPress={() => onGerenteNavigate?.({ area: 'top', tab: 'financeiro' })}
+            accessibilityLabel="Abrir financeiro e mensalidades atrasadas"
+          >
             <Text style={styles.statTitle}>Mensalidades Atrasadas</Text>
             <Text style={[styles.statValue, { color: '#f44336' }]}>
-              {painelGerente.mensalidades_atrasadas_mes_corrente || 0} / {painelGerente.mensalidades_atrasadas_mais_30_dias || 0}
+              {painelGerente.mensalidades_atrasadas_mes_corrente || 0} /{' '}
+              {painelGerente.mensalidades_atrasadas_mais_30_dias || 0}
             </Text>
             <Text style={styles.statSubtitle}>Mês corrente / +30 dias</Text>
-          </View>
-          
-          <View style={styles.statCard}>
+          </StatShell>
+
+          <StatShell
+            onPress={() => onGerenteNavigate?.({ area: 'top', tab: 'financeiro' })}
+            accessibilityLabel="Abrir financeiro e mensalidades pagas"
+          >
             <Text style={styles.statTitle}>Mensalidades Pagas</Text>
             <Text style={[styles.statValue, { color: '#4caf50' }]}>
               {painelGerente.mensalidades_pagas || 0}
             </Text>
             <Text style={styles.statSubtitle}>Mês corrente</Text>
-          </View>
+          </StatShell>
         </View>
 
         <View style={styles.section}>
@@ -810,16 +896,36 @@ const DashboardGerenteScreen: React.FC<DashboardGerenteProps> = ({
         </View>
 
         <View style={styles.statsGrid}>
-          <View style={styles.statCard}>
+          <StatShell
+            onPress={() =>
+              onGerenteNavigate?.({
+                area: 'top',
+                tab: 'usuarios',
+                usuariosTab: 'precadastros',
+              })
+            }
+            accessibilityLabel="Abrir pré-cadastros"
+          >
             <Text style={styles.statTitle}>Pré-cadastros</Text>
             <Text style={styles.statValue}>{painelGerente.precadastros || 0}</Text>
-          </View>
-          
-          <View style={styles.statCard}>
+          </StatShell>
+
+          <StatShell
+            onPress={() =>
+              onGerenteNavigate?.({
+                area: 'top',
+                tab: 'usuarios',
+                usuariosTab: 'precadastros',
+              })
+            }
+            accessibilityLabel="Abrir pré-cadastros e aulas experimentais"
+          >
             <Text style={styles.statTitle}>Aulas Experimentais</Text>
-            <Text style={styles.statValue}>{painelGerente.aulas_experimentais_futuras || 0} / {painelGerente.aulas_experimentais_ocorridas || 0}</Text>
+            <Text style={styles.statValue}>
+              {painelGerente.aulas_experimentais_futuras || 0} / {painelGerente.aulas_experimentais_ocorridas || 0}
+            </Text>
             <Text style={styles.statSubtitle}>Futuras / Já ocorreram</Text>
-          </View>
+          </StatShell>
         </View>
 
         {painelGerente.precadastros > 0 && (
@@ -2053,6 +2159,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+  },
+  statCardTouchable: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: `${colors.primary}33`,
   },
   statTitle: {
     fontSize: 12,

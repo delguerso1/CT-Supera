@@ -85,7 +85,11 @@ class ListaCriarTurmasAPIView(ListCreateAPIView):
         queryset = self.filter_queryset(self.get_queryset())
         page = self.paginate_queryset(queryset)
         turmas_page = page if page is not None else queryset
-        ids = list(turmas_page.values_list('id', flat=True))
+        # Com paginação, `page` é lista de instâncias (sem .values_list).
+        if page is not None:
+            ids = [t.id for t in page]
+        else:
+            ids = list(queryset.values_list('id', flat=True))
         alerta_map = {}
         user = request.user
         if user.is_authenticated and getattr(user, 'tipo', None) == 'gerente':

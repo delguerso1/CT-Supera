@@ -24,7 +24,7 @@ export const EAS_PROJECT_ID_FALLBACK = 'f1baab53-bbd8-436a-b0ed-18389f501f59';
 export const CONFIG = {
   API_BASE_URL: envUrl || (__DEV__ ? devBaseUrl : prodBaseUrl),
   APP_NAME: 'CT Supera',
-  VERSION: '1.0.6',
+  VERSION: '1.0.7',
 
   COLORS: {
     primary: colors.primary,

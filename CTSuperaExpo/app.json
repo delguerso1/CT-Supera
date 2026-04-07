@@ -3,7 +3,7 @@
     "name": "CT Supera",
     "slug": "CTSuperaExpo",
     "scheme": "ctsupera",
-    "version": "1.0.6",
+    "version": "1.0.7",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -15,11 +15,11 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.ctsupera.app",
-      "buildNumber": "7"
+      "buildNumber": "8"
     },
     "android": {
       "package": "com.ctsupera.app",
-      "versionCode": 7,
+      "versionCode": 8,
       "softwareKeyboardLayoutMode": "resize",
       "usesCleartextTraffic": false,
       "notification": {
