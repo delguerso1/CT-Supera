@@ -14,6 +14,7 @@ from .serializers import MensalidadeSerializer, DespesaSerializer, SalarioSerial
 from .pagination import MensalidadePagination
 from .c6_client import c6_client, C6BankError, C6BankMethodNotAllowedError, C6BankInvalidRequestError
 from .c6_checkout_sync import sincronizar_transacao_checkout_c6
+from .c6_boleto_sync import sincronizar_transacao_boleto_c6
 from django.shortcuts import get_object_or_404
 from django.conf import settings
 from datetime import timedelta
@@ -1166,6 +1167,84 @@ class C6BankWebhookCheckoutAPIView(APIView):
 
 
 @method_decorator(csrf_exempt, name='dispatch')
+class C6BankWebhookBankSlipAPIView(APIView):
+    """
+    Webhook C6 Bank para BANK_SLIP (boleto).
+
+    URL: /api/financeiro/c6/webhook-bank-slip/
+
+    Formato: WebhookNotification (webhook-api.yaml) com ``service`` = ``BANK_SLIP``;
+    ``external_id`` é o ID do boleto (mesmo valor salvo em ``TransacaoC6Bank.txid``).
+
+    Cadastro no C6 (API ``POST /v1/webhooks/``, escopo ``webhook.write``), exemplo::
+
+        {"url": "https://SEU_DOMINIO/api/financeiro/c6/webhook-bank-slip/", "service": "BANK_SLIP"}
+    """
+    permission_classes = []
+    authentication_classes = []
+
+    def post(self, request):
+        try:
+            data = request.data
+            if isinstance(data, str):
+                data = json.loads(data)
+
+            service = str(data.get('service', '') or '').upper().strip()
+            if service != 'BANK_SLIP':
+                logger.info('Webhook C6 bank slip: ignorado (service=%s)', service)
+                return JsonResponse({'status': 'ignored', 'reason': 'not_bank_slip'}, status=200)
+
+            external_id = data.get('external_id') or data.get('id')
+            if not external_id and data.get('information'):
+                try:
+                    info_raw = data['information']
+                    if isinstance(info_raw, str):
+                        info_parsed = json.loads(info_raw)
+                    else:
+                        info_parsed = info_raw
+                    if isinstance(info_parsed, dict):
+                        external_id = info_parsed.get('id') or info_parsed.get('external_id')
+                except (json.JSONDecodeError, TypeError, ValueError):
+                    pass
+            if not external_id:
+                logger.warning('Webhook C6 bank slip sem external_id: %s', data)
+                return JsonResponse({'status': 'ignored', 'reason': 'no_external_id'}, status=200)
+
+            external_id = str(external_id).strip()
+            transacao = TransacaoC6Bank.objects.filter(
+                tipo='boleto',
+                txid=external_id,
+            ).first()
+
+            if not transacao:
+                logger.warning(
+                    'Webhook C6 bank slip: transação local não encontrada (txid=%s)',
+                    external_id,
+                )
+                return JsonResponse({'status': 'ok', 'message': 'transacao_nao_encontrada'}, status=200)
+
+            wh_status = str(data.get('status', '') or '').upper().strip()
+            logger.info(
+                'Webhook C6 bank slip: txid=%s transacao_id=%s notify_status=%s',
+                external_id,
+                transacao.id,
+                wh_status,
+            )
+
+            resultado = sincronizar_transacao_boleto_c6(transacao)
+            transacao = resultado['transacao']
+
+            return JsonResponse({
+                'status': 'processed',
+                'transacao_id': transacao.id,
+                'transacao_status': transacao.status,
+            })
+        except Exception as e:
+            logger.exception('Erro no webhook C6 bank slip: %s', e)
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+
+
+@method_decorator(csrf_exempt, name='dispatch')
 class C6BankWebhookAPIView(APIView):
     """
     Webhook para receber notificações do C6 Bank - PIX
@@ -1827,48 +1906,16 @@ class ConsultarBoletoAPIView(APIView):
             # Se tem txid (ID do boleto), consulta o status no C6 Bank
             if transacao.txid:
                 try:
-                    boleto_data = c6_client.get_bank_slip(
-                        transacao.txid,
-                        partner_software_name="CT Supera",
-                        partner_software_version="1.0.0"
-                    )
-                    
-                    # Atualiza o status baseado na resposta
-                    status_boleto = boleto_data.get('status')
-                    
-                    if status_boleto == 'PAID' and transacao.status != 'aprovado':
-                        transacao.status = 'aprovado'
-                        transacao.data_aprovacao = timezone.now()
-                        transacao.resposta_api = boleto_data
-                        transacao.save()
-                        
-                        # Atualiza o status da mensalidade e valor efetivamente recebido
-                        mensalidade = transacao.mensalidade
-                        mensalidade.status = 'pago'
-                        mensalidade.valor_pago = transacao.valor  # Valor com multa/juros
-                        mensalidade.save()
-                        proxima = Mensalidade.criar_proxima_mensalidade(mensalidade)
-                        if proxima:
-                            logger.info(
-                                "Mensalidade %s criada para %s/%s após pagamento",
-                                proxima.id,
-                                str(proxima.data_vencimento.month).zfill(2),
-                                proxima.data_vencimento.year
-                            )
-                        logger.info(f"Mensalidade {mensalidade.id} marcada como paga após consulta de boleto")
-                        
-                    elif status_boleto == 'CANCELLED' and transacao.status != 'cancelado':
-                        transacao.status = 'cancelado'
-                        transacao.data_cancelamento = timezone.now()
-                        transacao.resposta_api = boleto_data
-                        transacao.save()
-                    
+                    resultado = sincronizar_transacao_boleto_c6(transacao)
+                    transacao = resultado['transacao']
+                    boleto_data = resultado['boleto_data']
+
                     return Response({
                         'transacao': TransacaoC6BankSerializer(transacao).data,
                         'boleto': boleto_data,
                         'status': transacao.status
                     })
-                    
+
                 except Exception as e:
                     logger.warning(f"Erro ao consultar boleto no C6 Bank: {str(e)}")
                     # Continua e retorna o status atual mesmo sem consultar

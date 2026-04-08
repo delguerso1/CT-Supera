@@ -151,6 +151,14 @@ const GerenteShellScreen: React.FC = () => {
   const topMountCenter = focus.area === 'top' ? topIndexFromFocus(focus.tab) : 0;
   const bottomMountCenter = focus.area === 'bottom' ? bottomIndexFromFocus(focus.tab) : 0;
 
+  /**
+   * Com vizinhos montados (shouldMountNeighborPage), no Android a página adjacente pode interceptar toques
+   * até o layout ser atualizado (ex.: CTs inacessível até visitar Turmas). Páginas inativas não recebem hit-test.
+   * (Só usado no PagerView inferior, onde focus.area === 'bottom' e bottomMountCenter é o índice ativo.)
+   */
+  const bottomPageStyle = (pageIndex: number) =>
+    pageIndex !== bottomMountCenter ? { pointerEvents: 'none' as const } : undefined;
+
   const pagerCommonProps =
     Platform.OS === 'android' ? { offscreenPageLimit: 1 as const } : {};
 
@@ -239,35 +247,35 @@ const GerenteShellScreen: React.FC = () => {
             onPageSelected={onBottomPageSelected}
             {...pagerCommonProps}
           >
-            <View style={styles.page} collapsable={false}>
+            <View style={[styles.page, bottomPageStyle(0)]} collapsable={false}>
               {shouldMountNeighborPage(0, bottomMountCenter) ? (
                 <GerenciarCTsScreen embedded navigation={noopNav} route={{}} />
               ) : (
                 <View style={styles.pagePlaceholder} />
               )}
             </View>
-            <View style={styles.page} collapsable={false}>
+            <View style={[styles.page, bottomPageStyle(1)]} collapsable={false}>
               {shouldMountNeighborPage(1, bottomMountCenter) ? (
                 <GerenciarTurmasScreen embedded navigation={noopNav} route={{}} />
               ) : (
                 <View style={styles.pagePlaceholder} />
               )}
             </View>
-            <View style={styles.page} collapsable={false}>
+            <View style={[styles.page, bottomPageStyle(2)]} collapsable={false}>
               {shouldMountNeighborPage(2, bottomMountCenter) ? (
                 <GerenciarSuperaNewsScreen embedded navigation={noopNav} route={{}} />
               ) : (
                 <View style={styles.pagePlaceholder} />
               )}
             </View>
-            <View style={styles.page} collapsable={false}>
+            <View style={[styles.page, bottomPageStyle(3)]} collapsable={false}>
               {shouldMountNeighborPage(3, bottomMountCenter) ? (
                 <GerenciarGaleriaScreen embedded navigation={noopNav} route={{}} />
               ) : (
                 <View style={styles.pagePlaceholder} />
               )}
             </View>
-            <View style={styles.page} collapsable={false}>
+            <View style={[styles.page, bottomPageStyle(4)]} collapsable={false}>
               {shouldMountNeighborPage(4, bottomMountCenter) ? (
                 <GerenciarCandidaturasTrabalhoScreen embedded navigation={noopNav} route={{}} />
               ) : (

@@ -339,6 +339,10 @@ export interface PainelGerente {
   precadastros: number;
   aulas_experimentais_futuras: number;
   aulas_experimentais_ocorridas: number;
+  aulas_experimentais_futuras_nomes?: string[];
+  aulas_experimentais_ocorridas_nomes?: string[];
+  mensalidades_atrasadas_mes_corrente_nomes?: string[];
+  mensalidades_atrasadas_mais_30_dias_nomes?: string[];
   turmas: Turma[];
   atividades_recentes: Activity[];
   first_name: string;

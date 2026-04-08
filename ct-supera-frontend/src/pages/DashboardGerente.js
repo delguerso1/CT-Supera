@@ -397,6 +397,10 @@ function DashboardGerente({ user }) {
     precadastros: 0,
     aulasExperimentaisFuturas: 0,
     aulasExperimentaisOcorridas: 0,
+    aulasExperimentaisFuturasNomes: [],
+    aulasExperimentaisOcorridasNomes: [],
+    mensalidadesAtrasadasMesCorrenteNomes: [],
+    mensalidadesAtrasadasMais30DiasNomes: [],
     turmas: []
   });
   const [recentActivities, setRecentActivities] = useState([]);
@@ -421,6 +425,9 @@ function DashboardGerente({ user }) {
   const [listaInativos, setListaInativos] = useState([]);
   const [loadingListaInativos, setLoadingListaInativos] = useState(false);
   const [erroListaInativos, setErroListaInativos] = useState('');
+  const [showModalListaNomes, setShowModalListaNomes] = useState(false);
+  const [tituloModalListaNomes, setTituloModalListaNomes] = useState('');
+  const [listaModalNomes, setListaModalNomes] = useState([]);
   const navigate = useNavigate();
   const prevActiveSectionRef = useRef(null);
 
@@ -439,6 +446,12 @@ function DashboardGerente({ user }) {
     } finally {
       setLoadingListaInativos(false);
     }
+  };
+
+  const abrirModalListaNomes = (titulo, nomes) => {
+    setTituloModalListaNomes(titulo);
+    setListaModalNomes(Array.isArray(nomes) ? nomes : []);
+    setShowModalListaNomes(true);
   };
 
   const fetchDashboardData = useCallback(async (options = {}) => {
@@ -478,6 +491,12 @@ function DashboardGerente({ user }) {
         precadastros: response.data.precadastros || 0,
         aulasExperimentaisFuturas: response.data.aulas_experimentais_futuras || 0,
         aulasExperimentaisOcorridas: response.data.aulas_experimentais_ocorridas || 0,
+        aulasExperimentaisFuturasNomes: response.data.aulas_experimentais_futuras_nomes || [],
+        aulasExperimentaisOcorridasNomes: response.data.aulas_experimentais_ocorridas_nomes || [],
+        mensalidadesAtrasadasMesCorrenteNomes:
+          response.data.mensalidades_atrasadas_mes_corrente_nomes || [],
+        mensalidadesAtrasadasMais30DiasNomes:
+          response.data.mensalidades_atrasadas_mais_30_dias_nomes || [],
         turmas: response.data.turmas || []
       });
 
@@ -710,7 +729,72 @@ function DashboardGerente({ user }) {
         
         <div style={styles.statCard}>
           <div style={styles.statTitle}>Mensalidades Atrasadas</div>
-          <div style={styles.statValueDanger}>{stats.mensalidadesAtrasadasMesCorrente} / {stats.mensalidadesAtrasadasMais30Dias}</div>
+          <div
+            style={{
+              ...styles.statValueDanger,
+              display: 'flex',
+              alignItems: 'baseline',
+              justifyContent: 'center',
+              gap: 6,
+              flexWrap: 'wrap',
+            }}
+          >
+            <span
+              role="button"
+              tabIndex={0}
+              onClick={() =>
+                abrirModalListaNomes(
+                  'Mensalidades atrasadas — mês corrente',
+                  stats.mensalidadesAtrasadasMesCorrenteNomes
+                )
+              }
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  abrirModalListaNomes(
+                    'Mensalidades atrasadas — mês corrente',
+                    stats.mensalidadesAtrasadasMesCorrenteNomes
+                  );
+                }
+              }}
+              style={{
+                cursor: 'pointer',
+                textDecoration: 'underline',
+                fontWeight: 700,
+              }}
+              title="Ver nomes dos alunos (mês corrente)"
+            >
+              {stats.mensalidadesAtrasadasMesCorrente}
+            </span>
+            <span aria-hidden="true">/</span>
+            <span
+              role="button"
+              tabIndex={0}
+              onClick={() =>
+                abrirModalListaNomes(
+                  'Mensalidades atrasadas — vencimento há mais de 30 dias',
+                  stats.mensalidadesAtrasadasMais30DiasNomes
+                )
+              }
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  abrirModalListaNomes(
+                    'Mensalidades atrasadas — vencimento há mais de 30 dias',
+                    stats.mensalidadesAtrasadasMais30DiasNomes
+                  );
+                }
+              }}
+              style={{
+                cursor: 'pointer',
+                textDecoration: 'underline',
+                fontWeight: 700,
+              }}
+              title="Ver nomes dos alunos (+30 dias)"
+            >
+              {stats.mensalidadesAtrasadasMais30Dias}
+            </span>
+          </div>
           <div style={styles.statSubtitle}>Mês corrente / +30 dias</div>
         </div>
         
@@ -728,7 +812,72 @@ function DashboardGerente({ user }) {
         
         <div style={styles.statCard}>
           <div style={styles.statTitle}>Aulas Experimentais</div>
-          <div style={styles.statValue}>{stats.aulasExperimentaisFuturas} / {stats.aulasExperimentaisOcorridas}</div>
+          <div
+            style={{
+              ...styles.statValue,
+              display: 'flex',
+              alignItems: 'baseline',
+              justifyContent: 'center',
+              gap: 6,
+              flexWrap: 'wrap',
+            }}
+          >
+            <span
+              role="button"
+              tabIndex={0}
+              onClick={() =>
+                abrirModalListaNomes(
+                  'Aulas experimentais futuras',
+                  stats.aulasExperimentaisFuturasNomes
+                )
+              }
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  abrirModalListaNomes(
+                    'Aulas experimentais futuras',
+                    stats.aulasExperimentaisFuturasNomes
+                  );
+                }
+              }}
+              style={{
+                cursor: 'pointer',
+                textDecoration: 'underline',
+                fontWeight: 700,
+              }}
+              title="Ver nomes completos dos pré-cadastros (futuras)"
+            >
+              {stats.aulasExperimentaisFuturas}
+            </span>
+            <span aria-hidden="true">/</span>
+            <span
+              role="button"
+              tabIndex={0}
+              onClick={() =>
+                abrirModalListaNomes(
+                  'Aulas experimentais já realizadas',
+                  stats.aulasExperimentaisOcorridasNomes
+                )
+              }
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  abrirModalListaNomes(
+                    'Aulas experimentais já realizadas',
+                    stats.aulasExperimentaisOcorridasNomes
+                  );
+                }
+              }}
+              style={{
+                cursor: 'pointer',
+                textDecoration: 'underline',
+                fontWeight: 700,
+              }}
+              title="Ver nomes completos dos pré-cadastros (já ocorreram)"
+            >
+              {stats.aulasExperimentaisOcorridas}
+            </span>
+          </div>
           <div style={styles.statSubtitle}>Futuras / Já ocorreram</div>
         </div>
       </div>
@@ -1288,6 +1437,43 @@ function DashboardGerente({ user }) {
                 type="button"
                 style={styles.modalCloseBtn}
                 onClick={() => setShowModalInativos(false)}
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showModalListaNomes && (
+        <div
+          style={styles.modalOverlay}
+          onClick={() => setShowModalListaNomes(false)}
+          role="presentation"
+        >
+          <div
+            style={styles.modalBox}
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-labelledby="modal-lista-nomes-titulo"
+          >
+            <div id="modal-lista-nomes-titulo" style={styles.modalHeader}>
+              {tituloModalListaNomes}
+            </div>
+            <div style={styles.modalBody}>
+              {listaModalNomes.length === 0 ? (
+                <p style={{ color: '#666', margin: 0 }}>Nenhum registro nesta lista.</p>
+              ) : (
+                listaModalNomes.map((nome, idx) => (
+                  <div key={`${nome}-${idx}`} style={styles.listaInativoItem}>
+                    {nome}
+                  </div>
+                ))
+              )}
+              <button
+                type="button"
+                style={styles.modalCloseBtn}
+                onClick={() => setShowModalListaNomes(false)}
               >
                 Fechar
               </button>

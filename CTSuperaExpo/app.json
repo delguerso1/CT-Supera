@@ -50,6 +50,12 @@
         "projectId": "f1baab53-bbd8-436a-b0ed-18389f501f59"
       }
     },
-    "owner": "devra.group"
+    "owner": "devra.group",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/f1baab53-bbd8-436a-b0ed-18389f501f59"
+    }
   }
 }

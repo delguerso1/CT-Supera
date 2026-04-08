@@ -10,7 +10,10 @@
     "eas:login": "eas login",
     "eas:build:android": "eas build --platform android --profile production",
     "eas:build:android:apk": "eas build --platform android --profile production-apk",
-    "eas:build:ios": "eas build --platform ios --profile production"
+    "eas:build:ios": "eas build --platform ios --profile production",
+    "eas:update:production": "eas update --channel production --message \"OTA\"",
+    "eas:update:android": "eas update --channel production --platform android --message \"OTA Android\"",
+    "eas:update:ios": "eas update --channel production --platform ios --message \"OTA iOS\""
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
@@ -29,6 +32,7 @@
     "expo-notifications": "~0.32.16",
     "expo-sharing": "~14.0.8",
     "expo-status-bar": "~3.0.9",
+    "expo-updates": "~29.0.16",
     "react": "19.1.0",
     "react-native": "0.81.5",
     "react-native-gesture-handler": "~2.28.0",

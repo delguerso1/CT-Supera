@@ -111,6 +111,9 @@ const DashboardGerenteScreen: React.FC<DashboardGerenteProps> = ({
     'presenca'
   );
   const [showDespesaModal, setShowDespesaModal] = useState(false);
+  const [showListaNomesModal, setShowListaNomesModal] = useState(false);
+  const [tituloListaNomesModal, setTituloListaNomesModal] = useState('');
+  const [listaNomesModal, setListaNomesModal] = useState<string[]>([]);
   const [editDespesa, setEditDespesa] = useState<Despesa | null>(null);
   const [savingDespesa, setSavingDespesa] = useState(false);
   const [despesaForm, setDespesaForm] = useState({
@@ -719,6 +722,12 @@ const DashboardGerenteScreen: React.FC<DashboardGerenteProps> = ({
     }
   };
 
+  const abrirListaNomesModal = (titulo: string, nomes: string[] | undefined) => {
+    setTituloListaNomesModal(titulo);
+    setListaNomesModal(Array.isArray(nomes) ? nomes : []);
+    setShowListaNomesModal(true);
+  };
+
   const renderDashboard = () => {
     if (!painelGerente) return null;
 
@@ -806,17 +815,43 @@ const DashboardGerenteScreen: React.FC<DashboardGerenteProps> = ({
             <Text style={styles.statSubtitle}>Mês corrente</Text>
           </StatShell>
 
-          <StatShell
-            onPress={() => onGerenteNavigate?.({ area: 'top', tab: 'financeiro' })}
-            accessibilityLabel="Abrir financeiro e mensalidades atrasadas"
-          >
+          <View style={styles.statCard}>
             <Text style={styles.statTitle}>Mensalidades Atrasadas</Text>
-            <Text style={[styles.statValue, { color: '#f44336' }]}>
-              {painelGerente.mensalidades_atrasadas_mes_corrente || 0} /{' '}
-              {painelGerente.mensalidades_atrasadas_mais_30_dias || 0}
-            </Text>
+            <View style={styles.statValueSplitRow}>
+              <TouchableOpacity
+                onPress={() =>
+                  abrirListaNomesModal(
+                    'Mensalidades atrasadas — mês corrente',
+                    painelGerente.mensalidades_atrasadas_mes_corrente_nomes
+                  )
+                }
+                accessibilityRole="button"
+                accessibilityLabel="Ver nomes dos alunos, mensalidades atrasadas mês corrente"
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.statValue, styles.statValueLinkDanger]}>
+                  {painelGerente.mensalidades_atrasadas_mes_corrente || 0}
+                </Text>
+              </TouchableOpacity>
+              <Text style={[styles.statValue, { color: '#f44336' }]}> / </Text>
+              <TouchableOpacity
+                onPress={() =>
+                  abrirListaNomesModal(
+                    'Mensalidades atrasadas — vencimento há mais de 30 dias',
+                    painelGerente.mensalidades_atrasadas_mais_30_dias_nomes
+                  )
+                }
+                accessibilityRole="button"
+                accessibilityLabel="Ver nomes dos alunos, mensalidades atrasadas mais de 30 dias"
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.statValue, styles.statValueLinkDanger]}>
+                  {painelGerente.mensalidades_atrasadas_mais_30_dias || 0}
+                </Text>
+              </TouchableOpacity>
+            </View>
             <Text style={styles.statSubtitle}>Mês corrente / +30 dias</Text>
-          </StatShell>
+          </View>
 
           <StatShell
             onPress={() => onGerenteNavigate?.({ area: 'top', tab: 'financeiro' })}
@@ -910,22 +945,43 @@ const DashboardGerenteScreen: React.FC<DashboardGerenteProps> = ({
             <Text style={styles.statValue}>{painelGerente.precadastros || 0}</Text>
           </StatShell>
 
-          <StatShell
-            onPress={() =>
-              onGerenteNavigate?.({
-                area: 'top',
-                tab: 'usuarios',
-                usuariosTab: 'precadastros',
-              })
-            }
-            accessibilityLabel="Abrir pré-cadastros e aulas experimentais"
-          >
+          <View style={styles.statCard}>
             <Text style={styles.statTitle}>Aulas Experimentais</Text>
-            <Text style={styles.statValue}>
-              {painelGerente.aulas_experimentais_futuras || 0} / {painelGerente.aulas_experimentais_ocorridas || 0}
-            </Text>
+            <View style={styles.statValueSplitRow}>
+              <TouchableOpacity
+                onPress={() =>
+                  abrirListaNomesModal(
+                    'Aulas experimentais futuras',
+                    painelGerente.aulas_experimentais_futuras_nomes
+                  )
+                }
+                accessibilityRole="button"
+                accessibilityLabel="Ver nomes dos pré-cadastros, aulas experimentais futuras"
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.statValue, styles.statValueLinkPrimary]}>
+                  {painelGerente.aulas_experimentais_futuras || 0}
+                </Text>
+              </TouchableOpacity>
+              <Text style={styles.statValue}> / </Text>
+              <TouchableOpacity
+                onPress={() =>
+                  abrirListaNomesModal(
+                    'Aulas experimentais já realizadas',
+                    painelGerente.aulas_experimentais_ocorridas_nomes
+                  )
+                }
+                accessibilityRole="button"
+                accessibilityLabel="Ver nomes dos pré-cadastros, aulas experimentais já realizadas"
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.statValue, styles.statValueLinkPrimary]}>
+                  {painelGerente.aulas_experimentais_ocorridas || 0}
+                </Text>
+              </TouchableOpacity>
+            </View>
             <Text style={styles.statSubtitle}>Futuras / Já ocorreram</Text>
-          </StatShell>
+          </View>
         </View>
 
         {painelGerente.precadastros > 0 && (
@@ -1977,6 +2033,35 @@ const DashboardGerenteScreen: React.FC<DashboardGerenteProps> = ({
           </View>
         </View>
       </Modal>
+      <Modal
+        visible={showListaNomesModal}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setShowListaNomesModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>{tituloListaNomesModal}</Text>
+            <ScrollView style={styles.modalListaNomesScroll}>
+              {listaNomesModal.length === 0 ? (
+                <Text style={styles.noData}>Nenhum registro nesta lista.</Text>
+              ) : (
+                listaNomesModal.map((nome, idx) => (
+                  <View key={`${nome}-${idx}`} style={styles.modalOption}>
+                    <Text style={styles.modalOptionText}>{nome}</Text>
+                  </View>
+                ))
+              )}
+            </ScrollView>
+            <TouchableOpacity
+              style={[styles.actionButton, styles.cancelButton, styles.inlineButton]}
+              onPress={() => setShowListaNomesModal(false)}
+            >
+              <Text style={styles.actionButtonText}>Fechar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
       <Modal visible={showPresencaTurmaModal} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
@@ -2173,6 +2258,24 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     color: colors.primary,
+  },
+  statValueSplitRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'center',
+    flexWrap: 'wrap',
+    gap: 4,
+  },
+  statValueLinkPrimary: {
+    textDecorationLine: 'underline',
+    color: colors.primary,
+  },
+  statValueLinkDanger: {
+    textDecorationLine: 'underline',
+    color: '#f44336',
+  },
+  modalListaNomesScroll: {
+    maxHeight: 360,
   },
   statSubtitle: {
     fontSize: 11,

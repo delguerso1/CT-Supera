@@ -19,6 +19,16 @@ from django.utils.dateparse import parse_date
 logger = logging.getLogger(__name__)
 
 
+def _nome_completo_precadastro(pc):
+    n = f"{(pc.first_name or '').strip()} {(pc.last_name or '').strip()}".strip()
+    return n or "—"
+
+
+def _nome_completo_usuario(u):
+    n = f"{(u.first_name or '').strip()} {(u.last_name or '').strip()}".strip()
+    return n or "—"
+
+
 class VerificarCheckinAlunosAPIView(APIView):
     """API para verificar quais alunos fizeram check-in em uma turma. Inclui pré-cadastros com aula experimental no dia.
 
@@ -356,6 +366,51 @@ class PainelGerenteAPIView(APIView):
                 data_aula_experimental__lte=hoje
             ).count()
 
+            qs_aulas_futuras = PreCadastro.objects.filter(
+                origem="aula_experimental",
+                status="pendente",
+                data_aula_experimental__gt=hoje,
+            ).order_by("data_aula_experimental", "first_name", "last_name", "id")
+            aulas_experimentais_futuras_nomes = [
+                _nome_completo_precadastro(pc) for pc in qs_aulas_futuras
+            ]
+
+            qs_aulas_ocorridas = PreCadastro.objects.filter(
+                origem="aula_experimental",
+                status="pendente",
+                data_aula_experimental__isnull=False,
+                data_aula_experimental__lte=hoje,
+            ).order_by("-data_aula_experimental", "first_name", "last_name", "id")
+            aulas_experimentais_ocorridas_nomes = [
+                _nome_completo_precadastro(pc) for pc in qs_aulas_ocorridas
+            ]
+
+            qs_atraso_mes = (
+                Mensalidade.objects.filter(
+                    ~Q(status="pago"),
+                    data_vencimento__year=ano,
+                    data_vencimento__month=mes,
+                    data_vencimento__lt=hoje,
+                )
+                .select_related("aluno")
+                .order_by("data_vencimento", "aluno__first_name", "aluno__last_name", "id")
+            )
+            mensalidades_atrasadas_mes_corrente_nomes = [
+                _nome_completo_usuario(m.aluno) for m in qs_atraso_mes
+            ]
+
+            qs_atraso_30 = (
+                Mensalidade.objects.filter(
+                    ~Q(status="pago"),
+                    data_vencimento__lt=limite_30_dias,
+                )
+                .select_related("aluno")
+                .order_by("data_vencimento", "aluno__first_name", "aluno__last_name", "id")
+            )
+            mensalidades_atrasadas_mais_30_dias_nomes = [
+                _nome_completo_usuario(m.aluno) for m in qs_atraso_30
+            ]
+
             turmas = Turma.objects.all()
 
             # Atividades recentes
@@ -442,6 +497,10 @@ class PainelGerenteAPIView(APIView):
                 'precadastros': precadastros,
                 'aulas_experimentais_futuras': aulas_experimentais_futuras,
                 'aulas_experimentais_ocorridas': aulas_experimentais_ocorridas,
+                'aulas_experimentais_futuras_nomes': aulas_experimentais_futuras_nomes,
+                'aulas_experimentais_ocorridas_nomes': aulas_experimentais_ocorridas_nomes,
+                'mensalidades_atrasadas_mes_corrente_nomes': mensalidades_atrasadas_mes_corrente_nomes,
+                'mensalidades_atrasadas_mais_30_dias_nomes': mensalidades_atrasadas_mais_30_dias_nomes,
                 'turmas': TurmaSerializer(turmas, many=True).data,
                 'atividades_recentes': atividades[:5],
                 # Dados do gerente
