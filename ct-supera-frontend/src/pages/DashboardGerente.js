@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import api, { MEDIA_URL } from '../services/api';
 import CadastroUsuario from '../pages/CadastroUsuario';
 import ControleFinanceiro from '../pages/ControleFinanceiro';
+import RelatoriosGerente from '../pages/RelatoriosGerente';
 import CadastroCentroTreinamento from '../pages/CadastroCentroTreinamento';
 import GerenciarCandidaturasTrabalho from '../pages/GerenciarCandidaturasTrabalho';
 
@@ -1236,6 +1237,16 @@ function DashboardGerente({ user }) {
     </div>
   );
 
+  const renderRelatorios = () => (
+    <div>
+      <h2 style={styles.contentTitle}>
+        <span>📑</span>
+        Relatórios
+      </h2>
+      <RelatoriosGerente user={user} />
+    </div>
+  );
+
   const renderCandidatosTrabalho = () => (
     <div>
       <h2 style={styles.contentTitle}>
@@ -1368,6 +1379,17 @@ function DashboardGerente({ user }) {
           <div
             style={{
               ...styles.menuItem,
+              ...(activeSection === 'relatorios' && styles.activeMenuItem)
+            }}
+            onClick={() => setActiveSection('relatorios')}
+            title="Relatórios PDF, presenças e observações"
+          >
+            <span style={styles.menuIcon}>📑</span>
+            <span style={styles.menuItemLabel}>Relatórios</span>
+          </div>
+          <div
+            style={{
+              ...styles.menuItem,
               ...(activeSection === 'financeiro' && styles.activeMenuItem)
             }}
             onClick={() => setActiveSection('financeiro')}
@@ -1394,6 +1416,7 @@ function DashboardGerente({ user }) {
           {activeSection === 'usuarios' && renderUsuarios()}
           {activeSection === 'candidatos-trabalho' && renderCandidatosTrabalho()}
           {activeSection === 'centros' && renderCentros()}
+          {activeSection === 'relatorios' && renderRelatorios()}
           {activeSection === 'financeiro' && renderFinanceiro()}
         </div>
       </div>
