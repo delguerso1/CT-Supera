@@ -226,10 +226,33 @@ function RelatoriosGerente({ user }) {
     return turmas.find((t) => t.id === id) || null;
   }, [filtroPresencaTurmaId, turmas]);
 
-  const atrasadosTurmaAtual = useMemo(() => {
-    if (!turmaSelecionada) return [];
-    return atrasadosPorTurma[turmaSelecionada.id] || [];
-  }, [atrasadosPorTurma, turmaSelecionada]);
+  /** Nomes com mensalidade atrasada só se, no relatório gerado, tiverem presença confirmada pelo professor */
+  const turmaIdParaNomesAtrasoComPresencaConfirmada = useMemo(() => {
+    const map = new Map();
+    if (!presencaRelatorio?.presencas) return map;
+    for (const p of presencaRelatorio.presencas) {
+      if (!p.presenca_confirmada) continue;
+      const arr = atrasadosPorTurma[p.turma_id];
+      if (!arr?.length) continue;
+      const aluno = arr.find((x) => x.id === p.aluno_id);
+      if (!aluno) continue;
+      const list = map.get(p.turma_id) || [];
+      if (!list.some((n) => n === aluno.nome)) list.push(aluno.nome);
+      map.set(p.turma_id, list);
+    }
+    return map;
+  }, [presencaRelatorio, atrasadosPorTurma]);
+
+  const atrasadosNaTurmaSelecionadaComPresencaConfirmadaNoRelatorio = useMemo(() => {
+    if (!turmaSelecionada || !presencaRelatorio?.presencas) return [];
+    const tid = turmaSelecionada.id;
+    const confirmados = new Set(
+      presencaRelatorio.presencas
+        .filter((p) => p.turma_id === tid && p.presenca_confirmada)
+        .map((p) => p.aluno_id)
+    );
+    return (atrasadosPorTurma[tid] || []).filter((a) => confirmados.has(a.id));
+  }, [turmaSelecionada, presencaRelatorio, atrasadosPorTurma]);
 
   useEffect(() => {
     if (!turmaSelecionada || user?.tipo !== 'gerente') {
@@ -282,13 +305,17 @@ function RelatoriosGerente({ user }) {
     return list.filter((p) => (p.aluno_nome || '').toLowerCase().includes(q));
   }, [presencaRelatorio, filtroPresencaBusca]);
 
-  const alunoTemAtrasoNaTurmaDoRegistro = (row) => {
+  const alunoTemMensalidadeAtrasadaNaTurma = (row) => {
     const tid = row.turma_id;
     const aid = row.aluno_id;
     const arr = atrasadosPorTurma[tid];
     if (!arr || !arr.length) return false;
     return arr.some((x) => x.id === aid);
   };
+
+  /** Aviso de atraso só quando o professor confirmou presença neste registro */
+  const mostrarAvisoAtrasoNoRegistro = (row) =>
+    Boolean(row.presenca_confirmada) && alunoTemMensalidadeAtrasadaNaTurma(row);
 
   if (user?.tipo !== 'gerente') {
     return <p style={{ color: '#c62828' }}>Acesso restrito a gerentes.</p>;
@@ -383,8 +410,9 @@ function RelatoriosGerente({ user }) {
         </h3>
         <p style={{ margin: '0 0 12px', fontSize: 14, color: '#455a64', lineHeight: 1.45 }}>
           Gere a lista por período. Selecione uma turma para ler a <strong>observação interna</strong> da aula (mesma
-          data do relatório ou outra). Turmas com mensalidade atrasada exibem aviso em vermelho com o nome do(s)
-          aluno(s).
+          data do relatório ou outra). O aviso de <strong>mensalidade atrasada</strong> (lista, etiqueta na tabela e
+          texto na turma) só aparece para alunos com <strong>presença confirmada pelo professor</strong> no relatório
+          gerado.
         </p>
 
         {loadingAtrasos && (
@@ -428,11 +456,11 @@ function RelatoriosGerente({ user }) {
             >
               <option value="">Todas as turmas</option>
               {turmas.map((t) => {
-                const atrasados = atrasadosPorTurma[t.id] || [];
+                const nomesComAtrasoEConfirmacao = turmaIdParaNomesAtrasoComPresencaConfirmada.get(t.id) || [];
                 const label = turmaOptionLabel(t);
                 const suffix =
-                  atrasados.length > 0
-                    ? ` — ⚠ mensalidade atrasada: ${atrasados.map((a) => a.nome).join(', ')}`
+                  nomesComAtrasoEConfirmacao.length > 0
+                    ? ` — ⚠ mensalidade atrasada: ${nomesComAtrasoEConfirmacao.join(', ')}`
                     : '';
                 return (
                   <option key={t.id} value={String(t.id)}>
@@ -456,7 +484,7 @@ function RelatoriosGerente({ user }) {
             }}
           >
             <div style={{ fontWeight: 700, color: '#1F6C86', marginBottom: 6 }}>Observação do professor (leitura)</div>
-            {atrasadosTurmaAtual.length > 0 && (
+            {atrasadosNaTurmaSelecionadaComPresencaConfirmadaNoRelatorio.length > 0 && (
               <div
                 style={{
                   marginBottom: 10,
@@ -469,9 +497,19 @@ function RelatoriosGerente({ user }) {
                 }}
                 role="status"
               >
-                <strong>Mensalidade atrasada:</strong> {atrasadosTurmaAtual.map((a) => a.nome).join(', ')}
+                <strong>Mensalidade atrasada (com presença confirmada no relatório):</strong>{' '}
+                {atrasadosNaTurmaSelecionadaComPresencaConfirmadaNoRelatorio.map((a) => a.nome).join(', ')}
               </div>
             )}
+            {turmaSelecionada &&
+              presencaRelatorio &&
+              atrasadosNaTurmaSelecionadaComPresencaConfirmadaNoRelatorio.length === 0 &&
+              (atrasadosPorTurma[turmaSelecionada.id] || []).length > 0 && (
+                <p style={{ margin: '0 0 10px', fontSize: 13, color: '#666' }}>
+                  Há alunos com mensalidade atrasada nesta turma, mas sem presença confirmada pelo professor no período
+                  do relatório — não são listados no alerta acima.
+                </p>
+              )}
             <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#37474f', marginBottom: 4 }}>
               Data da observação (AAAA-MM-DD)
             </label>
@@ -583,7 +621,7 @@ function RelatoriosGerente({ user }) {
                     </tr>
                   )}
                   {presencasFiltradas.map((row) => {
-                    const atraso = alunoTemAtrasoNaTurmaDoRegistro(row);
+                    const atraso = mostrarAvisoAtrasoNoRegistro(row);
                     return (
                       <tr key={row.id} style={{ borderBottom: '1px solid #eee' }}>
                         <td style={{ padding: 10 }}>
