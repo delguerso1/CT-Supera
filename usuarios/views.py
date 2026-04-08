@@ -476,7 +476,8 @@ class FinalizarAgendamentoAPIView(APIView):
                             usuario_aluno, 'pix',
                             valor=resultado['valor'],
                             data_vencimento=resultado['data_vencimento'],
-                            codigo_pix=resultado.get('codigo_pix')
+                            codigo_pix=resultado.get('codigo_pix'),
+                            qr_png_bytes=resultado.get('qr_png_bytes'),
                         )
                     elif forma_pagamento == 'boleto':
                         from financeiro.services import gerar_boleto_para_mensalidade

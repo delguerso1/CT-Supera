@@ -9,7 +9,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from usuarios.models import PushTokenExpo
-from usuarios.push_expo import enviar_lote_expo_push
+from usuarios.push_expo import enviar_lote_expo_push, token_expo_formato_valido
 
 logger = logging.getLogger(__name__)
 
@@ -30,16 +30,19 @@ class RegistrarPushTokenExpoAPIView(APIView):
         token = (
             request.data.get("token") or request.data.get("expoPushToken") or ""
         ).strip()
-        if not token or not (
-            token.startswith("ExponentPushToken") or token.startswith("ExpoPushToken")
-        ):
+        if not token or not token_expo_formato_valido(token):
             logger.warning(
-                "push-token inválido user_id=%s prefixo=%r",
+                "push-token inválido user_id=%s amostra=%r",
                 getattr(request.user, "pk", None),
                 (token[:48] + "…") if len(token) > 48 else token,
             )
             return Response(
-                {"error": "Token Expo inválido. Esperado ExponentPushToken[...]."},
+                {
+                    "error": (
+                        "Token Expo inválido. Use o token retornado por "
+                        "Notifications.getExpoPushTokenAsync no aparelho (não strings de teste)."
+                    ),
+                },
                 status=status.HTTP_400_BAD_REQUEST,
             )
         # Um token pertence a um aparelho; reatribui se já existir (troca de usuário no mesmo aparelho é raro)
@@ -84,16 +87,22 @@ class NotificacaoAppEstatisticasAPIView(APIView):
         # Todos os alunos com token (inclui conta Django inativa e aluno “inativo” no CT),
         # para o painel refletir o mesmo público do envio em massa.
         base = {"usuario__tipo": "aluno"}
-        # Alunos distintos com pelo menos um token
-        alunos_com_app = (
-            PushTokenExpo.objects.filter(**base)
-            .values("usuario")
-            .distinct()
-            .count()
+        # Conta só tokens com formato aceito pela Expo (evita placeholders de teste no painel).
+        aluno_ids_com_token_valido = set()
+        n_tokens_alunos = 0
+        for uid, tok in PushTokenExpo.objects.filter(**base).values_list(
+            "usuario_id", "token"
+        ):
+            if token_expo_formato_valido(tok):
+                aluno_ids_com_token_valido.add(uid)
+                n_tokens_alunos += 1
+        alunos_com_app = len(aluno_ids_com_token_valido)
+        tokens_total = n_tokens_alunos
+        dispositivos_no_servidor = sum(
+            1
+            for tok in PushTokenExpo.objects.values_list("token", flat=True)
+            if token_expo_formato_valido(tok)
         )
-        tokens_total = PushTokenExpo.objects.filter(**base).count()
-        # Diagnóstico: linhas na tabela (qualquer perfil) — se > 0 e alunos_com_app = 0, tokens podem estar em conta não-aluno.
-        dispositivos_no_servidor = PushTokenExpo.objects.count()
         return Response(
             {
                 "alunos_com_app": alunos_com_app,

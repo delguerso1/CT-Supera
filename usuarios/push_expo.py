@@ -3,6 +3,7 @@ Envio de notificações push via Expo Push Service (app React Native / Expo).
 Documentação: https://docs.expo.dev/push-notifications/sending-notifications/
 """
 import logging
+import re
 from typing import Any
 
 import requests
@@ -13,10 +14,16 @@ EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send"
 # Lote máximo recomendado pela Expo por requisição
 MAX_MESSAGES_PER_REQUEST = 100
 
+# O ID entre colchetes em tokens reais é longo (opaque); placeholders tipo
+# ExponentPushToken[teste-curl] passam no prefixo mas a Expo rejeita no envio.
+_EXPO_PUSH_TOKEN_RE = re.compile(
+    r"^(?:ExponentPushToken|ExpoPushToken)\[([A-Za-z0-9_-]{20,})\]\s*$"
+)
 
-def _token_expo_valido(t: str) -> bool:
-    s = (t or "").strip()
-    return bool(s.startswith("ExponentPushToken") or s.startswith("ExpoPushToken"))
+
+def token_expo_formato_valido(s: str) -> bool:
+    """True se o token segue o formato Expo (evita strings de teste/curl salvas no BD)."""
+    return bool(_EXPO_PUSH_TOKEN_RE.match((s or "").strip()))
 
 
 def enviar_lote_expo_push(tokens: list[str], titulo: str, corpo: str) -> dict[str, Any]:
@@ -24,7 +31,7 @@ def enviar_lote_expo_push(tokens: list[str], titulo: str, corpo: str) -> dict[st
     Envia a mesma notificação para vários tokens Expo.
     Retorna dict com: resultados, erros, tickets_ok (int), tickets_erro (int).
     """
-    tokens = [t.strip() for t in tokens if t and _token_expo_valido(str(t))]
+    tokens = [t.strip() for t in tokens if t and token_expo_formato_valido(str(t))]
     if not tokens:
         return {
             "erros": ["Nenhum token Expo válido no banco (formato esperado: ExponentPushToken[...])."],

@@ -151,11 +151,19 @@ def gerar_pix_para_mensalidade(mensalidade):
     ).first()
 
     if transacao_existente:
+        from financeiro.pix_utils import gerar_qr_pix_png_bytes, normalizar_codigo_pix
+
+        codigo = normalizar_codigo_pix(transacao_existente.codigo_pix)
+        if codigo and codigo != transacao_existente.codigo_pix:
+            transacao_existente.codigo_pix = codigo
+            transacao_existente.save(update_fields=['codigo_pix'])
+        qr_png = gerar_qr_pix_png_bytes(codigo) if codigo else None
         return {
-            'codigo_pix': transacao_existente.codigo_pix,
+            'codigo_pix': codigo or transacao_existente.codigo_pix,
             'valor': float(transacao_existente.valor),
             'data_vencimento': mensalidade.data_vencimento,
             'transacao': transacao_existente,
+            'qr_png_bytes': qr_png,
         }
 
     if not getattr(settings, 'C6_BANK_CHAVE_PIX', None):
@@ -183,6 +191,26 @@ def gerar_pix_para_mensalidade(mensalidade):
     expiracao_segundos = calendario.get('expiracao', 1800)
     data_expiracao = timezone.now() + timedelta(seconds=expiracao_segundos)
 
+    from financeiro.pix_utils import (
+        br_code_pix_parece_valido,
+        gerar_qr_pix_png_bytes,
+        normalizar_codigo_pix,
+    )
+
+    if not pix_copia_cola:
+        try:
+            pix_copia_cola = c6_client.get_pix_copia_cola(txid)
+        except Exception as e:
+            logger.warning(f"Erro ao obter código PIX Copia e Cola: {str(e)}")
+
+    pix_copia_cola = normalizar_codigo_pix(pix_copia_cola)
+    if pix_copia_cola and not br_code_pix_parece_valido(pix_copia_cola):
+        logger.warning(
+            "BR Code PIX com formato inesperado após normalização (txid=%s, len=%s).",
+            txid,
+            len(pix_copia_cola),
+        )
+
     transacao = TransacaoC6Bank.objects.create(
         mensalidade=mensalidade,
         tipo='pix',
@@ -192,23 +220,17 @@ def gerar_pix_para_mensalidade(mensalidade):
         descricao=descricao,
         data_expiracao=data_expiracao,
         resposta_api=pix_response,
-        codigo_pix=pix_copia_cola
+        codigo_pix=pix_copia_cola,
     )
 
-    if not pix_copia_cola:
-        try:
-            pix_copia_cola = c6_client.get_pix_copia_cola(txid)
-            if pix_copia_cola:
-                transacao.codigo_pix = pix_copia_cola
-                transacao.save()
-        except Exception as e:
-            logger.warning(f"Erro ao obter código PIX Copia e Cola: {str(e)}")
+    qr_png_bytes = gerar_qr_pix_png_bytes(pix_copia_cola) if pix_copia_cola else None
 
     return {
         'codigo_pix': pix_copia_cola or transacao.codigo_pix,
         'valor': valor_total,
         'data_vencimento': mensalidade.data_vencimento,
         'transacao': transacao,
+        'qr_png_bytes': qr_png_bytes,
     }
 
 

@@ -10,6 +10,8 @@ from django.conf import settings
 from typing import Optional, List
 from urllib.parse import quote
 import re
+import base64
+import html as html_module
 
 logger = logging.getLogger(__name__)
 
@@ -355,13 +357,23 @@ def enviar_convite_aluno(aluno) -> None:
         raise
 
 
-def enviar_primeira_mensalidade_email(aluno, forma_pagamento, valor, data_vencimento, codigo_pix=None, digitable_line=None, pdf_content=None) -> bool:
+def enviar_primeira_mensalidade_email(
+    aluno,
+    forma_pagamento,
+    valor,
+    data_vencimento,
+    codigo_pix=None,
+    digitable_line=None,
+    pdf_content=None,
+    qr_png_bytes=None,
+) -> bool:
     """
     Envia e-mail ao aluno com os dados da primeira mensalidade para pagamento.
     forma_pagamento: 'pix' ou 'boleto'
     codigo_pix: código PIX Copia e Cola (quando forma_pagamento='pix')
     digitable_line: linha digitável do boleto (quando forma_pagamento='boleto')
     pdf_content: bytes do PDF do boleto (opcional, para anexar)
+    qr_png_bytes: PNG do QR Code do mesmo BR Code (PIX copia e cola)
     """
     if not aluno.email or aluno.email == 'pendente':
         logger.warning("Aluno sem e-mail válido, não enviando cobrança.")
@@ -372,33 +384,65 @@ def enviar_primeira_mensalidade_email(aluno, forma_pagamento, valor, data_vencim
     data_str = data_vencimento.strftime("%d/%m/%Y") if hasattr(data_vencimento, 'strftime') else str(data_vencimento)
 
     if forma_pagamento == 'pix' and codigo_pix:
+        from financeiro.pix_utils import (
+            br_code_pix_parece_valido,
+            gerar_qr_pix_png_bytes,
+            normalizar_codigo_pix,
+        )
+
+        codigo_pix = normalizar_codigo_pix(codigo_pix)
+        if not codigo_pix:
+            logger.warning("Código PIX vazio após normalização; e-mail não enviado.")
+            return False
+        if not br_code_pix_parece_valido(codigo_pix):
+            logger.warning(
+                "BR Code PIX pode estar inválido (prefixo/tamanho); envio mesmo assim. len=%s",
+                len(codigo_pix),
+            )
+        if qr_png_bytes is None:
+            qr_png_bytes = gerar_qr_pix_png_bytes(codigo_pix)
+
+        codigo_esc = html_module.escape(codigo_pix)
         assunto = "Sua primeira mensalidade - Pagamento via PIX - CT Supera"
         corpo_texto = f"""
 Olá {nome}!
 
 Sua matrícula foi confirmada. Segue o pagamento da primeira mensalidade:
 
- Valor: {valor_str}
- Vencimento: {data_str}
+Valor: {valor_str}
+Vencimento: {data_str}
 
 PAGAMENTO VIA PIX
-Copie o código abaixo e cole no app do seu banco para realizar o pagamento:
+Copie o código abaixo INTEIRO (uma única linha, sem espaços no meio) e cole em "PIX copia e cola"
+no app do banco (PagBank, Nubank, etc.):
 
 {codigo_pix}
 
-Ou escaneie o QR Code anexo (se disponível).
+Dica: também enviamos o QR Code em anexo (pix_qrcode.png) — abra o app do banco em PIX por QR Code e use a imagem.
 
 Qualquer dúvida, entre em contato conosco.
 """
+        bloco_qr_html = ""
+        if qr_png_bytes:
+            b64_qr = base64.b64encode(qr_png_bytes).decode("ascii")
+            bloco_qr_html = f"""
+                    <p style="margin-top: 18px;"><strong>QR Code PIX</strong> (mesmo pagamento que o código abaixo):</p>
+                    <div style="text-align:center;margin:16px 0;">
+                        <img src="data:image/png;base64,{b64_qr}" alt="QR Code PIX" width="220" height="220" style="max-width:100%;height:auto;border:1px solid #e0e0e0;border-radius:8px;padding:8px;background:#fff;" />
+                    </div>
+                    <p style="color:#666;font-size:14px;">Se a imagem não aparecer, use o anexo <strong>pix_qrcode.png</strong> ou o código copia e cola.</p>
+            """
+
         content_html = f"""
                     <div style="font-size: 18px; color: #2c3e50; margin-bottom: 15px;">
-                        Olá <strong>{nome}</strong>,
+                        Olá <strong>{html_module.escape(nome)}</strong>,
                     </div>
                     <p style="color: #555; margin-bottom: 20px;">Sua matrícula foi confirmada. Segue o pagamento da primeira mensalidade:</p>
                     <p><strong>Valor:</strong> {valor_str}<br><strong>Vencimento:</strong> {data_str}</p>
-                    <p style="margin-top: 20px;"><strong>PIX Copia e Cola:</strong></p>
-                    <pre style="background:#f5f5f5;padding:12px;border-radius:4px;overflow-x:auto;border-left:4px solid {EMAIL_COR_PRIMARIA};">{codigo_pix}</pre>
-                    <p style="margin-top: 15px;">Copie o código acima e cole no app do seu banco.</p>
+                    {bloco_qr_html}
+                    <p style="margin-top: 20px;"><strong>PIX copia e cola</strong> (copie tudo de uma vez):</p>
+                    <pre style="background:#f5f5f5;padding:12px;border-radius:4px;overflow-x:auto;border-left:4px solid {EMAIL_COR_PRIMARIA};white-space:pre-wrap;word-break:break-all;font-size:12px;">{codigo_esc}</pre>
+                    <p style="margin-top: 15px; color:#555;">Cole no app do banco em <strong>PIX → Copia e cola</strong>. O código é uma linha só; não apague nem quebre no meio.</p>
         """
         corpo_html = _email_wrapper_html(
             content_html,
@@ -412,6 +456,8 @@ Qualquer dúvida, entre em contato conosco.
             [aluno.email],
         )
         email.attach_alternative(corpo_html, "text/html")
+        if qr_png_bytes:
+            email.attach("pix_qrcode.png", qr_png_bytes, "image/png")
         email.send(fail_silently=False)
         logger.info(f"Cobrança PIX enviada por e-mail para {aluno.email}")
         return True

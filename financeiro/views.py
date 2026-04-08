@@ -572,33 +572,25 @@ class GerarPixAPIView(APIView):
                 try:
                     logger.info(f"Código PIX não veio na resposta inicial, consultando cobrança {txid}")
                     pix_copia_cola = c6_client.get_pix_copia_cola(txid)
-                    if pix_copia_cola:
-                        transacao.codigo_pix = pix_copia_cola
-                        transacao.save()
                 except Exception as e:
                     logger.warning(f"Erro ao obter código PIX Copia e Cola: {str(e)}")
-            
+
+            from financeiro.pix_utils import gerar_qr_pix_png_bytes, normalizar_codigo_pix
+
+            pix_copia_cola = normalizar_codigo_pix(pix_copia_cola)
+            if pix_copia_cola:
+                transacao.codigo_pix = pix_copia_cola
+                transacao.save(update_fields=['codigo_pix'])
+
             # Gera QR Code em base64 (opcional, para compatibilidade)
             if pix_copia_cola:
                 try:
-                    import qrcode  # type: ignore
-                    from io import BytesIO
                     import base64
-                    
-                    qr = qrcode.QRCode(version=1, box_size=10, border=5)
-                    qr.add_data(pix_copia_cola)
-                    qr.make(fit=True)
-                    
-                    img = qr.make_image(fill_color="black", back_color="white")
-                    buffer = BytesIO()
-                    img.save(buffer, format='PNG')
-                    qr_code_base64 = base64.b64encode(buffer.getvalue()).decode()
-                    
-                    transacao.qr_code = qr_code_base64
-                    transacao.save()
-                except ImportError:
-                    # QRCode library não instalado - não é crítico
-                    logger.info("Biblioteca qrcode não instalada. QR Code não será gerado em base64.")
+
+                    png_bytes = gerar_qr_pix_png_bytes(pix_copia_cola)
+                    if png_bytes:
+                        transacao.qr_code = base64.b64encode(png_bytes).decode()
+                        transacao.save(update_fields=['qr_code'])
                 except Exception as e:
                     logger.warning(f"Erro ao gerar QR Code: {str(e)}")
             
