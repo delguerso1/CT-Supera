@@ -79,6 +79,7 @@ function App() {
     <Router>
       <div className="App">
         <Navbar />
+        <main className="main-content-offset">
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/supera-news" element={<SuperaNews />} />
@@ -135,6 +136,7 @@ function App() {
           />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        </main>
         <Footer />
       </div>
     </Router>

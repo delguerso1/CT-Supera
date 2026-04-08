@@ -6,7 +6,14 @@ const styles = {
     backgroundColor: '#1F6C86',
     padding: '1rem',
     color: 'white',
-    position: 'relative',
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    width: '100%',
+    boxSizing: 'border-box',
+    zIndex: 200,
+    boxShadow: '0 2px 10px rgba(0,0,0,0.12)',
   },
   container: {
     display: 'flex',
@@ -19,7 +26,6 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     textDecoration: 'none',
-    zIndex: 11,
   },
   logoImage: {
     height: '60px',

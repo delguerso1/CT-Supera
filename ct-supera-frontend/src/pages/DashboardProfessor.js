@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import api, { MEDIA_URL } from '../services/api';
 import { useNavigate } from 'react-router-dom';
+import { NAVBAR_HEIGHT_CSS } from '../constants/layout';
 
 // Hook para detectar tamanho da tela
 const useResponsive = () => {
@@ -33,9 +34,9 @@ const styles = {
     padding: '20px',
     boxShadow: '2px 0 10px rgba(0,0,0,0.1)',
     position: 'fixed',
-    top: 0,
+    top: NAVBAR_HEIGHT_CSS,
     left: 0,
-    height: '100vh',
+    height: `calc(100vh - ${NAVBAR_HEIGHT_CSS})`,
     overflowY: 'auto',
     zIndex: 10
   },
@@ -1173,8 +1174,9 @@ function DashboardProfessor({ user }) {
     sidebar: {
       ...styles.sidebar,
       width: isMobile ? '100%' : (isTablet ? '240px' : '280px'),
-      height: isMobile ? 'auto' : '100vh',
+      height: isMobile ? 'auto' : `calc(100vh - ${NAVBAR_HEIGHT_CSS})`,
       position: isMobile ? 'relative' : 'fixed',
+      top: isMobile ? 'auto' : NAVBAR_HEIGHT_CSS,
       marginBottom: isMobile ? '0' : '0',
       boxShadow: isMobile ? 'none' : styles.sidebar.boxShadow,
       borderBottom: isMobile ? '1px solid rgba(255,255,255,0.1)' : 'none'

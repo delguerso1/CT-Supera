@@ -125,7 +125,7 @@ class RegistrarPresencaAPIView(APIView):
                     turma=turma
                 ).first()
                 if presenca:
-                    presenca.checkin_realizado = True
+                    # Só o aluno (app) marca check-in real; o professor apenas confirma presença na aula.
                     presenca.presenca_confirmada = True
                     presenca.save()
                 else:
@@ -133,8 +133,8 @@ class RegistrarPresencaAPIView(APIView):
                         usuario=aluno,
                         turma=turma,
                         data=hoje,
-                        checkin_realizado=True,
-                        presenca_confirmada=True
+                        checkin_realizado=False,
+                        presenca_confirmada=True,
                     )
                 presencas_registradas += 1
 

@@ -1,3 +1,14 @@
+:root {
+  --navbar-height: 88px;
+}
+
+/* Compensa o Navbar fixo para o conteúdo não ficar por baixo do header */
+.main-content-offset {
+  flex: 1;
+  width: 100%;
+  padding-top: var(--navbar-height);
+}
+
 .App {
   text-align: center;
   min-height: 100vh;
