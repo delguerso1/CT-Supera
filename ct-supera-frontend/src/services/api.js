@@ -54,12 +54,6 @@ api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
     if (isDevelopment) {
-      let user = null;
-      try {
-        user = JSON.parse(localStorage.getItem('user') || 'null');
-      } catch {
-        user = null;
-      }
       console.log('[DEBUG] Requisição:', config.method, config.url, token ? 'com token' : 'sem token');
     }
 
