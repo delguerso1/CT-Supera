@@ -478,7 +478,41 @@ class GerarPixAPIView(APIView):
             ).first()
             
             if transacao_existente:
-                # Se já existe transação pendente válida, retorna ela
+                # Se já existe transação pendente válida, tenta garantir que o payload tenha
+                # codigo_pix válido. Alguns fluxos antigos podem ter salvo sem código ou com
+                # payload já corrompido por normalização agressiva.
+                codigo_ausente_ou_suspeito = False
+                try:
+                    from financeiro.pix_utils import br_code_pix_parece_valido, normalizar_codigo_pix
+
+                    codigo_atual = normalizar_codigo_pix(transacao_existente.codigo_pix)
+                    codigo_ausente_ou_suspeito = not codigo_atual or not br_code_pix_parece_valido(codigo_atual)
+                except Exception:
+                    codigo_ausente_ou_suspeito = not transacao_existente.codigo_pix
+
+                if codigo_ausente_ou_suspeito and transacao_existente.txid:
+                    try:
+                        from financeiro.pix_utils import (
+                            br_code_pix_parece_valido,
+                            gerar_qr_pix_png_bytes,
+                            normalizar_codigo_pix,
+                        )
+                        import base64
+
+                        codigo = normalizar_codigo_pix(c6_client.get_pix_copia_cola(transacao_existente.txid))
+                        if codigo and br_code_pix_parece_valido(codigo):
+                            transacao_existente.codigo_pix = codigo
+                            png_bytes = gerar_qr_pix_png_bytes(codigo)
+                            if png_bytes:
+                                transacao_existente.qr_code = base64.b64encode(png_bytes).decode()
+                            transacao_existente.save(update_fields=['codigo_pix', 'qr_code'])
+                    except Exception as e:
+                        logger.warning(
+                            "Falha ao complementar codigo_pix da transação pendente %s: %s",
+                            transacao_existente.id,
+                            str(e),
+                        )
+
                 return Response({
                     'message': 'Já existe um pagamento PIX pendente para esta mensalidade.',
                     'transacao': TransacaoC6BankSerializer(transacao_existente).data

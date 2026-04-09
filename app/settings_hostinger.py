@@ -235,7 +235,8 @@ FRONTEND_URL = os.getenv('FRONTEND_URL', 'https://ctsupera.com.br')
 # PAYMENT_PUBLIC_KEY = os.getenv('PAYMENT_PUBLIC_KEY', '')
 
 # Configurações do C6 Bank (valores devem vir do arquivo .env)
-C6_BANK_ENVIRONMENT = os.getenv('C6_BANK_ENVIRONMENT', 'sandbox').lower()  # sandbox ou production
+# Em produção (Hostinger), o padrão seguro é production para evitar fallback acidental para sandbox.
+C6_BANK_ENVIRONMENT = os.getenv('C6_BANK_ENVIRONMENT', 'production').lower()  # sandbox ou production
 
 # Seleciona as configurações baseadas no ambiente
 if C6_BANK_ENVIRONMENT == 'production':

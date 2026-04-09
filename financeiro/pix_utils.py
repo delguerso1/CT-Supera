@@ -25,8 +25,10 @@ def normalizar_codigo_pix(codigo: Optional[str]) -> Optional[str]:
     s = str(codigo).strip()
     if not s:
         return None
-    # Junta todas as "palavras" separadas por qualquer whitespace → uma linha
-    s = "".join(s.split())
+    # Remove apenas quebras de linha/tabulações.
+    # IMPORTANTE: não remover espaços internos indiscriminadamente, pois podem
+    # fazer parte do payload EMV e alterar comprimento/CRC do BR Code.
+    s = s.replace("\r", "").replace("\n", "").replace("\t", "")
     for zw in ("\u200b", "\u200c", "\u200d", "\ufeff", "\xa0"):
         s = s.replace(zw, "")
     return s or None
