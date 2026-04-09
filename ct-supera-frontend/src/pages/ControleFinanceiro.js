@@ -42,6 +42,8 @@ function ControleFinanceiro({ user, onDataChange }) {
   const [formData] = useState({});
   const [alunos, setAlunos] = useState([]);
   const [turmas, setTurmas] = useState([]);
+  /** Listas (mensalidades, turmas, etc.) ainda carregando em segundo plano após o dashboard. */
+  const [carregandoListas, setCarregandoListas] = useState(false);
   const itensPorPagina = 10;
   /** Evita segundo GET de mensalidades no mount (já carregado no efeito de mes/ano). */
   const skipMensalidadesFilterEffect = useRef(true);
@@ -68,13 +70,18 @@ function ControleFinanceiro({ user, onDataChange }) {
     const run = async () => {
       setErro('');
       setLoading(true);
+      setCarregandoListas(false);
       try {
         const { data } = await api.get('financeiro/dashboard/', { params: { mes, ano } });
         if (!cancelled) setDashboard(data);
       } catch (err) {
         if (!cancelled) setErro(mensagemErroCarregamento(err));
+      } finally {
+        // Libera a tela assim que o painel responde; listas pesadas vêm em paralelo abaixo.
+        if (!cancelled) setLoading(false);
       }
 
+      if (!cancelled) setCarregandoListas(true);
       const resultados = await Promise.allSettled([
         fetchAllPages(`financeiro/mensalidades/?mes=${mes}&ano=${ano}&page_size=500`),
         fetchAllPages(`financeiro/despesas/?mes=${mes}&ano=${ano}&page_size=500`),
@@ -127,7 +134,7 @@ function ControleFinanceiro({ user, onDataChange }) {
       if (erros.length) {
         setErro((prev) => (prev ? `${prev} ${erros.join(' ')}` : erros.join(' ')));
       }
-      if (!cancelled) setLoading(false);
+      if (!cancelled) setCarregandoListas(false);
     };
     run();
     return () => {
@@ -359,6 +366,11 @@ function ControleFinanceiro({ user, onDataChange }) {
   return (
     <div className="controle-financeiro-container" style={{...styles?.card, background: '#fff', padding: 24, borderRadius: 8, width: '100%', maxWidth: '100%', boxSizing: 'border-box', overflowX: 'hidden'}}>
       <h2 style={styles?.cardTitle || { color: '#1F6C86' }}>Painel Financeiro</h2>
+      {carregandoListas && (
+        <p style={{ margin: '0 0 12px', fontSize: 14, color: '#607d8b' }} role="status">
+          Carregando tabelas, filtros e vínculos…
+        </p>
+      )}
       <div className="controle-financeiro-filtros" style={{ marginBottom: 16, display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center' }}>
         <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           Mês:

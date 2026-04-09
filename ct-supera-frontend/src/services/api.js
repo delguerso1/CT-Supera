@@ -52,50 +52,48 @@ export function normalizeDrfNextUrl(nextUrl) {
 // Interceptor para requisições
 api.interceptors.request.use(
   (config) => {
-    const user = JSON.parse(localStorage.getItem('user'));
     const token = localStorage.getItem('token');
-    
-    console.log('[DEBUG] Configurando requisição:', {
-      url: config.url,
-      method: config.method,
-      user: user,
-      token: token ? 'Token presente' : 'Token ausente',
-      baseURL: config.baseURL
-    });
+    if (isDevelopment) {
+      let user = null;
+      try {
+        user = JSON.parse(localStorage.getItem('user') || 'null');
+      } catch {
+        user = null;
+      }
+      console.log('[DEBUG] Requisição:', config.method, config.url, token ? 'com token' : 'sem token');
+    }
 
     if (token) {
       config.headers.Authorization = `Token ${token}`;
     }
-    
+
     return config;
   },
   (error) => {
-    console.error('[DEBUG] Erro na configuração da requisição:', error);
+    if (isDevelopment) console.error('[DEBUG] Erro na configuração da requisição:', error);
     return Promise.reject(error);
   }
 );
 
-// Interceptor para respostas
+// Interceptor para respostas (em produção não logar `data` — listagens grandes travam o navegador)
 api.interceptors.response.use(
   (response) => {
-    console.log('[DEBUG] Resposta recebida:', {
-      status: response.status,
-      url: response.config.url,
-      data: response.data
-    });
+    if (isDevelopment) {
+      console.log('[DEBUG] Resposta:', response.status, response.config?.url);
+    }
     return response;
   },
   (error) => {
-    console.error('[DEBUG] Erro na resposta:', {
-      status: error.response?.status,
-      data: error.response?.data,
-      url: error.config?.url,
-      message: error.message,
-      baseURL: error.config?.baseURL
-    });
+    if (isDevelopment) {
+      console.error('[DEBUG] Erro na resposta:', {
+        status: error.response?.status,
+        url: error.config?.url,
+        message: error.message,
+      });
+    }
 
     if (error.response?.status === 401) {
-      console.log('[DEBUG] Sessão expirada, redirecionando para login');
+      if (isDevelopment) console.log('[DEBUG] Sessão expirada, redirecionando para login');
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       window.location.href = '/login';
