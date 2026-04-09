@@ -165,7 +165,7 @@ function RelatoriosGerente({ user }) {
     let cancelled = false;
     (async () => {
       try {
-        const list = await fetchAllPages('turmas/');
+        const list = await fetchAllPages('turmas/?page_size=500');
         if (!cancelled) setTurmas(Array.isArray(list) ? list.filter((t) => t.ativo !== false) : []);
       } catch {
         if (!cancelled) setTurmas([]);

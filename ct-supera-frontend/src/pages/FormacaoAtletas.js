@@ -121,7 +121,7 @@ function FormacaoAtletas() {
       setLoadingTurmas(true);
       setTurmasError('');
       try {
-        const todas = await fetchAllPages('turmas/');
+        const todas = await fetchAllPages('turmas/?page_size=500');
         setTurmas(todas);
       } catch (err) {
         console.error('Erro ao carregar turmas:', err);

@@ -5,17 +5,49 @@ import axios from 'axios';
 const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 const baseURL = process.env.REACT_APP_API_URL || (isDevelopment ? 'http://localhost:8000/api/' : 'https://ctsupera.com.br/api/');
 
+/**
+ * Listagens grandes (turmas, alunos, financeiro) frequentemente passam de 10s em rede lenta ou cold start.
+ * Cuidado: `Number("10000") || 60000` dá **10000** (valor truthy). Por isso só aceitamos env >= 60s.
+ */
+const envTimeoutMs = Number(process.env.REACT_APP_API_TIMEOUT_MS);
+const DEFAULT_TIMEOUT_MS =
+  Number.isFinite(envTimeoutMs) && envTimeoutMs >= 60000 ? envTimeoutMs : 90000;
+
 // Define a URL base para imagens/media
 export const MEDIA_URL = process.env.REACT_APP_MEDIA_URL || (isDevelopment ? 'http://localhost:8000' : 'https://ctsupera.com.br');
 
 const api = axios.create({
   baseURL: baseURL,
-  timeout: 10000, // Tempo limite de 10 segundos
+  timeout: DEFAULT_TIMEOUT_MS,
   headers: {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
   }
 });
+
+/**
+ * Converte o `next` da paginação DRF em path relativo ao `baseURL` do axios.
+ * Evita falhas quando a API devolve URL absoluta (http/https) diferente do `baseURL`.
+ */
+export function normalizeDrfNextUrl(nextUrl) {
+  if (!nextUrl) return null;
+  const next = String(nextUrl).trim();
+  const base = String(api.defaults.baseURL || '');
+  if (base && next.startsWith(base)) {
+    return next.slice(base.length);
+  }
+  try {
+    const n = new URL(next);
+    const b = new URL(base.endsWith('/') ? base : `${base}/`);
+    if (n.origin === b.origin && n.pathname.startsWith(b.pathname.replace(/\/$/, '') || b.pathname)) {
+      const stripped = n.pathname.slice(b.pathname.length) + n.search;
+      return stripped.replace(/^\//, '');
+    }
+  } catch {
+    /* ignore */
+  }
+  return next;
+}
 
 // Interceptor para requisições
 api.interceptors.request.use(

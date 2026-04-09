@@ -1,5 +1,19 @@
-import React, { useEffect, useState } from 'react';
-import api from '../services/api';
+import React, { useEffect, useState, useRef } from 'react';
+import api, { normalizeDrfNextUrl } from '../services/api';
+
+function isTimeoutError(err) {
+  return (
+    err?.code === 'ECONNABORTED' ||
+    String(err?.message || '').toLowerCase().includes('timeout')
+  );
+}
+
+function mensagemErroCarregamento(err) {
+  if (isTimeoutError(err)) {
+    return 'O servidor demorou demais para responder. Verifique sua conexão ou tente novamente em instantes.';
+  }
+  return err?.response?.data?.error || err?.message || 'Erro ao carregar dados.';
+}
 
 const styles = {
   formGroup: { marginBottom: '1rem' },
@@ -29,6 +43,8 @@ function ControleFinanceiro({ user, onDataChange }) {
   const [alunos, setAlunos] = useState([]);
   const [turmas, setTurmas] = useState([]);
   const itensPorPagina = 10;
+  /** Evita segundo GET de mensalidades no mount (já carregado no efeito de mes/ano). */
+  const skipMensalidadesFilterEffect = useRef(true);
 
   const fetchAllPages = async (initialUrl) => {
     let resultados = [];
@@ -38,7 +54,7 @@ function ControleFinanceiro({ user, onDataChange }) {
       const data = response.data;
       if (data && data.results) {
         resultados = resultados.concat(data.results);
-        nextUrl = data.next || null;
+        nextUrl = normalizeDrfNextUrl(data.next);
       } else {
         resultados = Array.isArray(data) ? data : [];
         nextUrl = null;
@@ -48,16 +64,83 @@ function ControleFinanceiro({ user, onDataChange }) {
   };
 
   useEffect(() => {
-    fetchDashboard();
-    fetchMensalidades();
-    fetchDespesas();
-    fetchSalarios();
-    fetchAlunos();
-    fetchTurmas();
+    let cancelled = false;
+    const run = async () => {
+      setErro('');
+      setLoading(true);
+      try {
+        const { data } = await api.get('financeiro/dashboard/', { params: { mes, ano } });
+        if (!cancelled) setDashboard(data);
+      } catch (err) {
+        if (!cancelled) setErro(mensagemErroCarregamento(err));
+      }
+
+      const resultados = await Promise.allSettled([
+        fetchAllPages(`financeiro/mensalidades/?mes=${mes}&ano=${ano}&page_size=500`),
+        fetchAllPages(`financeiro/despesas/?mes=${mes}&ano=${ano}&page_size=500`),
+        fetchAllPages(`financeiro/salarios/?mes=${mes}&ano=${ano}&page_size=500`),
+        fetchAllPages('usuarios/?tipo=aluno'),
+        fetchAllPages('turmas/?page_size=500'),
+      ]);
+
+      if (cancelled) return;
+
+      const labels = ['mensalidades', 'despesas', 'salários', 'alunos', 'turmas'];
+      const erros = [];
+      resultados.forEach((r, i) => {
+        if (r.status === 'rejected') {
+          erros.push(`${labels[i]}: ${mensagemErroCarregamento(r.reason)}`);
+        }
+      });
+
+      if (resultados[0].status === 'fulfilled') {
+        const d = resultados[0].value;
+        setMensalidades(Array.isArray(d) ? d : []);
+      } else {
+        setMensalidades([]);
+      }
+      if (resultados[1].status === 'fulfilled') {
+        const d = resultados[1].value;
+        setDespesas(Array.isArray(d) ? d : []);
+      } else {
+        setDespesas([]);
+      }
+      if (resultados[2].status === 'fulfilled') {
+        const d = resultados[2].value;
+        setSalarios(Array.isArray(d) ? d : []);
+      } else {
+        setSalarios([]);
+      }
+      if (resultados[3].status === 'fulfilled') {
+        const d = resultados[3].value;
+        setAlunos(Array.isArray(d) ? d : []);
+      } else {
+        setAlunos([]);
+      }
+      if (resultados[4].status === 'fulfilled') {
+        const d = resultados[4].value;
+        setTurmas(Array.isArray(d) ? d : []);
+      } else {
+        setTurmas([]);
+      }
+
+      if (erros.length) {
+        setErro((prev) => (prev ? `${prev} ${erros.join(' ')}` : erros.join(' ')));
+      }
+      if (!cancelled) setLoading(false);
+    };
+    run();
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line
   }, [mes, ano]);
 
   useEffect(() => {
+    if (skipMensalidadesFilterEffect.current) {
+      skipMensalidadesFilterEffect.current = false;
+      return;
+    }
     fetchMensalidades();
     // eslint-disable-next-line
   }, [turmaFiltro, mensalidadeStatus]);
@@ -67,9 +150,9 @@ function ControleFinanceiro({ user, onDataChange }) {
     try {
       const { data } = await api.get('financeiro/dashboard/', { params: { mes, ano } });
       setDashboard(data);
-      setLoading(false);
-    } catch {
-      setErro('Erro ao carregar painel financeiro.');
+    } catch (err) {
+      setErro(mensagemErroCarregamento(err));
+    } finally {
       setLoading(false);
     }
   };
@@ -80,26 +163,26 @@ function ControleFinanceiro({ user, onDataChange }) {
       if (turmaFiltro) url += `&turma=${turmaFiltro}`;
       const data = await fetchAllPages(url);
       setMensalidades(Array.isArray(data) ? data : []);
-    } catch {
-      setErro('Erro ao carregar mensalidades.');
+    } catch (err) {
+      setErro(mensagemErroCarregamento(err));
     }
   };
 
   const fetchDespesas = async () => {
     try {
-      const data = await fetchAllPages(`financeiro/despesas/?mes=${mes}&ano=${ano}`);
+      const data = await fetchAllPages(`financeiro/despesas/?mes=${mes}&ano=${ano}&page_size=500`);
       setDespesas(Array.isArray(data) ? data : []);
-    } catch {
-      setErro('Erro ao carregar despesas.');
+    } catch (err) {
+      setErro(mensagemErroCarregamento(err));
     }
   };
 
   const fetchSalarios = async () => {
     try {
-      const data = await fetchAllPages(`financeiro/salarios/?mes=${mes}&ano=${ano}`);
+      const data = await fetchAllPages(`financeiro/salarios/?mes=${mes}&ano=${ano}&page_size=500`);
       setSalarios(Array.isArray(data) ? data : []);
-    } catch {
-      setErro('Erro ao carregar salários.');
+    } catch (err) {
+      setErro(mensagemErroCarregamento(err));
     }
   };
 
@@ -107,17 +190,8 @@ function ControleFinanceiro({ user, onDataChange }) {
     try {
       const data = await fetchAllPages('usuarios/?tipo=aluno');
       setAlunos(Array.isArray(data) ? data : []);
-    } catch {
-      setErro('Erro ao carregar alunos.');
-    }
-  };
-
-  const fetchTurmas = async () => {
-    try {
-      const data = await fetchAllPages('turmas/');
-      setTurmas(Array.isArray(data) ? data : []);
-    } catch {
-      setErro('Erro ao carregar turmas.');
+    } catch (err) {
+      setErro(mensagemErroCarregamento(err));
     }
   };
 

@@ -394,7 +394,11 @@ function CadastroUsuario({ onUserChange }) {
       console.error('[DEBUG] Erro detalhado ao carregar usuários:', error);
       console.error('[DEBUG] Resposta do servidor:', error.response?.data);
       console.error('[DEBUG] Status do erro:', error.response?.status);
-      setError(error.response?.data?.error || 'Erro ao carregar usuários. Tente novamente.');
+      const msgTimeout =
+        error?.code === 'ECONNABORTED' || String(error?.message || '').includes('timeout')
+          ? 'O servidor demorou demais para responder. Verifique sua conexão e tente novamente.'
+          : null;
+      setError(msgTimeout || error.response?.data?.error || 'Erro ao carregar usuários. Tente novamente.');
     } finally {
       setLoading(false);
     }
@@ -428,7 +432,7 @@ function CadastroUsuario({ onUserChange }) {
     if (activeTab !== 'alunos' && activeTab !== 'precadastros') return;
     const fetchTurmas = async () => {
       try {
-        const turmasData = await fetchAllPages('turmas/');
+        const turmasData = await fetchAllPages('turmas/?page_size=500');
         setTurmas(Array.isArray(turmasData) ? turmasData : []);
       } catch (error) {
         console.error('[DEBUG] Erro ao carregar turmas:', error);

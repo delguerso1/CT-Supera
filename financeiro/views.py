@@ -145,6 +145,7 @@ class MensalidadeRetrieveUpdateDestroyView(RetrieveUpdateDestroyAPIView):
 # Despesas API
 class DespesaListCreateView(ListCreateAPIView):
     serializer_class = DespesaSerializer
+    pagination_class = MensalidadePagination
 
     def get_queryset(self):
         queryset = Despesa.objects.all()
@@ -167,6 +168,7 @@ class DespesaRetrieveUpdateDestroyView(RetrieveUpdateDestroyAPIView):
 # Salários API
 class SalarioListCreateView(ListCreateAPIView):
     serializer_class = SalarioSerializer
+    pagination_class = MensalidadePagination
 
     def get_queryset(self):
         mes_param = self.request.query_params.get('mes')

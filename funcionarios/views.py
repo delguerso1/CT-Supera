@@ -41,10 +41,16 @@ class VerificarCheckinAlunosAPIView(APIView):
         turma = get_object_or_404(Turma, id=turma_id)
         hoje = date.today()
 
-        # Busca todos os alunos da turma
-        alunos = Usuario.objects.filter(tipo="aluno", ativo=True, turmas_aluno=turma)
+        # Busca todos os alunos da turma (distinct evita duplicidades por JOIN/M2M)
+        alunos = (
+            Usuario.objects.filter(tipo="aluno", ativo=True, turmas_aluno=turma)
+            .distinct()
+            .order_by("first_name", "last_name", "id")
+        )
 
         status_alunos = []
+        emails_alunos = set()
+        cpfs_alunos = set()
         for aluno in alunos:
             presenca = Presenca.objects.filter(
                 usuario=aluno,
@@ -52,6 +58,12 @@ class VerificarCheckinAlunosAPIView(APIView):
                 turma=turma
             ).first()
             ja_confirmada = presenca.presenca_confirmada if presenca else False
+            email_norm = (aluno.email or "").strip().lower()
+            cpf_norm = ''.join(c for c in str(aluno.cpf or '') if c.isdigit())
+            if email_norm:
+                emails_alunos.add(email_norm)
+            if cpf_norm:
+                cpfs_alunos.add(cpf_norm)
             status_alunos.append({
                 "id": str(aluno.id),
                 "nome": f"{aluno.first_name} {aluno.last_name}",
@@ -68,8 +80,22 @@ class VerificarCheckinAlunosAPIView(APIView):
             data_aula_experimental=hoje,
             origem='aula_experimental',
             status='pendente'
-        )
+        ).order_by("first_name", "last_name", "id")
+        precadastros_adicionados = set()
         for pc in precadastros:
+            email_pc = (pc.email or "").strip().lower()
+            cpf_pc = ''.join(c for c in str(pc.cpf or '') if c.isdigit())
+
+            # Evita duplicação visual da mesma pessoa (já está como aluno regular da turma)
+            if (email_pc and email_pc in emails_alunos) or (cpf_pc and cpf_pc in cpfs_alunos):
+                continue
+
+            # Defesa extra contra duplicidade do próprio pré-cadastro no retorno
+            key_pc = (email_pc, cpf_pc, (pc.first_name or "").strip().lower(), (pc.last_name or "").strip().lower())
+            if key_pc in precadastros_adicionados:
+                continue
+            precadastros_adicionados.add(key_pc)
+
             ja_exp = bool(pc.compareceu_aula_experimental)
             status_alunos.append({
                 "id": f"precadastro_{pc.id}",
