@@ -4,6 +4,8 @@ from financeiro.models import Mensalidade
 from datetime import timedelta
 from funcionarios.models import Presenca
 from turmas.models import Turma
+
+from .checkin_utils import encontrar_data_aula_checkin
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -108,19 +110,19 @@ class PainelAlunoAPIView(APIView):
     def _dia_semana_nome(self, data):
         return _DIAS_SEMANA_NOMES[data.weekday()]
 
-    def _validar_regras_checkin(self, aluno, turma, hoje):
+    def _validar_regras_checkin(self, aluno, turma, data_ref):
         if not aluno.dias_habilitados.exists():
             return False, "Dias habilitados do aluno não configurados."
 
-        dia_nome = self._dia_semana_nome(hoje)
+        dia_nome = self._dia_semana_nome(data_ref)
         if not aluno.dias_habilitados.filter(nome=dia_nome).exists():
-            return False, "Hoje não é um dia habilitado para este aluno."
+            return False, "Este dia não está habilitado para este aluno no plano."
 
         if turma and not turma.dias_semana.filter(nome=dia_nome).exists():
-            return False, "A turma do aluno não ocorre hoje."
+            return False, "A turma não tem aula neste dia da semana."
 
         limite = aluno.dias_habilitados.count()
-        inicio_semana = hoje - timedelta(days=hoje.weekday())
+        inicio_semana = data_ref - timedelta(days=data_ref.weekday())
         fim_semana = inicio_semana + timedelta(days=6)
         checkins_semana = Presenca.objects.filter(
             usuario=aluno,
@@ -141,13 +143,29 @@ class PainelAlunoAPIView(APIView):
             .order_by("-data")
         )
         historico_pagamentos = Mensalidade.objects.filter(aluno=usuario).order_by('-data_vencimento')
-        turma = Turma.objects.filter(alunos=usuario).first()
-        turma_nome = getattr(turma, "nome", None) if turma else None
+        turma = Turma.objects.filter(alunos=usuario, ativo=True).prefetch_related("dias_semana").first()
+        turma_nome = str(turma) if turma else None
 
         # Verificar status de hoje (mesmo calendário BR que Mensalidade.status_efetivo)
         hoje = timezone.localdate()
         presenca_hoje = Presenca.objects.filter(usuario=usuario, data=hoje).first()
-        
+
+        aula_checkin = encontrar_data_aula_checkin(usuario, turma) if turma else None
+        data_aula_checkin = aula_checkin[0] if aula_checkin else None
+        horario_aula_checkin = (
+            timezone.localtime(aula_checkin[1]).strftime("%H:%M") if aula_checkin else None
+        )
+
+        if data_aula_checkin is not None:
+            presenca_alvo = Presenca.objects.filter(
+                usuario=usuario, turma=turma, data=data_aula_checkin
+            ).first()
+            checkin_realizado = presenca_alvo.checkin_realizado if presenca_alvo else False
+            presenca_confirmada = presenca_alvo.presenca_confirmada if presenca_alvo else False
+        else:
+            checkin_realizado = presenca_hoje.checkin_realizado if presenca_hoje else False
+            presenca_confirmada = presenca_hoje.presenca_confirmada if presenca_hoje else False
+
         # Calcular a idade do aluno
         if usuario.data_nascimento:
             idade = hoje.year - usuario.data_nascimento.year - (
@@ -159,10 +177,22 @@ class PainelAlunoAPIView(APIView):
         mensalidades_atrasadas = Mensalidade.objects.filter(
             aluno=usuario
         ).exclude(status="pago").filter(data_vencimento__lt=hoje)
-        pode_fazer_checkin = not mensalidades_atrasadas.exists()
-        motivo_checkin_bloqueado = None
-        if pode_fazer_checkin:
-            pode_fazer_checkin, motivo_checkin_bloqueado = self._validar_regras_checkin(usuario, turma, hoje)
+
+        if mensalidades_atrasadas.exists():
+            pode_fazer_checkin = False
+            motivo_checkin_bloqueado = "Você possui pendências de pagamento."
+        elif not turma:
+            pode_fazer_checkin = False
+            motivo_checkin_bloqueado = "Você não está matriculado em nenhuma turma ativa."
+        elif data_aula_checkin is None:
+            pode_fazer_checkin = False
+            motivo_checkin_bloqueado = (
+                "Check-in disponível apenas entre 24 horas antes e até o horário de início da aula."
+            )
+        else:
+            pode_fazer_checkin, motivo_checkin_bloqueado = self._validar_regras_checkin(
+                usuario, turma, data_aula_checkin
+            )
 
         return Response({
             "usuario": UsuarioSerializer(usuario).data,
@@ -176,10 +206,12 @@ class PainelAlunoAPIView(APIView):
             "idade": idade,
             "turma": turma_nome,
             "status_hoje": {
-                "checkin_realizado": presenca_hoje.checkin_realizado if presenca_hoje else False,
-                "presenca_confirmada": presenca_hoje.presenca_confirmada if presenca_hoje else False,
+                "checkin_realizado": checkin_realizado,
+                "presenca_confirmada": presenca_confirmada,
                 "pode_fazer_checkin": pode_fazer_checkin,
-                "motivo_checkin_bloqueado": motivo_checkin_bloqueado
+                "motivo_checkin_bloqueado": motivo_checkin_bloqueado,
+                "data_aula_checkin": data_aula_checkin.isoformat() if data_aula_checkin else None,
+                "horario_aula_checkin": horario_aula_checkin,
             }
         })
 
@@ -204,21 +236,38 @@ class RealizarCheckinAPIView(APIView):
                 ).data
             }, status=status.HTTP_403_FORBIDDEN)
 
-        # Verifica se já fez check-in hoje
-        presenca_existente = Presenca.objects.filter(usuario=usuario, data=hoje).first()
-        if presenca_existente and presenca_existente.checkin_realizado:
-            return Response({"message": "Você já realizou o check-in para hoje."}, status=status.HTTP_400_BAD_REQUEST)
-
         # Busca a turma ativa do aluno
-        turma = Turma.objects.filter(alunos=usuario, ativo=True).first()
+        turma = Turma.objects.filter(alunos=usuario, ativo=True).prefetch_related("dias_semana").first()
         if not turma:
             return Response({
                 "error": "Você não está matriculado em nenhuma turma ativa."
             }, status=status.HTTP_400_BAD_REQUEST)
 
-        # Regras de plano e dias habilitados
+        aula_checkin = encontrar_data_aula_checkin(usuario, turma)
+        if not aula_checkin:
+            return Response(
+                {
+                    "error": (
+                        "Check-in disponível apenas entre 24 horas antes e até o horário de início da aula."
+                    )
+                },
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        data_aula, _ = aula_checkin
+
+        presenca_existente = Presenca.objects.filter(
+            usuario=usuario, turma=turma, data=data_aula
+        ).first()
+        if presenca_existente and presenca_existente.checkin_realizado:
+            return Response(
+                {"message": "Você já realizou o check-in para esta aula."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Regras de plano e dias habilitados (semana da data da aula)
         painel = PainelAlunoAPIView()
-        pode_checkin, motivo = painel._validar_regras_checkin(usuario, turma, hoje)
+        pode_checkin, motivo = painel._validar_regras_checkin(usuario, turma, data_aula)
         if not pode_checkin:
             return Response({"error": motivo}, status=status.HTTP_403_FORBIDDEN)
 
@@ -228,10 +277,10 @@ class RealizarCheckinAPIView(APIView):
             presenca_existente.save()
         else:
             Presenca.objects.create(
-                usuario=usuario, 
-                data=hoje, 
+                usuario=usuario,
+                data=data_aula,
                 turma=turma,
                 checkin_realizado=True
             )
-            
+
         return Response({"message": "Check-in realizado com sucesso!"}, status=status.HTTP_200_OK)

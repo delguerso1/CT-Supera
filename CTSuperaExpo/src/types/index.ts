@@ -179,6 +179,8 @@ export interface PainelAluno {
     presenca_confirmada: boolean;
     pode_fazer_checkin: boolean;
     motivo_checkin_bloqueado?: string | null;
+    data_aula_checkin?: string | null;
+    horario_aula_checkin?: string | null;
   };
 }
 

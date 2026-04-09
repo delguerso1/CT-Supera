@@ -36,6 +36,16 @@ function formatLocalDateBR(value) {
   return parsed.toLocaleDateString('pt-BR');
 }
 
+function descricaoAulaCheckinParaAluno(status) {
+  if (!status) return 'da próxima aula';
+  const { data_aula_checkin, horario_aula_checkin } = status;
+  if (!data_aula_checkin) return 'da próxima aula';
+  const dia = formatLocalDateBR(data_aula_checkin);
+  return horario_aula_checkin
+    ? `da aula do dia ${dia} às ${horario_aula_checkin}`
+    : `da aula do dia ${dia}`;
+}
+
 const styles = {
   container: {
     display: 'flex',
@@ -453,7 +463,9 @@ function DashboardAluno({ user }) {
     checkin_realizado: false,
     presenca_confirmada: false,
     pode_fazer_checkin: true,
-    motivo_checkin_bloqueado: null
+    motivo_checkin_bloqueado: null,
+    data_aula_checkin: null,
+    horario_aula_checkin: null
   });
   const [form, setForm] = useState({
     first_name: '',
@@ -500,7 +512,9 @@ function DashboardAluno({ user }) {
           checkin_realizado: false,
           presenca_confirmada: false,
           pode_fazer_checkin: true,
-          motivo_checkin_bloqueado: null
+          motivo_checkin_bloqueado: null,
+          data_aula_checkin: null,
+          horario_aula_checkin: null
         });
         const parqRespondido = resp.data.usuario.parq_completed || resp.data.usuario.parq_completion_date;
         const getParqValue = (value) => (parqRespondido ? (value || false) : null);
@@ -755,7 +769,9 @@ function DashboardAluno({ user }) {
         checkin_realizado: false,
         presenca_confirmada: false,
         pode_fazer_checkin: true,
-        motivo_checkin_bloqueado: null
+        motivo_checkin_bloqueado: null,
+        data_aula_checkin: null,
+        horario_aula_checkin: null
       });
     } catch (err) {
       console.error('Erro ao realizar check-in:', err);
@@ -1050,7 +1066,7 @@ function DashboardAluno({ user }) {
         </div>
         
         <div style={styles.statCard}>
-          <div style={styles.statTitle}>Check-in Hoje</div>
+          <div style={styles.statTitle}>Check-in da aula</div>
           <div style={styles.statValue}>
             <span style={{
               ...styles.statusBadge,
@@ -1059,7 +1075,7 @@ function DashboardAluno({ user }) {
               {statusHoje.checkin_realizado ? 'Realizado' : 'Pendente'}
             </span>
           </div>
-          <div style={styles.statSubtitle}>Status do check-in de hoje</div>
+          <div style={styles.statSubtitle}>Janela: 24h antes até o início da aula</div>
         </div>
       </div>
 
@@ -1069,7 +1085,7 @@ function DashboardAluno({ user }) {
             <span>✅</span>
             Check-in Disponível
           </div>
-          <p>Você pode realizar o check-in para a aula de hoje.</p>
+          <p>Você pode realizar o check-in {descricaoAulaCheckinParaAluno(statusHoje)}.</p>
           <button
             className="checkin-button"
             onClick={handleCheckin}
@@ -1090,7 +1106,7 @@ function DashboardAluno({ user }) {
             <span>✅</span>
             Check-in Realizado
           </div>
-          <p>Você já realizou o check-in para a aula de hoje.</p>
+          <p>Você já realizou o check-in {descricaoAulaCheckinParaAluno(statusHoje)}.</p>
         </div>
       )}
 
@@ -1666,7 +1682,7 @@ function DashboardAluno({ user }) {
       <div className="checkin-card" style={styles.checkinCard}>
         <div style={styles.checkinTitle}>
           <span>📅</span>
-          Status de Hoje
+          Status do check-in
         </div>
         <div style={{ marginBottom: '15px' }}>
           <div style={{ 

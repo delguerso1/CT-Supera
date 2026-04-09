@@ -42,6 +42,19 @@ import {
 } from '../utils/registerExpoPush';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+function descricaoAulaCheckinParaAluno(status: PainelAluno['status_hoje']): string {
+  const { data_aula_checkin, horario_aula_checkin } = status;
+  if (!data_aula_checkin) return 'da próxima aula';
+  const parts = data_aula_checkin.split('-').map(Number);
+  if (parts.length !== 3 || parts.some((n) => Number.isNaN(n))) return 'da próxima aula';
+  const [y, m, d] = parts;
+  const local = new Date(y, m - 1, d);
+  const dia = local.toLocaleDateString('pt-BR');
+  return horario_aula_checkin
+    ? `da aula do dia ${dia} às ${horario_aula_checkin}`
+    : `da aula do dia ${dia}`;
+}
+
 const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
   const { user, logout } = useAuth();
@@ -618,7 +631,7 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Status de Hoje</Text>
+          <Text style={styles.sectionTitle}>Status do check-in</Text>
           <View style={styles.statusCard}>
             <View style={styles.statusRow}>
               <Text style={styles.statusLabel}>Check-in realizado:</Text>
@@ -645,7 +658,7 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
           <View style={styles.checkinHighlight}>
             <Text style={styles.checkinHighlightTitle}>✅ Check-in disponível</Text>
             <Text style={styles.checkinHighlightText}>
-              Você pode realizar o check-in para a aula de hoje.
+              Você pode realizar o check-in {descricaoAulaCheckinParaAluno(painelAluno.status_hoje)}.
             </Text>
           </View>
         )}
@@ -654,7 +667,7 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
           <View style={styles.checkinHighlight}>
             <Text style={styles.checkinHighlightTitle}>✅ Check-in realizado</Text>
             <Text style={styles.checkinHighlightText}>
-              Você já realizou o check-in de hoje.
+              Você já realizou o check-in {descricaoAulaCheckinParaAluno(painelAluno.status_hoje)}.
             </Text>
           </View>
         )}
@@ -1102,13 +1115,16 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
     }
 
     if (painelAluno.status_hoje.checkin_realizado) {
-      Alert.alert('Check-in já realizado', 'Você já realizou o check-in para hoje.');
+      Alert.alert(
+        'Check-in já realizado',
+        `Você já realizou o check-in ${descricaoAulaCheckinParaAluno(painelAluno.status_hoje)}.`
+      );
       return;
     }
 
     Alert.alert(
       'Confirmar Check-in',
-      'Deseja realizar o check-in para hoje?',
+      `Deseja realizar o check-in ${descricaoAulaCheckinParaAluno(painelAluno.status_hoje)}?`,
       [
         { text: 'Cancelar', style: 'cancel' },
         {
@@ -1207,7 +1223,7 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
           <Text style={styles.sectionTitle}>Check-in de Presença</Text>
           
           <View style={styles.checkinCard}>
-            <Text style={styles.checkinTitle}>Status de Hoje</Text>
+            <Text style={styles.checkinTitle}>Status do check-in</Text>
             
             <View style={styles.checkinStatusRow}>
               <Text style={styles.checkinLabel}>Check-in realizado:</Text>

@@ -138,6 +138,10 @@ export interface PainelAluno {
     presenca_confirmada: boolean;
     pode_fazer_checkin: boolean;
     motivo_checkin_bloqueado?: string | null;
+    /** Data (YYYY-MM-DD) da aula para a qual o check-in está em janela, se houver */
+    data_aula_checkin?: string | null;
+    /** Horário local da aula (HH:MM), quando `data_aula_checkin` existe */
+    horario_aula_checkin?: string | null;
   };
 }
 
