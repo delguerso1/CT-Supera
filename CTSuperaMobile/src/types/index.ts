@@ -240,7 +240,7 @@ export interface ObservacaoAulaResponse {
 }
 
 export interface PresencaRelatorioItem {
-  id: number;
+  id: number | null;
   aluno_id: number;
   aluno_nome: string;
   turma_id: number;
@@ -249,6 +249,8 @@ export interface PresencaRelatorioItem {
   checkin_realizado: boolean;
   presenca_confirmada: boolean;
   ausencia_registrada?: boolean;
+  /** Sem linha em Presenca — aluno esperado no dia de aula da turma */
+  sem_registro?: boolean;
 }
 
 export interface PresencaRelatorioResponse {
@@ -256,6 +258,7 @@ export interface PresencaRelatorioResponse {
   total_checkins: number;
   total_confirmadas: number;
   total_faltas?: number;
+  total_sem_registro?: number;
   presencas: PresencaRelatorioItem[];
 }
 

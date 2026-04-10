@@ -18,6 +18,33 @@ from django.utils.dateparse import parse_date
 
 logger = logging.getLogger(__name__)
 
+# Alinhado ao painel do aluno / turmas (dia da semana da data vs nomes em DiaSemana)
+_WEEKDAY_NOME_PT = (
+    "Segunda-feira",
+    "Terça-feira",
+    "Quarta-feira",
+    "Quinta-feira",
+    "Sexta-feira",
+    "Sábado",
+    "Domingo",
+)
+
+
+def _serialize_presenca_sintetica(aluno: Usuario, turma: Turma, d: date) -> dict:
+    """Linha sem registro em Presenca (aluno esperado na aula e sem linha no banco)."""
+    return {
+        "id": None,
+        "aluno_id": aluno.id,
+        "aluno_nome": aluno.get_full_name() or aluno.username,
+        "turma_id": turma.id,
+        "turma_nome": str(turma),
+        "data": d.isoformat(),
+        "checkin_realizado": False,
+        "presenca_confirmada": False,
+        "ausencia_registrada": False,
+        "sem_registro": True,
+    }
+
 
 def _nome_completo_precadastro(pc):
     n = f"{(pc.first_name or '').strip()} {(pc.last_name or '').strip()}".strip()
@@ -264,6 +291,7 @@ def _serialize_presenca(presenca: Presenca):
         "checkin_realizado": presenca.checkin_realizado,
         "presenca_confirmada": presenca.presenca_confirmada,
         "ausencia_registrada": presenca.ausencia_registrada,
+        "sem_registro": False,
     }
 
 
@@ -280,6 +308,9 @@ class RelatorioPresencaAPIView(APIView):
         turma_id = request.query_params.get("turma_id")
         aluno_id = request.query_params.get("aluno_id")
         aluno_nome = request.query_params.get("aluno_nome")
+
+        parsed_inicio = None
+        parsed_fim = None
 
         qs = Presenca.objects.select_related("usuario", "turma").order_by("-data", "usuario__first_name")
 
@@ -316,17 +347,70 @@ class RelatorioPresencaAPIView(APIView):
             .order_by("-data", "usuario__first_name")
         )
 
-        total_registros = qs.count()
         total_checkins = qs.filter(checkin_realizado=True).count()
         total_confirmadas = qs.filter(presenca_confirmada=True).count()
         total_faltas = qs.filter(ausencia_registrada=True).count()
+
+        presencas_list = [_serialize_presenca(item) for item in qs]
+
+        incluir_faltantes = request.query_params.get("incluir_faltantes", "true").lower() in (
+            "1",
+            "true",
+            "yes",
+            "",
+        )
+
+        if (
+            incluir_faltantes
+            and turma_id
+            and parsed_inicio
+            and parsed_fim
+            and parsed_inicio <= parsed_fim
+        ):
+            try:
+                turma = Turma.objects.prefetch_related("dias_semana", "alunos").get(pk=int(turma_id))
+            except (ValueError, Turma.DoesNotExist):
+                turma = None
+            if turma:
+                existentes = {
+                    (p["aluno_id"], p["turma_id"], (p["data"] or "")[:10])
+                    for p in presencas_list
+                }
+                dia_nomes = {d.nome for d in turma.dias_semana.all()}
+                cur = parsed_inicio
+                while cur <= parsed_fim:
+                    nome_dia = _WEEKDAY_NOME_PT[cur.weekday()]
+                    if nome_dia in dia_nomes:
+                        alunos_qs = turma.alunos.filter(tipo="aluno", ativo=True)
+                        if aluno_id:
+                            alunos_qs = alunos_qs.filter(id=int(aluno_id))
+                        if aluno_nome:
+                            alunos_qs = alunos_qs.filter(
+                                Q(first_name__icontains=aluno_nome)
+                                | Q(last_name__icontains=aluno_nome)
+                                | Q(username__icontains=aluno_nome)
+                            )
+                        for aluno in alunos_qs.distinct():
+                            k = (aluno.id, turma.id, cur.isoformat())
+                            if k not in existentes:
+                                presencas_list.append(_serialize_presenca_sintetica(aluno, turma, cur))
+                                existentes.add(k)
+                    cur += timedelta(days=1)
+
+        # Mesma ordem do queryset: data desc, nome asc (sort estável)
+        presencas_list.sort(key=lambda p: (p.get("aluno_nome") or "").lower())
+        presencas_list.sort(key=lambda p: (p.get("data") or "")[:10], reverse=True)
+
+        total_sem_registro = sum(1 for p in presencas_list if p.get("sem_registro"))
+        total_registros = len(presencas_list)
 
         return Response({
             "total_registros": total_registros,
             "total_checkins": total_checkins,
             "total_confirmadas": total_confirmadas,
             "total_faltas": total_faltas,
-            "presencas": [_serialize_presenca(item) for item in qs]
+            "total_sem_registro": total_sem_registro,
+            "presencas": presencas_list,
         }, status=status.HTTP_200_OK)
 
 

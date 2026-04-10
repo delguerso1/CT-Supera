@@ -622,6 +622,12 @@ function RelatoriosGerente({ user }) {
                   {presencaRelatorio.total_faltas ?? 0}
                 </div>
               </div>
+              <div>
+                <strong style={{ color: '#666', fontSize: 13 }}>Sem registro (esperados na aula)</strong>
+                <div style={{ fontSize: 22, color: '#757575' }}>
+                  {presencaRelatorio.total_sem_registro ?? 0}
+                </div>
+              </div>
             </div>
 
             <div style={{ overflowX: 'auto' }}>
@@ -666,7 +672,10 @@ function RelatoriosGerente({ user }) {
                     const row = item.row;
                     const atraso = mostrarAvisoAtrasoNoRegistro(row);
                     return (
-                      <tr key={row.id} style={{ borderBottom: '1px solid #eee' }}>
+                      <tr
+                        key={row.id != null ? row.id : `s-${row.aluno_id}-${row.data}`}
+                        style={{ borderBottom: '1px solid #eee' }}
+                      >
                         <td style={{ padding: 10 }}>
                           <span>{row.aluno_nome}</span>
                           {atraso && (
@@ -697,18 +706,22 @@ function RelatoriosGerente({ user }) {
                           style={{
                             padding: 10,
                             textAlign: 'center',
-                            color: row.ausencia_registrada
-                              ? '#c62828'
-                              : row.presenca_confirmada
-                                ? '#2e7d32'
-                                : '#f9a825',
+                            color: row.sem_registro
+                              ? '#757575'
+                              : row.ausencia_registrada
+                                ? '#c62828'
+                                : row.presenca_confirmada
+                                  ? '#2e7d32'
+                                  : '#f9a825',
                           }}
                         >
-                          {row.ausencia_registrada
-                            ? 'Falta'
-                            : row.presenca_confirmada
-                              ? 'Confirmada'
-                              : 'Pendente'}
+                          {row.sem_registro
+                            ? 'Sem registro'
+                            : row.ausencia_registrada
+                              ? 'Falta'
+                              : row.presenca_confirmada
+                                ? 'Confirmada'
+                                : 'Pendente'}
                         </td>
                       </tr>
                     );

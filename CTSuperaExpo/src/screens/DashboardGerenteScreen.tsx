@@ -1499,17 +1499,18 @@ const DashboardGerenteScreen: React.FC<DashboardGerenteProps> = ({
   };
 
   const handleCorrigirPresenca = async (item: PresencaRelatorioItem, confirmar: boolean) => {
+    if (item.id == null || item.sem_registro) return;
     if (corrigindoPresenca[item.id]) return;
 
     const executar = async (payload: { checkin_realizado?: boolean; presenca_confirmada?: boolean }) => {
       try {
-        setCorrigindoPresenca(prev => ({ ...prev, [item.id]: true }));
-        const atualizado = await presencaService.corrigirPresenca(item.id, payload);
+        setCorrigindoPresenca(prev => ({ ...prev, [item.id!]: true }));
+        const atualizado = await presencaService.corrigirPresenca(item.id!, payload);
         atualizarItemRelatorio(atualizado);
       } catch (error: any) {
         Alert.alert('Erro', error.response?.data?.error || 'Erro ao corrigir presença.');
       } finally {
-        setCorrigindoPresenca(prev => ({ ...prev, [item.id]: false }));
+        setCorrigindoPresenca(prev => ({ ...prev, [item.id!]: false }));
       }
     };
 
@@ -1735,13 +1736,19 @@ const DashboardGerenteScreen: React.FC<DashboardGerenteProps> = ({
                       </Text>
                       <Text style={styles.relatorioKpiLbl}>Faltas</Text>
                     </View>
+                    <View style={styles.relatorioKpi}>
+                      <Text style={[styles.relatorioKpiVal, { color: '#757575' }]}>
+                        {presencaRelatorio.total_sem_registro ?? 0}
+                      </Text>
+                      <Text style={styles.relatorioKpiLbl}>Sem registro</Text>
+                    </View>
                   </View>
 
                   {presencasFiltradas.length === 0 ? (
                     <Text style={styles.noData}>Nenhum registro para os filtros atuais.</Text>
                   ) : (
                     presencasFiltradas.map((item) => (
-                      <View key={item.id} style={styles.presencaCard}>
+                      <View key={item.id ?? `s-${item.aluno_id}-${item.data}`} style={styles.presencaCard}>
                         <View style={styles.presencaHeader}>
                           <Text style={styles.presencaAluno}>{item.aluno_nome}</Text>
                           <Text style={styles.presencaData}>{formatDate(item.data)}</Text>
@@ -1765,22 +1772,27 @@ const DashboardGerenteScreen: React.FC<DashboardGerenteProps> = ({
                               style={[
                                 styles.presencaStatusValue,
                                 {
-                                  color: item.ausencia_registrada
-                                    ? '#c62828'
-                                    : item.presenca_confirmada
-                                      ? '#4caf50'
-                                      : '#f9a825',
+                                  color: item.sem_registro
+                                    ? '#757575'
+                                    : item.ausencia_registrada
+                                      ? '#c62828'
+                                      : item.presenca_confirmada
+                                        ? '#4caf50'
+                                        : '#f9a825',
                                 },
                               ]}
                             >
-                              {item.ausencia_registrada
-                                ? 'Falta'
-                                : item.presenca_confirmada
-                                  ? 'Confirmada'
-                                  : 'Pendente'}
+                              {item.sem_registro
+                                ? 'Sem registro'
+                                : item.ausencia_registrada
+                                  ? 'Falta'
+                                  : item.presenca_confirmada
+                                    ? 'Confirmada'
+                                    : 'Pendente'}
                             </Text>
                           </View>
                         </View>
+                        {item.id != null && !item.sem_registro && (
                         <TouchableOpacity
                           style={[
                             styles.corrigirButton,
@@ -1802,6 +1814,7 @@ const DashboardGerenteScreen: React.FC<DashboardGerenteProps> = ({
                                 : 'Confirmar presença'}
                           </Text>
                         </TouchableOpacity>
+                        )}
                       </View>
                     ))
                   )}
