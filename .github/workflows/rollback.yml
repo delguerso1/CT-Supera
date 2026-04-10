@@ -21,11 +21,18 @@ jobs:
     
     steps:
       - name: Configurar SSH
+        shell: bash
         run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ secrets.HOST }} >> ~/.ssh/known_hosts
+          set -euo pipefail
+          SSH_DIR="${HOME}/.ssh"
+          if [ -e "$SSH_DIR" ] && [ ! -d "$SSH_DIR" ]; then
+            rm -f "$SSH_DIR"
+          fi
+          mkdir -p "$SSH_DIR"
+          chmod 700 "$SSH_DIR"
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > "$SSH_DIR/id_rsa"
+          chmod 600 "$SSH_DIR/id_rsa"
+          ssh-keyscan -H ${{ secrets.HOST }} >> "$SSH_DIR/known_hosts"
 
       - name: Listar backups disponíveis
         run: |
