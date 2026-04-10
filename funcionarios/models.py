@@ -37,6 +37,10 @@ class Presenca(models.Model):
     data = models.DateField(default=date.today)
     checkin_realizado = models.BooleanField(default=False)  # 🔹 Indica se o aluno fez check-in
     presenca_confirmada = models.BooleanField(default=False)  # 🔹 Indica se o professor confirmou a presença
+    ausencia_registrada = models.BooleanField(
+        default=False,
+        help_text="Professor registrou falta (desmarcação). Incompatível com presença confirmada.",
+    )
 
     class Meta:
         unique_together = ("usuario", "turma", "data")  # Um registro por aluno por turma por dia

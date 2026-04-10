@@ -35,7 +35,10 @@ def _serialize_presenca_historico_aluno(presenca: Presenca) -> dict:
     else:
         professor_nome = "-"
     dias_turma = ", ".join(d.nome for d in turma.dias_semana.all()) if turma else ""
-    presente = presenca.presenca_confirmada or presenca.checkin_realizado
+    ausencia = bool(getattr(presenca, "ausencia_registrada", False))
+    presente = not ausencia and (
+        presenca.presenca_confirmada or presenca.checkin_realizado
+    )
     return {
         "id": presenca.id,
         "data": presenca.data.isoformat(),
@@ -47,6 +50,7 @@ def _serialize_presenca_historico_aluno(presenca: Presenca) -> dict:
         "professor_nome": professor_nome,
         "checkin_realizado": presenca.checkin_realizado,
         "presenca_confirmada": presenca.presenca_confirmada,
+        "ausencia_registrada": ausencia,
         "presente": presente,
         "dia_semana_registro": _DIAS_SEMANA_NOMES[presenca.data.weekday()],
     }
@@ -162,9 +166,15 @@ class PainelAlunoAPIView(APIView):
             ).first()
             checkin_realizado = presenca_alvo.checkin_realizado if presenca_alvo else False
             presenca_confirmada = presenca_alvo.presenca_confirmada if presenca_alvo else False
+            ausencia_registrada = (
+                bool(presenca_alvo.ausencia_registrada) if presenca_alvo else False
+            )
         else:
             checkin_realizado = presenca_hoje.checkin_realizado if presenca_hoje else False
             presenca_confirmada = presenca_hoje.presenca_confirmada if presenca_hoje else False
+            ausencia_registrada = (
+                bool(presenca_hoje.ausencia_registrada) if presenca_hoje else False
+            )
 
         # Calcular a idade do aluno
         if usuario.data_nascimento:
@@ -208,6 +218,7 @@ class PainelAlunoAPIView(APIView):
             "status_hoje": {
                 "checkin_realizado": checkin_realizado,
                 "presenca_confirmada": presenca_confirmada,
+                "ausencia_registrada": ausencia_registrada,
                 "pode_fazer_checkin": pode_fazer_checkin,
                 "motivo_checkin_bloqueado": motivo_checkin_bloqueado,
                 "data_aula_checkin": data_aula_checkin.isoformat() if data_aula_checkin else None,

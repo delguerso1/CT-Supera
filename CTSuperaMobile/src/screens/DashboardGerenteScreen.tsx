@@ -1465,6 +1465,9 @@ const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }
                 <Text style={styles.reportSummaryText}>
                   Confirmadas: {presencaRelatorio.total_confirmadas}
                 </Text>
+                <Text style={styles.reportSummaryText}>
+                  Faltas: {presencaRelatorio.total_faltas ?? 0}
+                </Text>
               </View>
             )}
 
@@ -1493,9 +1496,19 @@ const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }
                     <Text style={styles.presencaStatusLabel}>Presença</Text>
                     <Text style={[
                       styles.presencaStatusValue,
-                      { color: item.presenca_confirmada ? '#4caf50' : '#f44336' }
+                      {
+                        color: item.ausencia_registrada
+                          ? '#c62828'
+                          : item.presenca_confirmada
+                            ? '#4caf50'
+                            : '#f9a825'
+                      }
                     ]}>
-                      {item.presenca_confirmada ? 'Confirmada' : 'Pendente'}
+                      {item.ausencia_registrada
+                        ? 'Falta'
+                        : item.presenca_confirmada
+                          ? 'Confirmada'
+                          : 'Pendente'}
                     </Text>
                   </View>
                 </View>

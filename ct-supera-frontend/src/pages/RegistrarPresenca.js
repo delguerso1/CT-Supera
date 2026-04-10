@@ -16,7 +16,13 @@ function RegistrarPresenca({ turmaId, onSuccess }) {
         setLoading(true);
         // Busca alunos da turma com status de check-in
         const resp = await api.get(`funcionarios/verificar-checkin/${turmaId}/`);
-        setAlunos(resp.data.alunos || []);
+        const lista = resp.data.alunos || [];
+        setAlunos(lista);
+        setPresenca(
+          lista
+            .filter((a) => a.presenca_confirmada && !a.ausencia_registrada)
+            .map((a) => String(a.id))
+        );
       } catch (err) {
         console.error('Erro ao carregar alunos:', err);
         setErro('Erro ao carregar alunos da turma.');
@@ -44,8 +50,13 @@ function RegistrarPresenca({ turmaId, onSuccess }) {
     setSuccess('');
     setWarning('');
     try {
+      const presencaIds = presenca.map(String);
+      const faltasIds = alunos
+        .filter((a) => !presenca.some((x) => normId(x) === normId(a.id)))
+        .map((a) => String(a.id));
       const response = await api.post(`funcionarios/registrar-presenca/${turmaId}/`, {
-        presenca: presenca.map(String), // IDs como string
+        presenca: presencaIds,
+        faltas: faltasIds,
       });
       setSuccess(response.data.message);
       if (response.data.warning) {
@@ -70,7 +81,8 @@ function RegistrarPresenca({ turmaId, onSuccess }) {
       <div style={{ marginBottom: 15 }}>
         <small style={{ color: '#666', lineHeight: 1.45, display: 'block' }}>
           💡 O check-in no app é feito pelo aluno. Aqui você confirma quem compareceu à aula; pode marcar presença
-          mesmo sem check-in no app (ex.: sem celular ou inadimplente). Aula experimental: marque o comparecimento.
+          mesmo sem check-in no app (ex.: sem celular ou inadimplente). Desmarcar grava falta. Aula experimental:
+          marque o comparecimento.
         </small>
       </div>
 
@@ -90,7 +102,7 @@ function RegistrarPresenca({ turmaId, onSuccess }) {
                   type="checkbox"
                   checked={presenca.some((x) => normId(x) === normId(aluno.id))}
                   onChange={() => handleToggle(aluno.id)}
-                  disabled={!aluno.pode_confirmar_presenca}
+                  disabled={false}
                   aria-label={`Presença: ${aluno.nome || ''}`}
                 />
                 <span style={{ flex: 1 }}>

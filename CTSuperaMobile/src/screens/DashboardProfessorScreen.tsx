@@ -272,12 +272,14 @@ const DashboardProfessorScreen: React.FC<NavigationProps> = ({ navigation, route
 
       await loadObservacaoAula(turma.id, data.data);
       
-      // Inicializa as presenças selecionadas com confirmadas e pendentes
+      // Presente = ligado; falta registrada = desligado; pendentes assumem presente até desmarcar
       const inicialPresencas: Record<string, boolean> = {};
       data.alunos.forEach(aluno => {
         const k = String(aluno.id);
         if (aluno.presenca_confirmada) {
           inicialPresencas[k] = true;
+        } else if (aluno.ausencia_registrada) {
+          inicialPresencas[k] = false;
         } else if (aluno.pode_confirmar_presenca) {
           inicialPresencas[k] = true;
         }
@@ -305,20 +307,15 @@ const DashboardProfessorScreen: React.FC<NavigationProps> = ({ navigation, route
       .replace(/[\u0300-\u036f]/g, '')
       .trim();
 
-  const getSelectedCount = (alunos: AlunoPresenca[]) =>
-    alunos.filter(
-      aluno =>
-        !aluno.presenca_confirmada &&
-        aluno.pode_confirmar_presenca &&
-        presencasSelecionadas[String(aluno.id)]
-    ).length;
-
   const clearSelections = () => {
     if (!checkinData) return;
     const cleared: Record<string, boolean> = {};
     checkinData.alunos.forEach(aluno => {
+      const k = String(aluno.id);
       if (aluno.presenca_confirmada) {
-        cleared[String(aluno.id)] = true;
+        cleared[k] = true;
+      } else {
+        cleared[k] = false;
       }
     });
     setPresencasSelecionadas(cleared);
@@ -328,9 +325,7 @@ const DashboardProfessorScreen: React.FC<NavigationProps> = ({ navigation, route
     if (!checkinData) return;
     const selecionadas: Record<string, boolean> = {};
     checkinData.alunos.forEach(aluno => {
-      if (aluno.presenca_confirmada || aluno.pode_confirmar_presenca) {
-        selecionadas[String(aluno.id)] = true;
-      }
+      selecionadas[String(aluno.id)] = true;
     });
     setPresencasSelecionadas(selecionadas);
   };
@@ -338,23 +333,25 @@ const DashboardProfessorScreen: React.FC<NavigationProps> = ({ navigation, route
   const handleRegistrarPresenca = async () => {
     if (!selectedTurma || !checkinData) return;
 
-    const alunosIds = checkinData.alunos
-      .filter(
-        aluno =>
-          !aluno.presenca_confirmada &&
-          aluno.pode_confirmar_presenca &&
-          presencasSelecionadas[String(aluno.id)]
-      )
-      .map(aluno => String(aluno.id));
+    const presencaIds: string[] = [];
+    const faltasIds: string[] = [];
+    checkinData.alunos.forEach(aluno => {
+      const k = String(aluno.id);
+      if (presencasSelecionadas[k]) {
+        presencaIds.push(k);
+      } else {
+        faltasIds.push(k);
+      }
+    });
 
-    if (alunosIds.length === 0) {
-      Alert.alert('Atenção', 'Selecione pelo menos um aluno ou aula experimental.');
+    if (presencaIds.length === 0 && faltasIds.length === 0) {
+      Alert.alert('Atenção', 'Nenhum aluno na lista.');
       return;
     }
 
     Alert.alert(
-      'Confirmar Presença',
-      `Deseja registrar presença para ${alunosIds.length} registro(s)?`,
+      'Confirmar presença',
+      `Serão registrados ${presencaIds.length} presente(s) e ${faltasIds.length} falta(s). Deseja continuar?`,
       [
         { text: 'Cancelar', style: 'cancel' },
         {
@@ -362,7 +359,11 @@ const DashboardProfessorScreen: React.FC<NavigationProps> = ({ navigation, route
           onPress: async () => {
             try {
               setLoadingPresenca(true);
-              const response = await presencaService.registrarPresenca(selectedTurma.id, alunosIds);
+              const response = await presencaService.registrarPresenca(
+                selectedTurma.id,
+                presencaIds,
+                faltasIds
+              );
               
               if (response.warning) {
                 Alert.alert('Presença Registrada', `${response.message}\n\n${response.warning}`);
@@ -446,11 +447,6 @@ const DashboardProfessorScreen: React.FC<NavigationProps> = ({ navigation, route
     const alunosNormais = alunosFiltrados.filter((a: any) => a.tipo !== 'aula_experimental');
     const alunosComCheckin = alunosNormais.filter(a => a.checkin_realizado);
     const alunosSemCheckin = alunosNormais.filter(a => !a.checkin_realizado);
-    const selectedCount = getSelectedCount([
-      ...alunosComCheckin,
-      ...alunosSemCheckin,
-      ...alunosAulaExperimental,
-    ]);
 
     return (
       <ScrollView style={styles.content}>
@@ -480,7 +476,8 @@ const DashboardProfessorScreen: React.FC<NavigationProps> = ({ navigation, route
           <View style={[styles.infoBox, styles.presencaLegendaMargin]}>
             <Text style={styles.infoText}>
               O check-in no app é feito pelo aluno. Aqui você confirma quem compareceu à aula; pode marcar
-              presença mesmo sem check-in no app (ex.: sem celular ou inadimplente).
+              presença mesmo sem check-in no app (ex.: sem celular ou inadimplente). Desmarcar um aluno grava
+              falta para o dia.
             </Text>
           </View>
 
@@ -560,14 +557,13 @@ const DashboardProfessorScreen: React.FC<NavigationProps> = ({ navigation, route
                     <View style={styles.alunoStatusRow}>
                       <View style={[styles.statusDot, { backgroundColor: '#ff9800' }]} />
                       <Text style={styles.alunoStatus}>
-                        {aluno.presenca_confirmada ? 'Compareceu' : 'Aguardando'}
+                        {aluno.presenca_confirmada ? 'Compareceu' : 'Aguardando confirmação'}
                       </Text>
                     </View>
                   </View>
                   <Switch
                     value={presencasSelecionadas[String(aluno.id)] || false}
                     onValueChange={() => togglePresenca(aluno.id)}
-                    disabled={aluno.presenca_confirmada || !aluno.pode_confirmar_presenca}
                     trackColor={{ false: '#ccc', true: '#4caf50' }}
                     thumbColor={presencasSelecionadas[String(aluno.id)] ? '#fff' : '#f4f3f4'}
                     accessibilityLabel={`Presença na aula experimental: ${aluno.nome}`}
@@ -589,14 +585,17 @@ const DashboardProfessorScreen: React.FC<NavigationProps> = ({ navigation, route
                     <View style={styles.alunoStatusRow}>
                       <View style={[styles.statusDot, { backgroundColor: '#4caf50' }]} />
                       <Text style={styles.alunoStatus}>
-                        {aluno.presenca_confirmada ? 'Presença confirmada' : 'Check-in no app'}
+                        {aluno.presenca_confirmada
+                          ? 'Presença confirmada'
+                          : aluno.ausencia_registrada
+                            ? 'Falta registrada'
+                            : 'Check-in no app'}
                       </Text>
                     </View>
                   </View>
                   <Switch
                     value={presencasSelecionadas[String(aluno.id)] || false}
                     onValueChange={() => togglePresenca(aluno.id)}
-                    disabled={aluno.presenca_confirmada || !aluno.pode_confirmar_presenca}
                     trackColor={{ false: '#ccc', true: '#4caf50' }}
                     thumbColor={presencasSelecionadas[String(aluno.id)] ? '#fff' : '#f4f3f4'}
                     accessibilityLabel={`Presença confirmada: ${aluno.nome}`}
@@ -625,14 +624,15 @@ const DashboardProfessorScreen: React.FC<NavigationProps> = ({ navigation, route
                       <Text style={styles.alunoStatus}>
                         {aluno.presenca_confirmada
                           ? 'Presença confirmada'
-                          : 'Sem check-in no app — pode registrar presença'}
+                          : aluno.ausencia_registrada
+                            ? 'Falta registrada'
+                            : 'Sem check-in no app — pode registrar presença'}
                       </Text>
                     </View>
                   </View>
                   <Switch
                     value={presencasSelecionadas[String(aluno.id)] || false}
                     onValueChange={() => togglePresenca(aluno.id)}
-                    disabled={aluno.presenca_confirmada || !aluno.pode_confirmar_presenca}
                     trackColor={{ false: '#ccc', true: '#4caf50' }}
                     thumbColor={presencasSelecionadas[String(aluno.id)] ? '#fff' : '#f4f3f4'}
                     accessibilityLabel={`Presença sem check-in no app: ${aluno.nome}`}
@@ -660,7 +660,7 @@ const DashboardProfessorScreen: React.FC<NavigationProps> = ({ navigation, route
               <ActivityIndicator color="#fff" />
             ) : (
               <Text style={styles.registrarButtonText}>
-                Registrar Presença ({selectedCount})
+                Registrar presença ({checkinData.alunos.length})
               </Text>
             )}
           </TouchableOpacity>

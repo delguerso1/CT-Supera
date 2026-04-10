@@ -305,6 +305,23 @@ function RelatoriosGerente({ user }) {
     return list.filter((p) => (p.aluno_nome || '').toLowerCase().includes(q));
   }, [presencaRelatorio, filtroPresencaBusca]);
 
+  /** Cabeçalhos por dia de aula: evita parecer “duplicata” quando o período tem várias datas */
+  const presencasAgrupadasPorData = useMemo(() => {
+    const list = presencasFiltradas;
+    if (!list.length) return [];
+    const rows = [];
+    let ultimaData = null;
+    for (const row of list) {
+      const d = row.data || '';
+      if (d !== ultimaData) {
+        ultimaData = d;
+        rows.push({ kind: 'data', data: d });
+      }
+      rows.push({ kind: 'presenca', row });
+    }
+    return rows;
+  }, [presencasFiltradas]);
+
   const alunoTemMensalidadeAtrasadaNaTurma = (row) => {
     const tid = row.turma_id;
     const aid = row.aluno_id;
@@ -599,6 +616,12 @@ function RelatoriosGerente({ user }) {
                 <strong style={{ color: '#666', fontSize: 13 }}>Presenças confirmadas</strong>
                 <div style={{ fontSize: 22, color: '#1565c0' }}>{presencaRelatorio.total_confirmadas}</div>
               </div>
+              <div>
+                <strong style={{ color: '#666', fontSize: 13 }}>Faltas (professor)</strong>
+                <div style={{ fontSize: 22, color: '#c62828' }}>
+                  {presencaRelatorio.total_faltas ?? 0}
+                </div>
+              </div>
             </div>
 
             <div style={{ overflowX: 'auto' }}>
@@ -620,7 +643,27 @@ function RelatoriosGerente({ user }) {
                       </td>
                     </tr>
                   )}
-                  {presencasFiltradas.map((row) => {
+                  {presencasAgrupadasPorData.map((item, idx) => {
+                    if (item.kind === 'data') {
+                      return (
+                        <tr key={`data-${item.data}-${idx}`}>
+                          <td
+                            colSpan={5}
+                            style={{
+                              padding: '12px 10px 6px',
+                              background: '#eceff1',
+                              fontWeight: 700,
+                              fontSize: 13,
+                              color: '#37474f',
+                              borderBottom: '1px solid #cfd8dc',
+                            }}
+                          >
+                            Data da aula: {formatDateBR(item.data)}
+                          </td>
+                        </tr>
+                      );
+                    }
+                    const row = item.row;
                     const atraso = mostrarAvisoAtrasoNoRegistro(row);
                     return (
                       <tr key={row.id} style={{ borderBottom: '1px solid #eee' }}>
@@ -650,8 +693,22 @@ function RelatoriosGerente({ user }) {
                         <td style={{ padding: 10, textAlign: 'center', color: row.checkin_realizado ? '#2e7d32' : '#c62828' }}>
                           {row.checkin_realizado ? 'Sim' : 'Não'}
                         </td>
-                        <td style={{ padding: 10, textAlign: 'center', color: row.presenca_confirmada ? '#2e7d32' : '#f9a825' }}>
-                          {row.presenca_confirmada ? 'Confirmada' : 'Pendente'}
+                        <td
+                          style={{
+                            padding: 10,
+                            textAlign: 'center',
+                            color: row.ausencia_registrada
+                              ? '#c62828'
+                              : row.presenca_confirmada
+                                ? '#2e7d32'
+                                : '#f9a825',
+                          }}
+                        >
+                          {row.ausencia_registrada
+                            ? 'Falta'
+                            : row.presenca_confirmada
+                              ? 'Confirmada'
+                              : 'Pendente'}
                         </td>
                       </tr>
                     );

@@ -10,7 +10,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
 from django.core.mail import send_mail
-from django.db.models import Count, Sum, Q
+from django.db.models import Count, Sum, Q, Max
 from django.utils import timezone
 from datetime import datetime, timedelta
 import logging
@@ -32,8 +32,10 @@ def _nome_completo_usuario(u):
 class VerificarCheckinAlunosAPIView(APIView):
     """API para verificar quais alunos fizeram check-in em uma turma. Inclui pré-cadastros com aula experimental no dia.
 
-    ``pode_confirmar_presenca``: o professor pode registrar presença hoje se ainda não estiver confirmada,
-    **independentemente de check-in** (check-in continua obrigatório só no app do aluno quando em dia).
+    ``ausencia_registrada``: falta registrada pelo professor (desmarcação de presença).
+
+    ``pode_confirmar_presenca``: sempre True para o professor alternar presente/falta no dia (check-in
+    continua sendo feito pelo aluno no app quando aplicável).
     """
     permission_classes = [IsAuthenticated]
 
@@ -58,6 +60,7 @@ class VerificarCheckinAlunosAPIView(APIView):
                 turma=turma
             ).first()
             ja_confirmada = presenca.presenca_confirmada if presenca else False
+            ausencia = bool(presenca.ausencia_registrada) if presenca else False
             email_norm = (aluno.email or "").strip().lower()
             cpf_norm = ''.join(c for c in str(aluno.cpf or '') if c.isdigit())
             if email_norm:
@@ -71,7 +74,9 @@ class VerificarCheckinAlunosAPIView(APIView):
                 "tipo": "aluno",
                 "checkin_realizado": presenca.checkin_realizado if presenca else False,
                 "presenca_confirmada": ja_confirmada,
-                "pode_confirmar_presenca": not ja_confirmada,
+                "ausencia_registrada": ausencia,
+                # Professor pode alternar presente / falta no mesmo dia
+                "pode_confirmar_presenca": True,
             })
 
         # Pré-cadastros com aula experimental nesta turma e data
@@ -104,7 +109,8 @@ class VerificarCheckinAlunosAPIView(APIView):
                 "tipo": "aula_experimental",
                 "checkin_realizado": False,
                 "presenca_confirmada": ja_exp,
-                "pode_confirmar_presenca": not ja_exp,
+                "ausencia_registrada": False,
+                "pode_confirmar_presenca": True,
             })
 
         return Response({
@@ -129,6 +135,11 @@ class RegistrarPresencaAPIView(APIView):
         if not isinstance(precadastros_presentes, (list, tuple)):
             precadastros_presentes = list(precadastros_presentes) if precadastros_presentes else []
 
+        usar_faltas = 'faltas' in request.data
+        faltas_raw = request.data.get('faltas', [])
+        if not isinstance(faltas_raw, (list, tuple)):
+            faltas_raw = list(faltas_raw) if faltas_raw else []
+
         alunos_ids = {str(x) for x in alunos_presentes if not str(x).startswith('precadastro_')}
         precadastro_ids = []
         for x in alunos_presentes:
@@ -140,19 +151,43 @@ class RegistrarPresencaAPIView(APIView):
                     pass
         precadastro_ids.extend(int(x) for x in precadastros_presentes if str(x).isdigit())
 
+        falta_ids = {str(x) for x in faltas_raw if not str(x).startswith('precadastro_')}
+        precadastro_falta_ids = []
+        for x in faltas_raw:
+            s = str(x)
+            if s.startswith('precadastro_'):
+                try:
+                    precadastro_falta_ids.append(int(s.replace('precadastro_', '')))
+                except ValueError:
+                    pass
+
+        inter = alunos_ids & falta_ids
+        if inter:
+            return Response(
+                {"error": "O mesmo aluno não pode estar em presença e em falta ao mesmo tempo."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        inter_pc = set(precadastro_ids) & set(precadastro_falta_ids)
+        if inter_pc:
+            return Response(
+                {"error": "O mesmo pré-cadastro não pode estar em presença e em falta ao mesmo tempo."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         presencas_registradas = 0
         alunos = Usuario.objects.filter(tipo="aluno", ativo=True, turmas_aluno=turma)
 
         for aluno in alunos:
-            if str(aluno.id) in alunos_ids:
+            sid = str(aluno.id)
+            if sid in alunos_ids:
                 presenca = Presenca.objects.filter(
                     usuario=aluno,
                     data=hoje,
                     turma=turma
                 ).first()
                 if presenca:
-                    # Só o aluno (app) marca check-in real; o professor apenas confirma presença na aula.
                     presenca.presenca_confirmada = True
+                    presenca.ausencia_registrada = False
                     presenca.save()
                 else:
                     Presenca.objects.create(
@@ -161,6 +196,27 @@ class RegistrarPresencaAPIView(APIView):
                         data=hoje,
                         checkin_realizado=False,
                         presenca_confirmada=True,
+                        ausencia_registrada=False,
+                    )
+                presencas_registradas += 1
+            elif usar_faltas and sid in falta_ids:
+                presenca = Presenca.objects.filter(
+                    usuario=aluno,
+                    data=hoje,
+                    turma=turma
+                ).first()
+                if presenca:
+                    presenca.presenca_confirmada = False
+                    presenca.ausencia_registrada = True
+                    presenca.save()
+                else:
+                    Presenca.objects.create(
+                        usuario=aluno,
+                        turma=turma,
+                        data=hoje,
+                        checkin_realizado=False,
+                        presenca_confirmada=False,
+                        ausencia_registrada=True,
                     )
                 presencas_registradas += 1
 
@@ -178,6 +234,20 @@ class RegistrarPresencaAPIView(APIView):
                 pc.save()
                 presencas_registradas += 1
 
+        if usar_faltas:
+            for pc_id in set(precadastro_falta_ids):
+                pc = PreCadastro.objects.filter(
+                    id=pc_id,
+                    turma=turma,
+                    data_aula_experimental=hoje,
+                    origem='aula_experimental',
+                    status='pendente'
+                ).first()
+                if pc:
+                    pc.compareceu_aula_experimental = False
+                    pc.save()
+                    presencas_registradas += 1
+
         return Response({
             "message": f"Presenças registradas com sucesso! ({presencas_registradas} registro(s))"
         }, status=status.HTTP_200_OK)
@@ -193,6 +263,7 @@ def _serialize_presenca(presenca: Presenca):
         "data": presenca.data.isoformat(),
         "checkin_realizado": presenca.checkin_realizado,
         "presenca_confirmada": presenca.presenca_confirmada,
+        "ausencia_registrada": presenca.ausencia_registrada,
     }
 
 
@@ -233,14 +304,28 @@ class RelatorioPresencaAPIView(APIView):
                 Q(usuario__username__icontains=aluno_nome)
             )
 
+        # Uma linha por (aluno, turma, data): remove duplicatas legadas mantendo o registro de maior id
+        max_ids = (
+            qs.values("usuario_id", "turma_id", "data")
+            .annotate(max_id=Max("id"))
+            .values_list("max_id", flat=True)
+        )
+        qs = (
+            Presenca.objects.filter(id__in=max_ids)
+            .select_related("usuario", "turma")
+            .order_by("-data", "usuario__first_name")
+        )
+
         total_registros = qs.count()
         total_checkins = qs.filter(checkin_realizado=True).count()
         total_confirmadas = qs.filter(presenca_confirmada=True).count()
+        total_faltas = qs.filter(ausencia_registrada=True).count()
 
         return Response({
             "total_registros": total_registros,
             "total_checkins": total_checkins,
             "total_confirmadas": total_confirmadas,
+            "total_faltas": total_faltas,
             "presencas": [_serialize_presenca(item) for item in qs]
         }, status=status.HTTP_200_OK)
 
@@ -256,14 +341,26 @@ class CorrigirPresencaAPIView(APIView):
         presenca = get_object_or_404(Presenca, id=presenca_id)
         checkin_realizado = request.data.get("checkin_realizado", None)
         presenca_confirmada = request.data.get("presenca_confirmada", None)
+        ausencia_registrada = request.data.get("ausencia_registrada", None)
 
-        if checkin_realizado is None and presenca_confirmada is None:
+        if (
+            checkin_realizado is None
+            and presenca_confirmada is None
+            and ausencia_registrada is None
+        ):
             return Response({"error": "Nenhum campo para atualizar."}, status=status.HTTP_400_BAD_REQUEST)
 
         if checkin_realizado is not None:
             presenca.checkin_realizado = bool(checkin_realizado)
             if not presenca.checkin_realizado:
                 presenca.presenca_confirmada = False
+
+        if ausencia_registrada is not None:
+            if bool(ausencia_registrada):
+                presenca.ausencia_registrada = True
+                presenca.presenca_confirmada = False
+            else:
+                presenca.ausencia_registrada = False
 
         if presenca_confirmada is not None:
             confirmar = bool(presenca_confirmada)
@@ -273,6 +370,8 @@ class CorrigirPresencaAPIView(APIView):
                     status=status.HTTP_400_BAD_REQUEST
                 )
             presenca.presenca_confirmada = confirmar
+            if confirmar:
+                presenca.ausencia_registrada = False
 
         presenca.save()
         return Response(_serialize_presenca(presenca), status=status.HTTP_200_OK)

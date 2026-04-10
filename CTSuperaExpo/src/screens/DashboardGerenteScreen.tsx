@@ -1729,6 +1729,12 @@ const DashboardGerenteScreen: React.FC<DashboardGerenteProps> = ({
                       <Text style={styles.relatorioKpiVal}>{presencaRelatorio.total_confirmadas}</Text>
                       <Text style={styles.relatorioKpiLbl}>Confirmadas</Text>
                     </View>
+                    <View style={styles.relatorioKpi}>
+                      <Text style={[styles.relatorioKpiVal, { color: '#c62828' }]}>
+                        {presencaRelatorio.total_faltas ?? 0}
+                      </Text>
+                      <Text style={styles.relatorioKpiLbl}>Faltas</Text>
+                    </View>
                   </View>
 
                   {presencasFiltradas.length === 0 ? (
@@ -1758,10 +1764,20 @@ const DashboardGerenteScreen: React.FC<DashboardGerenteProps> = ({
                             <Text
                               style={[
                                 styles.presencaStatusValue,
-                                { color: item.presenca_confirmada ? '#4caf50' : '#f44336' },
+                                {
+                                  color: item.ausencia_registrada
+                                    ? '#c62828'
+                                    : item.presenca_confirmada
+                                      ? '#4caf50'
+                                      : '#f9a825',
+                                },
                               ]}
                             >
-                              {item.presenca_confirmada ? 'Confirmada' : 'Pendente'}
+                              {item.ausencia_registrada
+                                ? 'Falta'
+                                : item.presenca_confirmada
+                                  ? 'Confirmada'
+                                  : 'Pendente'}
                             </Text>
                           </View>
                         </View>

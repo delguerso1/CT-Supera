@@ -333,10 +333,16 @@ export const presencaService = {
     return response.data;
   },
 
-  registrarPresenca: async (turmaId: number, alunosIds: string[]): Promise<RegistrarPresencaResponse> => {
-    const response = await api.post(`funcionarios/registrar-presenca/${turmaId}/`, {
-      presenca: alunosIds,
-    });
+  registrarPresenca: async (
+    turmaId: number,
+    presencaIds: string[],
+    faltasIds?: string[]
+  ): Promise<RegistrarPresencaResponse> => {
+    const body: Record<string, unknown> = { presenca: presencaIds };
+    if (faltasIds !== undefined) {
+      body.faltas = faltasIds;
+    }
+    const response = await api.post(`funcionarios/registrar-presenca/${turmaId}/`, body);
     return response.data;
   },
 
@@ -347,7 +353,9 @@ export const presencaService = {
 
   corrigirPresenca: async (
     presencaId: number,
-    data: Partial<Pick<PresencaRelatorioItem, 'checkin_realizado' | 'presenca_confirmada'>>
+    data: Partial<
+      Pick<PresencaRelatorioItem, 'checkin_realizado' | 'presenca_confirmada' | 'ausencia_registrada'>
+    >
   ): Promise<PresencaRelatorioItem> => {
     const response = await api.patch(`funcionarios/corrigir-presenca/${presencaId}/`, data);
     return response.data;

@@ -211,7 +211,9 @@ export interface AlunoPresenca {
   tipo?: 'aluno' | 'aula_experimental';
   checkin_realizado: boolean;
   presenca_confirmada: boolean;
-  /** Pode marcar presença hoje se ainda não confirmada (não depende de check-in no app) */
+  /** Professor registrou falta (desmarcação) — alunos regulares */
+  ausencia_registrada?: boolean;
+  /** Pode alternar presente/falta no dia (não depende de check-in no app) */
   pode_confirmar_presenca: boolean;
 }
 
@@ -246,12 +248,14 @@ export interface PresencaRelatorioItem {
   data: string;
   checkin_realizado: boolean;
   presenca_confirmada: boolean;
+  ausencia_registrada?: boolean;
 }
 
 export interface PresencaRelatorioResponse {
   total_registros: number;
   total_checkins: number;
   total_confirmadas: number;
+  total_faltas?: number;
   presencas: PresencaRelatorioItem[];
 }
 
