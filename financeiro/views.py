@@ -15,6 +15,7 @@ from .pagination import MensalidadePagination
 from .c6_client import c6_client, C6BankError, C6BankMethodNotAllowedError, C6BankInvalidRequestError
 from .c6_checkout_sync import sincronizar_transacao_checkout_c6
 from .c6_boleto_sync import sincronizar_transacao_boleto_c6
+from .c6_pix_sync import extrair_lista_pix_webhook, sincronizar_transacao_pix_c6
 from django.shortcuts import get_object_or_404
 from django.conf import settings
 from datetime import timedelta
@@ -676,58 +677,21 @@ class ConsultarStatusPixPorTransacaoAPIView(APIView):
                     'error': 'Você não tem permissão para consultar esta transação.'
                 }, status=status.HTTP_403_FORBIDDEN)
             
-            # Verifica se a transação expirou
-            if transacao.status == 'pendente' and timezone.now() > transacao.data_expiracao:
-                transacao.status = 'expirado'
-                transacao.save()
-                return Response({
-                    'message': 'Pagamento PIX expirado.',
-                    'transacao': TransacaoC6BankSerializer(transacao).data
-                })
-            
-            # Se tem TXID, consulta o status no C6 Bank
-            if transacao.txid and transacao.status == 'pendente':
-                try:
-                    status_response = c6_client.get_pix_payment_status(transacao.txid)
-                    
-                    # Atualiza o status baseado na resposta
-                    status_pix = status_response.get('status')
-                    
-                    if status_pix == 'CONCLUIDA' and transacao.status != 'aprovado':
-                        transacao.status = 'aprovado'
-                        transacao.data_aprovacao = timezone.now()
-                        transacao.resposta_api = status_response
-                        transacao.save()
-                        
-                        # Atualiza o status da mensalidade e valor efetivamente recebido
-                        mensalidade = transacao.mensalidade
-                        mensalidade.status = 'pago'
-                        mensalidade.valor_pago = transacao.valor  # Valor com multa/juros
-                        mensalidade.save()
-                        proxima = Mensalidade.criar_proxima_mensalidade(mensalidade)
-                        if proxima:
-                            logger.info(
-                                "Mensalidade %s criada para %s/%s após pagamento",
-                                proxima.id,
-                                str(proxima.data_vencimento.month).zfill(2),
-                                proxima.data_vencimento.year
-                            )
-                        logger.info(f"Mensalidade {mensalidade.id} marcada como paga após consulta de status")
-                        
-                    elif status_pix == 'REMOVIDA_PELO_USUARIO_RECEBEDOR':
-                        transacao.status = 'cancelado'
-                        transacao.data_cancelamento = timezone.now()
-                        transacao.resposta_api = status_response
-                        transacao.save()
-                        
-                except Exception as e:
-                    logger.warning(f"Erro ao consultar status no C6 Bank: {str(e)}")
-                    # Continua e retorna o status atual mesmo sem consultar
-            
-            return Response({
+            # Consulta o C6 antes de marcar expirado (reconcilia atrasos e tx já expirada localmente)
+            cobranca = sincronizar_transacao_pix_c6(transacao)
+            transacao.refresh_from_db()
+
+            payload = {
                 'transacao': TransacaoC6BankSerializer(transacao).data,
-                'status': transacao.status
-            })
+                'status': transacao.status,
+            }
+            if cobranca is not None:
+                payload['status_pix'] = cobranca.get('status')
+                payload['api_response'] = cobranca
+            if transacao.status == 'expirado':
+                payload['message'] = 'Pagamento PIX expirado.'
+
+            return Response(payload)
             
         except Exception as e:
             logger.error(f"Erro ao consultar status PIX: {str(e)}")
@@ -741,7 +705,8 @@ class ConsultarStatusPixAPIView(APIView):
     Consulta o status de uma transação PIX via C6 Bank
     URL: /api/financeiro/mensalidades/<pk>/status-pix/
     
-    Nota: Esta view recebe o pk da mensalidade e consulta a transação PIX mais recente.
+    Sincroniza todas as cobranças PIX pendentes/expiradas da mensalidade (ordem de criação),
+    depois devolve a transação mais relevante (aprovada mais recente, senão pendente, etc.).
     Para consultar por ID de transação diretamente, use: /api/financeiro/c6/check-payment-status/<transacao_id>/
     """
     permission_classes = [IsAuthenticated]
@@ -756,69 +721,54 @@ class ConsultarStatusPixAPIView(APIView):
                     'error': 'Você não tem permissão para consultar esta mensalidade.'
                 }, status=status.HTTP_403_FORBIDDEN)
             
-            # Busca a transação C6 Bank PIX mais recente para esta mensalidade
-            transacao = TransacaoC6Bank.objects.filter(
-                mensalidade=mensalidade,
-                tipo='pix'
-            ).order_by('-data_criacao').first()
-            
+            base_qs = TransacaoC6Bank.objects.filter(mensalidade=mensalidade, tipo='pix')
+            if not base_qs.exists():
+                return Response({
+                    'error': 'Nenhuma transação PIX encontrada para esta mensalidade.',
+                    'status': mensalidade.status
+                }, status=status.HTTP_404_NOT_FOUND)
+
+            candidatas = (
+                base_qs.filter(status__in=['pendente', 'expirado', 'processando'])
+                .exclude(txid__isnull=True)
+                .exclude(txid='')
+                .order_by('data_criacao')
+            )
+            ultima_cobranca = None
+            for t in candidatas:
+                r = sincronizar_transacao_pix_c6(t)
+                if r is not None:
+                    ultima_cobranca = r
+
+            mensalidade.refresh_from_db()
+            qs = TransacaoC6Bank.objects.filter(mensalidade=mensalidade, tipo='pix')
+
+            transacao = (
+                qs.filter(status='aprovado').order_by('-data_aprovacao', '-data_criacao').first()
+                or qs.filter(status='pendente').order_by('-data_criacao').first()
+                or qs.filter(status='expirado').order_by('-data_criacao').first()
+                or qs.order_by('-data_criacao').first()
+            )
+
             if not transacao:
                 return Response({
                     'error': 'Nenhuma transação PIX encontrada para esta mensalidade.',
                     'status': mensalidade.status
                 }, status=status.HTTP_404_NOT_FOUND)
-            
-            # Verifica se a transação expirou
-            if transacao.status == 'pendente' and timezone.now() > transacao.data_expiracao:
-                transacao.status = 'expirado'
-                transacao.save()
-                return Response({
-                    'message': 'Pagamento PIX expirado.',
-                    'transacao': TransacaoC6BankSerializer(transacao).data
-                })
-            
-            # Se tem TXID, consulta o status no C6 Bank
-            if transacao.txid and transacao.status == 'pendente':
-                try:
-                    status_response = c6_client.get_pix_payment_status(transacao.txid)
-                    
-                    # Atualiza o status baseado na resposta
-                    status_pix = status_response.get('status')
-                    
-                    if status_pix == 'CONCLUIDA' and transacao.status != 'aprovado':
-                        transacao.status = 'aprovado'
-                        transacao.data_aprovacao = timezone.now()
-                        transacao.resposta_api = status_response
-                        transacao.save()
-                        
-                        # Atualiza o status da mensalidade e valor efetivamente recebido
-                        mensalidade.status = 'pago'
-                        mensalidade.valor_pago = transacao.valor  # Valor com multa/juros
-                        mensalidade.save()
-                        proxima = Mensalidade.criar_proxima_mensalidade(mensalidade)
-                        if proxima:
-                            logger.info(
-                                "Mensalidade %s criada para %s/%s após pagamento",
-                                proxima.id,
-                                str(proxima.data_vencimento.month).zfill(2),
-                                proxima.data_vencimento.year
-                            )
-                        logger.info(f"Mensalidade {mensalidade.id} marcada como paga após consulta de status")
-                        
-                    elif status_pix == 'REMOVIDA_PELO_USUARIO_RECEBEDOR':
-                        transacao.status = 'cancelado'
-                        transacao.data_cancelamento = timezone.now()
-                        transacao.resposta_api = status_response
-                        transacao.save()
-                        
-                except Exception as e:
-                    logger.warning(f"Erro ao consultar status no C6 Bank: {str(e)}")
-                    # Continua e retorna o status atual mesmo sem consultar
-            
-            return Response({
+
+            transacao.refresh_from_db()
+
+            payload = {
                 'transacao': TransacaoC6BankSerializer(transacao).data,
-                'status': transacao.status
-            })
+                'status': transacao.status,
+            }
+            if ultima_cobranca is not None:
+                payload['status_pix'] = ultima_cobranca.get('status')
+                payload['api_response'] = ultima_cobranca
+            if transacao.status == 'expirado':
+                payload['message'] = 'Pagamento PIX expirado.'
+
+            return Response(payload)
             
         except Exception as e:
             logger.error(f"Erro ao consultar status PIX: {str(e)}")
@@ -903,19 +853,19 @@ class C6BankCheckPaymentStatusAPIView(APIView):
         # Usa a mesma lógica de ConsultarStatusPixPorTransacaoAPIView
         response = ConsultarStatusPixPorTransacaoAPIView().get(request, transacao_id)
         
-        # Adiciona campos extras para compatibilidade com resposta anterior
+        # Compatibilidade: inclui status da cobrança no C6 quando ainda não veio (ex.: transação já aprovada)
         if response.status_code == 200 and hasattr(response, 'data'):
-            try:
-                transacao = TransacaoC6Bank.objects.get(id=transacao_id)
-                if transacao.txid:
-                    status_response = c6_client.get_pix_payment_status(transacao.txid)
-                    # Cria uma nova Response com os dados adicionais
-                    data = dict(response.data)
-                    data['status_pix'] = status_response.get('status')
-                    data['api_response'] = status_response
-                    return Response(data, status=response.status_code)
-            except Exception as e:
-                logger.warning(f"Erro ao adicionar campos extras na resposta: {str(e)}")
+            data = dict(response.data)
+            if data.get('status_pix') is None:
+                try:
+                    transacao = TransacaoC6Bank.objects.get(id=transacao_id, tipo='pix')
+                    if transacao.txid:
+                        status_response = c6_client.get_pix_payment_status(transacao.txid)
+                        data['status_pix'] = status_response.get('status')
+                        data['api_response'] = status_response
+                        return Response(data, status=response.status_code)
+                except Exception as e:
+                    logger.warning(f"Erro ao adicionar campos extras na resposta: {str(e)}")
         
         return response
 
@@ -1286,8 +1236,8 @@ class C6BankWebhookAPIView(APIView):
     Webhook para receber notificações do C6 Bank - PIX
     URL: /api/financeiro/c6/webhook/
     
-    Conforme documentação: pix-api.yaml linha 2385-2392
-    O webhook PIX recebe um ARRAY de objetos PIX quando um pagamento é recebido.
+    Body conforme pix-api.yaml (WebhookPixBody): objeto com propriedade ``pix`` (array)
+    ou array na raiz / objeto único Pix — ver ``extrair_lista_pix_webhook``.
     """
     permission_classes = []  # Público para receber webhooks
     authentication_classes = []
@@ -1299,40 +1249,52 @@ class C6BankWebhookAPIView(APIView):
             logger.info(f"Headers: {dict(request.headers)}")
             logger.info(f"Body: {request.data}")
             
-            # Conforme documentação oficial, webhook PIX recebe um ARRAY de objetos PIX
-            # pix-api.yaml linha 2385: "type: array, items: $ref: '#/components/schemas/Pix'"
-            pix_array = request.data
-            
-            # Verifica se é uma lista (array)
-            if not isinstance(pix_array, list):
-                # Se não for array, tenta converter ou trata como array com um único item
-                if isinstance(pix_array, dict):
-                    pix_array = [pix_array]
-                else:
-                    logger.error(f"Formato inválido de webhook: esperado array, recebido {type(pix_array)}")
-                    return JsonResponse({
-                        'status': 'error',
-                        'message': 'Formato inválido: webhook deve ser um array de objetos PIX'
-                    }, status=400)
+            raw = request.data
+            if not isinstance(raw, (list, dict)) and raw is not None:
+                logger.error("Formato inválido de webhook PIX: esperado list ou dict, recebido %s", type(raw))
+                return JsonResponse({
+                    'status': 'error',
+                    'message': 'Formato inválido: body deve ser JSON array ou objeto (ex.: {"pix": [...]})'
+                }, status=400)
+
+            pix_array = extrair_lista_pix_webhook(raw)
+            if not pix_array:
+                logger.warning("Webhook PIX sem itens extraíveis (body=%s)", raw)
+                return JsonResponse({
+                    'status': 'received',
+                    'message': 'Nenhum item Pix no payload',
+                    'pix_processados': 0,
+                    'pix_ignorados': 0,
+                    'pix_erros': 0
+                })
             
             # Processa cada PIX recebido no array
             pix_processados = 0
             pix_erros = 0
+            pix_ignorados = 0
             
             for pix_data in pix_array:
                 try:
-                    self._process_pix_received(pix_data)
-                    pix_processados += 1
+                    if self._process_pix_received(pix_data):
+                        pix_processados += 1
+                    else:
+                        pix_ignorados += 1
                 except Exception as e:
                     logger.error(f"Erro ao processar PIX no webhook: {str(e)}")
                     pix_erros += 1
             
-            logger.info(f"Webhook processado: {pix_processados} PIX processados, {pix_erros} erros")
+            logger.info(
+                "Webhook PIX: %s associados, %s ignorados, %s erros",
+                pix_processados,
+                pix_ignorados,
+                pix_erros,
+            )
             
             return JsonResponse({
                 'status': 'received',
                 'message': 'Webhook processado com sucesso',
                 'pix_processados': pix_processados,
+                'pix_ignorados': pix_ignorados,
                 'pix_erros': pix_erros
             })
             
@@ -1354,89 +1316,96 @@ class C6BankWebhookAPIView(APIView):
         - valor (obrigatório)
         - horario (obrigatório)
         - infoPagador (opcional)
+
+        Returns:
+            True se vinculou a uma transação e atualizou o registro; False se ignorou o item.
         """
-        try:
-            # O txid identifica a cobrança que foi paga
-            txid = pix_data.get('txid')
-            end_to_end_id = pix_data.get('endToEndId')
-            valor = pix_data.get('valor')
-            horario = pix_data.get('horario')
-            
-            logger.info(f"Processando PIX: txid={txid}, endToEndId={end_to_end_id}, valor={valor}")
-            
-            if not txid:
-                logger.warning(f"PIX sem txid (endToEndId: {end_to_end_id}). Pode ser PIX espontâneo (não associado a cobrança).")
-                # PIX sem txid pode ser um pagamento espontâneo - não processamos no momento
-                return
-            
-            # Busca a transação pela cobrança (txid)
-            transacao = TransacaoC6Bank.objects.filter(txid=txid).first()
-            if not transacao:
-                logger.warning(f"Transação não encontrada para TXID: {txid}. PIX pode ter sido pago para cobrança não gerenciada por este sistema.")
-                return
-            
-            # Verifica se já foi processado (pode ter múltiplos webhooks para mesma cobrança)
-            if transacao.status == 'aprovado':
-                logger.info(f"Transação {transacao.id} já estava aprovada. Atualizando dados do PIX recebido.")
-            
-            # Atualiza o status da transação
-            transacao.status = 'aprovado'
-            transacao.data_aprovacao = timezone.now()
-            
-            # Armazena os dados completos do PIX recebido
-            if not transacao.resposta_api:
-                transacao.resposta_api = {}
-            
-            # Adiciona/atualiza informações do PIX recebido
-            if 'pix_recebidos' not in transacao.resposta_api:
-                transacao.resposta_api['pix_recebidos'] = []
-            
-            pix_info = {
-                'endToEndId': end_to_end_id,
-                'txid': txid,
-                'valor': valor,
-                'horario': horario,
-                'infoPagador': pix_data.get('infoPagador'),
-                'data_recebimento': timezone.now().isoformat()
-            }
-            
-            # Verifica se este PIX já foi registrado (pelo endToEndId)
-            pix_existente = False
-            for pix_exist in transacao.resposta_api['pix_recebidos']:
-                if pix_exist.get('endToEndId') == end_to_end_id:
-                    # Atualiza o PIX existente
-                    pix_exist.update(pix_info)
-                    pix_existente = True
-                    break
-            
-            if not pix_existente:
-                transacao.resposta_api['pix_recebidos'].append(pix_info)
-            
-            transacao.save()
-            
-            # Atualiza o status da mensalidade e o valor efetivamente recebido
-            mensalidade = transacao.mensalidade
-            if mensalidade.status != 'pago':
-                mensalidade.status = 'pago'
-                # Registra o valor efetivamente pago (com multa/juros) - transação já tem o total correto
-                mensalidade.valor_pago = transacao.valor
-                mensalidade.save()
-                proxima = Mensalidade.criar_proxima_mensalidade(mensalidade)
-                if proxima:
-                    logger.info(
-                        "Mensalidade %s criada para %s/%s após pagamento",
-                        proxima.id,
-                        str(proxima.data_vencimento.month).zfill(2),
-                        proxima.data_vencimento.year
-                    )
-                logger.info(f"Mensalidade {mensalidade.id} marcada como paga")
-            
-            logger.info(f"✅ PIX processado com sucesso: Transação {transacao.id}, EndToEndId: {end_to_end_id}, Valor: R$ {valor}")
-            
-        except Exception as e:
-            logger.error(f"Erro ao processar PIX recebido: {str(e)}")
-            import traceback
-            logger.error(traceback.format_exc())
+        if not isinstance(pix_data, dict):
+            logger.warning("Webhook PIX: item ignorado (não é objeto JSON): %s", type(pix_data))
+            return False
+
+        # O txid identifica a cobrança que foi paga
+        txid = pix_data.get('txid')
+        end_to_end_id = pix_data.get('endToEndId')
+        valor = pix_data.get('valor')
+        horario = pix_data.get('horario')
+
+        logger.info(f"Processando PIX: txid={txid}, endToEndId={end_to_end_id}, valor={valor}")
+
+        if not txid:
+            logger.warning(
+                "PIX sem txid (endToEndId: %s). Pode ser PIX espontâneo (não associado a cobrança).",
+                end_to_end_id,
+            )
+            return False
+
+        # Busca a transação pela cobrança (txid)
+        transacao = TransacaoC6Bank.objects.filter(txid=txid).first()
+        if not transacao:
+            logger.warning(
+                "Transação não encontrada para TXID: %s. PIX pode ter sido pago para cobrança não gerenciada por este sistema.",
+                txid,
+            )
+            return False
+
+        # Verifica se já foi processado (pode ter múltiplos webhooks para mesma cobrança)
+        if transacao.status == 'aprovado':
+            logger.info(f"Transação {transacao.id} já estava aprovada. Atualizando dados do PIX recebido.")
+
+        # Atualiza o status da transação
+        transacao.status = 'aprovado'
+        transacao.data_aprovacao = timezone.now()
+
+        # Armazena os dados completos do PIX recebido
+        if not transacao.resposta_api:
+            transacao.resposta_api = {}
+
+        # Adiciona/atualiza informações do PIX recebido
+        if 'pix_recebidos' not in transacao.resposta_api:
+            transacao.resposta_api['pix_recebidos'] = []
+
+        pix_info = {
+            'endToEndId': end_to_end_id,
+            'txid': txid,
+            'valor': valor,
+            'horario': horario,
+            'infoPagador': pix_data.get('infoPagador'),
+            'data_recebimento': timezone.now().isoformat()
+        }
+
+        # Verifica se este PIX já foi registrado (pelo endToEndId)
+        pix_existente = False
+        for pix_exist in transacao.resposta_api['pix_recebidos']:
+            if pix_exist.get('endToEndId') == end_to_end_id:
+                # Atualiza o PIX existente
+                pix_exist.update(pix_info)
+                pix_existente = True
+                break
+
+        if not pix_existente:
+            transacao.resposta_api['pix_recebidos'].append(pix_info)
+
+        transacao.save()
+
+        # Atualiza o status da mensalidade e o valor efetivamente recebido
+        mensalidade = transacao.mensalidade
+        if mensalidade.status != 'pago':
+            mensalidade.status = 'pago'
+            # Registra o valor efetivamente pago (com multa/juros) - transação já tem o total correto
+            mensalidade.valor_pago = transacao.valor
+            mensalidade.save()
+            proxima = Mensalidade.criar_proxima_mensalidade(mensalidade)
+            if proxima:
+                logger.info(
+                    "Mensalidade %s criada para %s/%s após pagamento",
+                    proxima.id,
+                    str(proxima.data_vencimento.month).zfill(2),
+                    proxima.data_vencimento.year
+                )
+            logger.info(f"Mensalidade {mensalidade.id} marcada como paga")
+
+        logger.info(f"✅ PIX processado com sucesso: Transação {transacao.id}, EndToEndId: {end_to_end_id}, Valor: R$ {valor}")
+        return True
 
 
 # ========================================
