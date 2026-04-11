@@ -154,19 +154,21 @@ jobs:
             ct-supera-frontend/build/ \
             ${{ secrets.USERNAME }}@${{ secrets.HOST }}:/root/ct-supera/ct-supera-frontend/build/
 
-      - name: Configurar cron (mensalidades, lembretes, sync checkout cartão e boletos C6)
+      - name: Configurar cron (mensalidades, lembretes, sync checkout cartão, boletos e PIX C6)
         run: |
           ssh ${{ secrets.USERNAME }}@${{ secrets.HOST }} << 'EOF'
             set -e
             chmod +x /root/ct-supera/scripts/gerar_mensalidades.sh 2>/dev/null || true
             chmod +x /root/ct-supera/scripts/sincronizar_checkouts_cartao_c6.sh 2>/dev/null || true
             chmod +x /root/ct-supera/scripts/sincronizar_boletos_c6.sh 2>/dev/null || true
+            chmod +x /root/ct-supera/scripts/sincronizar_pix_c6.sh 2>/dev/null || true
             mkdir -p /root/ct-supera/logs
-            ( crontab -l 2>/dev/null | grep -v gerar_mensalidades.sh | grep -v enviar_lembretes_aula_experimental | grep -v sincronizar_checkouts_cartao_c6.sh | grep -v sincronizar_boletos_c6.sh
+            ( crontab -l 2>/dev/null | grep -v gerar_mensalidades.sh | grep -v enviar_lembretes_aula_experimental | grep -v sincronizar_checkouts_cartao_c6.sh | grep -v sincronizar_boletos_c6.sh | grep -v sincronizar_pix_c6.sh
               echo "5 0 * * * cd /root/ct-supera && VENV_PATH=/root/ct-supera/venv DJANGO_SETTINGS_MODULE=app.settings_hostinger /root/ct-supera/scripts/gerar_mensalidades.sh >> /root/ct-supera/logs/gerar_mensalidades.log 2>&1"
               echo "0 9 * * * cd /root/ct-supera && DJANGO_SETTINGS_MODULE=app.settings_hostinger /root/ct-supera/venv/bin/python manage.py enviar_lembretes_aula_experimental"
               echo "*/10 * * * * cd /root/ct-supera && VENV_PATH=/root/ct-supera/venv DJANGO_SETTINGS_MODULE=app.settings_hostinger /root/ct-supera/scripts/sincronizar_checkouts_cartao_c6.sh >> /root/ct-supera/logs/sincronizar_checkouts_cartao_c6.log 2>&1"
               echo "*/10 * * * * cd /root/ct-supera && VENV_PATH=/root/ct-supera/venv DJANGO_SETTINGS_MODULE=app.settings_hostinger /root/ct-supera/scripts/sincronizar_boletos_c6.sh >> /root/ct-supera/logs/sincronizar_boletos_c6.log 2>&1"
+              echo "*/10 * * * * cd /root/ct-supera && VENV_PATH=/root/ct-supera/venv DJANGO_SETTINGS_MODULE=app.settings_hostinger /root/ct-supera/scripts/sincronizar_pix_c6.sh >> /root/ct-supera/logs/sincronizar_pix_c6.log 2>&1"
             ) | crontab -
           EOF
 
