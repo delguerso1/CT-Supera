@@ -8,6 +8,12 @@ from turmas.views import _validar_aluno_turma
 from financeiro.services import criar_mensalidade_ao_vincular_turma
 from financeiro.models import Mensalidade, Salario
 import re
+from app.date_api import (
+    DATA_API_FMT,
+    DATE_INPUT_FORMATS,
+    format_data_api,
+    format_datetime_api,
+)
 
 def validar_senha_serializer(senha):
     """Valida a força da senha no serializer"""
@@ -83,7 +89,12 @@ def validar_email_aluno_cadastro(email, data_nascimento, instance_usuario=None, 
 
 
 class UsuarioSerializer(serializers.ModelSerializer):
-    data_nascimento = serializers.DateField(format='%Y-%m-%d', required=False, allow_null=True)
+    data_nascimento = serializers.DateField(
+        format=DATA_API_FMT,
+        input_formats=DATE_INPUT_FORMATS,
+        required=False,
+        allow_null=True,
+    )
     nome_completo = serializers.SerializerMethodField()
     tipo_display = serializers.SerializerMethodField()
     centros_treinamento = serializers.SerializerMethodField()
@@ -137,7 +148,13 @@ class UsuarioSerializer(serializers.ModelSerializer):
             'contrato_aceito', 'contrato_aceito_em'
         ]
         extra_kwargs = {
-            'password': {'write_only': True}
+            'password': {'write_only': True},
+            'data_inativacao': {
+                'format': DATA_API_FMT,
+                'input_formats': DATE_INPUT_FORMATS,
+                'required': False,
+                'allow_null': True,
+            },
         }
 
     def get_nome_completo(self, obj):
@@ -227,6 +244,10 @@ class UsuarioSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         representation = super().to_representation(instance)
+        if instance.parq_completion_date:
+            representation['parq_completion_date'] = format_datetime_api(instance.parq_completion_date)
+        if instance.contrato_aceito_em:
+            representation['contrato_aceito_em'] = format_datetime_api(instance.contrato_aceito_em)
         representation['tipo'] = instance.tipo
         if instance.tipo == 'aluno':
             representation['turmas'] = list(
@@ -443,6 +464,18 @@ class PreCadastroSerializer(serializers.ModelSerializer):
 
     turma = serializers.PrimaryKeyRelatedField(queryset=Turma.objects.filter(ativo=True), required=False, allow_null=True)
     origem_display = serializers.SerializerMethodField()
+    data_nascimento = serializers.DateField(
+        format=DATA_API_FMT,
+        input_formats=DATE_INPUT_FORMATS,
+        required=False,
+        allow_null=True,
+    )
+    data_aula_experimental = serializers.DateField(
+        format=DATA_API_FMT,
+        input_formats=DATE_INPUT_FORMATS,
+        required=False,
+        allow_null=True,
+    )
 
     def get_origem_display(self, obj):
         if not obj.origem:
@@ -462,6 +495,14 @@ class PreCadastroSerializer(serializers.ModelSerializer):
             'data_aula_experimental', 'compareceu_aula_experimental', 'reagendou_aula_experimental',
         ]
         read_only_fields = ('matriculado_em', 'criado_em')
+
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        if instance.criado_em:
+            ret['criado_em'] = format_datetime_api(instance.criado_em)
+        if instance.matriculado_em:
+            ret['matriculado_em'] = format_datetime_api(instance.matriculado_em)
+        return ret
 
     def validate_cpf(self, value):
         if value is None:

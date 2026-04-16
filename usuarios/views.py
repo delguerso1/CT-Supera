@@ -27,6 +27,7 @@ from django.db.models import Prefetch
 import logging
 from calendar import monthrange
 import re
+from app.date_api import format_data_api, parse_data_api
 
 logger = logging.getLogger(__name__)
 
@@ -143,16 +144,19 @@ class ReagendarAulaExperimentalAPIView(APIView):
                 weekdays_validos.add(wd)
         amanha = hoje + timedelta(days=1)
         _, ultimo_dia = monthrange(hoje.year, hoje.month)
-        datas = []
+        datas_objs = []
         for d in range(1, ultimo_dia + 1):
             dt = date(hoje.year, hoje.month, d)
             if dt.weekday() in weekdays_validos and dt >= amanha:
-                datas.append(dt.isoformat())
+                datas_objs.append(dt)
+        datas = [format_data_api(x) for x in sorted(datas_objs)]
         return Response({
             "precadastro": {
                 "first_name": precadastro.first_name,
                 "last_name": precadastro.last_name,
-                "data_aula_experimental": precadastro.data_aula_experimental.isoformat() if precadastro.data_aula_experimental else None,
+                "data_aula_experimental": format_data_api(precadastro.data_aula_experimental)
+                if precadastro.data_aula_experimental
+                else None,
                 "turma_id": precadastro.turma.id,
                 "turma_nome": str(precadastro.turma),
                 "ct_nome": precadastro.turma.ct.nome if precadastro.turma.ct else None,
@@ -172,9 +176,8 @@ class ReagendarAulaExperimentalAPIView(APIView):
             return Response({"error": "Link inválido ou expirado."}, status=status.HTTP_404_NOT_FOUND)
         if precadastro.reagendou_aula_experimental:
             return Response({"error": "Você já realizou um reagendamento."}, status=status.HTTP_403_FORBIDDEN)
-        try:
-            dt = date.fromisoformat(nova_data)
-        except (ValueError, TypeError):
+        dt = parse_data_api(nova_data)
+        if not dt:
             return Response({"error": "Data inválida."}, status=status.HTTP_400_BAD_REQUEST)
         amanha = date.today() + timedelta(days=1)
         if dt < amanha:
@@ -200,7 +203,13 @@ class ReagendarAulaExperimentalAPIView(APIView):
             enviar_confirmacao_aula_experimental(precadastro)
         except Exception as e:
             logger.warning(f"Erro ao enviar e-mail de confirmação do reagendamento: {e}")
-        return Response({"message": "Reagendamento realizado com sucesso!", "data_aula_experimental": dt.isoformat()}, status=status.HTTP_200_OK)
+        return Response(
+            {
+                "message": "Reagendamento realizado com sucesso!",
+                "data_aula_experimental": format_data_api(dt),
+            },
+            status=status.HTTP_200_OK,
+        )
 
 
 class FinalizarAgendamentoAPIView(APIView):
@@ -221,13 +230,6 @@ class FinalizarAgendamentoAPIView(APIView):
         valor_uniforme = request.data.get("valor_uniforme")
         dia_vencimento_primeira = request.data.get("dia_vencimento_primeira")
         turma_id = request.data.get("turma")
-        criar_primeira_mensalidade_agora = request.data.get("criar_primeira_mensalidade_agora")
-        forma_pagamento = request.data.get("forma_pagamento") or ""
-
-        criar_e_enviar = bool(criar_primeira_mensalidade_agora)
-        if isinstance(criar_primeira_mensalidade_agora, str):
-            criar_e_enviar = criar_primeira_mensalidade_agora.strip().lower() in ["true", "1", "sim", "yes"]
-        forma_pagamento = (forma_pagamento or "").strip().lower()
 
         logger.debug(
             "Finalizar agendamento precadastro=%s ja_aluno=%s turma_id=%s",
@@ -255,8 +257,11 @@ class FinalizarAgendamentoAPIView(APIView):
             dia_vencimento = int(dia_vencimento)
         except (TypeError, ValueError):
             return Response({"error": "Dia de vencimento inválido."}, status=status.HTTP_400_BAD_REQUEST)
-        if dia_vencimento not in [1, 5, 10]:
-            return Response({"error": "Dia de vencimento deve ser 1, 5 ou 10."}, status=status.HTTP_400_BAD_REQUEST)
+        if dia_vencimento < 1 or dia_vencimento > 31:
+            return Response(
+                {"error": "Dia de vencimento deve estar entre 1 e 31."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         if not dias_habilitados_ids:
             return Response({"error": "Selecione pelo menos um dia habilitado para treino."}, status=status.HTTP_400_BAD_REQUEST)
@@ -367,11 +372,6 @@ class FinalizarAgendamentoAPIView(APIView):
             if dia_vencimento_primeira < 1 or dia_vencimento_primeira > 31:
                 return Response({"error": "Dia do vencimento da primeira mensalidade deve ser entre 1 e 31."}, status=status.HTTP_400_BAD_REQUEST)
 
-            if criar_e_enviar and forma_pagamento in ('pix', 'boleto') and not (turma_id or precadastro.turma_id):
-                return Response({
-                    "error": "Para criar e enviar a cobrança por e-mail, selecione uma turma."
-                }, status=status.HTTP_400_BAD_REQUEST)
-
         if ja_aluno_bool:
             resp_cpf = _salvar_cpf_no_precadastro_ou_erro(precadastro, cpf)
             if resp_cpf is not None:
@@ -454,51 +454,23 @@ class FinalizarAgendamentoAPIView(APIView):
                 plano=None,
                 dias_habilitados=dias_habilitados
             )
-            mensalidade_criada = None
             if usuario_aluno and turma_ref:
                 turma_ref.alunos.add(usuario_aluno)
                 from financeiro.services import criar_mensalidade_ao_vincular_turma
-                mensalidade_criada = criar_mensalidade_ao_vincular_turma(
+                criar_mensalidade_ao_vincular_turma(
                     usuario_aluno, turma_ref,
                     valor_primeira_mensalidade=valor_primeira_mensalidade,
                     dia_vencimento_primeira=dia_vencimento_primeira
                 )
 
-            # Opcional: criar cobrança (PIX/Boleto) e enviar por e-mail ao aluno
-            pagamento_enviado = False
-            if criar_e_enviar and forma_pagamento in ('pix', 'boleto') and mensalidade_criada and usuario_aluno.email and usuario_aluno.email != 'pendente':
-                try:
-                    if forma_pagamento == 'pix':
-                        from financeiro.services import gerar_pix_para_mensalidade
-                        resultado = gerar_pix_para_mensalidade(mensalidade_criada)
-                        from usuarios.utils import enviar_primeira_mensalidade_email
-                        pagamento_enviado = enviar_primeira_mensalidade_email(
-                            usuario_aluno, 'pix',
-                            valor=resultado['valor'],
-                            data_vencimento=resultado['data_vencimento'],
-                            codigo_pix=resultado.get('codigo_pix'),
-                            qr_png_bytes=resultado.get('qr_png_bytes'),
-                        )
-                    elif forma_pagamento == 'boleto':
-                        from financeiro.services import gerar_boleto_para_mensalidade
-                        resultado = gerar_boleto_para_mensalidade(mensalidade_criada)
-                        from usuarios.utils import enviar_primeira_mensalidade_email
-                        pagamento_enviado = enviar_primeira_mensalidade_email(
-                            usuario_aluno, 'boleto',
-                            valor=resultado['valor'],
-                            data_vencimento=resultado['data_vencimento'],
-                            digitable_line=resultado.get('digitable_line'),
-                            pdf_content=resultado.get('pdf_content')
-                        )
-                except Exception as e:
-                    logger.warning(f"Erro ao gerar/enviar cobrança da primeira mensalidade: {e}")
-                    import traceback
-                    logger.warning(traceback.format_exc())
-
-            msg = "Pré-cadastro convertido em aluno com sucesso!"
-            if pagamento_enviado:
-                msg += " Cobrança enviada por e-mail ao aluno."
-            return Response({"message": msg, "pagamento_enviado": pagamento_enviado}, status=status.HTTP_200_OK)
+            # Cobrança por e-mail (PIX/Boleto) desativada: o gerente dá baixa manualmente no financeiro.
+            return Response(
+                {
+                    "message": "Pré-cadastro convertido em aluno com sucesso!",
+                    "pagamento_enviado": False,
+                },
+                status=status.HTTP_200_OK,
+            )
         except Exception as e:
             return Response({"error": f"Erro ao finalizar agendamento: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
 

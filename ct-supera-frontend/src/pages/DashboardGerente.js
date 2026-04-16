@@ -7,6 +7,11 @@ import RelatoriosGerente from '../pages/RelatoriosGerente';
 import CadastroCentroTreinamento from '../pages/CadastroCentroTreinamento';
 import GerenciarCandidaturasTrabalho from '../pages/GerenciarCandidaturasTrabalho';
 import { NAVBAR_HEIGHT_CSS } from '../constants/layout';
+import {
+  apiDateToInputDate,
+  inputDateToApiDate,
+  parseApiDateToParts,
+} from '../utils/dateApi';
 
 // Hook para detectar tamanho da tela
 const useResponsive = () => {
@@ -371,13 +376,10 @@ const styles = {
 
 function formatDateOnly(dateString) {
   if (!dateString) return '-';
-  const str = String(dateString).split('T')[0];
-  const parts = str.split('-');
-  if (parts.length === 3) {
-    const [year, month, day] = parts.map(Number);
-    return new Date(year, month - 1, day).toLocaleDateString('pt-BR');
-  }
-  return new Date(dateString).toLocaleDateString('pt-BR');
+  const p = parseApiDateToParts(dateString);
+  if (p) return new Date(p.y, p.m - 1, p.d).toLocaleDateString('pt-BR');
+  const d = new Date(dateString);
+  return Number.isNaN(d.getTime()) ? String(dateString) : d.toLocaleDateString('pt-BR');
 }
 
 function getInitials(name) {
@@ -512,7 +514,7 @@ function DashboardGerente({ user }) {
         email: response.data.email || '',
         telefone: response.data.telefone || '',
         endereco: response.data.endereco || '',
-        data_nascimento: (response.data.data_nascimento || '').split('T')[0] || ''
+        data_nascimento: apiDateToInputDate(response.data.data_nascimento || '') || ''
       });
 
     } catch (error) {
@@ -647,7 +649,7 @@ function DashboardGerente({ user }) {
       email: gerente?.email || '',
       telefone: gerente?.telefone || '',
       endereco: gerente?.endereco || '',
-      data_nascimento: (gerente?.data_nascimento || '').split('T')[0] || ''
+      data_nascimento: apiDateToInputDate(gerente?.data_nascimento || '') || ''
     });
     setErro('');
     setSuccess('');
@@ -662,7 +664,10 @@ function DashboardGerente({ user }) {
     setErro('');
     setSuccess('');
     try {
-      const resp = await api.put('funcionarios/atualizar-dados-gerente/', form);
+      const resp = await api.put('funcionarios/atualizar-dados-gerente/', {
+        ...form,
+        data_nascimento: inputDateToApiDate(form.data_nascimento) || form.data_nascimento,
+      });
       setGerente(resp.data);
       setEditMode(false);
       setSuccess('Dados atualizados com sucesso!');

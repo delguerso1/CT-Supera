@@ -68,8 +68,6 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
     dia_vencimento_primeira: '',
     dias_habilitados: [] as number[],
     turma: '' as string | number,
-    criar_primeira_mensalidade_agora: false,
-    forma_pagamento: '',
   });
   const [turmasParaMatricula, setTurmasParaMatricula] = useState<Turma[]>([]);
   const [filtroStatusPrecadastro, setFiltroStatusPrecadastro] = useState<string>('');
@@ -345,8 +343,6 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
         dia_vencimento_primeira: '',
         dias_habilitados: [],
         turma: turmaInicial,
-        criar_primeira_mensalidade_agora: false,
-        forma_pagamento: '',
       });
       setShowMatriculaModal(true);
     } catch (error: any) {
@@ -420,8 +416,8 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
       }
     }
     const diaVenM = Number(matriculaForm.dia_vencimento);
-    if (!matriculaForm.dia_vencimento || Number.isNaN(diaVenM) || ![1, 5, 10].includes(diaVenM)) {
-      Alert.alert('Atenção', 'Selecione o dia de vencimento das mensalidades (1, 5 ou 10).');
+    if (!matriculaForm.dia_vencimento || Number.isNaN(diaVenM) || diaVenM < 1 || diaVenM > 31) {
+      Alert.alert('Atenção', 'Informe o dia de vencimento das mensalidades (entre 1 e 31).');
       return;
     }
     if (!matriculaForm.ja_aluno && !matriculaForm.turma) {
@@ -434,21 +430,6 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
     if (!matriculaForm.dias_habilitados || matriculaForm.dias_habilitados.length === 0) {
       Alert.alert('Atenção', 'Selecione pelo menos um dia habilitado para treino.');
       return;
-    }
-    if (!matriculaForm.ja_aluno && matriculaForm.criar_primeira_mensalidade_agora) {
-      if (!matriculaForm.forma_pagamento) {
-        Alert.alert('Atenção', 'Selecione a forma de pagamento (PIX ou Boleto) para enviar a cobrança.');
-        return;
-      }
-      const diaVenc = Number(matriculaForm.dia_vencimento_primeira);
-      if (!matriculaForm.dia_vencimento_primeira || Number.isNaN(diaVenc) || diaVenc < 1 || diaVenc > 31) {
-        Alert.alert('Atenção', 'Informe o dia de vencimento do PIX/Boleto (1 a 31).');
-        return;
-      }
-      if (!matriculaForm.turma) {
-        Alert.alert('Atenção', 'Selecione uma turma para criar e enviar a cobrança por e-mail.');
-        return;
-      }
     }
     try {
       const round2 = (v: string | number) => Math.round(Number(v || 0) * 100) / 100;
@@ -470,18 +451,10 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
       if (matriculaForm.turma) {
         payload.turma = Number(matriculaForm.turma);
       }
-      if (!matriculaForm.ja_aluno) {
-        payload.criar_primeira_mensalidade_agora = !!matriculaForm.criar_primeira_mensalidade_agora;
-        if (matriculaForm.criar_primeira_mensalidade_agora && matriculaForm.forma_pagamento) {
-          payload.forma_pagamento = matriculaForm.forma_pagamento;
-        }
-      }
       const response = await usuarioService.finalizarAgendamento(matriculaPrecadastro.id, payload);
       setShowMatriculaModal(false);
       await fetchUsers();
-      const msg = response?.pagamento_enviado
-        ? 'Matrícula confirmada! E-mails de ativação e cobrança enviados ao aluno.'
-        : 'Pré-cadastro matriculado com sucesso!';
+      const msg = 'Pré-cadastro matriculado com sucesso!';
       Alert.alert('Sucesso', msg);
     } catch (error: any) {
       Alert.alert('Erro', error.response?.data?.error || 'Erro ao finalizar matrícula.');
@@ -734,7 +707,7 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
                   />
                   <TextInput
                     style={styles.input}
-                    placeholder="Dia de vencimento (1, 5, 10)"
+                    placeholder="Dia de vencimento (1 a 31)"
                     keyboardType="numeric"
                     value={diaVencimento}
                     onChangeText={setDiaVencimento}
@@ -839,20 +812,14 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
                   }
                 />
               ) : null}
-              <Text style={styles.sectionTitle}>Dia de vencimento das mensalidades</Text>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
-                {(['1', '5', '10'] as const).map((d) => (
-                  <TouchableOpacity
-                    key={d}
-                    style={[styles.dayItem, matriculaForm.dia_vencimento === d && styles.turmaItemSelected]}
-                    onPress={() => setMatriculaForm(prev => ({ ...prev, dia_vencimento: d }))}
-                  >
-                    <Text style={[styles.dayText, matriculaForm.dia_vencimento === d && styles.turmaItemTextSelected]}>
-                      Dia {d}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+              <Text style={styles.sectionTitle}>Dia de vencimento das mensalidades (1 a 31)</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Ex: 7"
+                keyboardType="numeric"
+                value={matriculaForm.dia_vencimento}
+                onChangeText={(value) => setMatriculaForm(prev => ({ ...prev, dia_vencimento: value.replace(/\D/g, '').slice(0, 2) }))}
+              />
               <View style={styles.switchRow}>
                 <Text style={styles.switchLabel}>Já é aluno? (recredenciamento)</Text>
                 <Switch
@@ -913,52 +880,16 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
                   <Text style={styles.sectionTitle}>
                     Total 1ª cobrança: R$ {(Math.round((Number(matriculaForm.valor_matricula || 0) + Number(matriculaForm.valor_uniforme || 0) + Number(matriculaForm.valor_mensalidade_proporcional || 0)) * 100) / 100).toFixed(2)}
                   </Text>
-                  {!matriculaForm.criar_primeira_mensalidade_agora && (
-                    <TextInput
-                      style={styles.input}
-                      placeholder="Dia venc. 1ª mensalidade (1-31)"
-                      keyboardType="numeric"
-                      value={matriculaForm.dia_vencimento_primeira}
-                      onChangeText={(value) => setMatriculaForm(prev => ({ ...prev, dia_vencimento_primeira: value }))}
-                    />
-                  )}
-                  <View style={styles.switchRow}>
-                    <Text style={styles.switchLabel}>Criar 1ª mensalidade agora e enviar por e-mail</Text>
-                    <Switch
-                      value={matriculaForm.criar_primeira_mensalidade_agora}
-                      onValueChange={(v) => setMatriculaForm(prev => ({ ...prev, criar_primeira_mensalidade_agora: v }))}
-                    />
-                  </View>
-                  {matriculaForm.criar_primeira_mensalidade_agora && (
-                    <View style={{ marginBottom: 12 }}>
-                      <Text style={styles.sectionTitle}>Forma de pagamento</Text>
-                      <View style={{ flexDirection: 'row', gap: 8 }}>
-                        <TouchableOpacity
-                          style={[styles.dayItem, matriculaForm.forma_pagamento === 'pix' && styles.turmaItemSelected]}
-                          onPress={() => setMatriculaForm(prev => ({ ...prev, forma_pagamento: 'pix' }))}
-                        >
-                          <Text style={[styles.dayText, matriculaForm.forma_pagamento === 'pix' && styles.turmaItemTextSelected]}>PIX</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={[styles.dayItem, matriculaForm.forma_pagamento === 'boleto' && styles.turmaItemSelected]}
-                          onPress={() => setMatriculaForm(prev => ({ ...prev, forma_pagamento: 'boleto' }))}
-                        >
-                          <Text style={[styles.dayText, matriculaForm.forma_pagamento === 'boleto' && styles.turmaItemTextSelected]}>Boleto</Text>
-                        </TouchableOpacity>
-                      </View>
-                      <Text style={styles.sectionTitle}>Dia de vencimento (1-31)</Text>
-                      <TextInput
-                        style={styles.input}
-                        placeholder="Ex: 15"
-                        keyboardType="numeric"
-                        value={matriculaForm.dia_vencimento_primeira}
-                        onChangeText={(value) => setMatriculaForm(prev => ({ ...prev, dia_vencimento_primeira: value }))}
-                      />
-                      <Text style={{ fontSize: 12, color: '#666', marginTop: 4 }}>
-                        Cobrança será enviada ao e-mail do aluno
-                      </Text>
-                    </View>
-                  )}
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Dia venc. 1ª mensalidade (1-31)"
+                    keyboardType="numeric"
+                    value={matriculaForm.dia_vencimento_primeira}
+                    onChangeText={(value) => setMatriculaForm(prev => ({ ...prev, dia_vencimento_primeira: value }))}
+                  />
+                  <Text style={{ fontSize: 12, color: '#666', marginTop: 4, marginBottom: 8 }}>
+                    A 1ª parcela é lançada no financeiro; cobrança e baixa são feitas pelo gerente no sistema.
+                  </Text>
                 </>
               )}
               <Text style={styles.sectionTitle}>Dias habilitados para treino</Text>

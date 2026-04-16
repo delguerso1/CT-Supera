@@ -14,7 +14,7 @@ from django.db.models import Count, Sum, Q, Max
 from django.utils import timezone
 from datetime import datetime, timedelta
 import logging
-from django.utils.dateparse import parse_date
+from app.date_api import format_data_api, format_datetime_api, parse_data_api
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +38,7 @@ def _serialize_presenca_sintetica(aluno: Usuario, turma: Turma, d: date) -> dict
         "aluno_nome": aluno.get_full_name() or aluno.username,
         "turma_id": turma.id,
         "turma_nome": str(turma),
-        "data": d.isoformat(),
+        "data": format_data_api(d),
         "checkin_realizado": False,
         "presenca_confirmada": False,
         "ausencia_registrada": False,
@@ -142,7 +142,7 @@ class VerificarCheckinAlunosAPIView(APIView):
 
         return Response({
             "turma": turma.__str__(),
-            "data": hoje.isoformat(),
+            "data": format_data_api(hoje),
             "alunos": status_alunos
         }, status=status.HTTP_200_OK)
 
@@ -287,7 +287,7 @@ def _serialize_presenca(presenca: Presenca):
         "aluno_nome": presenca.usuario.get_full_name() or presenca.usuario.username,
         "turma_id": presenca.turma.id,
         "turma_nome": str(presenca.turma),
-        "data": presenca.data.isoformat(),
+        "data": format_data_api(presenca.data),
         "checkin_realizado": presenca.checkin_realizado,
         "presenca_confirmada": presenca.presenca_confirmada,
         "ausencia_registrada": presenca.ausencia_registrada,
@@ -315,12 +315,12 @@ class RelatorioPresencaAPIView(APIView):
         qs = Presenca.objects.select_related("usuario", "turma").order_by("-data", "usuario__first_name")
 
         if data_inicio:
-            parsed_inicio = parse_date(data_inicio)
+            parsed_inicio = parse_data_api(data_inicio)
             if not parsed_inicio:
                 return Response({"error": "Data inicial inválida."}, status=status.HTTP_400_BAD_REQUEST)
             qs = qs.filter(data__gte=parsed_inicio)
         if data_fim:
-            parsed_fim = parse_date(data_fim)
+            parsed_fim = parse_data_api(data_fim)
             if not parsed_fim:
                 return Response({"error": "Data final inválida."}, status=status.HTTP_400_BAD_REQUEST)
             qs = qs.filter(data__lte=parsed_fim)
@@ -373,7 +373,7 @@ class RelatorioPresencaAPIView(APIView):
                 turma = None
             if turma:
                 existentes = {
-                    (p["aluno_id"], p["turma_id"], (p["data"] or "")[:10])
+                    (p["aluno_id"], p["turma_id"], (p["data"] or ""))
                     for p in presencas_list
                 }
                 dia_nomes = {d.nome for d in turma.dias_semana.all()}
@@ -391,7 +391,7 @@ class RelatorioPresencaAPIView(APIView):
                                 | Q(username__icontains=aluno_nome)
                             )
                         for aluno in alunos_qs.distinct():
-                            k = (aluno.id, turma.id, cur.isoformat())
+                            k = (aluno.id, turma.id, format_data_api(cur))
                             if k not in existentes:
                                 presencas_list.append(_serialize_presenca_sintetica(aluno, turma, cur))
                                 existentes.add(k)
@@ -399,7 +399,7 @@ class RelatorioPresencaAPIView(APIView):
 
         # Mesma ordem do queryset: data desc, nome asc (sort estável)
         presencas_list.sort(key=lambda p: (p.get("aluno_nome") or "").lower())
-        presencas_list.sort(key=lambda p: (p.get("data") or "")[:10], reverse=True)
+        presencas_list.sort(key=lambda p: parse_data_api(p.get("data")) or date.min, reverse=True)
 
         total_sem_registro = sum(1 for p in presencas_list if p.get("sem_registro"))
         total_registros = len(presencas_list)
@@ -636,7 +636,8 @@ class PainelGerenteAPIView(APIView):
                     'id': f'aluno_{aluno.id}',
                     'type': 'aluno',
                     'description': f'Novo aluno cadastrado - {aluno.first_name}',
-                    'data': aluno.date_joined.isoformat()
+                    'data': format_datetime_api(timezone.localtime(aluno.date_joined)),
+                    '_ts': timezone.localtime(aluno.date_joined).timestamp(),
                 })
 
             # Pré-cadastros criados nos últimos 7 dias (feed alinhado ao painel)
@@ -648,7 +649,8 @@ class PainelGerenteAPIView(APIView):
                     'id': f'precadastro_{pc.id}',
                     'type': 'precadastro',
                     'description': f'Pré-cadastro recebido - {nome_pc}',
-                    'data': pc.criado_em.isoformat()
+                    'data': format_datetime_api(timezone.localtime(pc.criado_em)),
+                    '_ts': timezone.localtime(pc.criado_em).timestamp(),
                 })
 
             # Mensalidades pagas recentes: usar data_pagamento (quando o pagamento ocorreu),
@@ -676,20 +678,26 @@ class PainelGerenteAPIView(APIView):
 
             for mensalidade in ultimas_mensalidades:
                 nome_aluno = getattr(mensalidade.aluno, "first_name", None) or "Aluno"
-                data_evt = (
-                    mensalidade.data_pagamento.isoformat()
-                    if mensalidade.data_pagamento
-                    else mensalidade.data_vencimento.isoformat()
-                )
+                if mensalidade.data_pagamento:
+                    data_evt = format_datetime_api(mensalidade.data_pagamento)
+                    ts_evt = mensalidade.data_pagamento.timestamp()
+                else:
+                    data_evt = format_data_api(mensalidade.data_vencimento)
+                    ts_evt = timezone.make_aware(
+                        datetime.combine(mensalidade.data_vencimento, datetime.min.time())
+                    ).timestamp()
                 atividades.append({
                     'id': f'mensalidade_{mensalidade.id}',
                     'type': 'mensalidade',
                     'description': f'Mensalidade paga - {nome_aluno}',
                     'data': data_evt,
+                    '_ts': ts_evt,
                 })
 
             # Ordena todas as atividades por data
-            atividades.sort(key=lambda x: x['data'], reverse=True)
+            atividades.sort(key=lambda x: x.get('_ts') or 0, reverse=True)
+            for ev in atividades:
+                ev.pop('_ts', None)
 
             # Dados do gerente
             gerente = get_object_or_404(Usuario, id=request.user.id, tipo="gerente")
@@ -888,9 +896,9 @@ class ObservacaoAulaAPIView(APIView):
 
         data_param = request.query_params.get("data")
         if data_param:
-            dt = parse_date(data_param)
+            dt = parse_data_api(data_param)
             if not dt:
-                return Response({"error": "Data inválida. Use AAAA-MM-DD."}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({"error": "Data inválida. Use DD-MM-AAAA."}, status=status.HTTP_400_BAD_REQUEST)
         else:
             dt = timezone.localdate()
 
@@ -909,10 +917,10 @@ class ObservacaoAulaAPIView(APIView):
         return Response(
             {
                 "turma_id": turma.id,
-                "data": dt.isoformat(),
+                "data": format_data_api(dt),
                 "texto": obs.texto if obs else None,
                 "autor_nome": (obs.autor.get_full_name() or obs.autor.username) if obs else None,
-                "atualizado_em": obs.atualizado_em.isoformat() if obs else None,
+                "atualizado_em": format_datetime_api(obs.atualizado_em) if obs else None,
                 "pode_editar": pode_editar,
             },
             status=status.HTTP_200_OK,
@@ -954,10 +962,10 @@ class ObservacaoAulaAPIView(APIView):
         return Response(
             {
                 "turma_id": turma.id,
-                "data": hoje.isoformat(),
+                "data": format_data_api(hoje),
                 "texto": obs.texto,
                 "autor_nome": obs.autor.get_full_name() or obs.autor.username,
-                "atualizado_em": obs.atualizado_em.isoformat(),
+                "atualizado_em": format_datetime_api(obs.atualizado_em),
                 "pode_editar": True,
             },
             status=status.HTTP_200_OK,

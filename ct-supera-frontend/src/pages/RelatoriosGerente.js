@@ -1,28 +1,28 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import api from '../services/api';
 import { downloadPdfRelatorioAlunos, downloadPdfRelatorioFinanceiro } from '../utils/relatoriosPdf';
+import { parseApiDateToParts } from '../utils/dateApi';
 
-function todayIso() {
+function todayApiDate() {
   const d = new Date();
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
+  return `${day}-${m}-${y}`;
 }
 
-function firstDayOfMonthIso() {
+function firstDayOfMonthApiDate() {
   const d = new Date();
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
-  return `${y}-${m}-01`;
+  return `01-${m}-${y}`;
 }
 
 function formatDateBR(iso) {
   if (!iso) return '';
-  const parts = String(iso).split('T')[0].split('-');
-  if (parts.length !== 3) return String(iso);
-  const [year, month, day] = parts.map(Number);
-  return new Date(year, month - 1, day).toLocaleDateString('pt-BR');
+  const p = parseApiDateToParts(iso);
+  if (!p) return String(iso);
+  return new Date(p.y, p.m - 1, p.d).toLocaleDateString('pt-BR');
 }
 
 function turmaOptionLabel(t) {
@@ -46,11 +46,11 @@ function RelatoriosGerente({ user }) {
   const [atrasadosPorTurma, setAtrasadosPorTurma] = useState({});
   const [loadingAtrasos, setLoadingAtrasos] = useState(false);
 
-  const [filtroPresencaInicio, setFiltroPresencaInicio] = useState(() => firstDayOfMonthIso());
-  const [filtroPresencaFim, setFiltroPresencaFim] = useState(() => todayIso());
+  const [filtroPresencaInicio, setFiltroPresencaInicio] = useState(() => firstDayOfMonthApiDate());
+  const [filtroPresencaFim, setFiltroPresencaFim] = useState(() => todayApiDate());
   const [filtroPresencaTurmaId, setFiltroPresencaTurmaId] = useState('');
   const [filtroPresencaBusca, setFiltroPresencaBusca] = useState('');
-  const [filtroObservacaoData, setFiltroObservacaoData] = useState(() => todayIso());
+  const [filtroObservacaoData, setFiltroObservacaoData] = useState(() => todayApiDate());
   const [presencaRelatorio, setPresencaRelatorio] = useState(null);
   const [loadingPresencaRelatorio, setLoadingPresencaRelatorio] = useState(false);
   const [erroPresenca, setErroPresenca] = useState('');
@@ -438,12 +438,12 @@ function RelatoriosGerente({ user }) {
 
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 12, alignItems: 'flex-end' }}>
           <div>
-            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4, color: '#37474f' }}>De (AAAA-MM-DD)</div>
+            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4, color: '#37474f' }}>De (DD-MM-AAAA)</div>
             <input
               type="text"
               value={filtroPresencaInicio}
               onChange={(e) => setFiltroPresencaInicio(e.target.value)}
-              placeholder="2026-04-01"
+              placeholder="01-04-2026"
               style={{ padding: '0.6rem', borderRadius: 4, border: '1px solid #ccc', width: 140, fontSize: 15 }}
             />
           </div>
@@ -453,7 +453,7 @@ function RelatoriosGerente({ user }) {
               type="text"
               value={filtroPresencaFim}
               onChange={(e) => setFiltroPresencaFim(e.target.value)}
-              placeholder="2026-04-08"
+              placeholder="16-04-2026"
               style={{ padding: '0.6rem', borderRadius: 4, border: '1px solid #ccc', width: 140, fontSize: 15 }}
             />
           </div>
@@ -528,7 +528,7 @@ function RelatoriosGerente({ user }) {
                 </p>
               )}
             <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#37474f', marginBottom: 4 }}>
-              Data da observação (AAAA-MM-DD)
+              Data da observação (DD-MM-AAAA)
             </label>
             <input
               type="text"

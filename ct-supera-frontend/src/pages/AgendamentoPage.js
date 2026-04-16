@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import api from '../services/api';
 import { formatarCpfMascara, apenasDigitosCpf, MSG_CPF_11_DIGITOS } from '../utils/cpf';
 import { normalizarTelefoneBrParaApi } from '../utils/telefone';
+import { inputDateToApiDate, parseApiDateToParts } from '../utils/dateApi';
 
 const styles = {
   container: {
@@ -310,7 +311,7 @@ function AgendamentoPage() {
       last_name: formatarNome(form.last_name),
       email: form.email,
       telefone: telefoneDigitos,
-      data_nascimento: form.data_nascimento,
+      data_nascimento: inputDateToApiDate(form.data_nascimento) || form.data_nascimento,
       cpf: cpfLimpo,
       turma: form.turma || undefined,
       data_aula_experimental: form.data_aula_experimental || undefined,
@@ -377,9 +378,10 @@ function AgendamentoPage() {
       celulas.push(<div key={`empty-${i}`} style={{ ...styles.calendarDay, ...styles.calendarDayEmpty }} />);
     }
     for (let dia = 1; dia <= diasNoMes; dia++) {
-      const dataStr = `${ano}-${String(mes + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
-      const disponivel = datasSet.has(dataStr);
-      const selecionado = form.data_aula_experimental === dataStr;
+      const pad2 = (n) => String(n).padStart(2, '0');
+      const dataStrApi = `${pad2(dia)}-${pad2(mes + 1)}-${ano}`;
+      const disponivel = datasSet.has(dataStrApi);
+      const selecionado = form.data_aula_experimental === dataStrApi;
       const dataObj = new Date(ano, mes, dia);
       const passou = dataObj < new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
       const podeClicar = disponivel && !passou;
@@ -391,7 +393,7 @@ function AgendamentoPage() {
             ...(selecionado ? styles.calendarDaySelected : null),
             ...(podeClicar ? styles.calendarDayAvailable : styles.calendarDayDisabled)
           }}
-          onClick={() => podeClicar && setForm(prev => ({ ...prev, data_aula_experimental: dataStr }))}
+          onClick={() => podeClicar && setForm(prev => ({ ...prev, data_aula_experimental: dataStrApi }))}
           onMouseEnter={(e) => {
             if (podeClicar && !selecionado) e.currentTarget.style.background = '#bbdefb';
           }}
@@ -576,7 +578,17 @@ function AgendamentoPage() {
                   </div>
                   {form.data_aula_experimental && (
                     <div style={{ marginTop: '8px', fontSize: '0.85rem', color: '#1565c0' }}>
-                      Selecionado: {new Date(form.data_aula_experimental + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}
+                      Selecionado:{' '}
+                      {(() => {
+                        const p = parseApiDateToParts(form.data_aula_experimental);
+                        return p
+                          ? new Date(p.y, p.m - 1, p.d).toLocaleDateString('pt-BR', {
+                              weekday: 'long',
+                              day: '2-digit',
+                              month: 'long',
+                            })
+                          : '';
+                      })()}
                       {turmaSelecionada?.horario && ` às ${formatarHorario(turmaSelecionada.horario)}`}
                     </div>
                   )}

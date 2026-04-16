@@ -23,6 +23,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from django.http import JsonResponse
 from decimal import Decimal, InvalidOperation
+from app.date_api import format_data_api, format_datetime_api
 import json
 import logging
 import re
@@ -367,7 +368,7 @@ class DashboardFinanceiroAPIView(APIView):
                 "id": u.id,
                 "nome": (u.get_full_name() or f"{u.first_name or ''} {u.last_name or ''}").strip() or u.username,
                 "cpf": u.username,
-                "data_inativacao": u.data_inativacao.isoformat() if u.data_inativacao else None,
+                "data_inativacao": format_data_api(u.data_inativacao) if u.data_inativacao else None,
             }
             for u in desistencias_qs
         ]
@@ -1370,7 +1371,7 @@ class C6BankWebhookAPIView(APIView):
             'valor': valor,
             'horario': horario,
             'infoPagador': pix_data.get('infoPagador'),
-            'data_recebimento': timezone.now().isoformat()
+            'data_recebimento': format_datetime_api(timezone.now())
         }
 
         # Verifica se este PIX já foi registrado (pelo endToEndId)

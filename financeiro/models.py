@@ -6,6 +6,8 @@ from datetime import timedelta, date
 from calendar import monthrange
 from usuarios.models import Usuario
 
+from financeiro.dias_uteis import proximo_dia_util_br
+
 
 def _hoje_br():
     return timezone.localdate()
@@ -55,7 +57,8 @@ class Mensalidade(models.Model):
         hoje = _hoje_br()
 
         if not self.data_vencimento:
-            self.data_vencimento = self.data_inicio + timedelta(days=30)  # 🔹 Define vencimento automático
+            bruto = self.data_inicio + timedelta(days=30)
+            self.data_vencimento = proximo_dia_util_br(bruto)
 
         if self.status == "pago":
             if not self.data_pagamento:
@@ -78,7 +81,7 @@ class Mensalidade(models.Model):
             dia_vencimento = dia_referencia
         ultimo_dia = monthrange(ano, mes)[1]
         dia_vencimento = min(dia_vencimento, ultimo_dia)
-        return date(ano, mes, dia_vencimento)
+        return proximo_dia_util_br(date(ano, mes, dia_vencimento))
 
     @classmethod
     def criar_proxima_mensalidade(cls, mensalidade_base):

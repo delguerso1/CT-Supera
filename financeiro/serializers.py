@@ -2,12 +2,17 @@ from django.utils import timezone
 from rest_framework import serializers
 from .models import Salario, Despesa, Mensalidade, TransacaoC6Bank
 from usuarios.serializers import UsuarioSerializer
+from app.date_api import DATA_API_FMT, DATE_INPUT_FORMATS, format_data_api, format_datetime_api
 
 
 class SalarioSerializer(serializers.ModelSerializer):
     class Meta:
         model = Salario
         fields = ['id', 'professor', 'valor', 'competencia', 'data_pagamento', 'status']
+        extra_kwargs = {
+            'competencia': {'format': DATA_API_FMT, 'input_formats': DATE_INPUT_FORMATS},
+            'data_pagamento': {'format': DATA_API_FMT, 'input_formats': DATE_INPUT_FORMATS},
+        }
 
     def create(self, validated_data):
         from datetime import date
@@ -38,6 +43,9 @@ class DespesaSerializer(serializers.ModelSerializer):
     class Meta:
         model = Despesa
         fields = ['id', 'categoria', 'descricao', 'valor', 'data']
+        extra_kwargs = {
+            'data': {'format': DATA_API_FMT, 'input_formats': DATE_INPUT_FORMATS},
+        }
 
 class MensalidadeSerializer(serializers.ModelSerializer):
     aluno = UsuarioSerializer(read_only=True)
@@ -48,6 +56,10 @@ class MensalidadeSerializer(serializers.ModelSerializer):
     class Meta:
         model = Mensalidade
         fields = '__all__'
+        extra_kwargs = {
+            'data_vencimento': {'format': DATA_API_FMT, 'input_formats': DATE_INPUT_FORMATS},
+            'data_inicio': {'format': DATA_API_FMT, 'input_formats': DATE_INPUT_FORMATS},
+        }
 
     def get_forma_pagamento_label(self, obj):
         """PIX/Boleto/Cartão pela transação C6 aprovada; senão baixa manual na secretaria."""
@@ -89,6 +101,8 @@ class MensalidadeSerializer(serializers.ModelSerializer):
         """Status na API reflete vencimento (pendente / atrasado / pago), não só o valor gravado no BD."""
         ret = super().to_representation(instance)
         ret['status'] = instance.status_efetivo
+        if instance.data_pagamento:
+            ret['data_pagamento'] = format_datetime_api(instance.data_pagamento)
         return ret
 
 
@@ -112,10 +126,11 @@ class TransacaoC6BankSerializer(serializers.ModelSerializer):
     
     def get_mensalidade_info(self, obj):
         """Retorna informações básicas da mensalidade"""
+        dv = obj.mensalidade.data_vencimento
         return {
             'id': obj.mensalidade.id,
             'aluno_nome': obj.mensalidade.aluno.get_full_name(),
             'valor': obj.mensalidade.valor,
-            'data_vencimento': obj.mensalidade.data_vencimento,
+            'data_vencimento': format_data_api(dv) if dv else None,
             'status': obj.mensalidade.status_efetivo
         }

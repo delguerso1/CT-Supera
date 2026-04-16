@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import api, { normalizeDrfNextUrl } from '../services/api';
+import { apiDateToInputDate, formatApiDateDisplay, inputDateToApiDate } from '../utils/dateApi';
 
 function isTimeoutError(err) {
   return (
@@ -241,12 +242,7 @@ function ControleFinanceiro({ user, onDataChange }) {
 
   function formatDate(dateStr) {
     if (!dateStr) return '';
-    const parts = String(dateStr).split('-');
-    if (parts.length !== 3) {
-      return new Date(dateStr).toLocaleDateString('pt-BR');
-    }
-    const [year, month, day] = parts.map(Number);
-    return new Date(year, month - 1, day).toLocaleDateString('pt-BR');
+    return formatApiDateDisplay(dateStr);
   }
 
   /** Data e hora do pagamento (mensalidade com data_pagamento ISO). */
@@ -284,7 +280,12 @@ function ControleFinanceiro({ user, onDataChange }) {
   // Função para abrir modal de edição
   function handleEditarDespesa(despesa) {
     setEditDespesa(despesa);
-    setDespesaForm({ categoria: despesa.categoria || 'outros', descricao: despesa.descricao, valor: despesa.valor, data: despesa.data });
+    setDespesaForm({
+      categoria: despesa.categoria || 'outros',
+      descricao: despesa.descricao,
+      valor: despesa.valor,
+      data: apiDateToInputDate(despesa.data || '') || '',
+    });
     setShowDespesaModal(true);
   }
 
@@ -292,10 +293,14 @@ function ControleFinanceiro({ user, onDataChange }) {
   async function handleSalvarDespesa(e) {
     e.preventDefault();
     try {
+      const payload = {
+        ...despesaForm,
+        data: despesaForm.data ? inputDateToApiDate(despesaForm.data) || despesaForm.data : despesaForm.data,
+      };
       if (editDespesa) {
-        await api.put(`financeiro/despesas/${editDespesa.id}/`, despesaForm);
+        await api.put(`financeiro/despesas/${editDespesa.id}/`, payload);
       } else {
-        await api.post('financeiro/despesas/', despesaForm);
+        await api.post('financeiro/despesas/', payload);
       }
       setShowDespesaModal(false);
       fetchDespesas();

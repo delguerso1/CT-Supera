@@ -5,6 +5,7 @@ python-dotenv>=1.0.0
 Pillow>=10.0.0
 requests>=2.31.0
 qrcode[pil]>=8.0.0
+holidays>=0.40
 
 # Dependências para produção
 gunicorn>=21.2.0

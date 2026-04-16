@@ -11,6 +11,7 @@ from datetime import date, timedelta
 from django.db import IntegrityError
 from django.utils import timezone
 
+from financeiro.dias_uteis import proximo_dia_util_br
 from financeiro.models import Mensalidade, TransacaoC6Bank
 from usuarios.models import Usuario
 
@@ -58,6 +59,8 @@ def criar_mensalidade_ao_vincular_turma(aluno, turma, valor_primeira_mensalidade
         else:
             data_vencimento = data_vencimento.replace(month=hoje.month + 1)
 
+    data_vencimento = proximo_dia_util_br(data_vencimento)
+
     existe = Mensalidade.objects.filter(
         aluno=aluno,
         data_vencimento__year=data_vencimento.year,
@@ -102,12 +105,12 @@ def gerar_mensalidades_para_mes(ano: int, mes: int) -> int:
             dia_venc = 10
 
         dia = min(dia_venc, ultimo_dia)
-        data_vencimento = date(ano, mes, dia)
+        data_vencimento = proximo_dia_util_br(date(ano, mes, dia))
 
         existe = Mensalidade.objects.filter(
             aluno=aluno,
-            data_vencimento__year=ano,
-            data_vencimento__month=mes
+            data_vencimento__year=data_vencimento.year,
+            data_vencimento__month=data_vencimento.month,
         ).exists()
 
         if not existe:

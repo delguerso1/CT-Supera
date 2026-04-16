@@ -3,9 +3,15 @@ from usuarios.models import Usuario
 from financeiro.models import Mensalidade
 from funcionarios.models import Presenca
 from turmas.models import Turma
+from app.date_api import DATA_API_FMT, DATE_INPUT_FORMATS, format_data_api, format_datetime_api
 
 class UsuarioSerializer(serializers.ModelSerializer):
-    data_nascimento = serializers.DateField(format='%Y-%m-%d', required=False, allow_null=True)
+    data_nascimento = serializers.DateField(
+        format=DATA_API_FMT,
+        input_formats=DATE_INPUT_FORMATS,
+        required=False,
+        allow_null=True,
+    )
 
     class Meta:
         model = Usuario
@@ -25,7 +31,7 @@ class UsuarioSerializer(serializers.ModelSerializer):
 class MensalidadeSerializer(serializers.ModelSerializer):
     valor = serializers.DecimalField(max_digits=10, decimal_places=2, coerce_to_string=False)
     valor_efetivo = serializers.SerializerMethodField()
-    data_vencimento = serializers.DateField(format="%Y-%m-%d")
+    data_vencimento = serializers.DateField(format=DATA_API_FMT, input_formats=DATE_INPUT_FORMATS)
     data_pagamento = serializers.SerializerMethodField()
     
     class Meta:
@@ -39,7 +45,7 @@ class MensalidadeSerializer(serializers.ModelSerializer):
     def get_data_pagamento(self, obj):
         if not obj.data_pagamento:
             return None
-        return obj.data_pagamento.strftime("%Y-%m-%d")
+        return format_datetime_api(obj.data_pagamento)
 
     def to_representation(self, instance):
         ret = super().to_representation(instance)
@@ -50,6 +56,9 @@ class PresencaSerializer(serializers.ModelSerializer):
     class Meta:
         model = Presenca
         fields = ['id', 'usuario', 'data']
+        extra_kwargs = {
+            'data': {'format': DATA_API_FMT, 'input_formats': DATE_INPUT_FORMATS},
+        }
 
 class TurmaSerializer(serializers.ModelSerializer):
     class Meta:

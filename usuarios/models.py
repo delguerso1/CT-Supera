@@ -9,6 +9,7 @@ from django.core.validators import RegexValidator
 from ct.models import CentroDeTreinamento
 import logging
 from usuarios.utils import enviar_convite_aluno
+from financeiro.dias_uteis import proximo_dia_util_br
 
 logger = logging.getLogger(__name__)
 
@@ -442,8 +443,8 @@ class Usuario(AbstractUser):
             mes = mensalidade.data_vencimento.month
             ultimo_dia = monthrange(ano, mes)[1]
             dia = min(int(self.dia_vencimento), ultimo_dia)
-            nova_data_vencimento = mensalidade.data_vencimento.replace(day=dia)
-            mensalidade.data_vencimento = nova_data_vencimento
+            bruta = mensalidade.data_vencimento.replace(day=dia)
+            mensalidade.data_vencimento = proximo_dia_util_br(bruta)
             mensalidade.valor = self.valor_mensalidade
             mensalidade.save()
 

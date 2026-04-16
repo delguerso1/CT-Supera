@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import api, { MEDIA_URL } from '../services/api';
 import { useNavigate } from 'react-router-dom';
 import { NAVBAR_HEIGHT_CSS } from '../constants/layout';
+import { apiDateToInputDate, formatApiDateDisplay, inputDateToApiDate } from '../utils/dateApi';
 
 // Hook para detectar tamanho da tela
 const useResponsive = () => {
@@ -313,17 +314,6 @@ const styles = {
   }
 };
 
-function formatDateOnly(dateString) {
-  if (!dateString) return '-';
-  const str = String(dateString).split('T')[0];
-  const parts = str.split('-');
-  if (parts.length === 3) {
-    const [year, month, day] = parts.map(Number);
-    return new Date(year, month - 1, day).toLocaleDateString('pt-BR');
-  }
-  return new Date(dateString).toLocaleDateString('pt-BR');
-}
-
 function getInitials(name) {
   if (!name) return '?';
   return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
@@ -430,7 +420,7 @@ function DashboardProfessor({ user }) {
           email: painelResp.data.email || '',
           telefone: painelResp.data.telefone || '',
           endereco: painelResp.data.endereco || '',
-          data_nascimento: (painelResp.data.data_nascimento || '').split('T')[0] || ''
+          data_nascimento: apiDateToInputDate(painelResp.data.data_nascimento || '') || ''
         });
       } catch (err) {
         setErro('Erro ao carregar dados do painel do professor.');
@@ -535,7 +525,7 @@ function DashboardProfessor({ user }) {
       email: professor?.email || '',
       telefone: professor?.telefone || '',
       endereco: professor?.endereco || '',
-      data_nascimento: (professor?.data_nascimento || '').split('T')[0] || ''
+      data_nascimento: apiDateToInputDate(professor?.data_nascimento || '') || ''
     });
     setErro('');
     setSuccess('');
@@ -550,7 +540,13 @@ function DashboardProfessor({ user }) {
     setErro('');
     setSuccess('');
     try {
-      const resp = await api.put('funcionarios/atualizar-dados-professor/', form);
+      const payload = {
+        ...form,
+        data_nascimento: form.data_nascimento
+          ? inputDateToApiDate(form.data_nascimento) || form.data_nascimento
+          : form.data_nascimento,
+      };
+      const resp = await api.put('funcionarios/atualizar-dados-professor/', payload);
       setProfessor(resp.data);
       setEditMode(false);
       setSuccess('Dados atualizados com sucesso!');
@@ -1014,7 +1010,7 @@ function DashboardProfessor({ user }) {
             <label style={styles.label}>Data de Nascimento</label>
             <div style={styles.input}>
               {professor?.data_nascimento
-                ? formatDateOnly(professor.data_nascimento)
+                ? formatApiDateDisplay(professor.data_nascimento)
                 : '-'}
             </div>
           </div>

@@ -1,5 +1,11 @@
 import React, { useEffect, useState, useRef } from 'react';
 import api, { MEDIA_URL } from '../services/api';
+import {
+  apiDateToInputDate,
+  formatApiDateDisplay,
+  inputDateToApiDate,
+  parseApiDateToParts,
+} from '../utils/dateApi';
 import { NAVBAR_HEIGHT_CSS } from '../constants/layout';
 
 // Hook para detectar tamanho da tela
@@ -20,20 +26,10 @@ const useResponsive = () => {
   return { isMobile, isTablet };
 };
 
-/** Data ISO (YYYY-MM-DD) sem interpretar como UTC — evita exibir o dia anterior em pt-BR. */
+/** Data vinda da API (DD-MM-AAAA ou legado AAAA-MM-DD), sem deslocar fuso. */
 function formatLocalDateBR(value) {
   if (value == null || value === '') return '';
-  const str = String(value).split('T')[0];
-  const parts = str.split('-');
-  if (parts.length === 3 && parts.every((p) => p.length > 0)) {
-    const [y, m, d] = parts.map(Number);
-    if (!Number.isNaN(y) && !Number.isNaN(m) && !Number.isNaN(d)) {
-      return new Date(y, m - 1, d).toLocaleDateString('pt-BR');
-    }
-  }
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return String(value);
-  return parsed.toLocaleDateString('pt-BR');
+  return formatApiDateDisplay(value);
 }
 
 function descricaoAulaCheckinParaAluno(status) {
@@ -410,28 +406,18 @@ function formatCurrency(value) {
 
 function formatDateOnly(dateString) {
   if (!dateString) return '-';
-  const parts = String(dateString).split('-');
-  if (parts.length !== 3) {
-    return new Date(dateString).toLocaleDateString();
-  }
-  const [year, month, day] = parts.map(Number);
-  return new Date(year, month - 1, day).toLocaleDateString('pt-BR');
+  const p = parseApiDateToParts(dateString);
+  if (p) return new Date(p.y, p.m - 1, p.d).toLocaleDateString('pt-BR');
+  const d = new Date(dateString);
+  return Number.isNaN(d.getTime()) ? String(dateString) : d.toLocaleDateString('pt-BR');
 }
 
 function formatMonthYear(dateString) {
   if (!dateString) return '-';
-  const parts = String(dateString).split('-');
-  if (parts.length !== 3) {
-    return new Date(dateString).toLocaleDateString('pt-BR', {
-      month: 'long',
-      year: 'numeric'
-    });
-  }
-  const [year, month, day] = parts.map(Number);
-  return new Date(year, month - 1, day).toLocaleDateString('pt-BR', {
-    month: 'long',
-    year: 'numeric'
-  });
+  const p = parseApiDateToParts(dateString);
+  const ref = p ? new Date(p.y, p.m - 1, p.d) : new Date(dateString);
+  if (Number.isNaN(ref.getTime())) return String(dateString);
+  return ref.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
 }
 
 function getInitials(name) {
@@ -524,7 +510,7 @@ function DashboardAluno({ user }) {
           email: resp.data.usuario.email || '',
           telefone: resp.data.usuario.telefone || '',
           endereco: resp.data.usuario.endereco || '',
-          data_nascimento: (resp.data.usuario.data_nascimento || '').split('T')[0] || '',
+          data_nascimento: apiDateToInputDate(resp.data.usuario.data_nascimento || ''),
           nome_responsavel: resp.data.usuario.nome_responsavel || '',
           telefone_responsavel: resp.data.usuario.telefone_responsavel || '',
           telefone_emergencia: resp.data.usuario.telefone_emergencia || '',
@@ -574,7 +560,7 @@ function DashboardAluno({ user }) {
       email: aluno?.email || '',
       telefone: aluno?.telefone || '',
       endereco: aluno?.endereco || '',
-      data_nascimento: (aluno?.data_nascimento || '').split('T')[0] || '',
+      data_nascimento: apiDateToInputDate(aluno?.data_nascimento || ''),
       nome_responsavel: aluno?.nome_responsavel || '',
       telefone_responsavel: aluno?.telefone_responsavel || '',
       telefone_emergencia: aluno?.telefone_emergencia || '',
@@ -681,7 +667,7 @@ function DashboardAluno({ user }) {
       email: form.email,
       telefone: form.telefone,
       endereco: form.endereco,
-      data_nascimento: (form.data_nascimento || '').split('T')[0] || '',
+      data_nascimento: inputDateToApiDate(form.data_nascimento || '') || '',
       nome_responsavel: form.nome_responsavel,
       telefone_responsavel: form.telefone_responsavel,
       telefone_emergencia: form.telefone_emergencia,

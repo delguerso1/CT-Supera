@@ -8,6 +8,7 @@ import {
   MSG_CPF_MATRICULA,
 } from '../utils/cpf';
 import { normalizarTelefoneBrParaApi } from '../utils/telefone';
+import { apiDateToInputDate, inputDateToApiDate } from '../utils/dateApi';
 
 const styles = {
   container: {
@@ -317,8 +318,6 @@ function CadastroUsuario({ onUserChange }) {
     dia_vencimento_primeira: '',
     dias_habilitados: [],
     turma: '',
-    criar_primeira_mensalidade_agora: false,
-    forma_pagamento: '',
   });
 
   const usuarioModalOverlayRef = useRef(null);
@@ -808,6 +807,14 @@ function CadastroUsuario({ onUserChange }) {
       return;
     }
 
+    if (formData.tipo === 'aluno' && activeTab !== 'precadastros') {
+      const dVen = parseInt(String(diaVencimento).trim(), 10);
+      if (diaVencimento === '' || Number.isNaN(dVen) || dVen < 1 || dVen > 31) {
+        setError('Informe o dia de vencimento da mensalidade entre 1 e 31.');
+        return;
+      }
+    }
+
     // Campos base para todos os tipos
     const dados = {
       username: cpfDigitos,
@@ -818,7 +825,9 @@ function CadastroUsuario({ onUserChange }) {
       last_name: formData.last_name,
       telefone: formData.telefone,
       endereco: formData.endereco,
-      data_nascimento: formData.data_nascimento,
+      data_nascimento: formData.data_nascimento
+        ? inputDateToApiDate(formData.data_nascimento) || formData.data_nascimento
+        : formData.data_nascimento,
     };
 
     // Campos específicos para alunos
@@ -856,7 +865,9 @@ function CadastroUsuario({ onUserChange }) {
           last_name: formData.last_name || '',
           email: formData.email,
           telefone: normalizarTelefoneBrParaApi(formData.telefone),
-          data_nascimento: formData.data_nascimento,
+          data_nascimento: formData.data_nascimento
+            ? inputDateToApiDate(formData.data_nascimento) || formData.data_nascimento
+            : formData.data_nascimento,
           cpf: cpfDigitos.length > 0 ? cpfDigitos : null,
           origem: formData.origem || (editingUser && editingUser.origem) || 'formulario',
         };
@@ -915,7 +926,7 @@ function CadastroUsuario({ onUserChange }) {
         tipo: user.tipo || 'aluno',
         telefone: user.telefone || '',
         endereco: user.endereco || '',
-        data_nascimento: user.data_nascimento || '',
+        data_nascimento: apiDateToInputDate(user.data_nascimento || '') || '',
         telefone_responsavel: user.telefone_responsavel || '',
         telefone_emergencia: user.telefone_emergencia || '',
         nome_responsavel: user.nome_responsavel || '',
@@ -1084,8 +1095,6 @@ function CadastroUsuario({ onUserChange }) {
       dia_vencimento_primeira: '',
       dias_habilitados: [],
       turma: precadastro.turma ? (typeof precadastro.turma === 'object' ? precadastro.turma.id : precadastro.turma) : '',
-      criar_primeira_mensalidade_agora: false,
-      forma_pagamento: '',
     });
     setError('');
     setSuccess('');
@@ -1164,8 +1173,8 @@ function CadastroUsuario({ onUserChange }) {
       return;
     }
     const diaVen = parseInt(matriculaForm.dia_vencimento, 10);
-    if (![1, 5, 10].includes(diaVen)) {
-      setError('O dia de vencimento das mensalidades deve ser 1, 5 ou 10.');
+    if (Number.isNaN(diaVen) || diaVen < 1 || diaVen > 31) {
+      setError('O dia de vencimento das mensalidades deve estar entre 1 e 31.');
       return;
     }
     if (!matriculaForm.ja_aluno) {
@@ -1213,21 +1222,6 @@ function CadastroUsuario({ onUserChange }) {
       setError('Selecione pelo menos um dia habilitado para treino.');
       return;
     }
-    if (!matriculaForm.ja_aluno && matriculaForm.criar_primeira_mensalidade_agora) {
-      if (!matriculaForm.forma_pagamento) {
-        setError('Selecione a forma de pagamento (PIX ou Boleto) para enviar a cobrança.');
-        return;
-      }
-      const diaVenc = parseInt(matriculaForm.dia_vencimento_primeira, 10);
-      if (!matriculaForm.dia_vencimento_primeira || Number.isNaN(diaVenc) || diaVenc < 1 || diaVenc > 31) {
-        setError('Informe o dia de vencimento do PIX/Boleto (1 a 31).');
-        return;
-      }
-      if (!matriculaForm.turma) {
-        setError('Selecione uma turma para criar e enviar a cobrança por e-mail.');
-        return;
-      }
-    }
     try {
       setMatriculaLoading(true);
       setError('');
@@ -1250,17 +1244,9 @@ function CadastroUsuario({ onUserChange }) {
       if (matriculaForm.turma) {
         payload.turma = parseInt(matriculaForm.turma, 10);
       }
-      if (!matriculaForm.ja_aluno) {
-        payload.criar_primeira_mensalidade_agora = !!matriculaForm.criar_primeira_mensalidade_agora;
-        if (matriculaForm.criar_primeira_mensalidade_agora && matriculaForm.forma_pagamento) {
-          payload.forma_pagamento = matriculaForm.forma_pagamento;
-        }
-      }
       const response = await api.post(`usuarios/finalizar-agendamento/${matriculaPrecadastro.id}/`, payload);
       if (response.data.message) {
-        const msg = response.data.pagamento_enviado
-          ? 'Matrícula confirmada! E-mails de ativação e cobrança enviados ao aluno.'
-          : 'Obrigado por se cadastrar! Um e-mail será enviado para ativação de senha.';
+        const msg = 'Matrícula confirmada! Um e-mail será enviado para ativação de senha do aluno.';
         setSuccess(msg);
         setShowMatriculaModal(false);
         setMatriculaPrecadastro(null);
@@ -2222,21 +2208,19 @@ function CadastroUsuario({ onUserChange }) {
                 <>
                   <div style={styles.formGroup}>
                     <label style={styles.label} htmlFor="diaVencimento">
-                      Dia de Vencimento da Mensalidade
+                      Dia de vencimento da mensalidade (1 a 31)
                     </label>
-                    <select
+                    <input
+                      type="number"
                       id="diaVencimento"
                       name="diaVencimento"
                       value={diaVencimento}
                       onChange={e => setDiaVencimento(e.target.value)}
-                      style={styles.select}
+                      style={styles.input}
+                      min={1}
+                      max={31}
                       required={activeTab !== 'precadastros'}
-                    >
-                      <option value="">Selecione</option>
-                      <option value="1">Dia 1</option>
-                      <option value="5">Dia 5</option>
-                      <option value="10">Dia 10</option>
-                    </select>
+                    />
                   </div>
                   <div style={styles.formGroup}>
                     <label style={styles.label} htmlFor="valorMensalidadeNovo">
@@ -2477,20 +2461,19 @@ function CadastroUsuario({ onUserChange }) {
 
               <div style={styles.formGroup}>
                 <label style={styles.label} htmlFor="matricula_dia_vencimento">
-                  Dia de vencimento das mensalidades
+                  Dia de vencimento das mensalidades (1 a 31)
                 </label>
-                <select
+                <input
+                  type="number"
                   id="matricula_dia_vencimento"
                   name="dia_vencimento"
                   value={matriculaForm.dia_vencimento}
                   onChange={handleMatriculaChange}
-                  style={styles.select}
+                  style={styles.input}
+                  min={1}
+                  max={31}
                   required
-                >
-                  <option value="1">Dia 1</option>
-                  <option value="5">Dia 5</option>
-                  <option value="10">Dia 10</option>
-                </select>
+                />
               </div>
 
               {!matriculaForm.ja_aluno && (
@@ -2571,83 +2554,25 @@ function CadastroUsuario({ onUserChange }) {
                       (Math.round((parseFloat(matriculaForm.valor_matricula || 0) + parseFloat(matriculaForm.valor_uniforme || 0) + parseFloat(matriculaForm.valor_mensalidade_proporcional || 0)) * 100) / 100).toFixed(2).replace('.', ',')
                     }
                   </div>
-                  {!matriculaForm.criar_primeira_mensalidade_agora && (
-                    <div style={styles.formGroup}>
-                      <label style={styles.label} htmlFor="matricula_dia_vencimento_primeira">
-                        Dia de vencimento da primeira mensalidade
-                      </label>
-                      <input
-                        type="number"
-                        id="matricula_dia_vencimento_primeira"
-                        name="dia_vencimento_primeira"
-                        value={matriculaForm.dia_vencimento_primeira}
-                        onChange={handleMatriculaChange}
-                        style={styles.input}
-                        min="1"
-                        max="31"
-                        placeholder="Ex: 15 (dia 1 a 31)"
-                        required={!matriculaForm.ja_aluno}
-                      />
-                    </div>
-                  )}
-
-                  <div style={{
-                    backgroundColor: '#e8f5e9',
-                    padding: '0.75rem',
-                    borderRadius: '4px',
-                    border: '1px solid #81c784',
-                    marginBottom: '1rem'
-                  }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', marginBottom: matriculaForm.criar_primeira_mensalidade_agora ? '0.75rem' : 0 }}>
-                      <input
-                        type="checkbox"
-                        name="criar_primeira_mensalidade_agora"
-                        checked={!!matriculaForm.criar_primeira_mensalidade_agora}
-                        onChange={handleMatriculaChange}
-                      />
-                      <span><strong>Criar primeira mensalidade agora</strong> e enviar por e-mail ao aluno</span>
+                  <div style={styles.formGroup}>
+                    <label style={styles.label} htmlFor="matricula_dia_vencimento_primeira">
+                      Dia de vencimento da primeira mensalidade (1 a 31)
                     </label>
-                    {matriculaForm.criar_primeira_mensalidade_agora && (
-                      <>
-                        <div style={styles.formGroup}>
-                          <label style={styles.label} htmlFor="matricula_forma_pagamento">
-                            Forma de pagamento
-                          </label>
-                          <select
-                            id="matricula_forma_pagamento"
-                            name="forma_pagamento"
-                            value={matriculaForm.forma_pagamento}
-                            onChange={handleMatriculaChange}
-                            style={styles.select}
-                            required={!!matriculaForm.criar_primeira_mensalidade_agora}
-                          >
-                            <option value="">Selecione</option>
-                            <option value="pix">PIX</option>
-                            <option value="boleto">Boleto</option>
-                          </select>
-                        </div>
-                        <div style={styles.formGroup}>
-                          <label style={styles.label} htmlFor="matricula_dia_vencimento_pagamento">
-                            Dia de vencimento do PIX/Boleto (1 a 31)
-                          </label>
-                          <input
-                            type="number"
-                            id="matricula_dia_vencimento_pagamento"
-                            name="dia_vencimento_primeira"
-                            value={matriculaForm.dia_vencimento_primeira}
-                            onChange={handleMatriculaChange}
-                            style={styles.input}
-                            min="1"
-                            max="31"
-                            placeholder="Ex: 15"
-                            required={!!matriculaForm.criar_primeira_mensalidade_agora}
-                          />
-                          <div style={{ fontSize: '0.85rem', color: '#2e7d32', marginTop: '4px' }}>
-                            Será gerada a cobrança e enviada ao e-mail do aluno com as instruções de pagamento.
-                          </div>
-                        </div>
-                      </>
-                    )}
+                    <input
+                      type="number"
+                      id="matricula_dia_vencimento_primeira"
+                      name="dia_vencimento_primeira"
+                      value={matriculaForm.dia_vencimento_primeira}
+                      onChange={handleMatriculaChange}
+                      style={styles.input}
+                      min="1"
+                      max="31"
+                      placeholder="Ex: 15"
+                      required={!matriculaForm.ja_aluno}
+                    />
+                    <div style={{ fontSize: '0.82rem', color: '#555', marginTop: '4px' }}>
+                      A primeira parcela é registrada no financeiro na matrícula; a cobrança e a baixa são tratadas pelo gerente no sistema.
+                    </div>
                   </div>
                 </>
               )}

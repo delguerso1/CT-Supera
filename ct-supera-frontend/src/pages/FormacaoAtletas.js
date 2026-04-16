@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../services/api';
 import { formatarCpfMascara, apenasDigitosCpf, MSG_CPF_11_DIGITOS } from '../utils/cpf';
 import { normalizarTelefoneBrParaApi } from '../utils/telefone';
+import { inputDateToApiDate } from '../utils/dateApi';
 
 /** Mesma base visual de AgendamentoPage (aula experimental). */
 const styles = {
@@ -200,6 +201,8 @@ function FormacaoAtletas() {
         email: formData.email,
         telefone: telefoneDigitos,
         data_nascimento: formData.data_nascimento
+          ? inputDateToApiDate(formData.data_nascimento) || formData.data_nascimento
+          : formData.data_nascimento
       };
       if (formData.turma) payload.turma = parseInt(formData.turma, 10);
       payload.origem = 'formulario';

@@ -12,6 +12,7 @@ from django.db import models
 from financeiro.services import criar_mensalidade_ao_vincular_turma
 from datetime import date
 from calendar import monthrange
+from app.date_api import format_data_api
 
 
 def _validar_aluno_turma(aluno, turma):
@@ -251,9 +252,10 @@ class DatasAulaExperimentalAPIView(APIView):
         if not weekdays_validos:
             return Response({"datas": []}, status=status.HTTP_200_OK)
         _, ultimo_dia = monthrange(hoje.year, hoje.month)
-        datas = []
+        datas_objs = []
         for dia in range(1, ultimo_dia + 1):
             d = date(hoje.year, hoje.month, dia)
             if d.weekday() in weekdays_validos and d >= hoje:
-                datas.append(d.isoformat())
-        return Response({"datas": sorted(datas)}, status=status.HTTP_200_OK)
+                datas_objs.append(d)
+        datas = [format_data_api(x) for x in sorted(datas_objs)]
+        return Response({"datas": datas}, status=status.HTTP_200_OK)

@@ -235,8 +235,8 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
     if (isoForm) return calcularIdade(isoForm);
     const saved = painelAluno.usuario.data_nascimento;
     if (saved) {
-      const m = String(saved).match(/^(\d{4}-\d{2}-\d{2})/);
-      if (m) return calcularIdade(m[1]);
+      const id = calcularIdade(String(saved));
+      if (id !== null) return id;
     }
     if (typeof painelAluno.idade === 'number') return painelAluno.idade;
     return null;
@@ -334,13 +334,14 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
 
   const formatDate = (value?: string) => {
     if (!value) return '-';
-    const str = String(value).split('T')[0];
-    const parts = str.split('-');
-    if (parts.length === 3 && parts.every((p) => p.length > 0)) {
-      const [year, month, day] = parts.map(Number);
-      if (!Number.isNaN(year) && !Number.isNaN(month) && !Number.isNaN(day)) {
-        return new Date(year, month - 1, day).toLocaleDateString('pt-BR');
-      }
+    const s = String(value).trim().split(/[\sT]/)[0];
+    const dmY = /^(\d{2})-(\d{2})-(\d{4})$/.exec(s);
+    if (dmY) {
+      return new Date(+dmY[3], +dmY[2] - 1, +dmY[1]).toLocaleDateString('pt-BR');
+    }
+    const ymd = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+    if (ymd) {
+      return new Date(+ymd[1], +ymd[2] - 1, +ymd[3]).toLocaleDateString('pt-BR');
     }
     const parsed = new Date(value);
     if (Number.isNaN(parsed.getTime())) return value;
@@ -434,7 +435,7 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
     }
     const isoForm = normalizarDataNascimentoParaApi(form.data_nascimento);
     const saved = painelAluno.usuario.data_nascimento;
-    const isoSalva = saved ? String(saved).match(/^(\d{4}-\d{2}-\d{2})/)?.[1] : undefined;
+    const isoSalva = saved ? normalizarDataNascimentoParaApi(String(saved)) ?? undefined : undefined;
     const isoEfetivo = isoForm || isoSalva || null;
     const idade = isoEfetivo ? calcularIdade(isoEfetivo) : null;
     if (idade !== null && idade < 18) {

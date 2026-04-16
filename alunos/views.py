@@ -11,6 +11,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from .serializers import MensalidadeSerializer, UsuarioSerializer
 from rest_framework import status
+from app.date_api import format_data_api
 
 _DIAS_SEMANA_NOMES = (
     "Segunda-feira",
@@ -41,7 +42,7 @@ def _serialize_presenca_historico_aluno(presenca: Presenca) -> dict:
     )
     return {
         "id": presenca.id,
-        "data": presenca.data.isoformat(),
+        "data": format_data_api(presenca.data),
         "turma_id": turma.id,
         "turma": str(turma),
         "turma_nome": str(turma),
@@ -221,7 +222,7 @@ class PainelAlunoAPIView(APIView):
                 "ausencia_registrada": ausencia_registrada,
                 "pode_fazer_checkin": pode_fazer_checkin,
                 "motivo_checkin_bloqueado": motivo_checkin_bloqueado,
-                "data_aula_checkin": data_aula_checkin.isoformat() if data_aula_checkin else None,
+                "data_aula_checkin": format_data_api(data_aula_checkin) if data_aula_checkin else None,
                 "horario_aula_checkin": horario_aula_checkin,
             }
         })
