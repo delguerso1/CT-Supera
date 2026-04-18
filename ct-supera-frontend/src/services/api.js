@@ -16,6 +16,21 @@ const DEFAULT_TIMEOUT_MS =
 // Define a URL base para imagens/media
 export const MEDIA_URL = process.env.REACT_APP_MEDIA_URL || (isDevelopment ? 'http://localhost:8000' : 'https://ctsupera.com.br');
 
+/**
+ * Valor para CSS `backgroundImage` com foto em /media/.
+ * Só adiciona `?t=` quando há cache-bust explícito (ex.: após upload). Evita `Date.now()` a cada
+ * render, que mudava a URL sempre e impedia cache do navegador.
+ */
+export function mediaProfileBackgroundImageUrl(relativePath, cacheBustMs) {
+  if (!relativePath) return 'none';
+  const base = `${MEDIA_URL}${relativePath}`;
+  const t = cacheBustMs != null && cacheBustMs !== '' ? Number(cacheBustMs) : NaN;
+  if (Number.isFinite(t)) {
+    return `url(${base}?t=${t})`;
+  }
+  return `url(${base})`;
+}
+
 const api = axios.create({
   baseURL: baseURL,
   timeout: DEFAULT_TIMEOUT_MS,

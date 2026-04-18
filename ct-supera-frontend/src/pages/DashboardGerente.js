@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import api, { MEDIA_URL } from '../services/api';
+import api, { mediaProfileBackgroundImageUrl } from '../services/api';
 import CadastroUsuario from '../pages/CadastroUsuario';
 import ControleFinanceiro from '../pages/ControleFinanceiro';
 import RelatoriosGerente from '../pages/RelatoriosGerente';
@@ -968,7 +968,7 @@ function DashboardGerente({ user }) {
               color: '#1F6C86',
               border: '3px solid #e0e0e0',
               overflow: 'hidden',
-              backgroundImage: gerente?.foto_perfil ? `url(${MEDIA_URL}${gerente.foto_perfil}?t=${gerente._photoTimestamp || Date.now()})` : 'none',
+              backgroundImage: mediaProfileBackgroundImageUrl(gerente?.foto_perfil, gerente?._photoTimestamp),
               backgroundSize: 'cover',
               backgroundPosition: 'center'
             }}>
@@ -1311,7 +1311,7 @@ function DashboardGerente({ user }) {
         <div style={styles.profileSection}>
           <div style={{
             ...styles.profilePhoto,
-            backgroundImage: gerente?.foto_perfil ? `url(${MEDIA_URL}${gerente.foto_perfil}?t=${gerente._photoTimestamp || Date.now()})` : 'none',
+            backgroundImage: mediaProfileBackgroundImageUrl(gerente?.foto_perfil, gerente?._photoTimestamp),
             backgroundSize: 'cover',
             backgroundPosition: 'center'
           }}>

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import api, { MEDIA_URL } from '../services/api';
+import api, { mediaProfileBackgroundImageUrl } from '../services/api';
 import {
   apiDateToInputDate,
   formatApiDateDisplay,
@@ -1156,7 +1156,7 @@ function DashboardAluno({ user }) {
               color: '#1F6C86',
               border: '3px solid #e0e0e0',
               overflow: 'hidden',
-              backgroundImage: aluno?.foto_perfil ? `url(${MEDIA_URL}${aluno.foto_perfil}?t=${aluno._photoTimestamp || Date.now()})` : 'none',
+              backgroundImage: mediaProfileBackgroundImageUrl(aluno?.foto_perfil, aluno?._photoTimestamp),
               backgroundSize: 'cover',
               backgroundPosition: 'center'
             }}>
@@ -2016,7 +2016,7 @@ function DashboardAluno({ user }) {
         <div style={styles.profileSection}>
           <div style={{
             ...styles.profilePhoto,
-            backgroundImage: aluno?.foto_perfil ? `url(${MEDIA_URL}${aluno.foto_perfil}?t=${aluno._photoTimestamp || Date.now()})` : 'none',
+            backgroundImage: mediaProfileBackgroundImageUrl(aluno?.foto_perfil, aluno?._photoTimestamp),
             backgroundSize: 'cover',
             backgroundPosition: 'center'
           }}>

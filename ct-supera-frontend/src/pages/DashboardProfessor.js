@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import api, { MEDIA_URL } from '../services/api';
+import api, { mediaProfileBackgroundImageUrl } from '../services/api';
 import { useNavigate } from 'react-router-dom';
 import { NAVBAR_HEIGHT_CSS } from '../constants/layout';
 import { apiDateToInputDate, formatApiDateDisplay, inputDateToApiDate } from '../utils/dateApi';
@@ -782,7 +782,7 @@ function DashboardProfessor({ user }) {
               color: '#1F6C86',
               border: '3px solid #e0e0e0',
               overflow: 'hidden',
-              backgroundImage: professor?.foto_perfil ? `url(${MEDIA_URL}${professor.foto_perfil}?t=${professor._photoTimestamp || Date.now()})` : 'none',
+              backgroundImage: mediaProfileBackgroundImageUrl(professor?.foto_perfil, professor?._photoTimestamp),
               backgroundSize: 'cover',
               backgroundPosition: 'center'
             }}>
@@ -1191,7 +1191,7 @@ function DashboardProfessor({ user }) {
         <div style={styles.profileSection}>
           <div style={{
             ...styles.profilePhoto,
-            backgroundImage: professor?.foto_perfil ? `url(${MEDIA_URL}${professor.foto_perfil}?t=${professor._photoTimestamp || Date.now()})` : 'none',
+            backgroundImage: mediaProfileBackgroundImageUrl(professor?.foto_perfil, professor?._photoTimestamp),
             backgroundSize: 'cover',
             backgroundPosition: 'center'
           }}>
