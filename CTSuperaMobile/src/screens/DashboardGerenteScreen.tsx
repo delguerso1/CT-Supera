@@ -30,7 +30,11 @@ import {
 } from '../types';
 import { NavigationProps } from '../types';
 import CONFIG from '../config';
-import { formatApiDateLocale } from '../utils/dateApi';
+import {
+  formatApiDateDisplay,
+  formatApiDateLocale,
+  formatApiDateTimeDisplay,
+} from '../utils/dateApi';
 import { launchImageLibrary, ImagePickerResponse, MediaType } from 'react-native-image-picker';
 
 const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }) => {
@@ -319,31 +323,12 @@ const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }
     }).format(safeValue);
   };
 
-  const formatDate = (value?: string) => {
-    if (!value) return '-';
-    const parts = String(value).split('-');
-    if (parts.length === 3 && parts.every(part => part.length > 0)) {
-      const [year, month, day] = parts.map(Number);
-      if (!Number.isNaN(year) && !Number.isNaN(month) && !Number.isNaN(day)) {
-        return new Date(year, month - 1, day).toLocaleDateString('pt-BR');
-      }
-    }
-    const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime())) return value;
-    return parsed.toLocaleDateString('pt-BR');
-  };
+  const formatDate = (value?: string) => (value ? formatApiDateDisplay(value) : '-');
 
   const formatDateTime = (value?: string) => {
     if (!value) return '—';
-    const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime())) return '—';
-    return parsed.toLocaleString('pt-BR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    const s = formatApiDateTimeDisplay(value);
+    return s || '—';
   };
 
   const normalizeSearch = (value: string) =>
@@ -679,9 +664,7 @@ const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }
               <View key={activity.id} style={styles.activityCard}>
                 <Text style={styles.activityDescription}>{activity.description}</Text>
                 <Text style={styles.activityDate}>
-                  {activity.data && !Number.isNaN(new Date(activity.data).getTime())
-                    ? new Date(activity.data).toLocaleDateString('pt-BR')
-                    : '-'}
+                  {activity.data ? formatApiDateDisplay(activity.data) : '-'}
                 </Text>
               </View>
             ))
@@ -1032,7 +1015,7 @@ const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }
                   style={styles.precadastroHeader}
                   onPress={() => {
                     const nome = precadastro.nome || `${precadastro.first_name || ''} ${precadastro.last_name || ''}`.trim() || 'Sem nome';
-                    let msg = `E-mail: ${precadastro.email}\nTelefone: ${precadastro.telefone || '-'}\nCadastrado em: ${new Date(precadastro.criado_em).toLocaleDateString('pt-BR')}`;
+                    let msg = `E-mail: ${precadastro.email}\nTelefone: ${precadastro.telefone || '-'}\nCadastrado em: ${formatApiDateTimeDisplay(precadastro.criado_em)}`;
                     if (precadastro.origem === 'aula_experimental' && precadastro.data_aula_experimental) {
                       msg += `\n\nData da aula experimental: ${formatApiDateLocale(precadastro.data_aula_experimental)}`;
                     }
@@ -1053,7 +1036,7 @@ const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }
                   </View>
                 </TouchableOpacity>
                 <Text style={styles.precadastroDate}>
-                  Cadastrado em: {new Date(precadastro.criado_em).toLocaleDateString('pt-BR')}
+                  Cadastrado em: {formatApiDateTimeDisplay(precadastro.criado_em)}
                 </Text>
                 <TouchableOpacity
                   style={styles.converterButton}
@@ -1432,7 +1415,7 @@ const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }
                     <Text style={styles.observacaoGerenteMeta}>
                       Por {observacaoGerente.autor_nome}
                       {observacaoGerente.atualizado_em
-                        ? ` · ${new Date(observacaoGerente.atualizado_em).toLocaleString('pt-BR')}`
+                        ? ` · ${formatApiDateTimeDisplay(observacaoGerente.atualizado_em)}`
                         : ''}
                     </Text>
                   ) : null}

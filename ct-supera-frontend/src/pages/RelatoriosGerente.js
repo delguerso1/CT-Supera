@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import api from '../services/api';
 import { downloadPdfRelatorioAlunos, downloadPdfRelatorioFinanceiro } from '../utils/relatoriosPdf';
-import { parseApiDateToParts } from '../utils/dateApi';
+import { formatApiDateTimeDisplay, parseApiDateToParts } from '../utils/dateApi';
 
 function todayApiDate() {
   const d = new Date();
@@ -556,7 +556,7 @@ function RelatoriosGerente({ user }) {
                   <p style={{ margin: 0, fontSize: 13, color: '#666' }}>
                     Por {observacaoGerente.autor_nome}
                     {observacaoGerente.atualizado_em
-                      ? ` · ${new Date(observacaoGerente.atualizado_em).toLocaleString('pt-BR')}`
+                      ? ` · ${formatApiDateTimeDisplay(observacaoGerente.atualizado_em)}`
                       : ''}
                   </p>
                 ) : null}

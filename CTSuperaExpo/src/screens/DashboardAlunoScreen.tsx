@@ -34,6 +34,12 @@ import {
   normalizarDataNascimentoParaApi,
   calcularIdade,
 } from '../utils/dataNascimento';
+import {
+  apiDateTimeStringToLocalDate,
+  formatApiDateDisplay,
+  formatApiDateTimeDisplay,
+  formatApiMonthYearDisplay,
+} from '../utils/dateApi';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import {
@@ -332,37 +338,16 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
 
-  const formatDate = (value?: string) => {
-    if (!value) return '-';
-    const s = String(value).trim().split(/[\sT]/)[0];
-    const dmY = /^(\d{2})-(\d{2})-(\d{4})$/.exec(s);
-    if (dmY) {
-      return new Date(+dmY[3], +dmY[2] - 1, +dmY[1]).toLocaleDateString('pt-BR');
-    }
-    const ymd = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
-    if (ymd) {
-      return new Date(+ymd[1], +ymd[2] - 1, +ymd[3]).toLocaleDateString('pt-BR');
-    }
-    const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime())) return value;
-    return parsed.toLocaleDateString('pt-BR');
-  };
+  const formatDate = (value?: string) => (value ? formatApiDateDisplay(value) : '-');
 
-  const formatMonthYear = (value?: string) => {
-    if (!value) return '-';
-    const [year, month] = value.split('-').map(Number);
-    if (!year || !month) return formatDate(value);
-    return new Date(year, month - 1, 1).toLocaleDateString('pt-BR', {
-      month: 'long',
-      year: 'numeric',
-    });
-  };
+  const formatMonthYear = (value?: string) => (value ? formatApiMonthYearDisplay(value) : '-');
 
   const canFillParqAgain = () => {
     if (!painelAluno?.usuario.parq_completed || !painelAluno?.usuario.parq_completion_date) {
       return true;
     }
-    const filledAt = new Date(painelAluno.usuario.parq_completion_date);
+    const filledAt = apiDateTimeStringToLocalDate(painelAluno.usuario.parq_completion_date);
+    if (!filledAt) return true;
     const oneYearLater = new Date(filledAt);
     oneYearLater.setFullYear(oneYearLater.getFullYear() + 1);
     return new Date() >= oneYearLater;
@@ -372,7 +357,8 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
     if (!painelAluno?.usuario.parq_completed || !painelAluno?.usuario.parq_completion_date) {
       return 0;
     }
-    const filledAt = new Date(painelAluno.usuario.parq_completion_date);
+    const filledAt = apiDateTimeStringToLocalDate(painelAluno.usuario.parq_completion_date);
+    if (!filledAt) return 0;
     const oneYearLater = new Date(filledAt);
     oneYearLater.setFullYear(oneYearLater.getFullYear() + 1);
     const diffTime = oneYearLater.getTime() - new Date().getTime();
@@ -382,15 +368,8 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
 
   const formatParqDate = (value?: string) => {
     if (!value) return 'Data não disponível';
-    const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime())) return 'Data inválida';
-    return parsed.toLocaleString('pt-BR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    const s = formatApiDateTimeDisplay(value);
+    return s || 'Data inválida';
   };
 
   const handleFormChange = (field: string, value: string) => {
@@ -1854,7 +1833,7 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
                 </Text>
                 {mensalidade.data_pagamento && (
                   <Text style={styles.mensalidadeDate}>
-                    Pago em: {new Date(mensalidade.data_pagamento).toLocaleDateString('pt-BR')}
+                    Pago em: {formatApiDateTimeDisplay(mensalidade.data_pagamento)}
                   </Text>
                 )}
               </View>

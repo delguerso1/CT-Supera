@@ -1,6 +1,11 @@
 import React, { useEffect, useState, useRef } from 'react';
 import api, { normalizeDrfNextUrl } from '../services/api';
-import { apiDateToInputDate, formatApiDateDisplay, inputDateToApiDate } from '../utils/dateApi';
+import {
+  apiDateToInputDate,
+  formatApiDateDisplay,
+  formatApiDateTimeDisplay,
+  inputDateToApiDate,
+} from '../utils/dateApi';
 
 function isTimeoutError(err) {
   return (
@@ -245,18 +250,11 @@ function ControleFinanceiro({ user, onDataChange }) {
     return formatApiDateDisplay(dateStr);
   }
 
-  /** Data e hora do pagamento (mensalidade com data_pagamento ISO). */
+  /** Data/hora do pagamento: API usa `format_datetime_api` (DD-MM-AAAA HH:MM), não ISO. */
   function formatDateTime(dateStr) {
     if (!dateStr) return '—';
-    const d = new Date(dateStr);
-    if (Number.isNaN(d.getTime())) return '—';
-    return d.toLocaleString('pt-BR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    const s = formatApiDateTimeDisplay(dateStr);
+    return s || '—';
   }
 
   function formatCurrency(value) {

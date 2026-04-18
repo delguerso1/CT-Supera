@@ -2,7 +2,12 @@ import React, { useEffect, useState } from 'react';
 import api, { mediaProfileBackgroundImageUrl } from '../services/api';
 import { useNavigate } from 'react-router-dom';
 import { NAVBAR_HEIGHT_CSS } from '../constants/layout';
-import { apiDateToInputDate, formatApiDateDisplay, inputDateToApiDate } from '../utils/dateApi';
+import {
+  apiDateToInputDate,
+  formatApiDateDisplay,
+  formatApiDateTimeDisplay,
+  inputDateToApiDate,
+} from '../utils/dateApi';
 
 // Hook para detectar tamanho da tela
 const useResponsive = () => {
@@ -1338,7 +1343,7 @@ function DashboardProfessor({ user }) {
                   <p style={{ fontSize: '12px', color: '#888', marginTop: '8px' }}>
                     Por {observacaoMeta.autor_nome}
                     {observacaoMeta.atualizado_em
-                      ? ` · ${new Date(observacaoMeta.atualizado_em).toLocaleString('pt-BR')}`
+                      ? ` · ${formatApiDateTimeDisplay(observacaoMeta.atualizado_em)}`
                       : ''}
                   </p>
                 ) : null}

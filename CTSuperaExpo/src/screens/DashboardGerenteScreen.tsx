@@ -39,6 +39,10 @@ import {
   isoParaBrDisplay,
   normalizarDataNascimentoParaApi,
 } from '../utils/dataNascimento';
+import {
+  formatApiDateDisplay,
+  formatApiDateTimeDisplay,
+} from '../utils/dateApi';
 
 /** Navegação a partir do dashboard embutido no shell do gerente (abas topo/fundo). */
 export type GerenteNavigateTarget =
@@ -410,31 +414,12 @@ const DashboardGerenteScreen: React.FC<DashboardGerenteProps> = ({
     }).format(safeValue);
   };
 
-  const formatDate = (value?: string) => {
-    if (!value) return '-';
-    const parts = String(value).split('-');
-    if (parts.length === 3 && parts.every(part => part.length > 0)) {
-      const [year, month, day] = parts.map(Number);
-      if (!Number.isNaN(year) && !Number.isNaN(month) && !Number.isNaN(day)) {
-        return new Date(year, month - 1, day).toLocaleDateString('pt-BR');
-      }
-    }
-    const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime())) return value;
-    return parsed.toLocaleDateString('pt-BR');
-  };
+  const formatDate = (value?: string) => (value ? formatApiDateDisplay(value) : '-');
 
   const formatDateTime = (value?: string) => {
     if (!value) return '—';
-    const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime())) return '—';
-    return parsed.toLocaleString('pt-BR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    const s = formatApiDateTimeDisplay(value);
+    return s || '—';
   };
 
   const normalizeSearch = (value: string) =>
@@ -1007,9 +992,7 @@ const DashboardGerenteScreen: React.FC<DashboardGerenteProps> = ({
               <View key={activity.id} style={styles.activityCard}>
                 <Text style={styles.activityDescription}>{activity.description}</Text>
                 <Text style={styles.activityDate}>
-                  {activity.data && !Number.isNaN(new Date(activity.data).getTime())
-                    ? new Date(activity.data).toLocaleDateString('pt-BR')
-                    : '-'}
+                  {activity.data ? formatApiDateDisplay(activity.data) : '-'}
                 </Text>
               </View>
             ))
@@ -1682,7 +1665,7 @@ const DashboardGerenteScreen: React.FC<DashboardGerenteProps> = ({
                     <Text style={styles.relatorioObservacaoMeta}>
                       Por {observacaoGerente.autor_nome}
                       {observacaoGerente.atualizado_em
-                        ? ` · ${new Date(observacaoGerente.atualizado_em).toLocaleString('pt-BR')}`
+                        ? ` · ${formatApiDateTimeDisplay(observacaoGerente.atualizado_em)}`
                         : ''}
                     </Text>
                   ) : null}

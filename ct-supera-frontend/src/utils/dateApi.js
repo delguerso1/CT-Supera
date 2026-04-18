@@ -36,10 +36,25 @@ export function inputDateToApiDate(htmlYmd) {
 export function formatApiDateDisplay(value) {
   const p = parseApiDateToParts(value);
   if (!p) {
-    const d = new Date(value);
+    const d = new Date(String(value));
     return Number.isNaN(d.getTime()) ? String(value || '') : d.toLocaleDateString('pt-BR');
   }
   return new Date(p.y, p.m - 1, p.d).toLocaleDateString('pt-BR');
+}
+
+/** Mês e ano legíveis a partir de data da API (ex.: vencimento de mensalidade). */
+export function formatApiMonthYearDisplay(value, locales = 'pt-BR') {
+  const p = parseApiDateToParts(value);
+  if (!p) {
+    const d = new Date(String(value));
+    return Number.isNaN(d.getTime())
+      ? String(value ?? '')
+      : d.toLocaleDateString(locales, { month: 'long', year: 'numeric' });
+  }
+  return new Date(p.y, p.m - 1, p.d).toLocaleDateString(locales, {
+    month: 'long',
+    year: 'numeric',
+  });
 }
 
 /**
@@ -61,4 +76,57 @@ export function formatApiDateLocale(value, locales = 'pt-BR', options) {
     return Number.isNaN(d.getTime()) ? String(value ?? '') : d.toLocaleDateString(locales, opts);
   }
   return new Date(p.y, p.m - 1, p.d).toLocaleDateString(locales, opts);
+}
+
+/**
+ * Data/hora da API: "DD-MM-AAAA HH:MM" (format_datetime_api), ISO ou só data.
+ */
+export function parseApiDateTimeParts(value) {
+  if (value == null || value === '') return null;
+  const s = String(value).trim();
+  const br = /^(\d{2})-(\d{2})-(\d{4})\s+(\d{1,2}):(\d{2})$/.exec(s);
+  if (br) {
+    return {
+      day: +br[1],
+      month: +br[2],
+      year: +br[3],
+      hour: +br[4],
+      minute: +br[5],
+    };
+  }
+  const dIso = new Date(s);
+  if (!Number.isNaN(dIso.getTime())) {
+    return {
+      day: dIso.getDate(),
+      month: dIso.getMonth() + 1,
+      year: dIso.getFullYear(),
+      hour: dIso.getHours(),
+      minute: dIso.getMinutes(),
+    };
+  }
+  const dp = parseApiDateToParts(s);
+  if (dp) return { day: dp.d, month: dp.m, year: dp.y, hour: 0, minute: 0 };
+  return null;
+}
+
+/** Converte string data/hora da API em Date no fuso local (cálculos, comparações). */
+export function apiDateTimeStringToLocalDate(value) {
+  const p = parseApiDateTimeParts(value);
+  if (!p) return null;
+  return new Date(p.year, p.month - 1, p.day, p.hour, p.minute, 0, 0);
+}
+
+export function formatApiDateTimeDisplay(value, locales = 'pt-BR', options) {
+  const opts =
+    options ??
+    {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    };
+  const d = apiDateTimeStringToLocalDate(value);
+  if (!d) return String(value ?? '');
+  return d.toLocaleString(locales, opts);
 }

@@ -8,7 +8,12 @@ import {
   MSG_CPF_MATRICULA,
 } from '../utils/cpf';
 import { normalizarTelefoneBrParaApi } from '../utils/telefone';
-import { apiDateToInputDate, formatApiDateLocale, inputDateToApiDate } from '../utils/dateApi';
+import {
+  apiDateToInputDate,
+  formatApiDateLocale,
+  formatApiDateTimeDisplay,
+  inputDateToApiDate,
+} from '../utils/dateApi';
 
 const styles = {
   container: {
@@ -518,17 +523,10 @@ function CadastroUsuario({ onUserChange }) {
     return telefone;
   };
 
-  // Função para formatar data e hora do preenchimento do Par-Q
   const formatParqDate = (dateString) => {
     if (!dateString) return 'N/A';
-    const date = new Date(dateString);
-    return date.toLocaleString('pt-BR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    const s = formatApiDateTimeDisplay(dateString);
+    return s || 'N/A';
   };
 
   const getFotoUrl = (foto) => {

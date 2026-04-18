@@ -1,8 +1,11 @@
 import React, { useEffect, useState, useRef } from 'react';
 import api, { mediaProfileBackgroundImageUrl } from '../services/api';
 import {
+  apiDateTimeStringToLocalDate,
   apiDateToInputDate,
   formatApiDateDisplay,
+  formatApiDateTimeDisplay,
+  formatApiMonthYearDisplay,
   inputDateToApiDate,
   parseApiDateToParts,
 } from '../utils/dateApi';
@@ -412,14 +415,6 @@ function formatDateOnly(dateString) {
   return Number.isNaN(d.getTime()) ? String(dateString) : d.toLocaleDateString('pt-BR');
 }
 
-function formatMonthYear(dateString) {
-  if (!dateString) return '-';
-  const p = parseApiDateToParts(dateString);
-  const ref = p ? new Date(p.y, p.m - 1, p.d) : new Date(dateString);
-  if (Number.isNaN(ref.getTime())) return String(dateString);
-  return ref.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
-}
-
 function getInitials(name) {
   if (!name) return '?';
   return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
@@ -585,7 +580,8 @@ function DashboardAluno({ user }) {
       return true; // Pode preencher se nunca preencheu
     }
     
-    const dataPreenchimento = new Date(aluno.parq_completion_date);
+    const dataPreenchimento = apiDateTimeStringToLocalDate(aluno.parq_completion_date);
+    if (!dataPreenchimento) return true;
     const umAnoDepois = new Date(dataPreenchimento);
     umAnoDepois.setFullYear(umAnoDepois.getFullYear() + 1);
     const hoje = new Date();
@@ -599,7 +595,8 @@ function DashboardAluno({ user }) {
       return 0;
     }
     
-    const dataPreenchimento = new Date(aluno.parq_completion_date);
+    const dataPreenchimento = apiDateTimeStringToLocalDate(aluno.parq_completion_date);
+    if (!dataPreenchimento) return 0;
     const umAnoDepois = new Date(dataPreenchimento);
     umAnoDepois.setFullYear(umAnoDepois.getFullYear() + 1);
     const hoje = new Date();
@@ -624,25 +621,10 @@ function DashboardAluno({ user }) {
     });
   };
 
-  // Função para formatar data e hora do preenchimento do Par-Q
   const formatParqDate = (dateString) => {
     if (!dateString) return 'Data não disponível';
-    try {
-      const date = new Date(dateString);
-      if (isNaN(date.getTime())) {
-        return 'Data inválida';
-      }
-      return date.toLocaleString('pt-BR', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-    } catch (error) {
-      console.error('Erro ao formatar data:', error, dateString);
-      return 'Erro ao formatar data';
-    }
+    const s = formatApiDateTimeDisplay(dateString);
+    return s || 'Data inválida';
   };
 
   const handleChange = e => {
@@ -1832,7 +1814,7 @@ function DashboardAluno({ user }) {
                 {mensalidadesPendentes.map(mensalidade => (
                   <tr key={mensalidade.id}>
                     <td style={styles.td}>
-                      {formatMonthYear(mensalidade.data_vencimento)}
+                      {formatApiMonthYearDisplay(mensalidade.data_vencimento)}
                     </td>
                     <td style={styles.td}>
                       {formatCurrency(mensalidade.valor_efetivo ?? mensalidade.valor)}
@@ -1915,7 +1897,7 @@ function DashboardAluno({ user }) {
               {historicoMensalidades.map(mensalidade => (
                 <tr key={mensalidade.id}>
                   <td style={styles.td}>
-                      {formatMonthYear(mensalidade.data_vencimento)}
+                      {formatApiMonthYearDisplay(mensalidade.data_vencimento)}
                   </td>
                   <td style={styles.td}>
                     {formatCurrency(mensalidade.valor_efetivo ?? mensalidade.valor)}
@@ -1933,7 +1915,7 @@ function DashboardAluno({ user }) {
                   </td>
                   <td style={styles.td}>
                     {mensalidade.data_pagamento
-                      ? new Date(mensalidade.data_pagamento).toLocaleDateString()
+                      ? formatApiDateTimeDisplay(mensalidade.data_pagamento)
                       : '-'}
                   </td>
                   <td style={styles.td}>

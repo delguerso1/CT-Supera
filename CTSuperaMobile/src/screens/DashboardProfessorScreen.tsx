@@ -24,6 +24,7 @@ import {
 } from '../types';
 import { NavigationProps } from '../types';
 import CONFIG from '../config';
+import { formatApiDateDisplay, formatApiDateTimeDisplay } from '../utils/dateApi';
 
 const MAX_OBSERVACAO_AULA_CHARS = 1000;
 
@@ -97,12 +98,7 @@ const DashboardProfessorScreen: React.FC<NavigationProps> = ({ navigation, route
     );
   };
 
-  const formatDate = (value?: string) => {
-    if (!value) return '-';
-    const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime())) return value;
-    return parsed.toLocaleDateString('pt-BR');
-  };
+  const formatDate = (value?: string) => (value ? formatApiDateDisplay(value) : '-');
 
   const getInitials = (name: string) => {
     if (!name) return '?';
@@ -456,7 +452,7 @@ const DashboardProfessorScreen: React.FC<NavigationProps> = ({ navigation, route
               <Text style={styles.sectionTitle}>Registrar Presença</Text>
               <Text style={styles.sectionSubtitle}>{checkinData.turma}</Text>
               <Text style={styles.sectionSubtitle}>
-                Data: {new Date(checkinData.data).toLocaleDateString('pt-BR')}
+                Data: {formatApiDateDisplay(checkinData.data)}
               </Text>
             </View>
             <TouchableOpacity
@@ -521,7 +517,7 @@ const DashboardProfessorScreen: React.FC<NavigationProps> = ({ navigation, route
               <Text style={styles.observacaoMeta}>
                 Por {observacaoInfo.autor_nome}
                 {observacaoInfo.atualizado_em
-                  ? ` · ${new Date(observacaoInfo.atualizado_em).toLocaleString('pt-BR')}`
+                  ? ` · ${formatApiDateTimeDisplay(observacaoInfo.atualizado_em)}`
                   : ''}
               </Text>
             ) : null}
