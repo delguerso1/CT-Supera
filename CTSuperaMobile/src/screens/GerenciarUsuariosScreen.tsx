@@ -23,6 +23,7 @@ import {
   MSG_CPF_MATRICULA,
 } from '../utils/cpf';
 import { normalizarTelefoneBrParaApi, telefoneBrValido } from '../utils/telefone';
+import { formatApiDateLocale } from '../utils/dateApi';
 
 type TabKey = 'alunos' | 'professores' | 'gerentes' | 'precadastros';
 
@@ -545,7 +546,7 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
                         const nome = item.nome || `${item.first_name || ''} ${item.last_name || ''}`.trim() || 'Sem nome';
                         let msg = `E-mail: ${item.email}\nTelefone: ${item.telefone || '-'}\nTipo: ${item.origem_display || item.origem || '-'}\nStatus: ${item.status === 'matriculado' ? 'Matriculado' : item.status === 'cancelado' ? 'Cancelado' : 'Pendente'}`;
                         if (item.origem === 'aula_experimental' && item.data_aula_experimental) {
-                          msg += `\n\nData da aula experimental: ${new Date(item.data_aula_experimental + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}`;
+                          msg += `\n\nData da aula experimental: ${formatApiDateLocale(item.data_aula_experimental)}`;
                         }
                         Alert.alert(nome, msg, [{ text: 'OK' }]);
                       }}

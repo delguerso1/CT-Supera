@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import api from '../services/api';
+import { formatApiDateLocale } from '../utils/dateApi';
 
 const styles = {
   container: {
@@ -133,10 +134,10 @@ function ReagendamentoPage() {
             Sua aula está agendada para{' '}
             <strong>
               {info.data_aula_experimental
-                ? new Date(info.data_aula_experimental + 'T12:00:00').toLocaleDateString('pt-BR', {
+                ? formatApiDateLocale(info.data_aula_experimental, 'pt-BR', {
                     weekday: 'long',
                     day: '2-digit',
-                    month: 'long'
+                    month: 'long',
                   })
                 : ''}
             </strong>
@@ -157,10 +158,10 @@ function ReagendamentoPage() {
               </option>
               {datasDisponiveis.map((d) => (
                 <option key={d} value={d}>
-                  {new Date(d + 'T12:00:00').toLocaleDateString('pt-BR', {
+                  {formatApiDateLocale(d, 'pt-BR', {
                     weekday: 'long',
                     day: '2-digit',
-                    month: 'long'
+                    month: 'long',
                   })}
                 </option>
               ))}

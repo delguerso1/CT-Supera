@@ -41,3 +41,24 @@ export function formatApiDateDisplay(value) {
   }
   return new Date(p.y, p.m - 1, p.d).toLocaleDateString('pt-BR');
 }
+
+/**
+ * Formata data vinda da API (DD-MM-AAAA ou AAAA-MM-DD) com opções de locale.
+ * Evita `new Date(str + 'T12:00:00')`, que quebra com DD-MM-AAAA (não é ISO 8601).
+ */
+export function formatApiDateLocale(value, locales = 'pt-BR', options) {
+  const opts =
+    options ??
+    {
+      weekday: 'long',
+      day: '2-digit',
+      month: 'long',
+      year: 'numeric',
+    };
+  const p = parseApiDateToParts(value);
+  if (!p) {
+    const d = new Date(value);
+    return Number.isNaN(d.getTime()) ? String(value ?? '') : d.toLocaleDateString(locales, opts);
+  }
+  return new Date(p.y, p.m - 1, p.d).toLocaleDateString(locales, opts);
+}

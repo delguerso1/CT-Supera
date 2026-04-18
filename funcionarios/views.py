@@ -620,7 +620,9 @@ class PainelGerenteAPIView(APIView):
                 _nome_completo_usuario(m.aluno) for m in qs_atraso_30
             ]
 
-            turmas = Turma.objects.all()
+            # Só id/ativo: os apps usam apenas len(turmas) no cartão "Total de turmas".
+            # Evita TurmaSerializer(depth=1) com todos os alunos aninhados por turma.
+            turmas_resumo = list(Turma.objects.order_by('id').values('id', 'ativo'))
 
             # Atividades recentes
             atividades = []
@@ -718,7 +720,7 @@ class PainelGerenteAPIView(APIView):
                 'aulas_experimentais_ocorridas_nomes': aulas_experimentais_ocorridas_nomes,
                 'mensalidades_atrasadas_mes_corrente_nomes': mensalidades_atrasadas_mes_corrente_nomes,
                 'mensalidades_atrasadas_mais_30_dias_nomes': mensalidades_atrasadas_mais_30_dias_nomes,
-                'turmas': TurmaSerializer(turmas, many=True).data,
+                'turmas': turmas_resumo,
                 'atividades_recentes': atividades[:5],
                 # Dados do gerente
                 'first_name': gerente_data.get('first_name'),

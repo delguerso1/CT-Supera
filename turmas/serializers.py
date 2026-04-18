@@ -18,6 +18,13 @@ class TurmaSerializer(serializers.ModelSerializer):
     ct_nome = serializers.SerializerMethodField()
     alerta_inadimplente_presenca = serializers.SerializerMethodField()
 
+    def _alunos_ativos_count_value(self, obj):
+        """Usa annotate(alunos_ativos_count=...) do queryset quando existir (evita 2× COUNT por turma)."""
+        v = getattr(obj, "alunos_ativos_count", None)
+        if v is not None:
+            return int(v)
+        return obj.alunos.filter(ativo=True).count()
+
     ct = serializers.PrimaryKeyRelatedField(
         queryset=CentroDeTreinamento.objects.all()
     )
@@ -55,10 +62,10 @@ class TurmaSerializer(serializers.ModelSerializer):
         return [dia.nome for dia in obj.dias_semana.all()]
 
     def get_alunos_count(self, obj):
-        return obj.alunos.filter(ativo=True).count()
+        return self._alunos_ativos_count_value(obj)
 
     def get_vagas_disponiveis(self, obj):
-        alunos_ativos = obj.alunos.filter(ativo=True).count()
+        alunos_ativos = self._alunos_ativos_count_value(obj)
         return max(0, obj.capacidade_maxima - alunos_ativos)
 
     def get_tem_vagas(self, obj):

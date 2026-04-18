@@ -30,6 +30,7 @@ import {
 } from '../types';
 import { NavigationProps } from '../types';
 import CONFIG from '../config';
+import { formatApiDateLocale } from '../utils/dateApi';
 import { launchImageLibrary, ImagePickerResponse, MediaType } from 'react-native-image-picker';
 
 const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }) => {
@@ -1033,7 +1034,7 @@ const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }
                     const nome = precadastro.nome || `${precadastro.first_name || ''} ${precadastro.last_name || ''}`.trim() || 'Sem nome';
                     let msg = `E-mail: ${precadastro.email}\nTelefone: ${precadastro.telefone || '-'}\nCadastrado em: ${new Date(precadastro.criado_em).toLocaleDateString('pt-BR')}`;
                     if (precadastro.origem === 'aula_experimental' && precadastro.data_aula_experimental) {
-                      msg += `\n\nData da aula experimental: ${new Date(precadastro.data_aula_experimental + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}`;
+                      msg += `\n\nData da aula experimental: ${formatApiDateLocale(precadastro.data_aula_experimental)}`;
                     }
                     Alert.alert(nome, msg, [{ text: 'OK' }]);
                   }}

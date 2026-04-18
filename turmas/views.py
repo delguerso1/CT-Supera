@@ -79,7 +79,13 @@ class ListaCriarTurmasAPIView(ListCreateAPIView):
                 filter=models.Q(alunos__ativo=True)
             )
         )
-        
+
+        queryset = queryset.select_related('ct').prefetch_related(
+            'dias_semana',
+            'professores',
+            'alunos',
+        )
+
         return queryset
 
     def list(self, request, *args, **kwargs):
@@ -109,8 +115,20 @@ class ListaCriarTurmasAPIView(ListCreateAPIView):
 class EditarExcluirTurmaAPIView(RetrieveUpdateDestroyAPIView):
     """API para editar, excluir ou visualizar uma turma."""
     permission_classes = [IsAuthenticated]
-    queryset = Turma.objects.all()
     serializer_class = TurmaSerializer
+
+    def get_queryset(self):
+        return (
+            Turma.objects.all()
+            .select_related('ct')
+            .prefetch_related('dias_semana', 'professores', 'alunos')
+            .annotate(
+                alunos_ativos_count=models.Count(
+                    'alunos',
+                    filter=models.Q(alunos__ativo=True),
+                ),
+            )
+        )
 
     def get_serializer_context(self):
         ctx = super().get_serializer_context()

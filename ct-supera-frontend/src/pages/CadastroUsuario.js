@@ -8,7 +8,7 @@ import {
   MSG_CPF_MATRICULA,
 } from '../utils/cpf';
 import { normalizarTelefoneBrParaApi } from '../utils/telefone';
-import { apiDateToInputDate, inputDateToApiDate } from '../utils/dateApi';
+import { apiDateToInputDate, formatApiDateLocale, inputDateToApiDate } from '../utils/dateApi';
 
 const styles = {
   container: {
@@ -2738,12 +2738,7 @@ function CadastroUsuario({ onUserChange }) {
           {selectedPrecadastroInfo.origem === 'aula_experimental' && selectedPrecadastroInfo.data_aula_experimental && (
             <div>
               <strong>Data da aula experimental:</strong>{' '}
-              {new Date(selectedPrecadastroInfo.data_aula_experimental + 'T12:00:00').toLocaleDateString('pt-BR', {
-                weekday: 'long',
-                day: '2-digit',
-                month: 'long',
-                year: 'numeric'
-              })}
+              {formatApiDateLocale(selectedPrecadastroInfo.data_aula_experimental)}
             </div>
           )}
           <div><strong>Status:</strong> {selectedPrecadastroInfo.status === 'matriculado' ? 'Matriculado' : selectedPrecadastroInfo.status === 'cancelado' ? 'Cancelado' : 'Pendente'}</div>
