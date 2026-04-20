@@ -41,9 +41,6 @@ function HomePage() {
           <div className="home-hero__tagline">
             <span className="home-hero__tagline-line">Vôlei de praia</span>
             <span className="home-hero__tagline-line home-hero__tagline-line--sub">
-              Formação de atletas
-            </span>
-            <span className="home-hero__tagline-line home-hero__tagline-line--sub">
               Projetos Escolares
             </span>
           </div>
@@ -134,7 +131,7 @@ function HomePage() {
             </p>
             <p>
               Venha conhecer nossa metodologia e fazer parte da família Supera! Agende uma aula
-              experimental e descubra por que somos referência em formação de atletas.
+              experimental e descubra por que somos referência em treinamento de vôlei de praia.
             </p>
           </div>
 

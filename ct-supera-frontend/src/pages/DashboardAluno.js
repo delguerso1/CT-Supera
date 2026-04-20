@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import api, { mediaProfileBackgroundImageUrl } from '../services/api';
 import {
   apiDateTimeStringToLocalDate,
@@ -421,6 +422,8 @@ function getInitials(name) {
 }
 
 function DashboardAluno({ user }) {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const sectionParam = searchParams.get('section');
   const { isMobile, isTablet } = useResponsive();
   const [activeSection, setActiveSection] = useState('dashboard');
   const [loading, setLoading] = useState(true);
@@ -472,6 +475,54 @@ function DashboardAluno({ user }) {
   const [fotoPerfil, setFotoPerfil] = useState(null);
   const [fotoPreview, setFotoPreview] = useState(null);
   const [uploadingFoto, setUploadingFoto] = useState(false);
+  const parqPendente = aluno
+    ? aluno.parq_completed !== true && aluno.parq_completed !== 'true'
+    : false;
+
+  const updateStoredUser = (updatedUser) => {
+    const storedUserRaw = localStorage.getItem('user');
+    if (!storedUserRaw) return;
+    try {
+      const storedUser = JSON.parse(storedUserRaw);
+      localStorage.setItem('user', JSON.stringify({ ...storedUser, ...updatedUser }));
+      window.dispatchEvent(new Event('storage'));
+    } catch (error) {
+      console.error('Erro ao atualizar user no localStorage:', error);
+    }
+  };
+
+  const handleSectionChange = (section) => {
+    if (parqPendente && section !== 'parq') {
+      setSuccess('');
+      setErro('Você precisa concluir o questionário PAR-Q antes de acessar as demais áreas.');
+      return;
+    }
+    setErro('');
+    setActiveSection(section);
+    if (section === 'parq') {
+      setSearchParams({ section: 'parq' }, { replace: true });
+      return;
+    }
+    if (sectionParam === 'parq') {
+      setSearchParams({}, { replace: true });
+    }
+  };
+
+  useEffect(() => {
+    if (sectionParam === 'parq') {
+      setActiveSection('parq');
+    }
+  }, [sectionParam]);
+
+  useEffect(() => {
+    if (!parqPendente) return;
+    if (activeSection !== 'parq') {
+      setActiveSection('parq');
+    }
+    if (sectionParam !== 'parq') {
+      setSearchParams({ section: 'parq' }, { replace: true });
+    }
+  }, [activeSection, parqPendente, sectionParam, setSearchParams]);
 
   useEffect(() => {
     async function fetchData() {
@@ -487,6 +538,7 @@ function DashboardAluno({ user }) {
         console.log('[DEBUG] Tipo de parq_completion_date:', typeof resp.data.usuario.parq_completion_date);
         console.log('[DEBUG] Todos os campos do usuario:', Object.keys(resp.data.usuario));
         setAluno(resp.data.usuario);
+        updateStoredUser(resp.data.usuario);
         setHistoricoAulas(resp.data.historico_aulas);
         setHistoricoMensalidades(resp.data.historico_pagamentos);
         setStatusHoje(resp.data.status_hoje || {
@@ -674,6 +726,7 @@ function DashboardAluno({ user }) {
       console.log('[DEBUG] Tipo de parq_completed:', typeof resp.data.usuario.parq_completed);
       console.log('[DEBUG] Tipo de parq_completion_date:', typeof resp.data.usuario.parq_completion_date);
       setAluno(resp.data.usuario);
+      updateStoredUser(resp.data.usuario);
     } catch (err) {
       const errorMessage = err.response?.data?.parq_question_1 || err.response?.data?.detail || 'Erro ao atualizar dados.';
       setErro(Array.isArray(errorMessage) ? errorMessage[0] : errorMessage);
@@ -702,6 +755,9 @@ function DashboardAluno({ user }) {
       setSuccess('Questionário PAR-Q atualizado com sucesso!');
       const resp = await api.get('alunos/painel-aluno/');
       setAluno(resp.data.usuario);
+      updateStoredUser(resp.data.usuario);
+      setActiveSection('dashboard');
+      setSearchParams({}, { replace: true });
       setForm(prev => ({
         ...prev,
         parq_question_1: resp.data.usuario.parq_question_1 || false,
@@ -2023,7 +2079,7 @@ function DashboardAluno({ user }) {
               ...styles.menuItem,
               ...(activeSection === 'dashboard' && styles.activeMenuItem)
             }}
-            onClick={() => setActiveSection('dashboard')}
+            onClick={() => handleSectionChange('dashboard')}
           >
             <span style={styles.menuIcon}>📊</span>
             Dashboard
@@ -2033,7 +2089,7 @@ function DashboardAluno({ user }) {
               ...styles.menuItem,
               ...(activeSection === 'perfil' && styles.activeMenuItem)
             }}
-            onClick={() => setActiveSection('perfil')}
+            onClick={() => handleSectionChange('perfil')}
           >
             <span style={styles.menuIcon}>👤</span>
             Meu Perfil
@@ -2043,7 +2099,7 @@ function DashboardAluno({ user }) {
               ...styles.menuItem,
               ...(activeSection === 'parq' && styles.activeMenuItem)
             }}
-            onClick={() => setActiveSection('parq')}
+            onClick={() => handleSectionChange('parq')}
           >
             <span style={styles.menuIcon}>📋</span>
             PAR-Q
@@ -2053,7 +2109,7 @@ function DashboardAluno({ user }) {
               ...styles.menuItem,
               ...(activeSection === 'checkin' && styles.activeMenuItem)
             }}
-            onClick={() => setActiveSection('checkin')}
+            onClick={() => handleSectionChange('checkin')}
           >
             <span style={styles.menuIcon}>✅</span>
             Check-in
@@ -2063,7 +2119,7 @@ function DashboardAluno({ user }) {
               ...styles.menuItem,
               ...(activeSection === 'pagamentos' && styles.activeMenuItem)
             }}
-            onClick={() => setActiveSection('pagamentos')}
+            onClick={() => handleSectionChange('pagamentos')}
           >
             <span style={styles.menuIcon}>💳</span>
             Pagamentos

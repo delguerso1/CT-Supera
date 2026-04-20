@@ -276,6 +276,17 @@ function Navbar() {
     navigate('/');
   };
 
+  const getPanelRoute = (currentUser) => {
+    if (currentUser?.tipo === 'gerente') return '/dashboard/gerente';
+    if (currentUser?.tipo === 'professor') return '/dashboard/professor';
+    if (currentUser?.tipo === 'aluno') {
+      const parqPendente =
+        currentUser.parq_completed !== true && currentUser.parq_completed !== 'true';
+      return parqPendente ? '/dashboard/aluno?section=parq' : '/dashboard/aluno';
+    }
+    return '/dashboard';
+  };
+
   return (
     <nav style={styles.navbar}>
       <div style={styles.container}>
@@ -294,9 +305,6 @@ function Navbar() {
           </Link>
           <Link to="/supera-news" style={styles.navLink}>
             Supera News
-          </Link>
-          <Link to="/alunos" style={styles.navLink}>
-            Alunos
           </Link>
           <Link to="/galeria" style={styles.navLink}>
             Galeria de Fotos
@@ -355,13 +363,7 @@ function Navbar() {
                   style={styles.dropdownItem}
                   onClick={() => {
                     setShowDropdown(false);
-                    navigate(
-                      user.tipo === 'gerente'
-                        ? '/dashboard/gerente'
-                        : user.tipo === 'professor'
-                        ? '/dashboard/professor'
-                        : '/dashboard/aluno'
-                    );
+                    navigate(getPanelRoute(user));
                   }}
                 >
                   Meu Painel
@@ -421,13 +423,6 @@ function Navbar() {
             Supera News
           </Link>
           <Link 
-            to="/alunos" 
-            style={styles.mobileNavLink}
-            onClick={() => setShowMobileMenu(false)}
-          >
-            Alunos
-          </Link>
-          <Link 
             to="/galeria" 
             style={styles.mobileNavLink}
             onClick={() => setShowMobileMenu(false)}
@@ -472,13 +467,7 @@ function Navbar() {
                 style={{...styles.mobileNavLink, background: 'none', border: 'none', textAlign: 'left', cursor: 'pointer', width: '100%'}}
                 onClick={() => {
                   setShowMobileMenu(false);
-                  navigate(
-                    user.tipo === 'gerente'
-                      ? '/dashboard/gerente'
-                      : user.tipo === 'professor'
-                      ? '/dashboard/professor'
-                      : '/dashboard/aluno'
-                  );
+                  navigate(getPanelRoute(user));
                 }}
               >
                 Meu Painel

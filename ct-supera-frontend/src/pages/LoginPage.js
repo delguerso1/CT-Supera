@@ -168,9 +168,13 @@ function LoginPage() {
         localStorage.setItem('user', JSON.stringify(response.data.user));
         
         // Redireciona com base no tipo de usuário
-        const userType = response.data.user.tipo;
-        if (userType === 'aluno' && response.data.user.contrato_aceito === false) {
+        const loggedUser = response.data.user;
+        const userType = loggedUser.tipo;
+        const parqPendente = loggedUser.parq_completed !== true && loggedUser.parq_completed !== 'true';
+        if (userType === 'aluno' && loggedUser.contrato_aceito === false) {
           navigate('/contrato');
+        } else if (userType === 'aluno' && parqPendente) {
+          navigate('/dashboard/aluno?section=parq');
         } else if (userType === 'gerente') {
           navigate('/dashboard/gerente');
         } else if (userType === 'professor') {

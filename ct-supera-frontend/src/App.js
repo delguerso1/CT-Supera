@@ -1,9 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useParams } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useParams } from 'react-router-dom';
 import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
 import SuperaNews from './pages/SuperaNews';
-import FormacaoAtletas from './pages/FormacaoAtletas';
 import GaleriaFotos from './pages/GaleriaFotos';
 import DashboardGerente from './pages/DashboardGerente';
 import DashboardProfessor from './pages/DashboardProfessor';
@@ -33,6 +32,7 @@ function CadastroTurmasWrapper() {
 function ProtectedRoute({ children, requiredType, allowContractAccess = false }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const location = useLocation();
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
@@ -64,7 +64,22 @@ function ProtectedRoute({ children, requiredType, allowContractAccess = false })
   }
 
   if (allowContractAccess && user.tipo === 'aluno' && user.contrato_aceito) {
-    return <Navigate to="/dashboard/aluno" replace />;
+    const parqPendente = user.parq_completed !== true && user.parq_completed !== 'true';
+    return <Navigate to={parqPendente ? "/dashboard/aluno?section=parq" : "/dashboard/aluno"} replace />;
+  }
+
+  const isAlunoComParqPendente =
+    user.tipo === 'aluno' &&
+    user.contrato_aceito !== false &&
+    user.parq_completed !== true &&
+    user.parq_completed !== 'true';
+
+  if (isAlunoComParqPendente) {
+    const section = new URLSearchParams(location.search).get('section');
+    const estaNaTelaParq = location.pathname === '/dashboard/aluno' && section === 'parq';
+    if (!estaNaTelaParq) {
+      return <Navigate to="/dashboard/aluno?section=parq" replace />;
+    }
   }
 
   if (requiredType && user.tipo !== requiredType) {
@@ -83,8 +98,8 @@ function App() {
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/supera-news" element={<SuperaNews />} />
-          <Route path="/alunos" element={<FormacaoAtletas />} />
-          <Route path="/formacao-atletas" element={<Navigate to="/alunos" replace />} />
+          <Route path="/alunos" element={<Navigate to="/" replace />} />
+          <Route path="/formacao-atletas" element={<Navigate to="/" replace />} />
           <Route path="/galeria" element={<GaleriaFotos />} />
           <Route path="/trabalhe-conosco" element={<TrabalheConoscoPage />} />
           <Route path="/login" element={<LoginPage />} />
