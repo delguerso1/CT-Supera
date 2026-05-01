@@ -76,12 +76,36 @@ const styles = {
     borderRadius: '8px',
     border: '1px solid #90caf9'
   },
-  calendarHeader: {
+  calendarNav: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: '8px',
+    marginBottom: '12px'
+  },
+  calendarNavBtn: {
+    flex: '0 0 auto',
+    padding: '6px 12px',
+    fontSize: '0.85rem',
+    fontWeight: '600',
+    color: '#1F6C86',
+    background: '#fff',
+    border: '1px solid #90caf9',
+    borderRadius: '6px',
+    cursor: 'pointer'
+  },
+  calendarNavBtnDisabled: {
+    color: '#b0bec5',
+    borderColor: '#e0e0e0',
+    cursor: 'default',
+    background: '#fafafa'
+  },
+  calendarNavTitle: {
+    flex: '1 1 auto',
     textAlign: 'center',
     fontSize: '1rem',
     fontWeight: 'bold',
-    color: '#1F6C86',
-    marginBottom: '12px'
+    color: '#1F6C86'
   },
   calendarWeekdays: {
     display: 'grid',
@@ -144,6 +168,8 @@ function AgendamentoPage() {
   const [cts, setCts] = useState([]);
   const [turmas, setTurmas] = useState([]);
   const [datasDisponiveis, setDatasDisponiveis] = useState([]);
+  /** 0 = mês atual, 1 = próximo mês (alinhado à API de datas). */
+  const [calendarioMesOffset, setCalendarioMesOffset] = useState(0);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
@@ -244,6 +270,10 @@ function AgendamentoPage() {
       }
     }
     fetchDatas();
+  }, [form.turma]);
+
+  useEffect(() => {
+    setCalendarioMesOffset(0);
   }, [form.turma]);
 
   const handleChange = (e) => {
@@ -362,8 +392,9 @@ function AgendamentoPage() {
   const hojeRef = new Date();
   const anoAtual = hojeRef.getFullYear();
   const mesAtual0 = hojeRef.getMonth();
-  const anoProx = mesAtual0 === 11 ? anoAtual + 1 : anoAtual;
-  const mesProx0 = mesAtual0 === 11 ? 0 : mesAtual0 + 1;
+  const refMesVisivel = new Date(anoAtual, mesAtual0 + calendarioMesOffset, 1);
+  const anoVisivel = refMesVisivel.getFullYear();
+  const mesVisivel0 = refMesVisivel.getMonth();
 
   const datasSet = new Set(datasDisponiveis);
   const nomesDias = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
@@ -371,7 +402,9 @@ function AgendamentoPage() {
 
   const pad2 = (n) => String(n).padStart(2, '0');
 
-  const renderCalendarioMes = (ano, mes0, keyPrefix) => {
+  const renderCalendarioMesUnico = () => {
+    const ano = anoVisivel;
+    const mes0 = mesVisivel0;
     const primeiroDia = new Date(ano, mes0, 1);
     const ultimoDia = new Date(ano, mes0 + 1, 0);
     const diasNoMes = ultimoDia.getDate();
@@ -379,7 +412,7 @@ function AgendamentoPage() {
     const celulas = [];
     for (let i = 0; i < primeiroDiaSemana; i++) {
       celulas.push(
-        <div key={`${keyPrefix}-empty-${i}`} style={{ ...styles.calendarDay, ...styles.calendarDayEmpty }} />
+        <div key={`empty-${i}`} style={{ ...styles.calendarDay, ...styles.calendarDayEmpty }} />
       );
     }
     for (let dia = 1; dia <= diasNoMes; dia++) {
@@ -391,7 +424,7 @@ function AgendamentoPage() {
       const podeClicar = disponivel && !passou;
       celulas.push(
         <div
-          key={`${keyPrefix}-${dia}`}
+          key={dia}
           style={{
             ...styles.calendarDay,
             ...(selecionado ? styles.calendarDaySelected : null),
@@ -410,19 +443,45 @@ function AgendamentoPage() {
       );
     }
     return (
-      <div key={keyPrefix} style={{ marginBottom: keyPrefix === 'atual' ? '20px' : 0 }}>
-        <div style={styles.calendarHeader}>
-          {meses[mes0]} {ano}
+      <>
+        <div style={styles.calendarNav}>
+          <button
+            type="button"
+            disabled={calendarioMesOffset <= 0}
+            onClick={() => setCalendarioMesOffset(0)}
+            aria-label="Voltar para o mês atual"
+            style={{
+              ...styles.calendarNavBtn,
+              ...(calendarioMesOffset <= 0 ? styles.calendarNavBtnDisabled : null)
+            }}
+          >
+            ← Mês atual
+          </button>
+          <div style={styles.calendarNavTitle}>
+            {meses[mes0]} {ano}
+          </div>
+          <button
+            type="button"
+            disabled={calendarioMesOffset >= 1}
+            onClick={() => setCalendarioMesOffset(1)}
+            aria-label="Ir para o próximo mês"
+            style={{
+              ...styles.calendarNavBtn,
+              ...(calendarioMesOffset >= 1 ? styles.calendarNavBtnDisabled : null)
+            }}
+          >
+            Próximo mês →
+          </button>
         </div>
         <div style={styles.calendarWeekdays}>
           {nomesDias.map(d => (
-            <div key={`${keyPrefix}-wd-${d}`} style={styles.calendarWeekday}>
+            <div key={`wd-${d}`} style={styles.calendarWeekday}>
               {d}
             </div>
           ))}
         </div>
         <div style={styles.calendarGrid}>{celulas}</div>
-      </div>
+      </>
     );
   };
 
@@ -589,8 +648,7 @@ function AgendamentoPage() {
                 </div>
               ) : (
                 <div style={styles.calendar}>
-                  {renderCalendarioMes(anoAtual, mesAtual0, 'atual')}
-                  {renderCalendarioMes(anoProx, mesProx0, 'proximo')}
+                  {renderCalendarioMesUnico()}
                   {form.data_aula_experimental && (
                     <div style={{ marginTop: '8px', fontSize: '0.85rem', color: '#1565c0' }}>
                       Selecionado:{' '}
