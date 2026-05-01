@@ -557,14 +557,21 @@ class PreCadastroSerializer(serializers.ModelSerializer):
                     'data_aula_experimental': 'Informe a data da aula experimental.'
                 })
             from datetime import date
+
+            from app.aula_experimental_datas import data_no_janela_agendamento, eh_feriado_nacional_br
+
             hoje = date.today()
-            if data_aula.month != hoje.month or data_aula.year != hoje.year:
+            if not data_no_janela_agendamento(data_aula, hoje):
                 raise serializers.ValidationError({
-                    'data_aula_experimental': 'A data deve ser no mês atual.'
+                    'data_aula_experimental': 'A data deve estar no mês atual ou no próximo mês.'
                 })
             if data_aula < hoje:
                 raise serializers.ValidationError({
                     'data_aula_experimental': 'A data não pode ser no passado.'
+                })
+            if eh_feriado_nacional_br(data_aula):
+                raise serializers.ValidationError({
+                    'data_aula_experimental': 'Não é possível agendar em feriado nacional.'
                 })
             if turma:
                 DIAS_MAP = {'Segunda-feira': 0, 'Terça-feira': 1, 'Quarta-feira': 2, 'Quinta-feira': 3,

@@ -153,7 +153,7 @@ function ReagendamentoPage() {
             >
               <option value="">
                 {datasDisponiveis.length === 0
-                  ? 'Nenhuma data disponível (reagendamento com mínimo 24h de antecedência)'
+                  ? 'Nenhuma data disponível (mês atual e próximo, mínimo 24h de antecedência; feriados nacionais excluídos)'
                   : 'Selecione a nova data'}
               </option>
               {datasDisponiveis.map((d) => (

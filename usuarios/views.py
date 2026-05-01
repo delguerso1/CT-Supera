@@ -25,9 +25,13 @@ from django.core.mail import send_mail
 from django.db import transaction, IntegrityError
 from django.db.models import Prefetch
 import logging
-from calendar import monthrange
 import re
 from app.date_api import format_data_api, parse_data_api
+from app.aula_experimental_datas import (
+    data_no_janela_agendamento,
+    eh_feriado_nacional_br,
+    listar_datas_aula_experimental,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -143,13 +147,8 @@ class ReagendarAulaExperimentalAPIView(APIView):
             if wd is not None:
                 weekdays_validos.add(wd)
         amanha = hoje + timedelta(days=1)
-        _, ultimo_dia = monthrange(hoje.year, hoje.month)
-        datas_objs = []
-        for d in range(1, ultimo_dia + 1):
-            dt = date(hoje.year, hoje.month, d)
-            if dt.weekday() in weekdays_validos and dt >= amanha:
-                datas_objs.append(dt)
-        datas = [format_data_api(x) for x in sorted(datas_objs)]
+        datas_objs = listar_datas_aula_experimental(weekdays_validos, min_data_inclusive=amanha)
+        datas = [format_data_api(x) for x in datas_objs]
         return Response({
             "precadastro": {
                 "first_name": precadastro.first_name,
@@ -193,8 +192,16 @@ class ReagendarAulaExperimentalAPIView(APIView):
         if dt.weekday() not in weekdays_validos:
             return Response({"error": "Data incompatível com os dias da turma."}, status=status.HTTP_400_BAD_REQUEST)
         hoje = date.today()
-        if dt.year != hoje.year or dt.month != hoje.month:
-            return Response({"error": "A nova data deve ser no mês atual."}, status=status.HTTP_400_BAD_REQUEST)
+        if not data_no_janela_agendamento(dt, hoje):
+            return Response(
+                {"error": "A nova data deve estar no mês atual ou no próximo mês."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if eh_feriado_nacional_br(dt):
+            return Response(
+                {"error": "Não é possível reagendar para feriado nacional."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         precadastro.data_aula_experimental = dt
         precadastro.reagendou_aula_experimental = True
         precadastro.save(update_fields=['data_aula_experimental', 'reagendou_aula_experimental'])

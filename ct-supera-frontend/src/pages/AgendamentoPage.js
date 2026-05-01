@@ -359,35 +359,39 @@ function AgendamentoPage() {
   const ctSelecionado = cts.find(ct => String(ct.id) === String(form.ct));
   const turmaSelecionada = turmasFiltradas.find(t => t.id === parseInt(form.turma));
 
-  // Calendário do mês atual
-  const hoje = new Date();
-  const ano = hoje.getFullYear();
-  const mes = hoje.getMonth();
-  const primeiroDia = new Date(ano, mes, 1);
-  const ultimoDia = new Date(ano, mes + 1, 0);
-  const diasNoMes = ultimoDia.getDate();
-  const primeiroDiaSemana = primeiroDia.getDay(); // 0=dom, 1=seg, ...
+  const hojeRef = new Date();
+  const anoAtual = hojeRef.getFullYear();
+  const mesAtual0 = hojeRef.getMonth();
+  const anoProx = mesAtual0 === 11 ? anoAtual + 1 : anoAtual;
+  const mesProx0 = mesAtual0 === 11 ? 0 : mesAtual0 + 1;
+
   const datasSet = new Set(datasDisponiveis);
   const nomesDias = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
   const meses = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
-  const renderCalendarioDias = () => {
+  const pad2 = (n) => String(n).padStart(2, '0');
+
+  const renderCalendarioMes = (ano, mes0, keyPrefix) => {
+    const primeiroDia = new Date(ano, mes0, 1);
+    const ultimoDia = new Date(ano, mes0 + 1, 0);
+    const diasNoMes = ultimoDia.getDate();
+    const primeiroDiaSemana = primeiroDia.getDay();
     const celulas = [];
-    const espacosInicio = primeiroDiaSemana;
-    for (let i = 0; i < espacosInicio; i++) {
-      celulas.push(<div key={`empty-${i}`} style={{ ...styles.calendarDay, ...styles.calendarDayEmpty }} />);
+    for (let i = 0; i < primeiroDiaSemana; i++) {
+      celulas.push(
+        <div key={`${keyPrefix}-empty-${i}`} style={{ ...styles.calendarDay, ...styles.calendarDayEmpty }} />
+      );
     }
     for (let dia = 1; dia <= diasNoMes; dia++) {
-      const pad2 = (n) => String(n).padStart(2, '0');
-      const dataStrApi = `${pad2(dia)}-${pad2(mes + 1)}-${ano}`;
+      const dataStrApi = `${pad2(dia)}-${pad2(mes0 + 1)}-${ano}`;
       const disponivel = datasSet.has(dataStrApi);
       const selecionado = form.data_aula_experimental === dataStrApi;
-      const dataObj = new Date(ano, mes, dia);
-      const passou = dataObj < new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
+      const dataObj = new Date(ano, mes0, dia);
+      const passou = dataObj < new Date(hojeRef.getFullYear(), hojeRef.getMonth(), hojeRef.getDate());
       const podeClicar = disponivel && !passou;
       celulas.push(
         <div
-          key={dia}
+          key={`${keyPrefix}-${dia}`}
           style={{
             ...styles.calendarDay,
             ...(selecionado ? styles.calendarDaySelected : null),
@@ -405,7 +409,21 @@ function AgendamentoPage() {
         </div>
       );
     }
-    return celulas;
+    return (
+      <div key={keyPrefix} style={{ marginBottom: keyPrefix === 'atual' ? '20px' : 0 }}>
+        <div style={styles.calendarHeader}>
+          {meses[mes0]} {ano}
+        </div>
+        <div style={styles.calendarWeekdays}>
+          {nomesDias.map(d => (
+            <div key={`${keyPrefix}-wd-${d}`} style={styles.calendarWeekday}>
+              {d}
+            </div>
+          ))}
+        </div>
+        <div style={styles.calendarGrid}>{celulas}</div>
+      </div>
+    );
   };
 
   return (
@@ -565,17 +583,14 @@ function AgendamentoPage() {
               )}
               {!form.turma || datasDisponiveis.length === 0 ? (
                 <div style={{ padding: '12px', background: '#f5f5f5', borderRadius: '6px', color: '#757575', fontSize: '0.9rem' }}>
-                  {!form.turma ? 'Selecione a turma primeiro' : 'Nenhuma data disponível neste mês'}
+                  {!form.turma
+                    ? 'Selecione a turma primeiro'
+                    : 'Nenhuma data disponível no mês atual nem no próximo (feriados nacionais e dias fora da turma são excluídos).'}
                 </div>
               ) : (
                 <div style={styles.calendar}>
-                  <div style={styles.calendarHeader}>{meses[mes]} {ano}</div>
-                  <div style={styles.calendarWeekdays}>
-                    {nomesDias.map(d => <div key={d} style={styles.calendarWeekday}>{d}</div>)}
-                  </div>
-                  <div style={styles.calendarGrid}>
-                    {renderCalendarioDias()}
-                  </div>
+                  {renderCalendarioMes(anoAtual, mesAtual0, 'atual')}
+                  {renderCalendarioMes(anoProx, mesProx0, 'proximo')}
                   {form.data_aula_experimental && (
                     <div style={{ marginTop: '8px', fontSize: '0.85rem', color: '#1565c0' }}>
                       Selecionado:{' '}

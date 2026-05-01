@@ -11,8 +11,8 @@ from .pagination import TurmaListPagination
 from django.db import models
 from financeiro.services import criar_mensalidade_ao_vincular_turma
 from datetime import date
-from calendar import monthrange
 from app.date_api import format_data_api
+from app.aula_experimental_datas import listar_datas_aula_experimental
 
 
 def _validar_aluno_turma(aluno, turma):
@@ -253,7 +253,7 @@ DIASEMANA_WEEKDAY_MAP = {
 
 
 class DatasAulaExperimentalAPIView(APIView):
-    """Retorna datas disponíveis para aula experimental no mês atual (dias da turma, não no passado)."""
+    """Datas para aula experimental: mês atual + próximo; dias da turma; sem feriados nacionais BR."""
     permission_classes = [AllowAny]
 
     def get(self, request, turma_id):
@@ -269,11 +269,6 @@ class DatasAulaExperimentalAPIView(APIView):
                 weekdays_validos.add(wd)
         if not weekdays_validos:
             return Response({"datas": []}, status=status.HTTP_200_OK)
-        _, ultimo_dia = monthrange(hoje.year, hoje.month)
-        datas_objs = []
-        for dia in range(1, ultimo_dia + 1):
-            d = date(hoje.year, hoje.month, dia)
-            if d.weekday() in weekdays_validos and d >= hoje:
-                datas_objs.append(d)
-        datas = [format_data_api(x) for x in sorted(datas_objs)]
+        datas_objs = listar_datas_aula_experimental(weekdays_validos, min_data_inclusive=hoje)
+        datas = [format_data_api(x) for x in datas_objs]
         return Response({"datas": datas}, status=status.HTTP_200_OK)
