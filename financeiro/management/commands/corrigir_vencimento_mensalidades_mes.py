@@ -46,9 +46,8 @@ class Command(BaseCommand):
             self.stderr.write(self.style.ERROR("Use --mes entre 1 e 12."))
             return
 
-        qs = Mensalidade.objects.filter(data_vencimento__year=ano, data_vencimento__month=mes).select_related(
-            "aluno"
-        )
+        # Sem select_related("aluno"): evita JOIN em usuarios_usuario (útil se o BD atrasou migrações).
+        qs = Mensalidade.objects.filter(data_vencimento__year=ano, data_vencimento__month=mes)
         total = qs.count()
         atualizadas = 0
         inalteradas = 0
@@ -74,9 +73,9 @@ class Command(BaseCommand):
                     .exists()
                 )
                 if existe_outra:
-                    nome = m.aluno.get_full_name() if m.aluno else f"aluno_id={m.aluno_id}"
                     conflitos.append(
-                        f"id={m.pk} {nome}: {antiga} -> {nova} (já existe parcela em {nova.month:02d}/{nova.year})"
+                        f"id={m.pk} aluno_id={m.aluno_id}: {antiga} -> {nova} "
+                        f"(já existe parcela em {nova.month:02d}/{nova.year})"
                     )
                     continue
 
