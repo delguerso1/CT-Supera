@@ -52,7 +52,9 @@ def calcular_multa_mora(mensalidade):
             - valor_total: valor original + multa + mora
             - esta_atrasada: boolean indicando se está atrasada
     """
-    hoje = timezone.now().date()
+    # Usar data civil no fuso TIME_ZONE (ex.: America/Sao_Paulo). timezone.now().date()
+    # usa o dia em UTC e, à noite no Brasil, pode virar o dia seguinte — cobrando juros no próprio vencimento.
+    hoje = timezone.localdate()
     data_vencimento = mensalidade.data_vencimento
     
     # Se não está atrasada, retorna valores zerados
@@ -123,7 +125,7 @@ class MensalidadeListCreateView(ListCreateAPIView):
                 pass
         # Filtro por status efetivo (não pago + data) — alinha com Controle Financeiro
         status_param = (self.request.query_params.get('status') or '').strip().lower()
-        hoje = timezone.now().date()
+        hoje = timezone.localdate()
         if status_param == 'pago':
             queryset = queryset.filter(status='pago')
         elif status_param == 'pendente':
@@ -209,7 +211,7 @@ class PagarSalarioAPIView(APIView):
 
             # Atualiza o status do salário
             salario.status = 'pago'
-            salario.data_pagamento = timezone.now().date()
+            salario.data_pagamento = timezone.localdate()
             salario.save(update_fields=['status', 'data_pagamento'])
 
             serializer = SalarioSerializer(salario)

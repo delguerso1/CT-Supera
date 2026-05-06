@@ -2739,6 +2739,37 @@ function CadastroUsuario({ onUserChange }) {
               {formatApiDateLocale(selectedPrecadastroInfo.data_aula_experimental)}
             </div>
           )}
+          {selectedPrecadastroInfo.origem === 'aula_experimental' &&
+            (selectedPrecadastroInfo.turma_ct_nome ||
+              selectedPrecadastroInfo.turma_horario ||
+              (selectedPrecadastroInfo.turma_dias_semana_nomes &&
+                selectedPrecadastroInfo.turma_dias_semana_nomes.length > 0)) && (
+            <>
+              <div>
+                <strong>Centro de treinamento:</strong>{' '}
+                {selectedPrecadastroInfo.turma_ct_nome || '—'}
+              </div>
+              <div>
+                <strong>Turma (dias):</strong>{' '}
+                {selectedPrecadastroInfo.turma_dias_semana_nomes?.length
+                  ? selectedPrecadastroInfo.turma_dias_semana_nomes.join(', ')
+                  : '—'}
+              </div>
+              <div>
+                <strong>Horário:</strong> {selectedPrecadastroInfo.turma_horario || '—'}
+              </div>
+            </>
+          )}
+          {selectedPrecadastroInfo.origem === 'aula_experimental' &&
+            !selectedPrecadastroInfo.turma_ct_nome &&
+            !selectedPrecadastroInfo.turma_horario &&
+            !(selectedPrecadastroInfo.turma_dias_semana_nomes &&
+              selectedPrecadastroInfo.turma_dias_semana_nomes.length > 0) &&
+            selectedPrecadastroInfo.turma_resumo && (
+              <div>
+                <strong>Turma escolhida:</strong> {selectedPrecadastroInfo.turma_resumo}
+              </div>
+            )}
           <div><strong>Status:</strong> {selectedPrecadastroInfo.status === 'matriculado' ? 'Matriculado' : selectedPrecadastroInfo.status === 'cancelado' ? 'Cancelado' : 'Pendente'}</div>
         </div>,
         document.body

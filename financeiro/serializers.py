@@ -18,7 +18,7 @@ class SalarioSerializer(serializers.ModelSerializer):
         from datetime import date
 
         if 'competencia' not in validated_data:
-            h = timezone.now().date()
+            h = timezone.localdate()
             validated_data['competencia'] = date(h.year, h.month, 1)
         return super().create(validated_data)
 
@@ -26,7 +26,7 @@ class SalarioSerializer(serializers.ModelSerializer):
         new_status = validated_data.get('status', instance.status)
         if new_status == 'pago' and instance.status != 'pago':
             if validated_data.get('data_pagamento') is None and not instance.data_pagamento:
-                validated_data['data_pagamento'] = timezone.now().date()
+                validated_data['data_pagamento'] = timezone.localdate()
         return super().update(instance, validated_data)
 
     def to_representation(self, instance):

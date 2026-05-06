@@ -34,6 +34,11 @@ yarn-error.*
 .env
 .env*.local
 
+# Chave privada Google (FCM V1 / conta de serviço) — não versionar; só enviar à Expo via EAS
+*-adminsdk-*.json
+*-service-account*.json
+ct-supera-firebase-adminsdk-fbsvc-534d4116eb.json
+
 # typescript
 *.tsbuildinfo
 

@@ -20,7 +20,7 @@ from financeiro.models import Mensalidade
 from django.utils import timezone
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from .serializers import UsuarioSerializer, PreCadastroSerializer, MensalidadeSerializer, SalarioSerializer
-from datetime import date, timedelta
+from datetime import timedelta
 from django.core.mail import send_mail
 from django.db import transaction, IntegrityError
 from django.db.models import Prefetch
@@ -98,6 +98,8 @@ class ListarPrecadastrosAPIView(ListCreateAPIView):
         elif origem_param == 'pendente':
             qs = qs.filter(origem='formulario')
 
+        if self.request.method == 'GET':
+            qs = qs.select_related('turma__ct').prefetch_related('turma__dias_semana')
         return qs
 
     def get_permissions(self):
@@ -118,7 +120,7 @@ class ListarPrecadastrosAPIView(ListCreateAPIView):
 class EditarExcluirPrecadastroAPIView(RetrieveUpdateDestroyAPIView):
     """API para editar, excluir ou visualizar um pré-cadastro."""
     permission_classes = [IsAuthenticated]
-    queryset = PreCadastro.objects.all()
+    queryset = PreCadastro.objects.select_related('turma__ct').prefetch_related('turma__dias_semana').all()
     serializer_class = PreCadastroSerializer
 
 
@@ -138,7 +140,7 @@ class ReagendarAulaExperimentalAPIView(APIView):
         if not precadastro.turma:
             return Response({"error": "Turma não encontrada."}, status=status.HTTP_400_BAD_REQUEST)
         # Datas disponíveis (mesmo endpoint que agendamento)
-        hoje = date.today()
+        hoje = timezone.localdate()
         turma = precadastro.turma
         dias_turma = turma.dias_semana.all()
         weekdays_validos = set()
@@ -178,7 +180,7 @@ class ReagendarAulaExperimentalAPIView(APIView):
         dt = parse_data_api(nova_data)
         if not dt:
             return Response({"error": "Data inválida."}, status=status.HTTP_400_BAD_REQUEST)
-        amanha = date.today() + timedelta(days=1)
+        amanha = timezone.localdate() + timedelta(days=1)
         if dt < amanha:
             return Response({"error": "Reagendamento só é permitido com pelo menos 24h de antecedência."}, status=status.HTTP_400_BAD_REQUEST)
         # Validar que a data está nas datas da turma
@@ -191,7 +193,7 @@ class ReagendarAulaExperimentalAPIView(APIView):
                 weekdays_validos.add(wd)
         if dt.weekday() not in weekdays_validos:
             return Response({"error": "Data incompatível com os dias da turma."}, status=status.HTTP_400_BAD_REQUEST)
-        hoje = date.today()
+        hoje = timezone.localdate()
         if not data_no_janela_agendamento(dt, hoje):
             return Response(
                 {"error": "A nova data deve estar no mês atual ou no próximo mês."},

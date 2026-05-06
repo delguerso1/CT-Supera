@@ -3,6 +3,7 @@
  */
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { formatApiDateTimeDisplay, localDateTimeStampForFilename } from './dateApi';
 
 const MESES = [
   'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
@@ -200,7 +201,7 @@ export function downloadPdfRelatorioAlunos(rows) {
     y = 32;
     doc.setFontSize(8);
     doc.setTextColor(90, 90, 90);
-    doc.text(`Gerado em ${new Date().toLocaleString('pt-BR')}`, margin, y);
+    doc.text(`Gerado em ${formatApiDateTimeDisplay(new Date().toISOString())}`, margin, y);
     doc.setTextColor(0, 0, 0);
     y += 8;
   };
@@ -313,7 +314,7 @@ export function downloadPdfRelatorioAlunos(rows) {
     });
   }
 
-  const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+  const stamp = localDateTimeStampForFilename();
   doc.save(`relatorio-alunos-completo-${stamp}.pdf`);
 }
 
@@ -346,7 +347,7 @@ export function downloadPdfRelatorioFinanceiro({
   y += 7;
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
-  doc.text(`Gerado em ${new Date().toLocaleString('pt-BR')}`, 14, y);
+  doc.text(`Gerado em ${formatApiDateTimeDisplay(new Date().toISOString())}`, 14, y);
   y += 10;
 
   const fmtMoney = (n) =>

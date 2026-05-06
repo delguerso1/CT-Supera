@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import api from '../services/api';
 import { formatarCpfMascara, apenasDigitosCpf, MSG_CPF_11_DIGITOS } from '../utils/cpf';
 import { normalizarTelefoneBrParaApi } from '../utils/telefone';
-import { inputDateToApiDate, parseApiDateToParts } from '../utils/dateApi';
+import { formatApiDateDisplay, inputDateToApiDate, localYmdForDateInput } from '../utils/dateApi';
 
 const styles = {
   container: {
@@ -556,7 +556,7 @@ function AgendamentoPage() {
               value={form.data_nascimento}
               onChange={handleChange}
               autoComplete="bday"
-              max={new Date().toISOString().slice(0, 10)}
+              max={localYmdForDateInput()}
               required
             />
             <p style={styles.hint}>
@@ -652,16 +652,7 @@ function AgendamentoPage() {
                   {form.data_aula_experimental && (
                     <div style={{ marginTop: '8px', fontSize: '0.85rem', color: '#1565c0' }}>
                       Selecionado:{' '}
-                      {(() => {
-                        const p = parseApiDateToParts(form.data_aula_experimental);
-                        return p
-                          ? new Date(p.y, p.m - 1, p.d).toLocaleDateString('pt-BR', {
-                              weekday: 'long',
-                              day: '2-digit',
-                              month: 'long',
-                            })
-                          : '';
-                      })()}
+                      {formatApiDateDisplay(form.data_aula_experimental)}
                       {turmaSelecionada?.horario && ` às ${formatarHorario(turmaSelecionada.horario)}`}
                     </div>
                   )}

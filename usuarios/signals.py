@@ -14,7 +14,7 @@ def criar_salario_ao_criar_professor(sender, instance, created, **kwargs):
     if instance.tipo == "professor" and instance.salario_professor:
         print(f"🔹 Signal executado: Criando/atualizando salário para professor {instance.first_name}")
         try:
-            hoje = timezone.now().date()
+            hoje = timezone.localdate()
             competencia = date(hoje.year, hoje.month, 1)
             salario_existente = Salario.objects.filter(
                 professor=instance,

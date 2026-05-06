@@ -5,8 +5,9 @@ from turmas.models import Turma
 from django.core.exceptions import ValidationError
 import re
 from django.contrib.auth.hashers import make_password
-import datetime
 from datetime import date
+
+from django.utils import timezone
 from ct.models import CentroDeTreinamento
 
 def normalizar_telefone_precadastro_br(valor):
@@ -116,7 +117,7 @@ class UsuarioForm(forms.ModelForm):
             if not data_nascimento:
                 self.add_error("data_nascimento", "Data de nascimento é obrigatória para aluno.")
             else:
-                hoje = datetime.date.today()
+                hoje = timezone.localdate()
                 idade = hoje.year - data_nascimento.year - ((hoje.month, hoje.day) < (data_nascimento.month, data_nascimento.day))
                 if idade >= 18 and not telefone_emergencia:
                     self.add_error("telefone_emergencia", "Telefone de emergência é obrigatório para alunos maiores de idade.")
@@ -167,7 +168,7 @@ class PreCadastroForm(forms.ModelForm):
             return email
         data_nascimento = self.cleaned_data.get('data_nascimento')
         if data_nascimento:
-            hoje = date.today()
+            hoje = timezone.localdate()
             idade = hoje.year - data_nascimento.year - (
                 (hoje.month, hoje.day) < (data_nascimento.month, data_nascimento.day)
             )

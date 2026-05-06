@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "118572725145",
+    "project_id": "ct-supera",
+    "storage_bucket": "ct-supera.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:118572725145:android:af1e3439964a4742619908",
+        "android_client_info": {
+          "package_name": "com.ctsupera.superaapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDrZ9clA1Bwkgc2XkysmMF84gudEPQ9yEk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

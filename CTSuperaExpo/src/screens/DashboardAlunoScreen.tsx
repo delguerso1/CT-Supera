@@ -29,8 +29,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { pickImageFromLibrary } from '../utils/pickImageFromLibrary';
 import { colors } from '../theme';
 import {
+  apiDateParaCampoNascimentoMascarado,
   formatarDataBrMascara,
-  isoParaBrDisplay,
   normalizarDataNascimentoParaApi,
   calcularIdade,
 } from '../utils/dataNascimento';
@@ -51,11 +51,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 function descricaoAulaCheckinParaAluno(status: PainelAluno['status_hoje']): string {
   const { data_aula_checkin, horario_aula_checkin } = status;
   if (!data_aula_checkin) return 'da próxima aula';
-  const parts = data_aula_checkin.split('-').map(Number);
-  if (parts.length !== 3 || parts.some((n) => Number.isNaN(n))) return 'da próxima aula';
-  const [y, m, d] = parts;
-  const local = new Date(y, m - 1, d);
-  const dia = local.toLocaleDateString('pt-BR');
+  const dia = formatApiDateDisplay(data_aula_checkin);
+  if (!dia) return 'da próxima aula';
   return horario_aula_checkin
     ? `da aula do dia ${dia} às ${horario_aula_checkin}`
     : `da aula do dia ${dia}`;
@@ -286,7 +283,7 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
         email: usuario.email || '',
         telefone: usuario.telefone || '',
         endereco: usuario.endereco || '',
-        data_nascimento: isoParaBrDisplay(usuario.data_nascimento),
+        data_nascimento: apiDateParaCampoNascimentoMascarado(usuario.data_nascimento),
         nome_responsavel: usuario.nome_responsavel || '',
         telefone_responsavel: usuario.telefone_responsavel || '',
         telefone_emergencia: usuario.telefone_emergencia || '',
@@ -395,7 +392,7 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
         email: usuario.email || '',
         telefone: usuario.telefone || '',
         endereco: usuario.endereco || '',
-        data_nascimento: isoParaBrDisplay(usuario.data_nascimento),
+        data_nascimento: apiDateParaCampoNascimentoMascarado(usuario.data_nascimento),
         nome_responsavel: usuario.nome_responsavel || '',
         telefone_responsavel: usuario.telefone_responsavel || '',
         telefone_emergencia: usuario.telefone_emergencia || '',
@@ -1044,7 +1041,7 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
               <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>Data de Nascimento:</Text>
                 <Text style={styles.infoValue}>
-                  {isoParaBrDisplay(aluno.data_nascimento) || '-'}
+                  {formatApiDateDisplay(aluno.data_nascimento) || '-'}
                 </Text>
               </View>
               {idadePerfilAluno !== null && idadePerfilAluno < 18 && (

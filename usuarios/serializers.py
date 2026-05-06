@@ -39,8 +39,7 @@ def validar_senha_serializer(senha):
 def idade_em_anos_completos(data_nascimento):
     if not data_nascimento:
         return None
-    from datetime import date
-    hoje = date.today()
+    hoje = timezone.localdate()
     return hoje.year - data_nascimento.year - (
         (hoje.month, hoje.day) < (data_nascimento.month, data_nascimento.day)
     )
@@ -351,7 +350,7 @@ class UsuarioSerializer(serializers.ModelSerializer):
                             data_preenchimento = data_preenchimento.date()
 
                         um_ano_depois = data_preenchimento + timedelta(days=365)
-                        hoje = timezone.now().date()
+                        hoje = timezone.localdate()
 
                         dias_restantes = (um_ano_depois - hoje).days
 
@@ -364,7 +363,7 @@ class UsuarioSerializer(serializers.ModelSerializer):
             # Registra desistência (inativação) para relatórios mensais
             if instance.tipo == 'aluno' and 'ativo' in validated_data:
                 if validated_data['ativo'] is False and instance.ativo is True:
-                    validated_data['data_inativacao'] = timezone.now().date()
+                    validated_data['data_inativacao'] = timezone.localdate()
                 elif validated_data['ativo'] is True:
                     validated_data['data_inativacao'] = None
 
@@ -502,6 +501,18 @@ class PreCadastroSerializer(serializers.ModelSerializer):
             ret['criado_em'] = format_datetime_api(instance.criado_em)
         if instance.matriculado_em:
             ret['matriculado_em'] = format_datetime_api(instance.matriculado_em)
+        turma = getattr(instance, 'turma', None)
+        if turma:
+            ct = getattr(turma, 'ct', None)
+            ret['turma_ct_nome'] = ct.nome if ct else None
+            ret['turma_horario'] = turma.horario.strftime('%H:%M') if turma.horario else None
+            ret['turma_dias_semana_nomes'] = [d.nome for d in turma.dias_semana.all()]
+            ret['turma_resumo'] = str(turma)
+        else:
+            ret['turma_ct_nome'] = None
+            ret['turma_horario'] = None
+            ret['turma_dias_semana_nomes'] = []
+            ret['turma_resumo'] = None
         return ret
 
     def validate_cpf(self, value):
@@ -556,11 +567,9 @@ class PreCadastroSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError({
                     'data_aula_experimental': 'Informe a data da aula experimental.'
                 })
-            from datetime import date
-
             from app.aula_experimental_datas import data_no_janela_agendamento, eh_feriado_nacional_br
 
-            hoje = date.today()
+            hoje = timezone.localdate()
             if not data_no_janela_agendamento(data_aula, hoje):
                 raise serializers.ValidationError({
                     'data_aula_experimental': 'A data deve estar no mês atual ou no próximo mês.'

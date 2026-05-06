@@ -8,7 +8,6 @@ import {
   formatApiDateTimeDisplay,
   formatApiMonthYearDisplay,
   inputDateToApiDate,
-  parseApiDateToParts,
 } from '../utils/dateApi';
 import { NAVBAR_HEIGHT_CSS } from '../constants/layout';
 
@@ -410,10 +409,7 @@ function formatCurrency(value) {
 
 function formatDateOnly(dateString) {
   if (!dateString) return '-';
-  const p = parseApiDateToParts(dateString);
-  if (p) return new Date(p.y, p.m - 1, p.d).toLocaleDateString('pt-BR');
-  const d = new Date(dateString);
-  return Number.isNaN(d.getTime()) ? String(dateString) : d.toLocaleDateString('pt-BR');
+  return formatApiDateDisplay(dateString) || '-';
 }
 
 function getInitials(name) {

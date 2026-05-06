@@ -27,6 +27,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import RNBlobUtil from 'react-native-blob-util';
 import {
   apiDateTimeStringToLocalDate,
+  apiDateToInputDate,
   formatApiDateDisplay,
   formatApiDateTimeDisplay,
   formatApiMonthYearDisplay,
@@ -35,11 +36,8 @@ import {
 function descricaoAulaCheckinParaAluno(status: PainelAluno['status_hoje']): string {
   const { data_aula_checkin, horario_aula_checkin } = status;
   if (!data_aula_checkin) return 'da próxima aula';
-  const parts = data_aula_checkin.split('-').map(Number);
-  if (parts.length !== 3 || parts.some((n) => Number.isNaN(n))) return 'da próxima aula';
-  const [y, m, d] = parts;
-  const local = new Date(y, m - 1, d);
-  const dia = local.toLocaleDateString('pt-BR');
+  const dia = formatApiDateDisplay(data_aula_checkin);
+  if (!dia) return 'da próxima aula';
   return horario_aula_checkin
     ? `da aula do dia ${dia} às ${horario_aula_checkin}`
     : `da aula do dia ${dia}`;
@@ -142,7 +140,7 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
         email: usuario.email || '',
         telefone: usuario.telefone || '',
         endereco: usuario.endereco || '',
-        data_nascimento: (usuario.data_nascimento || '').split('T')[0] || '',
+        data_nascimento: apiDateToInputDate(usuario.data_nascimento) || '',
         nome_responsavel: usuario.nome_responsavel || '',
         telefone_responsavel: usuario.telefone_responsavel || '',
         telefone_emergencia: usuario.telefone_emergencia || '',
@@ -247,7 +245,7 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
         email: usuario.email || '',
         telefone: usuario.telefone || '',
         endereco: usuario.endereco || '',
-        data_nascimento: (usuario.data_nascimento || '').split('T')[0] || '',
+        data_nascimento: apiDateToInputDate(usuario.data_nascimento) || '',
         nome_responsavel: usuario.nome_responsavel || '',
         telefone_responsavel: usuario.telefone_responsavel || '',
         telefone_emergencia: usuario.telefone_emergencia || '',
@@ -267,7 +265,7 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
         email: form.email,
         telefone: form.telefone,
         endereco: form.endereco,
-        data_nascimento: (form.data_nascimento || '').split('T')[0] || null,
+        data_nascimento: apiDateToInputDate(form.data_nascimento) || null,
         nome_responsavel: form.nome_responsavel || '',
         telefone_responsavel: form.telefone_responsavel || '',
         telefone_emergencia: form.telefone_emergencia || '',

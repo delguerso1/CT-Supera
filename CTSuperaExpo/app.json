@@ -3,7 +3,7 @@
     "name": "CT Supera",
     "slug": "CTSuperaExpo",
     "scheme": "ctsupera",
-    "version": "1.0.7",
+    "version": "1.0.8",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -15,11 +15,12 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.ctsupera.app",
-      "buildNumber": "8"
+      "buildNumber": "9"
     },
     "android": {
-      "package": "com.ctsupera.app",
-      "versionCode": 8,
+      "package": "com.ctsupera.superaapp",
+      "googleServicesFile": "./google-services.json",
+      "versionCode": 9,
       "softwareKeyboardLayoutMode": "resize",
       "usesCleartextTraffic": false,
       "notification": {
@@ -43,7 +44,8 @@
           "icon": "./assets/icon.png",
           "color": "#1F6C86"
         }
-      ]
+      ],
+      "./plugins/withFirebaseAndroid.js"
     ],
     "extra": {
       "eas": {

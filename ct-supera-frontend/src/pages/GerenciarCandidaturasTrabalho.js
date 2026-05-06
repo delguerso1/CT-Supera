@@ -1,21 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import api from '../services/api';
-
-function formatarData(iso) {
-  if (!iso) return '—';
-  try {
-    const d = new Date(iso);
-    return d.toLocaleString('pt-BR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  } catch {
-    return iso;
-  }
-}
+import { formatApiDateTimeDisplay } from '../utils/dateApi';
 
 function modalidades(c) {
   const p = [];
@@ -158,7 +143,7 @@ function GerenciarCandidaturasTrabalho() {
             <tbody>
               {lista.map((c) => (
                 <tr key={c.id}>
-                  <td style={td}>{formatarData(c.data_envio)}</td>
+                  <td style={td}>{formatApiDateTimeDisplay(c.data_envio) || '—'}</td>
                   <td style={td}>{c.nome_completo}</td>
                   <td style={td}>
                     <div>{c.email}</div>

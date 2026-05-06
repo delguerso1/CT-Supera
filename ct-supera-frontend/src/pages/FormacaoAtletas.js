@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../services/api';
 import { formatarCpfMascara, apenasDigitosCpf, MSG_CPF_11_DIGITOS } from '../utils/cpf';
 import { normalizarTelefoneBrParaApi } from '../utils/telefone';
-import { inputDateToApiDate } from '../utils/dateApi';
+import { inputDateToApiDate, localYmdForDateInput } from '../utils/dateApi';
 
 /** Mesma base visual de AgendamentoPage (aula experimental). */
 const styles = {
@@ -346,7 +346,7 @@ function FormacaoAtletas() {
             value={formData.data_nascimento}
             onChange={handleChange}
             autoComplete="bday"
-            max={new Date().toISOString().slice(0, 10)}
+            max={localYmdForDateInput()}
             required
           />
           <p style={styles.hint}>

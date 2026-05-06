@@ -1,7 +1,6 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.core.exceptions import ValidationError
-from datetime import date
 from django.core.exceptions import PermissionDenied
 from django.utils import timezone as django_timezone
 from django.core.mail import send_mail
@@ -147,7 +146,7 @@ class PreCadastro(models.Model):
         # Verifica a idade do aluno
         idade = None
         if self.data_nascimento:
-            hoje = date.today()
+            hoje = django_timezone.localdate()
             idade = hoje.year - self.data_nascimento.year - (
                 (hoje.month, hoje.day) < (self.data_nascimento.month, self.data_nascimento.day)
             )
@@ -389,7 +388,7 @@ class Usuario(AbstractUser):
                 data_preenchimento = data_preenchimento.date()
             
             um_ano_depois = data_preenchimento + timedelta(days=365)
-            hoje = timezone.now().date()
+            hoje = timezone.localdate()
             
             return hoje >= um_ano_depois
         
@@ -399,7 +398,7 @@ class Usuario(AbstractUser):
     def idade(self):
         """Calcula idade do usuário com base na data de nascimento."""
         if self.data_nascimento:
-            today = date.today()
+            today = django_timezone.localdate()
             return today.year - self.data_nascimento.year - (
                 (today.month, today.day) < (self.data_nascimento.month, self.data_nascimento.day)
             )

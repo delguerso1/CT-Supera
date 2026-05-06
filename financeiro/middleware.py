@@ -30,7 +30,7 @@ class MensalidadeMesViradoMiddleware:
         Usa cache.add em chave única por mês para evitar corrida entre requisições
         simultâneas (get+set não é atômico).
         """
-        hoje = timezone.now().date()
+        hoje = timezone.localdate()
         mes_atual = f'{hoje.year}-{hoje.month:02d}'
         chave_mes = f'{CACHE_KEY_ULTIMO_MES_GERADO}:{mes_atual}'
         if cache.add(chave_mes, '1', CACHE_TIMEOUT):

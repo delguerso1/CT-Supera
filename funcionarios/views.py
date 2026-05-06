@@ -68,7 +68,7 @@ class VerificarCheckinAlunosAPIView(APIView):
 
     def get(self, request, turma_id):
         turma = get_object_or_404(Turma, id=turma_id)
-        hoje = date.today()
+        hoje = timezone.localdate()
 
         # Busca todos os alunos da turma (distinct evita duplicidades por JOIN/M2M)
         alunos = (
@@ -153,7 +153,7 @@ class RegistrarPresencaAPIView(APIView):
 
     def post(self, request, turma_id):
         turma = get_object_or_404(Turma, id=turma_id)
-        hoje = date.today()
+        hoje = timezone.localdate()
 
         alunos_presentes = request.data.get('presenca', [])
         precadastros_presentes = request.data.get('precadastros', [])
@@ -509,8 +509,8 @@ class PainelGerenteAPIView(APIView):
                 logger.warning(f"Tentativa de acesso não autorizado por: {request.user.username}")
                 return Response({"error": "Permissão negada."}, status=status.HTTP_403_FORBIDDEN)
 
-            # Estatísticas básicas
-            hoje = timezone.now().date()
+            # Estatísticas básicas (data civil em TIME_ZONE — alinha com mensalidades / vencimento)
+            hoje = timezone.localdate()
             ano = hoje.year
             mes = hoje.month
             limite_30_dias = hoje - timedelta(days=30)
@@ -620,6 +620,25 @@ class PainelGerenteAPIView(APIView):
                 _nome_completo_usuario(m.aluno) for m in qs_atraso_30
             ]
 
+            qs_parq_alunos = Usuario.objects.filter(
+                tipo="aluno", ativo=True, is_active=True
+            ).order_by("first_name", "last_name", "id")
+
+            parq_sim_q = Q()
+            for i in range(1, 11):
+                parq_sim_q |= Q(**{f"parq_question_{i}": True})
+
+            qs_parq_respondidos = qs_parq_alunos.filter(parq_completed=True)
+            qs_parq_nao_respondidos = qs_parq_alunos.filter(parq_completed=False)
+            qs_parq_com_sim = qs_parq_alunos.filter(parq_completed=True).filter(parq_sim_q)
+
+            parq_respondidos = qs_parq_respondidos.count()
+            parq_respondidos_nomes = [_nome_completo_usuario(a) for a in qs_parq_respondidos]
+            parq_nao_respondidos = qs_parq_nao_respondidos.count()
+            parq_nao_respondidos_nomes = [_nome_completo_usuario(a) for a in qs_parq_nao_respondidos]
+            parq_com_resposta_sim = qs_parq_com_sim.count()
+            parq_com_resposta_sim_nomes = [_nome_completo_usuario(a) for a in qs_parq_com_sim]
+
             # Só id/ativo: os apps usam apenas len(turmas) no cartão "Total de turmas".
             # Evita TurmaSerializer(depth=1) com todos os alunos aninhados por turma.
             turmas_resumo = list(Turma.objects.order_by('id').values('id', 'ativo'))
@@ -658,7 +677,7 @@ class PainelGerenteAPIView(APIView):
             # Mensalidades pagas recentes: usar data_pagamento (quando o pagamento ocorreu),
             # não data_vencimento — senão pagamentos de títulos antigos não apareciam no feed.
             limite_pag = timezone.now() - timedelta(days=14)
-            limite_venc = timezone.now().date() - timedelta(days=14)
+            limite_venc = timezone.localdate() - timedelta(days=14)
             cand_mens = list(
                 Mensalidade.objects.filter(status="pago")
                 .filter(
@@ -720,6 +739,12 @@ class PainelGerenteAPIView(APIView):
                 'aulas_experimentais_ocorridas_nomes': aulas_experimentais_ocorridas_nomes,
                 'mensalidades_atrasadas_mes_corrente_nomes': mensalidades_atrasadas_mes_corrente_nomes,
                 'mensalidades_atrasadas_mais_30_dias_nomes': mensalidades_atrasadas_mais_30_dias_nomes,
+                'parq_respondidos': parq_respondidos,
+                'parq_respondidos_nomes': parq_respondidos_nomes,
+                'parq_nao_respondidos': parq_nao_respondidos,
+                'parq_nao_respondidos_nomes': parq_nao_respondidos_nomes,
+                'parq_com_resposta_sim': parq_com_resposta_sim,
+                'parq_com_resposta_sim_nomes': parq_com_resposta_sim_nomes,
                 'turmas': turmas_resumo,
                 'atividades_recentes': atividades[:5],
                 # Dados do gerente

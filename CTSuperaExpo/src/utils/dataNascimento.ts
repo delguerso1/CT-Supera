@@ -1,7 +1,9 @@
 /**
- * Data de nascimento em formato brasileiro (dd/mm/aaaa) no app,
- * enviada ao backend como DD-MM-AAAA (também aceita leitura legada AAAA-MM-DD).
+ * Data de nascimento: máscara dd/mm/aaaa na edição; envio ao backend DD-MM-AAAA (via normalizarDataNascimentoParaApi).
+ * Exibição alinhada a formatApiDateDisplay (DD-MM-AAAA).
  */
+
+import { formatApiDateDisplay } from './dateApi';
 
 export function formatarDataBrMascara(value: string): string {
   const d = value.replace(/\D/g, '').slice(0, 8);
@@ -28,15 +30,15 @@ export function dataBrParaApi(br: string): string | null {
 /** @deprecated use dataBrParaApi — mesmo retorno (DD-MM-AAAA). */
 export const dataBrParaIso = dataBrParaApi;
 
-/** Exibe data vinda da API (DD-MM-AAAA, legado AAAA-MM-DD ou ISO) como dd/mm/aaaa. */
+/** Mesmo que formatApiDateDisplay — DD-MM-AAAA para leitura. */
 export function isoParaBrDisplay(iso: string | null | undefined): string {
-  if (!iso) return '';
-  const s = String(iso).trim().split(/[\sT]/)[0];
-  const dmY = /^(\d{2})-(\d{2})-(\d{4})$/.exec(s);
-  if (dmY) return `${dmY[1]}/${dmY[2]}/${dmY[3]}`;
-  const ymd = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
-  if (ymd) return `${ymd[3]}/${ymd[2]}/${ymd[1]}`;
-  return '';
+  return formatApiDateDisplay(iso ?? '');
+}
+
+/** Valor inicial para TextInput com máscara dd/mm/aaaa (só dígitos → máscara). */
+export function apiDateParaCampoNascimentoMascarado(iso: string | null | undefined): string {
+  const digits = formatApiDateDisplay(iso ?? '').replace(/\D/g, '').slice(0, 8);
+  return digits ? formatarDataBrMascara(digits) : '';
 }
 
 function parsePartesDataApi(s: string): { y: number; mo: number; day: number } | null {

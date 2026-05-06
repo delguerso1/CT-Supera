@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api, { MEDIA_URL } from '../services/api';
+import { formatApiDateDisplay } from '../utils/dateApi';
 
 const styles = {
   container: {
@@ -340,7 +341,7 @@ function GaleriaFotos() {
                 )}
                 <div style={styles.photoFooter}>
                   <span>Por: {foto.autor_nome}</span>
-                  <span>{new Date(foto.data_criacao).toLocaleDateString('pt-BR')}</span>
+                  <span>{formatApiDateDisplay(foto.data_criacao)}</span>
                 </div>
                 {isGerente && (
                   <button
@@ -428,7 +429,7 @@ function GaleriaFotos() {
               )}
               <div style={styles.photoFooter}>
                 <span>Por: {selectedImage.autor_nome}</span>
-                <span>{new Date(selectedImage.data_criacao).toLocaleDateString('pt-BR')}</span>
+                <span>{formatApiDateDisplay(selectedImage.data_criacao)}</span>
               </div>
             </div>
           </div>

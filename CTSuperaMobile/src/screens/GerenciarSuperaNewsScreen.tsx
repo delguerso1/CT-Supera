@@ -19,6 +19,7 @@ import { SuperaNews } from '../types';
 import { NavigationProps } from '../types';
 import { launchImageLibrary, ImagePickerResponse, MediaType } from 'react-native-image-picker';
 import CONFIG from '../config';
+import { formatApiDateDisplay } from '../utils/dateApi';
 
 const GerenciarSuperaNewsScreen: React.FC<NavigationProps> = ({ navigation }) => {
   const { user } = useAuth();
@@ -232,9 +233,7 @@ const GerenciarSuperaNewsScreen: React.FC<NavigationProps> = ({ navigation }) =>
                 </Text>
                 <View style={styles.noticiaFooter}>
                   <Text style={styles.noticiaData}>
-                    {noticia.data_criacao
-                      ? new Date(noticia.data_criacao).toLocaleDateString('pt-BR')
-                      : ''}
+                    {noticia.data_criacao ? formatApiDateDisplay(noticia.data_criacao) : ''}
                   </Text>
                   {noticia.autor_nome && (
                     <Text style={styles.noticiaAutor}>Por: {noticia.autor_nome}</Text>

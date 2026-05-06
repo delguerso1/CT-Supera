@@ -9,8 +9,8 @@ import GerenciarCandidaturasTrabalho from '../pages/GerenciarCandidaturasTrabalh
 import { NAVBAR_HEIGHT_CSS } from '../constants/layout';
 import {
   apiDateToInputDate,
+  formatApiDateDisplay,
   inputDateToApiDate,
-  parseApiDateToParts,
 } from '../utils/dateApi';
 
 // Hook para detectar tamanho da tela
@@ -376,10 +376,7 @@ const styles = {
 
 function formatDateOnly(dateString) {
   if (!dateString) return '-';
-  const p = parseApiDateToParts(dateString);
-  if (p) return new Date(p.y, p.m - 1, p.d).toLocaleDateString('pt-BR');
-  const d = new Date(dateString);
-  return Number.isNaN(d.getTime()) ? String(dateString) : d.toLocaleDateString('pt-BR');
+  return formatApiDateDisplay(dateString) || '-';
 }
 
 function getInitials(name) {
@@ -405,7 +402,13 @@ function DashboardGerente({ user }) {
     aulasExperimentaisOcorridasNomes: [],
     mensalidadesAtrasadasMesCorrenteNomes: [],
     mensalidadesAtrasadasMais30DiasNomes: [],
-    turmas: []
+    turmas: [],
+    parqRespondidos: 0,
+    parqRespondidosNomes: [],
+    parqNaoRespondidos: 0,
+    parqNaoRespondidosNomes: [],
+    parqComRespostaSim: 0,
+    parqComRespostaSimNomes: [],
   });
   const [recentActivities, setRecentActivities] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -501,6 +504,12 @@ function DashboardGerente({ user }) {
           response.data.mensalidades_atrasadas_mes_corrente_nomes || [],
         mensalidadesAtrasadasMais30DiasNomes:
           response.data.mensalidades_atrasadas_mais_30_dias_nomes || [],
+        parqRespondidos: response.data.parq_respondidos ?? 0,
+        parqRespondidosNomes: response.data.parq_respondidos_nomes || [],
+        parqNaoRespondidos: response.data.parq_nao_respondidos ?? 0,
+        parqNaoRespondidosNomes: response.data.parq_nao_respondidos_nomes || [],
+        parqComRespostaSim: response.data.parq_com_resposta_sim ?? 0,
+        parqComRespostaSimNomes: response.data.parq_com_resposta_sim_nomes || [],
         turmas: response.data.turmas || []
       });
 
@@ -886,6 +895,97 @@ function DashboardGerente({ user }) {
             </span>
           </div>
           <div style={styles.statSubtitle}>Futuras / Já ocorreram</div>
+        </div>
+
+        <div style={styles.statCard}>
+          <div style={styles.statTitle}>PAR-Q</div>
+          <div style={{ ...styles.statSubtitle, marginBottom: 8 }}>
+            Alunos ativos no sistema — questionário de aptidão para atividade física
+          </div>
+          <div
+            style={{
+              ...styles.statValue,
+              display: 'flex',
+              alignItems: 'baseline',
+              justifyContent: 'center',
+              gap: 6,
+              flexWrap: 'wrap',
+            }}
+          >
+            <span
+              role="button"
+              tabIndex={0}
+              onClick={() =>
+                abrirModalListaNomes('PAR-Q — respondidos', stats.parqRespondidosNomes)
+              }
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  abrirModalListaNomes('PAR-Q — respondidos', stats.parqRespondidosNomes);
+                }
+              }}
+              style={{
+                cursor: 'pointer',
+                textDecoration: 'underline',
+                fontWeight: 700,
+              }}
+              title="Ver alunos com PAR-Q preenchido"
+            >
+              {stats.parqRespondidos}
+            </span>
+            <span aria-hidden="true">/</span>
+            <span
+              role="button"
+              tabIndex={0}
+              onClick={() =>
+                abrirModalListaNomes('PAR-Q — não respondidos', stats.parqNaoRespondidosNomes)
+              }
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  abrirModalListaNomes('PAR-Q — não respondidos', stats.parqNaoRespondidosNomes);
+                }
+              }}
+              style={{
+                cursor: 'pointer',
+                textDecoration: 'underline',
+                fontWeight: 700,
+              }}
+              title="Ver alunos sem PAR-Q preenchido"
+            >
+              {stats.parqNaoRespondidos}
+            </span>
+            <span aria-hidden="true">/</span>
+            <span
+              role="button"
+              tabIndex={0}
+              onClick={() =>
+                abrirModalListaNomes(
+                  'PAR-Q — pelo menos uma resposta “sim”',
+                  stats.parqComRespostaSimNomes
+                )
+              }
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  abrirModalListaNomes(
+                    'PAR-Q — pelo menos uma resposta “sim”',
+                    stats.parqComRespostaSimNomes
+                  );
+                }
+              }}
+              style={{
+                cursor: 'pointer',
+                textDecoration: 'underline',
+                fontWeight: 700,
+                color: '#c62828',
+              }}
+              title="Ver alunos com alguma resposta positiva no PAR-Q"
+            >
+              {stats.parqComRespostaSim}
+            </span>
+          </div>
+          <div style={styles.statSubtitle}>Respondidos / Não respondidos / Com “sim”</div>
         </div>
       </div>
 

@@ -10,7 +10,7 @@ from .serializers import TurmaSerializer, UsuarioSerializer, DiaSemanaSerializer
 from .pagination import TurmaListPagination
 from django.db import models
 from financeiro.services import criar_mensalidade_ao_vincular_turma
-from datetime import date
+from django.utils import timezone
 from app.date_api import format_data_api
 from app.aula_experimental_datas import listar_datas_aula_experimental
 
@@ -258,7 +258,7 @@ class DatasAulaExperimentalAPIView(APIView):
 
     def get(self, request, turma_id):
         turma = get_object_or_404(Turma, id=turma_id)
-        hoje = date.today()
+        hoje = timezone.localdate()
         dias_turma = turma.dias_semana.all()
         if not dias_turma.exists():
             return Response({"datas": []}, status=status.HTTP_200_OK)

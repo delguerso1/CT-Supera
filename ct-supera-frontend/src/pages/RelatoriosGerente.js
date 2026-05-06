@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import api from '../services/api';
 import { downloadPdfRelatorioAlunos, downloadPdfRelatorioFinanceiro } from '../utils/relatoriosPdf';
-import { formatApiDateTimeDisplay, parseApiDateToParts } from '../utils/dateApi';
+import { formatApiDateDisplay, formatApiDateTimeDisplay } from '../utils/dateApi';
 
 function todayApiDate() {
   const d = new Date();
@@ -16,13 +16,6 @@ function firstDayOfMonthApiDate() {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
   return `01-${m}-${y}`;
-}
-
-function formatDateBR(iso) {
-  if (!iso) return '';
-  const p = parseApiDateToParts(iso);
-  if (!p) return String(iso);
-  return new Date(p.y, p.m - 1, p.d).toLocaleDateString('pt-BR');
 }
 
 function turmaOptionLabel(t) {
@@ -664,7 +657,7 @@ function RelatoriosGerente({ user }) {
                               borderBottom: '1px solid #cfd8dc',
                             }}
                           >
-                            Data da aula: {formatDateBR(item.data)}
+                            Data da aula: {formatApiDateDisplay(item.data)}
                           </td>
                         </tr>
                       );
@@ -698,7 +691,7 @@ function RelatoriosGerente({ user }) {
                           )}
                         </td>
                         <td style={{ padding: 10 }}>{row.turma_nome}</td>
-                        <td style={{ padding: 10, textAlign: 'center' }}>{formatDateBR(row.data)}</td>
+                        <td style={{ padding: 10, textAlign: 'center' }}>{formatApiDateDisplay(row.data)}</td>
                         <td style={{ padding: 10, textAlign: 'center', color: row.checkin_realizado ? '#2e7d32' : '#c62828' }}>
                           {row.checkin_realizado ? 'Sim' : 'Não'}
                         </td>

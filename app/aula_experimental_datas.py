@@ -6,6 +6,7 @@ from calendar import monthrange
 from datetime import date
 
 import holidays
+from django.utils import timezone
 
 
 def eh_feriado_nacional_br(d: date) -> bool:
@@ -27,7 +28,7 @@ def meses_janela_agendamento(ref: date) -> tuple[tuple[int, int], tuple[int, int
 
 def data_no_janela_agendamento(d: date, ref: date | None = None) -> bool:
     """True se a data cair no mês de ref ou no mês seguinte."""
-    ref = ref or date.today()
+    ref = ref or timezone.localdate()
     return (d.year, d.month) in meses_janela_agendamento(ref)
 
 
@@ -42,7 +43,7 @@ def listar_datas_aula_experimental(weekdays_validos: set[int], *, min_data_inclu
     Dias de aula da turma na janela (mês atual + próximo), a partir de min_data_inclusive,
     excluindo feriados nacionais brasileiros.
     """
-    hoje = date.today()
+    hoje = timezone.localdate()
     out: list[date] = []
     for y, m in meses_janela_agendamento(hoje):
         for d in _iter_dias_mes(y, m):

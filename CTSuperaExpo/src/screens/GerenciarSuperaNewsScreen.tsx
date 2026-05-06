@@ -20,6 +20,7 @@ import { pickImageFromLibrary } from '../utils/pickImageFromLibrary';
 import CONFIG from '../config';
 import SafeScreen from '../components/SafeScreen';
 import { colors } from '../theme';
+import { formatApiDateDisplay } from '../utils/dateApi';
 
 const GerenciarSuperaNewsScreen: React.FC<NavigationProps> = ({ navigation, embedded }) => {
   const { user } = useAuth();
@@ -229,9 +230,7 @@ const GerenciarSuperaNewsScreen: React.FC<NavigationProps> = ({ navigation, embe
                 </Text>
                 <View style={styles.noticiaFooter}>
                   <Text style={styles.noticiaData}>
-                    {noticia.data_criacao
-                      ? new Date(noticia.data_criacao).toLocaleDateString('pt-BR')
-                      : ''}
+                    {noticia.data_criacao ? formatApiDateDisplay(noticia.data_criacao) : ''}
                   </Text>
                   {noticia.autor_nome && (
                     <Text style={styles.noticiaAutor}>Por: {noticia.autor_nome}</Text>

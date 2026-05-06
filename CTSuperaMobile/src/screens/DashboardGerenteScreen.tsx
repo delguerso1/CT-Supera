@@ -37,6 +37,21 @@ import {
 } from '../utils/dateApi';
 import { launchImageLibrary, ImagePickerResponse, MediaType } from 'react-native-image-picker';
 
+function textoTurmaPrecadastroAulaExperimental(p: PreCadastro): string {
+  const temCt = Boolean(p.turma_ct_nome);
+  const temHorario = Boolean(p.turma_horario);
+  const temDias = Boolean(p.turma_dias_semana_nomes?.length);
+  if (temCt || temHorario || temDias) {
+    const diasTxt =
+      p.turma_dias_semana_nomes?.length ? p.turma_dias_semana_nomes.join(', ') : '—';
+    return `\n\nCentro de treinamento: ${p.turma_ct_nome ?? '—'}\nTurma (dias): ${diasTxt}\nHorário: ${p.turma_horario ?? '—'}`;
+  }
+  if (p.turma_resumo) {
+    return `\n\nTurma escolhida: ${p.turma_resumo}`;
+  }
+  return '';
+}
+
 const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }) => {
   const { user, logout } = useAuth();
   const [painelGerente, setPainelGerente] = useState<PainelGerente | null>(null);
@@ -579,6 +594,14 @@ const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }
   const renderDashboard = () => {
     if (!painelGerente) return null;
 
+    const abrirListaParqMobile = (titulo: string, nomes?: string[]) => {
+      const arr = Array.isArray(nomes) ? nomes.filter((n) => String(n).trim()) : [];
+      Alert.alert(
+        titulo,
+        arr.length ? `• ${arr.join('\n• ')}` : 'Nenhum aluno nesta lista.'
+      );
+    };
+
     return (
       <ScrollView
         style={styles.content}
@@ -639,6 +662,61 @@ const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }
             <Text style={styles.statTitle}>Aulas Experimentais</Text>
             <Text style={styles.statValue}>{painelGerente.aulas_experimentais_futuras || 0} / {painelGerente.aulas_experimentais_ocorridas || 0}</Text>
             <Text style={styles.statSubtitle}>Futuras / Já ocorreram</Text>
+          </View>
+        </View>
+
+        <View style={styles.statsGrid}>
+          <View style={[styles.statCard, { flex: 1, minWidth: '92%' }]}>
+            <Text style={styles.statTitle}>PAR-Q</Text>
+            <Text style={[styles.statSubtitle, { marginBottom: 8 }]}>
+              Alunos ativos — questionário de aptidão
+            </Text>
+            <View
+              style={{
+                flexDirection: 'row',
+                flexWrap: 'wrap',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 6,
+              }}
+            >
+              <TouchableOpacity
+                onPress={() =>
+                  abrirListaParqMobile('PAR-Q respondidos', painelGerente.parq_respondidos_nomes)
+                }
+              >
+                <Text style={[styles.statValue, { textDecorationLine: 'underline' }]}>
+                  {painelGerente.parq_respondidos ?? 0}
+                </Text>
+              </TouchableOpacity>
+              <Text style={styles.statValue}> / </Text>
+              <TouchableOpacity
+                onPress={() =>
+                  abrirListaParqMobile(
+                    'PAR-Q não respondidos',
+                    painelGerente.parq_nao_respondidos_nomes
+                  )
+                }
+              >
+                <Text style={[styles.statValue, { textDecorationLine: 'underline' }]}>
+                  {painelGerente.parq_nao_respondidos ?? 0}
+                </Text>
+              </TouchableOpacity>
+              <Text style={styles.statValue}> / </Text>
+              <TouchableOpacity
+                onPress={() =>
+                  abrirListaParqMobile(
+                    'PAR-Q com pelo menos uma resposta sim',
+                    painelGerente.parq_com_resposta_sim_nomes
+                  )
+                }
+              >
+                <Text style={[styles.statValue, { color: '#f44336', textDecorationLine: 'underline' }]}>
+                  {painelGerente.parq_com_resposta_sim ?? 0}
+                </Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.statSubtitle}>Respondidos / Não respondidos / Com sim</Text>
           </View>
         </View>
 
@@ -1018,6 +1096,9 @@ const DashboardGerenteScreen: React.FC<NavigationProps> = ({ navigation, route }
                     let msg = `E-mail: ${precadastro.email}\nTelefone: ${precadastro.telefone || '-'}\nCadastrado em: ${formatApiDateTimeDisplay(precadastro.criado_em)}`;
                     if (precadastro.origem === 'aula_experimental' && precadastro.data_aula_experimental) {
                       msg += `\n\nData da aula experimental: ${formatApiDateLocale(precadastro.data_aula_experimental)}`;
+                    }
+                    if (precadastro.origem === 'aula_experimental') {
+                      msg += textoTurmaPrecadastroAulaExperimental(precadastro);
                     }
                     Alert.alert(nome, msg, [{ text: 'OK' }]);
                   }}

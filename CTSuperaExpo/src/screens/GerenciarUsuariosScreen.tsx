@@ -22,8 +22,8 @@ import {
   MSG_CPF_MATRICULA,
 } from '../utils/cpf';
 import {
+  apiDateParaCampoNascimentoMascarado,
   formatarDataBrMascara,
-  isoParaBrDisplay,
   normalizarDataNascimentoParaApi,
   calcularIdade,
 } from '../utils/dataNascimento';
@@ -54,6 +54,21 @@ function sortPreCadastrosByName(list: PreCadastro[]): PreCadastro[] {
     const bn = (b.nome || `${b.first_name || ''} ${b.last_name || ''}`.trim()).toLocaleLowerCase();
     return an.localeCompare(bn, 'pt-BR');
   });
+}
+
+function textoTurmaPrecadastroAulaExperimental(p: PreCadastro): string {
+  const temCt = Boolean(p.turma_ct_nome);
+  const temHorario = Boolean(p.turma_horario);
+  const temDias = Boolean(p.turma_dias_semana_nomes?.length);
+  if (temCt || temHorario || temDias) {
+    const diasTxt =
+      p.turma_dias_semana_nomes?.length ? p.turma_dias_semana_nomes.join(', ') : '—';
+    return `\n\nCentro de treinamento: ${p.turma_ct_nome ?? '—'}\nTurma (dias): ${diasTxt}\nHorário: ${p.turma_horario ?? '—'}`;
+  }
+  if (p.turma_resumo) {
+    return `\n\nTurma escolhida: ${p.turma_resumo}`;
+  }
+  return '';
 }
 
 /** Filtro na aba Alunos: login (`username`) e busca parcial por dígitos (CPF costuma ser o usuário). */
@@ -342,7 +357,10 @@ const GerenciarUsuariosScreen: React.FC<GerenciarUsuariosProps> = ({
       email: (target as any).email || '',
       telefone: (target as any).telefone || '',
       endereco: (target as any).endereco || '',
-      data_nascimento: isoParaBrDisplay((target as any).data_nascimento) || (target as any).data_nascimento || '',
+      data_nascimento:
+        apiDateParaCampoNascimentoMascarado((target as any).data_nascimento) ||
+        (target as any).data_nascimento ||
+        '',
       nome_responsavel: (target as any).nome_responsavel || '',
       telefone_responsavel: (target as any).telefone_responsavel || '',
       telefone_emergencia: (target as any).telefone_emergencia || '',
@@ -948,6 +966,9 @@ const GerenciarUsuariosScreen: React.FC<GerenciarUsuariosProps> = ({
                         let msg = `E-mail: ${item.email}\nTelefone: ${item.telefone || '-'}\nTipo: ${item.origem_display || item.origem || '-'}\nStatus: ${item.status === 'matriculado' ? 'Matriculado' : item.status === 'cancelado' ? 'Cancelado' : 'Pendente'}`;
                         if (item.origem === 'aula_experimental' && item.data_aula_experimental) {
                           msg += `\n\nData da aula experimental: ${formatApiDateLocale(item.data_aula_experimental)}`;
+                        }
+                        if (item.origem === 'aula_experimental') {
+                          msg += textoTurmaPrecadastroAulaExperimental(item);
                         }
                         Alert.alert(nome, msg, [{ text: 'OK' }]);
                       }}

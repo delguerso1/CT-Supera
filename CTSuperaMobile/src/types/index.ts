@@ -296,6 +296,10 @@ export interface PreCadastro {
   criado_em: string;
   data_nascimento?: string;
   data_aula_experimental?: string;
+  turma_ct_nome?: string | null;
+  turma_horario?: string | null;
+  turma_dias_semana_nomes?: string[];
+  turma_resumo?: string | null;
 }
 
 export interface PainelGerente {
@@ -313,6 +317,12 @@ export interface PainelGerente {
   aulas_experimentais_ocorridas_nomes?: string[];
   mensalidades_atrasadas_mes_corrente_nomes?: string[];
   mensalidades_atrasadas_mais_30_dias_nomes?: string[];
+  parq_respondidos?: number;
+  parq_respondidos_nomes?: string[];
+  parq_nao_respondidos?: number;
+  parq_nao_respondidos_nomes?: string[];
+  parq_com_resposta_sim?: number;
+  parq_com_resposta_sim_nomes?: string[];
   turmas: Turma[];
   atividades_recentes: Activity[];
   first_name: string;

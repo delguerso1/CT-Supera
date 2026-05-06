@@ -16,22 +16,7 @@ import { CandidaturaTrabalho } from '../types';
 import { NavigationProps } from '../types';
 import SafeScreen from '../components/SafeScreen';
 import { colors } from '../theme';
-
-function formatarData(iso: string) {
-  if (!iso) return '—';
-  try {
-    const d = new Date(iso);
-    return d.toLocaleString('pt-BR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  } catch {
-    return iso;
-  }
-}
+import { formatApiDateTimeDisplay } from '../utils/dateApi';
 
 function modalidades(c: CandidaturaTrabalho) {
   const p: string[] = [];
@@ -132,7 +117,7 @@ const GerenciarCandidaturasTrabalhoScreen: React.FC<NavigationProps> = ({ embedd
       renderItem={({ item: c }) => (
         <View style={styles.card}>
           <Text style={styles.nome}>{c.nome_completo}</Text>
-          <Text style={styles.meta}>{formatarData(c.data_envio)}</Text>
+          <Text style={styles.meta}>{formatApiDateTimeDisplay(c.data_envio) || '—'}</Text>
           <Text style={styles.line}>
             {c.tipo_vaga_display || c.tipo_vaga} · {modalidades(c)}
           </Text>

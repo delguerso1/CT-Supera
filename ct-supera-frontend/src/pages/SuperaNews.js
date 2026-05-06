@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api, { MEDIA_URL } from '../services/api';
+import { formatApiDateDisplay } from '../utils/dateApi';
 
 const styles = {
   container: {
@@ -308,7 +309,7 @@ function SuperaNews() {
                 <p style={styles.newsDescription}>{noticia.descricao}</p>
                 <div style={styles.newsFooter}>
                   <span>Por: {noticia.autor_nome}</span>
-                  <span>{new Date(noticia.data_criacao).toLocaleDateString('pt-BR')}</span>
+                  <span>{formatApiDateDisplay(noticia.data_criacao)}</span>
                 </div>
                 {isGerente && (
                   <button

@@ -35,8 +35,8 @@ import { colors } from '../theme';
 import { nomeAlunoMensalidade } from '../utils/nomeAlunoMensalidade';
 import { formatarErroApi } from '../utils/apiError';
 import {
+  apiDateParaCampoNascimentoMascarado,
   formatarDataBrMascara,
-  isoParaBrDisplay,
   normalizarDataNascimentoParaApi,
 } from '../utils/dataNascimento';
 import {
@@ -256,7 +256,7 @@ const DashboardGerenteScreen: React.FC<DashboardGerenteProps> = ({
         email: painelData.email || '',
         telefone: painelData.telefone || '',
         endereco: painelData.endereco || '',
-        data_nascimento: isoParaBrDisplay(painelData.data_nascimento),
+        data_nascimento: apiDateParaCampoNascimentoMascarado(painelData.data_nascimento),
       });
       await loadNotifStats();
     } catch (error: any) {
@@ -666,7 +666,7 @@ const DashboardGerenteScreen: React.FC<DashboardGerenteProps> = ({
         email: painelGerente.email || '',
         telefone: painelGerente.telefone || '',
         endereco: painelGerente.endereco || '',
-        data_nascimento: isoParaBrDisplay(painelGerente.data_nascimento),
+        data_nascimento: apiDateParaCampoNascimentoMascarado(painelGerente.data_nascimento),
       });
     }
   };
@@ -848,6 +848,62 @@ const DashboardGerenteScreen: React.FC<DashboardGerenteProps> = ({
             </Text>
             <Text style={styles.statSubtitle}>Mês corrente</Text>
           </StatShell>
+        </View>
+
+        <View style={{ width: '100%', marginBottom: 20, paddingHorizontal: 4 }}>
+          <View style={styles.statCard}>
+            <Text style={styles.statTitle}>PAR-Q</Text>
+            <Text style={[styles.statSubtitle, { marginBottom: 8 }]}>
+              Alunos ativos — questionário de aptidão para atividade física
+            </Text>
+            <View style={styles.statValueSplitRow}>
+              <TouchableOpacity
+                onPress={() =>
+                  abrirListaNomesModal('PAR-Q respondidos', painelGerente.parq_respondidos_nomes)
+                }
+                accessibilityRole="button"
+                accessibilityLabel="Ver nomes dos alunos com PAR-Q respondido"
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.statValue, styles.statValueLinkPrimary]}>
+                  {painelGerente.parq_respondidos ?? 0}
+                </Text>
+              </TouchableOpacity>
+              <Text style={[styles.statValue, { color: colors.primary }]}> / </Text>
+              <TouchableOpacity
+                onPress={() =>
+                  abrirListaNomesModal(
+                    'PAR-Q não respondidos',
+                    painelGerente.parq_nao_respondidos_nomes
+                  )
+                }
+                accessibilityRole="button"
+                accessibilityLabel="Ver nomes dos alunos sem PAR-Q respondido"
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.statValue, styles.statValueLinkPrimary]}>
+                  {painelGerente.parq_nao_respondidos ?? 0}
+                </Text>
+              </TouchableOpacity>
+              <Text style={[styles.statValue, { color: colors.primary }]}> / </Text>
+              <TouchableOpacity
+                onPress={() =>
+                  abrirListaNomesModal(
+                    'PAR-Q com pelo menos uma resposta sim',
+                    painelGerente.parq_com_resposta_sim_nomes
+                  )
+                }
+                accessibilityRole="button"
+                accessibilityLabel="Ver nomes dos alunos com resposta sim no PAR-Q"
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.statValue, styles.statValueLinkDanger]}>
+                  {painelGerente.parq_com_resposta_sim ?? 0}
+                </Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.statSubtitle}>Respondidos / Não respondidos / Com sim</Text>
+          </View>
         </View>
 
         <View style={styles.section}>

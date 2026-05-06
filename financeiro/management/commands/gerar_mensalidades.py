@@ -8,7 +8,7 @@ class Command(BaseCommand):
     help = 'Gera mensalidades do mês atual para alunos ativos. Também executado automaticamente na virada de mês via signal.'
 
     def handle(self, *args, **kwargs):
-        hoje = timezone.now().date()
+        hoje = timezone.localdate()
         total_geradas = gerar_mensalidades_para_mes(ano=hoje.year, mes=hoje.month)
 
         self.stdout.write(
