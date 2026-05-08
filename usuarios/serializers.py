@@ -563,6 +563,9 @@ class PreCadastroSerializer(serializers.ModelSerializer):
         if origem == 'aula_experimental':
             data_aula = attrs.get('data_aula_experimental') or (self.instance.data_aula_experimental if self.instance else None)
             turma = attrs.get('turma') or (self.instance.turma if self.instance else None)
+            email_norm = str((attrs.get('email') or (self.instance.email if self.instance else '') or '')).strip().lower()
+            telefone_norm = str(attrs.get('telefone') or (self.instance.telefone if self.instance else '') or '').strip()
+            data_nascimento_ref = attrs.get('data_nascimento') or (self.instance.data_nascimento if self.instance else None)
             if not data_aula:
                 raise serializers.ValidationError({
                     'data_aula_experimental': 'Informe a data da aula experimental.'
@@ -590,6 +593,20 @@ class PreCadastroSerializer(serializers.ModelSerializer):
                 if data_aula.weekday() not in weekdays_turma:
                     raise serializers.ValidationError({
                         'data_aula_experimental': 'A data deve ser um dia de aula da turma selecionada.'
+                    })
+            if email_norm and telefone_norm and data_nascimento_ref:
+                qs_dup_pessoa = PreCadastro.objects.filter(
+                    origem='aula_experimental',
+                    status='pendente',
+                    email__iexact=email_norm,
+                    telefone=telefone_norm,
+                    data_nascimento=data_nascimento_ref,
+                )
+                if self.instance:
+                    qs_dup_pessoa = qs_dup_pessoa.exclude(pk=self.instance.pk)
+                if qs_dup_pessoa.exists():
+                    raise serializers.ValidationError({
+                        'error': 'Já existe um agendamento pendente para estes dados. Se precisar alterar a data, utilize o link de reagendamento enviado por e-mail.'
                     })
             cpf_raw = attrs.get('cpf') or (self.instance.cpf if self.instance else None)
             if cpf_raw:

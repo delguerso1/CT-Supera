@@ -172,6 +172,7 @@ function AgendamentoPage() {
   const [calendarioMesOffset, setCalendarioMesOffset] = useState(0);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Calcula a idade em anos completos a partir da data de nascimento
   const calcularIdade = (dataNascimento) => {
@@ -305,6 +306,8 @@ function AgendamentoPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     setError('');
     setSuccess('');
 
@@ -312,21 +315,25 @@ function AgendamentoPage() {
     const turma = turmasFiltradas.find(t => t.id === parseInt(form.turma));
     if (turma && !turma.tem_vagas) {
       setError('Esta turma não possui mais vagas disponíveis.');
+      setIsSubmitting(false);
       return;
     }
     if (!form.data_aula_experimental) {
       setError('Selecione a data da aula experimental no calendário.');
+      setIsSubmitting(false);
       return;
     }
 
     if (!form.data_nascimento) {
       setError('Informe sua data de nascimento.');
+      setIsSubmitting(false);
       return;
     }
 
     const cpfLimpo = apenasDigitosCpf(form.cpf);
     if (cpfLimpo.length > 0 && cpfLimpo.length !== 11) {
       setError(MSG_CPF_11_DIGITOS);
+      setIsSubmitting(false);
       return;
     }
     const telefoneDigitos = normalizarTelefoneBrParaApi(form.telefone);
@@ -334,6 +341,7 @@ function AgendamentoPage() {
       setError(
         'Informe o telefone com DDD (10 ou 11 dígitos). Você pode colar com +55; o sistema ajusta automaticamente.'
       );
+      setIsSubmitting(false);
       return;
     }
     const dados = {
@@ -351,6 +359,7 @@ function AgendamentoPage() {
     try {
       await api.post('usuarios/precadastros/', dados);
       setSuccess('Pré-cadastro realizado com sucesso!');
+      window.alert('Aula experimental agendada com sucesso!');
       setForm({
         first_name: '',
         last_name: '',
@@ -375,6 +384,8 @@ function AgendamentoPage() {
         data.error ||
         'Erro ao realizar pré-cadastro.'
       );
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -661,7 +672,9 @@ function AgendamentoPage() {
             </div>
           )}
           <div style={{ textAlign: 'center', marginTop: '8px' }}>
-            <button type="submit" style={styles.button}>Agendar</button>
+            <button type="submit" style={styles.button} disabled={isSubmitting}>
+              {isSubmitting ? 'Agendando...' : 'Agendar'}
+            </button>
           </div>
         </form>
       </div>
