@@ -38,6 +38,7 @@ function ControleFinanceiro({ user, onDataChange }) {
   const [erro, setErro] = useState('');
   const [turmaFiltro, setTurmaFiltro] = useState('');
   const [mensalidadeStatus, setMensalidadeStatus] = useState('');
+  const [buscaNomeAluno, setBuscaNomeAluno] = useState('');
   const [pagina, setPagina] = useState(1);
   const [aumentoIncremento, setAumentoIncremento] = useState('');
   const [aumentoAplicando, setAumentoAplicando] = useState(false);
@@ -222,6 +223,11 @@ function ControleFinanceiro({ user, onDataChange }) {
   // Status já filtrado na API quando há seleção; mantém filtro local como redundância
   const mensalidadesFiltradas = mensalidades
     .filter(m => !mensalidadeStatus || m.status === mensalidadeStatus)
+    .filter(m => {
+      if (!buscaNomeAluno.trim()) return true;
+      const nome = nomeAlunoMensalidade(m).toLowerCase();
+      return nome.includes(buscaNomeAluno.trim().toLowerCase());
+    })
     .sort((a, b) =>
       nomeAlunoMensalidade(a).localeCompare(nomeAlunoMensalidade(b), 'pt-BR', { sensitivity: 'base' })
     );
@@ -498,6 +504,13 @@ function ControleFinanceiro({ user, onDataChange }) {
 
       <h3 style={{ color: '#1F6C86', marginTop: 32 }}>Mensalidades</h3>
       <div className="controle-financeiro-busca" style={{ marginBottom: 12, display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center' }}>
+        <input
+          type="text"
+          placeholder="Buscar por nome do aluno…"
+          value={buscaNomeAluno}
+          onChange={e => { setBuscaNomeAluno(e.target.value); setPagina(1); }}
+          style={{ padding: '0.75rem', borderRadius: 4, border: '1px solid #ccc', minHeight: '44px', fontSize: '16px', flex: '2 1 auto', minWidth: 200 }}
+        />
         <select
           value={turmaFiltro}
           onChange={e => { setTurmaFiltro(e.target.value); setPagina(1); }}
