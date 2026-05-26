@@ -26,6 +26,9 @@ import {
   SuperaNews,
   GaleriaFoto,
   CandidaturaTrabalho
+  CadastroWellhub,
+  WellhubTurmaOpcao,
+  WellhubReserva,
 } from '../types';
 import CONFIG from '../config';
 
@@ -696,6 +699,54 @@ export const pagamentoService = {
 
   consultarCheckout: async (transacaoId: number): Promise<any> => {
     const response = await api.get(`financeiro/checkout/status/${transacaoId}/`);
+    return response.data;
+  },
+};
+
+export type WellhubCadastrosFiltros = {
+  q?: string;
+  mes?: string;
+  semana_inicio?: string;
+  turma_id?: number | null;
+};
+
+export const wellhubService = {
+  listarTurmasOpcoes: async (): Promise<WellhubTurmaOpcao[]> => {
+    const response = await api.get('wellhub/turmas-opcoes/');
+    const data = response.data;
+    return Array.isArray(data) ? data : [];
+  },
+
+  listarCadastros: async (filtros: WellhubCadastrosFiltros = {}): Promise<CadastroWellhub[]> => {
+    const params: Record<string, string | number> = {};
+    if (filtros.q?.trim()) params.q = filtros.q.trim();
+    if (filtros.mes?.trim()) params.mes = filtros.mes.trim();
+    if (filtros.semana_inicio?.trim()) params.semana_inicio = filtros.semana_inicio.trim();
+    if (filtros.turma_id != null) params.turma_id = filtros.turma_id;
+    const response = await api.get('wellhub/cadastros/', { params });
+    const data = response.data;
+    return Array.isArray(data) ? data : data.results || [];
+  },
+
+  obterCadastro: async (id: number, filtros: WellhubCadastrosFiltros = {}): Promise<CadastroWellhub> => {
+    const params: Record<string, string | number> = {};
+    if (filtros.mes?.trim()) params.mes = filtros.mes.trim();
+    if (filtros.semana_inicio?.trim()) params.semana_inicio = filtros.semana_inicio.trim();
+    if (filtros.turma_id != null) params.turma_id = filtros.turma_id;
+    const response = await api.get(`wellhub/cadastros/${id}/`, { params });
+    return response.data;
+  },
+
+  atualizarCadastro: async (
+    id: number,
+    payload: Partial<Pick<CadastroWellhub, 'first_name' | 'last_name' | 'email' | 'telefone' | 'observacoes'>>
+  ): Promise<CadastroWellhub> => {
+    const response = await api.patch(`wellhub/cadastros/${id}/`, payload);
+    return response.data;
+  },
+
+  sincronizarSlots: async (): Promise<{ message: string; stats: Record<string, number> }> => {
+    const response = await api.post('wellhub/sync/slots/');
     return response.data;
   },
 };

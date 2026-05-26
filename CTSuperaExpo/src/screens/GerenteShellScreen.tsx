@@ -16,9 +16,10 @@ import GerenciarTurmasScreen from './GerenciarTurmasScreen';
 import GerenciarSuperaNewsScreen from './GerenciarSuperaNewsScreen';
 import GerenciarGaleriaScreen from './GerenciarGaleriaScreen';
 import GerenciarCandidaturasTrabalhoScreen from './GerenciarCandidaturasTrabalhoScreen';
+import GerenciarCadastrosWellhubScreen from './GerenciarCadastrosWellhubScreen';
 
 type TopKey = 'dashboard' | 'perfil' | 'usuarios' | 'financeiro' | 'relatorios';
-type BottomKey = 'cts' | 'turmas' | 'news' | 'galeria' | 'candidatos';
+type BottomKey = 'cts' | 'turmas' | 'news' | 'galeria' | 'candidatos' | 'wellhub';
 
 type FocusState = { area: 'top' | 'bottom'; tab: TopKey | BottomKey };
 
@@ -35,6 +36,7 @@ const TOP_TABS: { key: TopKey; label: string }[] = [
 const BOTTOM_TABS: { key: BottomKey; label: string }[] = [
   { key: 'cts', label: 'CTs' },
   { key: 'turmas', label: 'Turmas' },
+  { key: 'wellhub', label: 'Wellhub' },
   { key: 'news', label: 'News' },
   { key: 'galeria', label: 'Galeria' },
   { key: 'candidatos', label: 'Candidatos' },
@@ -65,6 +67,8 @@ function iconBottom(key: BottomKey): keyof typeof MaterialIcons.glyphMap {
       return 'business';
     case 'turmas':
       return 'group';
+    case 'wellhub':
+      return 'fitness-center';
     case 'news':
       return 'article';
     case 'galeria':
@@ -263,20 +267,27 @@ const GerenteShellScreen: React.FC = () => {
             </View>
             <View style={[styles.page, bottomPageStyle(2)]} collapsable={false}>
               {shouldMountNeighborPage(2, bottomMountCenter) ? (
-                <GerenciarSuperaNewsScreen embedded navigation={noopNav} route={{}} />
+                <GerenciarCadastrosWellhubScreen embedded navigation={noopNav} route={{}} />
               ) : (
                 <View style={styles.pagePlaceholder} />
               )}
             </View>
             <View style={[styles.page, bottomPageStyle(3)]} collapsable={false}>
               {shouldMountNeighborPage(3, bottomMountCenter) ? (
-                <GerenciarGaleriaScreen embedded navigation={noopNav} route={{}} />
+                <GerenciarSuperaNewsScreen embedded navigation={noopNav} route={{}} />
               ) : (
                 <View style={styles.pagePlaceholder} />
               )}
             </View>
             <View style={[styles.page, bottomPageStyle(4)]} collapsable={false}>
               {shouldMountNeighborPage(4, bottomMountCenter) ? (
+                <GerenciarGaleriaScreen embedded navigation={noopNav} route={{}} />
+              ) : (
+                <View style={styles.pagePlaceholder} />
+              )}
+            </View>
+            <View style={[styles.page, bottomPageStyle(5)]} collapsable={false}>
+              {shouldMountNeighborPage(5, bottomMountCenter) ? (
                 <GerenciarCandidaturasTrabalhoScreen embedded navigation={noopNav} route={{}} />
               ) : (
                 <View style={styles.pagePlaceholder} />

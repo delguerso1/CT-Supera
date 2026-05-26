@@ -440,7 +440,10 @@ const DashboardProfessorScreen: React.FC<NavigationProps> = ({ navigation, route
       normalizeSearch(aluno.nome).includes(searchNormalized)
     );
     const alunosAulaExperimental = alunosFiltrados.filter((a: any) => a.tipo === 'aula_experimental');
-    const alunosNormais = alunosFiltrados.filter((a: any) => a.tipo !== 'aula_experimental');
+    const alunosWellhub = alunosFiltrados.filter((a: any) => a.tipo === 'wellhub');
+    const alunosNormais = alunosFiltrados.filter(
+      (a: any) => a.tipo !== 'aula_experimental' && a.tipo !== 'wellhub'
+    );
     const alunosComCheckin = alunosNormais.filter(a => a.checkin_realizado);
     const alunosSemCheckin = alunosNormais.filter(a => !a.checkin_realizado);
 
@@ -540,6 +543,40 @@ const DashboardProfessorScreen: React.FC<NavigationProps> = ({ navigation, route
               </TouchableOpacity>
             </View>
           </View>
+
+          {alunosWellhub.length > 0 && (
+            <View style={styles.alunosSection}>
+              <Text style={styles.alunosSectionTitle}>
+                Wellhub ({alunosWellhub.length})
+              </Text>
+              {alunosWellhub.map(aluno => (
+                <View key={aluno.id} style={[styles.alunoItem, { backgroundColor: '#e8f5e9' }]}>
+                  <View style={styles.alunoInfo}>
+                    <Text style={[styles.alunoNome, { color: '#2e7d32', fontWeight: '600' }]}>
+                      {aluno.nome}
+                    </Text>
+                    <View style={styles.alunoStatusRow}>
+                      <View style={[styles.statusDot, { backgroundColor: '#2e7d32' }]} />
+                      <Text style={styles.alunoStatus}>
+                        {aluno.presenca_confirmada
+                          ? 'Presença confirmada'
+                          : aluno.ausencia_registrada
+                            ? 'Falta registrada'
+                            : 'Reserva Wellhub — aguardando confirmação'}
+                      </Text>
+                    </View>
+                  </View>
+                  <Switch
+                    value={presencasSelecionadas[String(aluno.id)] || false}
+                    onValueChange={() => togglePresenca(aluno.id)}
+                    trackColor={{ false: '#ccc', true: '#4caf50' }}
+                    thumbColor={presencasSelecionadas[String(aluno.id)] ? '#fff' : '#f4f3f4'}
+                    accessibilityLabel={`Presença Wellhub: ${aluno.nome}`}
+                  />
+                </View>
+              ))}
+            </View>
+          )}
 
           {alunosAulaExperimental.length > 0 && (
             <View style={styles.alunosSection}>

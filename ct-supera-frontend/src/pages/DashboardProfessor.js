@@ -1354,11 +1354,16 @@ function DashboardProfessor({ user }) {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   {alunosPresenca.map(aluno => {
                     const isAulaExperimental = aluno.tipo === 'aula_experimental';
+                    const isWellhub = aluno.tipo === 'wellhub';
                     return (
                       <div key={aluno.id} style={{
                         ...styles.checkboxContainer,
                         opacity: aluno.presenca_confirmada ? 0.7 : 1,
-                        backgroundColor: isAulaExperimental ? '#fff8e1' : (aluno.checkin_realizado ? '#f0f8ff' : '#fff8f0')
+                        backgroundColor: isWellhub
+                          ? '#e8f5e9'
+                          : isAulaExperimental
+                            ? '#fff8e1'
+                            : (aluno.checkin_realizado ? '#f0f8ff' : '#fff8f0')
                       }}>
                         <input
                           type="checkbox"
@@ -1379,21 +1384,32 @@ function DashboardProfessor({ user }) {
                             cursor: aluno.presenca_confirmada ? 'not-allowed' : 'pointer'
                           }}
                         >
-                          <span>{aluno.nome || `${aluno.first_name || ''} ${aluno.last_name || ''}`.trim()}{aluno.username ? ` (${aluno.username})` : ''}</span>
+                          <span style={isWellhub ? { color: '#2e7d32', fontWeight: 600 } : undefined}>
+                            {aluno.nome || `${aluno.first_name || ''} ${aluno.last_name || ''}`.trim()}
+                            {!isWellhub && aluno.username ? ` (${aluno.username})` : ''}
+                          </span>
                           <span style={{
                             fontSize: '11px',
                             padding: '2px 6px',
                             borderRadius: 3,
-                            backgroundColor: aluno.presenca_confirmada ? '#4caf50' : isAulaExperimental ? '#ff9800' : (aluno.checkin_realizado ? '#2196f3' : '#ff9800'),
+                            backgroundColor: aluno.presenca_confirmada
+                              ? '#4caf50'
+                              : isWellhub
+                                ? '#2e7d32'
+                                : isAulaExperimental
+                                  ? '#ff9800'
+                                  : (aluno.checkin_realizado ? '#2196f3' : '#ff9800'),
                             color: 'white'
                           }}>
                             {aluno.presenca_confirmada
                               ? '✅ Confirmada'
-                              : isAulaExperimental
-                                ? 'Aula experimental'
-                                : aluno.checkin_realizado
-                                  ? 'Check-in no app'
-                                  : 'Sem check-in no app'}
+                              : isWellhub
+                                ? 'Wellhub'
+                                : isAulaExperimental
+                                  ? 'Aula experimental'
+                                  : aluno.checkin_realizado
+                                    ? 'Check-in no app'
+                                    : 'Sem check-in no app'}
                           </span>
                         </label>
                       </div>

@@ -339,6 +339,52 @@ export interface PreCadastro {
   turma_resumo?: string | null;
 }
 
+export interface WellhubTurmaOpcao {
+  id: number;
+  horario: string;
+  ct_nome: string;
+  label: string;
+}
+
+export interface CadastroWellhubUltimaReserva {
+  id: number;
+  status: string;
+  status_display?: string;
+  data_aula: string;
+  horario: string;
+  turma_id?: number;
+}
+
+export interface CadastroWellhub {
+  id: number;
+  wellhub_user_id?: string;
+  first_name: string;
+  last_name?: string;
+  nome_completo?: string;
+  email?: string;
+  telefone?: string;
+  observacoes?: string;
+  criado_em?: string;
+  atualizado_em?: string;
+  ultima_reserva?: CadastroWellhubUltimaReserva | null;
+  reservas?: WellhubReserva[];
+}
+
+export interface WellhubReserva {
+  id: number;
+  wellhub_booking_id: string;
+  status: string;
+  status_display?: string;
+  late_cancel?: boolean;
+  cadastro?: number;
+  cadastro_nome?: string;
+  slot?: number;
+  data_aula?: string;
+  turma_horario?: string;
+  turma_ct?: string;
+  criado_em?: string;
+}
+
 export interface PainelGerente {
   alunos_ativos: number;
   alunos_inativos: number;

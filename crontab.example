@@ -10,6 +10,9 @@
 # Lembretes de aula experimental (diário às 09:00)
 0 9 * * * cd /root/ct-supera && DJANGO_SETTINGS_MODULE=app.settings_hostinger /root/ct-supera/venv/bin/python manage.py enviar_lembretes_aula_experimental
 
+# Wellhub: sincronizar slots do mês (diário às 03:00)
+0 3 * * * cd /root/ct-supera && DJANGO_SETTINGS_MODULE=app.settings_hostinger /root/ct-supera/venv/bin/python manage.py sincronizar_wellhub_slots >> /root/ct-supera/logs/sincronizar_wellhub_slots.log 2>&1
+
 # Sincronização C6: checkout cartão e boletos pendentes (fallback ao webhook, a cada 10 min)
 # */10 * * * * cd /root/ct-supera && VENV_PATH=/root/ct-supera/venv DJANGO_SETTINGS_MODULE=app.settings_hostinger /root/ct-supera/scripts/sincronizar_checkouts_cartao_c6.sh >> /root/ct-supera/logs/sincronizar_checkouts_cartao_c6.log 2>&1
 # */10 * * * * cd /root/ct-supera && VENV_PATH=/root/ct-supera/venv DJANGO_SETTINGS_MODULE=app.settings_hostinger /root/ct-supera/scripts/sincronizar_boletos_c6.sh >> /root/ct-supera/logs/sincronizar_boletos_c6.log 2>&1

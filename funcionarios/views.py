@@ -15,6 +15,7 @@ from django.utils import timezone
 from datetime import datetime, timedelta
 import logging
 from app.date_api import format_data_api, format_datetime_api, parse_data_api
+from wellhub.services.presenca_professor import wellhub_bookings_presenca_turma
 
 logger = logging.getLogger(__name__)
 
@@ -127,6 +128,8 @@ class VerificarCheckinAlunosAPIView(APIView):
             if key_pc in precadastros_adicionados:
                 continue
             precadastros_adicionados.add(key_pc)
+            if email_pc:
+                emails_alunos.add(email_pc)
 
             ja_exp = bool(pc.compareceu_aula_experimental)
             status_alunos.append({
@@ -137,6 +140,30 @@ class VerificarCheckinAlunosAPIView(APIView):
                 "checkin_realizado": False,
                 "presenca_confirmada": ja_exp,
                 "ausencia_registrada": False,
+                "pode_confirmar_presenca": True,
+            })
+
+        wellhub_adicionados = set()
+        for booking in wellhub_bookings_presenca_turma(turma, hoje):
+            cadastro = booking.cadastro
+            if not cadastro:
+                continue
+            email_wh = (cadastro.email or "").strip().lower()
+            if email_wh and email_wh in emails_alunos:
+                continue
+            nome_wh = f"{cadastro.first_name} {cadastro.last_name or ''}".strip()
+            key_wh = (email_wh, nome_wh.lower())
+            if key_wh in wellhub_adicionados:
+                continue
+            wellhub_adicionados.add(key_wh)
+            status_alunos.append({
+                "id": f"wellhub_{booking.id}",
+                "nome": nome_wh or "Cliente Wellhub",
+                "username": cadastro.email or "Wellhub",
+                "tipo": "wellhub",
+                "checkin_realizado": False,
+                "presenca_confirmada": bool(booking.presenca_confirmada),
+                "ausencia_registrada": bool(booking.ausencia_registrada),
                 "pode_confirmar_presenca": True,
             })
 
@@ -167,8 +194,13 @@ class RegistrarPresencaAPIView(APIView):
         if not isinstance(faltas_raw, (list, tuple)):
             faltas_raw = list(faltas_raw) if faltas_raw else []
 
-        alunos_ids = {str(x) for x in alunos_presentes if not str(x).startswith('precadastro_')}
+        alunos_ids = {
+            str(x)
+            for x in alunos_presentes
+            if not str(x).startswith('precadastro_') and not str(x).startswith('wellhub_')
+        }
         precadastro_ids = []
+        wellhub_presentes_ids = []
         for x in alunos_presentes:
             s = str(x)
             if s.startswith('precadastro_'):
@@ -176,15 +208,30 @@ class RegistrarPresencaAPIView(APIView):
                     precadastro_ids.append(int(s.replace('precadastro_', '')))
                 except ValueError:
                     pass
+            elif s.startswith('wellhub_'):
+                try:
+                    wellhub_presentes_ids.append(int(s.replace('wellhub_', '')))
+                except ValueError:
+                    pass
         precadastro_ids.extend(int(x) for x in precadastros_presentes if str(x).isdigit())
 
-        falta_ids = {str(x) for x in faltas_raw if not str(x).startswith('precadastro_')}
+        falta_ids = {
+            str(x)
+            for x in faltas_raw
+            if not str(x).startswith('precadastro_') and not str(x).startswith('wellhub_')
+        }
         precadastro_falta_ids = []
+        wellhub_falta_ids = []
         for x in faltas_raw:
             s = str(x)
             if s.startswith('precadastro_'):
                 try:
                     precadastro_falta_ids.append(int(s.replace('precadastro_', '')))
+                except ValueError:
+                    pass
+            elif s.startswith('wellhub_'):
+                try:
+                    wellhub_falta_ids.append(int(s.replace('wellhub_', '')))
                 except ValueError:
                     pass
 
@@ -198,6 +245,12 @@ class RegistrarPresencaAPIView(APIView):
         if inter_pc:
             return Response(
                 {"error": "O mesmo pré-cadastro não pode estar em presença e em falta ao mesmo tempo."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        inter_wh = set(wellhub_presentes_ids) & set(wellhub_falta_ids)
+        if inter_wh:
+            return Response(
+                {"error": "O mesmo cliente Wellhub não pode estar em presença e em falta ao mesmo tempo."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -273,6 +326,23 @@ class RegistrarPresencaAPIView(APIView):
                 if pc:
                     pc.compareceu_aula_experimental = False
                     pc.save()
+                    presencas_registradas += 1
+
+        for booking_id in set(wellhub_presentes_ids):
+            booking = wellhub_bookings_presenca_turma(turma, hoje).filter(id=booking_id).first()
+            if booking:
+                booking.presenca_confirmada = True
+                booking.ausencia_registrada = False
+                booking.save(update_fields=["presenca_confirmada", "ausencia_registrada", "atualizado_em"])
+                presencas_registradas += 1
+
+        if usar_faltas:
+            for booking_id in set(wellhub_falta_ids):
+                booking = wellhub_bookings_presenca_turma(turma, hoje).filter(id=booking_id).first()
+                if booking:
+                    booking.presenca_confirmada = False
+                    booking.ausencia_registrada = True
+                    booking.save(update_fields=["presenca_confirmada", "ausencia_registrada", "atualizado_em"])
                     presencas_registradas += 1
 
         return Response({

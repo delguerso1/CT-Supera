@@ -89,13 +89,18 @@ function RegistrarPresenca({ turmaId, onSuccess }) {
       <ul style={{ listStyle: 'none', padding: 0 }}>
         {alunos.map(aluno => {
           const isAulaExperimental = aluno.tipo === 'aula_experimental';
+          const isWellhub = aluno.tipo === 'wellhub';
           return (
             <li key={aluno.id} style={{
               marginBottom: 8,
               padding: 8,
               border: '1px solid #eee',
               borderRadius: 4,
-              backgroundColor: isAulaExperimental ? '#fff8e1' : (aluno.checkin_realizado ? '#f0f8ff' : '#fff5f5')
+              backgroundColor: isWellhub
+                ? '#e8f5e9'
+                : isAulaExperimental
+                  ? '#fff8e1'
+                  : (aluno.checkin_realizado ? '#f0f8ff' : '#fff5f5')
             }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <input
@@ -105,10 +110,23 @@ function RegistrarPresenca({ turmaId, onSuccess }) {
                   disabled={false}
                   aria-label={`Presença: ${aluno.nome || ''}`}
                 />
-                <span style={{ flex: 1 }}>
-                  {aluno.nome}{aluno.username ? ` (${aluno.username})` : ''}
+                <span style={{
+                  flex: 1,
+                  ...(isWellhub ? { color: '#2e7d32', fontWeight: 600 } : {}),
+                }}>
+                  {aluno.nome}{!isWellhub && aluno.username ? ` (${aluno.username})` : ''}
                 </span>
-                {isAulaExperimental ? (
+                {isWellhub ? (
+                  <span style={{
+                    fontSize: '12px',
+                    padding: '2px 6px',
+                    borderRadius: 3,
+                    backgroundColor: '#2e7d32',
+                    color: 'white'
+                  }}>
+                    Wellhub
+                  </span>
+                ) : isAulaExperimental ? (
                   <span style={{
                     fontSize: '12px',
                     padding: '2px 6px',

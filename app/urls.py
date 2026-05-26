@@ -30,6 +30,7 @@ urlpatterns = [
     path('api/financeiro/', include('financeiro.urls')),
     path('api/usuarios/', include('usuarios.urls')),
     path('api/cts/', include('ct.urls')),
+    path('api/wellhub/', include('wellhub.urls')),
     # Rota catch-all para servir o frontend React
     re_path(r'^.*$', serve_frontend, name='frontend'),
 ]

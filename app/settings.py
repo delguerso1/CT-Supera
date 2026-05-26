@@ -66,6 +66,7 @@ INSTALLED_APPS = [
     'ct',
     'funcionarios',
     'financeiro',
+    'wellhub',
     'rest_framework',
     'rest_framework.authtoken',
     'corsheaders',
@@ -283,3 +284,15 @@ else:  # sandbox (padrão)
 # URLs mantidas para compatibilidade
 C6_BANK_SANDBOX_URL = os.getenv('C6_BANK_SANDBOX_URL', 'https://baas-api-sandbox.c6bank.info')
 C6_BANK_PRODUCTION_URL = os.getenv('C6_BANK_PRODUCTION_URL', 'https://baas-api.c6bank.info')
+
+# Wellhub (Gympass) Booking API
+WELLHUB_API_BASE_URL = os.getenv(
+    'WELLHUB_API_BASE_URL',
+    'https://api.partners.gympass-staging.com',
+)
+WELLHUB_API_KEY = os.getenv('WELLHUB_API_KEY', '')
+WELLHUB_GYM_ID = os.getenv('WELLHUB_GYM_ID', '')
+WELLHUB_WEBHOOK_SECRET = os.getenv('WELLHUB_WEBHOOK_SECRET', '')
+WELLHUB_PRODUCT_ID = int(os.getenv('WELLHUB_PRODUCT_ID', '1') or '1')
+WELLHUB_HTTP_TIMEOUT = int(os.getenv('WELLHUB_HTTP_TIMEOUT', '30') or '30')
+WELLHUB_HTTP_MAX_RETRIES = int(os.getenv('WELLHUB_HTTP_MAX_RETRIES', '2') or '2')

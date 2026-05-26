@@ -6,6 +6,7 @@ import ControleFinanceiro from '../pages/ControleFinanceiro';
 import RelatoriosGerente from '../pages/RelatoriosGerente';
 import CadastroCentroTreinamento from '../pages/CadastroCentroTreinamento';
 import GerenciarCandidaturasTrabalho from '../pages/GerenciarCandidaturasTrabalho';
+import GerenciarCadastrosWellhub from '../pages/GerenciarCadastrosWellhub';
 import { NAVBAR_HEIGHT_CSS } from '../constants/layout';
 import {
   apiDateToInputDate,
@@ -1363,6 +1364,16 @@ function DashboardGerente({ user }) {
     </div>
   );
 
+  const renderWellhub = () => (
+    <div>
+      <h2 style={styles.contentTitle}>
+        <span>🏐</span>
+        Cadastros Wellhub
+      </h2>
+      <GerenciarCadastrosWellhub />
+    </div>
+  );
+
   if (loading) return <div style={styles.container}>Carregando...</div>;
   if (error) {
     return (
@@ -1475,6 +1486,17 @@ function DashboardGerente({ user }) {
           <div
             style={{
               ...styles.menuItem,
+              ...(activeSection === 'wellhub' && styles.activeMenuItem)
+            }}
+            onClick={() => setActiveSection('wellhub')}
+            title="Cadastros Wellhub"
+          >
+            <span style={styles.menuIcon}>🏐</span>
+            <span style={styles.menuItemLabel}>Wellhub</span>
+          </div>
+          <div
+            style={{
+              ...styles.menuItem,
               ...(activeSection === 'centros' && styles.activeMenuItem)
             }}
             onClick={() => setActiveSection('centros')}
@@ -1522,6 +1544,7 @@ function DashboardGerente({ user }) {
           {activeSection === 'perfil' && renderMeuPerfil()}
           {activeSection === 'usuarios' && renderUsuarios()}
           {activeSection === 'candidatos-trabalho' && renderCandidatosTrabalho()}
+          {activeSection === 'wellhub' && renderWellhub()}
           {activeSection === 'centros' && renderCentros()}
           {activeSection === 'relatorios' && renderRelatorios()}
           {activeSection === 'financeiro' && renderFinanceiro()}
