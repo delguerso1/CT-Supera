@@ -161,7 +161,7 @@ class VerificarCheckinAlunosAPIView(APIView):
                 "nome": nome_wh or "Cliente Wellhub",
                 "username": cadastro.email or "Wellhub",
                 "tipo": "wellhub",
-                "checkin_realizado": False,
+                "checkin_realizado": bool(booking.checkin_validado),
                 "presenca_confirmada": bool(booking.presenca_confirmada),
                 "ausencia_registrada": bool(booking.ausencia_registrada),
                 "pode_confirmar_presenca": True,

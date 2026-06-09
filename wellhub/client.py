@@ -53,11 +53,15 @@ class WellhubClient:
         *,
         json_body: Optional[dict] = None,
         params: Optional[dict] = None,
+        extra_headers: Optional[dict] = None,
     ) -> Any:
         if not self.configured:
             raise WellhubAPIError("Wellhub API não configurada (WELLHUB_API_KEY / WELLHUB_GYM_ID).")
 
         url = f"{self.base_url}{path}"
+        headers = self._headers()
+        if extra_headers:
+            headers.update(extra_headers)
         last_exc: Optional[Exception] = None
 
         for attempt in range(self.max_retries + 1):
@@ -65,7 +69,7 @@ class WellhubClient:
                 response = requests.request(
                     method,
                     url,
-                    headers=self._headers(),
+                    headers=headers,
                     json=json_body,
                     params=params,
                     timeout=self.timeout,
@@ -135,4 +139,22 @@ class WellhubClient:
             "PATCH",
             f"/booking/v1/gyms/{gym_id}/bookings/{booking_number}",
             json_body=payload,
+        )
+
+    def validate_access(self, gympass_id: str, *, gym_id: Optional[int] = None) -> dict:
+        """
+        Confirma check-in do usuário na Wellhub (Access Control API).
+        POST /access/v1/validate — requer check-in prévio no app Wellhub.
+        """
+        resolved_gym_id = gym_id if gym_id is not None else self.gym_id
+        if not resolved_gym_id:
+            raise WellhubAPIError("gym_id ausente para Access Validate.")
+        gympass_id = str(gympass_id or "").strip()
+        if not gympass_id:
+            raise WellhubAPIError("gympass_id ausente para Access Validate.")
+        return self._request(
+            "POST",
+            "/access/v1/validate",
+            json_body={"gympass_id": gympass_id},
+            extra_headers={"X-Gym-Id": str(resolved_gym_id)},
         )

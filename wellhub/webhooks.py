@@ -188,3 +188,60 @@ def is_cancel_event(event_type: str) -> bool:
 def is_late_cancel_event(event_type: str) -> bool:
     n = normalize_event_type(event_type)
     return "bookinglatecancelation" in n or "bookinglatecancellation" in n
+
+
+def is_checkin_event(event_type: str) -> bool:
+    """Check-in físico no app Wellhub (Access Control)."""
+    n = normalize_event_type(event_type)
+    return (
+        n in ("checkinoccurred", "checkinbookingoccurred")
+        or "checkinoccurred" in n
+        or "checkinbookingoccurred" in n
+    )
+
+
+def extract_gympass_id(payload: dict) -> Optional[str]:
+    """ID numérico do usuário (13 dígitos) para POST /access/v1/validate."""
+    payload = normalize_webhook_payload(payload)
+    for key in (
+        "gympass_user_id",
+        "gympass_id",
+        "gympass_userid",
+        "gympassid",
+        "unique_token",
+    ):
+        val = payload.get(key)
+        if val is not None and str(val).strip():
+            return str(val).strip()
+
+    user = payload.get("user") or payload.get("member") or {}
+    if isinstance(user, dict):
+        for key in (
+            "gympass_user_id",
+            "gympass_id",
+            "unique_token",
+            "gympass-id",
+            "gympass-user-id",
+        ):
+            val = user.get(key)
+            if val is not None and str(val).strip():
+                return str(val).strip()
+
+    user_data = extract_user_data(payload)
+    wid = user_data.get("wellhub_user_id") or ""
+    if wid:
+        return str(wid).strip()
+    return None
+
+
+def extract_gym_id(payload: dict) -> Optional[int]:
+    payload = normalize_webhook_payload(payload)
+    for key in ("gym_id", "gymId"):
+        val = payload.get(key)
+        if val is not None and str(val).strip().isdigit():
+            return int(val)
+    for path in (("gym", "id"), ("slot", "gym_id")):
+        val = _dig(payload, *path)
+        if val is not None and str(val).strip().isdigit():
+            return int(val)
+    return None

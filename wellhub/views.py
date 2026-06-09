@@ -29,11 +29,13 @@ from wellhub.serializers import (
     WellhubBookingListSerializer,
 )
 from wellhub.services.bookings import handle_booking_cancel, handle_booking_requested
+from wellhub.services.checkins import handle_checkin_occurred
 from wellhub.services.sync_slots import sync_all_published_slots
 from wellhub.webhooks import (
     extract_event_id,
     extract_event_type,
     is_cancel_event,
+    is_checkin_event,
     is_late_cancel_event,
     is_requested_event,
     verify_gympass_signature,
@@ -112,6 +114,9 @@ class WellhubWebhookAPIView(APIView):
         if is_cancel_event(event_type):
             action, detail = handle_booking_cancel(payload, late=False)
             return {"handler": "cancel", "action": action, "detail": detail}
+        if is_checkin_event(event_type):
+            action, detail = handle_checkin_occurred(payload)
+            return {"handler": "checkin", "action": action, "detail": detail}
         logger.info("Webhook Wellhub ignorado (tipo=%s)", event_type)
         return {"handler": "ignored", "event_type": event_type}
 

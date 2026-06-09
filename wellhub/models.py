@@ -143,6 +143,20 @@ class WellhubBooking(models.Model):
         default=False,
         help_text="Professor registrou falta para a aula do dia.",
     )
+    checkin_validado = models.BooleanField(
+        default=False,
+        help_text="Check-in confirmado na Wellhub via Access Validate.",
+    )
+    checkin_validado_em = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Momento em que o Access Validate foi aceito pela Wellhub.",
+    )
+    checkin_validate_response = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Resposta da API POST /access/v1/validate.",
+    )
     payload = models.JSONField(default=dict, blank=True)
     criado_em = models.DateTimeField(auto_now_add=True)
     atualizado_em = models.DateTimeField(auto_now=True)

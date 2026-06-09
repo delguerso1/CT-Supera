@@ -561,7 +561,11 @@ class PreCadastroSerializer(serializers.ModelSerializer):
         # Validação para origem=aula_experimental
         origem = attrs.get('origem') or (self.instance.origem if self.instance else None)
         if origem == 'aula_experimental':
-            data_aula = attrs.get('data_aula_experimental') or (self.instance.data_aula_experimental if self.instance else None)
+            data_aula_em_attrs = 'data_aula_experimental' in attrs
+            data_aula = attrs.get('data_aula_experimental')
+            if data_aula is None and self.instance:
+                data_aula = self.instance.data_aula_experimental
+            turma_em_attrs = 'turma' in attrs
             turma = attrs.get('turma') or (self.instance.turma if self.instance else None)
             email_norm = str((attrs.get('email') or (self.instance.email if self.instance else '') or '')).strip().lower()
             telefone_norm = str(attrs.get('telefone') or (self.instance.telefone if self.instance else '') or '').strip()
@@ -572,20 +576,23 @@ class PreCadastroSerializer(serializers.ModelSerializer):
                 })
             from app.aula_experimental_datas import data_no_janela_agendamento, eh_feriado_nacional_br
 
-            hoje = timezone.localdate()
-            if not data_no_janela_agendamento(data_aula, hoje):
-                raise serializers.ValidationError({
-                    'data_aula_experimental': 'A data deve estar no mês atual ou no próximo mês.'
-                })
-            if data_aula < hoje:
-                raise serializers.ValidationError({
-                    'data_aula_experimental': 'A data não pode ser no passado.'
-                })
-            if eh_feriado_nacional_br(data_aula):
-                raise serializers.ValidationError({
-                    'data_aula_experimental': 'Não é possível agendar em feriado nacional.'
-                })
-            if turma:
+            validar_regras_agendamento = not self.instance or data_aula_em_attrs
+            if validar_regras_agendamento:
+                hoje = timezone.localdate()
+                if not data_no_janela_agendamento(data_aula, hoje):
+                    raise serializers.ValidationError({
+                        'data_aula_experimental': 'A data deve estar no mês atual ou no próximo mês.'
+                    })
+                if data_aula < hoje:
+                    raise serializers.ValidationError({
+                        'data_aula_experimental': 'A data não pode ser no passado.'
+                    })
+                if eh_feriado_nacional_br(data_aula):
+                    raise serializers.ValidationError({
+                        'data_aula_experimental': 'Não é possível agendar em feriado nacional.'
+                    })
+            validar_dia_turma = not self.instance or data_aula_em_attrs or turma_em_attrs
+            if validar_dia_turma and turma:
                 DIAS_MAP = {'Segunda-feira': 0, 'Terça-feira': 1, 'Quarta-feira': 2, 'Quinta-feira': 3,
                             'Sexta-feira': 4, 'Sábado': 5, 'Domingo': 6}
                 dias_turma = turma.dias_semana.all()

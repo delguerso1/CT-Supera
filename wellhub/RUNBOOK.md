@@ -2,7 +2,7 @@
 
 ## Visão geral
 
-- **API:** Booking API Wellhub/Gympass (sem Access Control)
+- **APIs:** Booking API + Access Control (validate check-in)
 - **Piloto:** CT **Praia de Itaipuaçu**, turmas **07:00, 08:00, 19:00**
 - **Dias Wellhub:** segunda e quarta (5 vagas/slot)
 - **Webhook:** `POST /api/wellhub/webhook/`
@@ -40,6 +40,7 @@ python manage.py configurar_wellhub_praia --skip-api
 4. Registrar na Wellhub:
    - **Webhook URL:** `https://<dominio>/api/wellhub/webhook/`
    - **Secret:** mesmo valor de `WELLHUB_WEBHOOK_SECRET`
+   - Habilitar eventos de **booking** e **check-in** no portal
    - Enviar Bearer token das APIs CT Supera (processo Wellhub)
 
 ## Operação diária
@@ -69,7 +70,8 @@ python manage.py test wellhub
 4. [ ] 6ª reserva na mesma aula → **rejected**
 5. [ ] Cancelamento libera vaga (`total_booked` correto)
 6. [ ] Webhook com assinatura inválida → HTTP **403**
-7. [ ] Sexta **sem** slot Wellhub; matriculados CT seguem check-in normal
+7. [ ] Check-in teste no app → webhook `checkin.occurred` / `checkin-booking-occurred` → `POST /access/v1/validate`
+8. [ ] Sexta **sem** slot Wellhub; matriculados CT seguem check-in normal
 
 ## Troubleshooting
 
@@ -96,8 +98,20 @@ python manage.py test wellhub
 4. Executar `configurar_wellhub_praia` uma vez
 5. Monitorar primeira semana: Admin → Reservas Wellhub / Eventos webhook
 
+## Access Validate (check-in)
+
+Quando o usuário faz check-in no app Wellhub, a plataforma envia um webhook (`checkin.occurred` ou `checkin-booking-occurred`) para `POST /api/wellhub/webhook/`. O CT Supera responde chamando:
+
+```
+POST {WELLHUB_API_BASE_URL}/access/v1/validate
+Header: X-Gym-Id: {WELLHUB_GYM_ID}
+Header: Authorization: Bearer {WELLHUB_API_KEY}
+Body: {"gympass_id": "<13 dígitos>"}
+```
+
+A resposta é gravada na reserva (`WellhubBooking.checkin_validado`). Na lista de presença do professor, alunos Wellhub com check-in validado aparecem com status de check-in realizado.
+
 ## Fora do escopo
 
-- Access Control / check-in Wellhub no dia
 - Aula experimental via Wellhub
 - Publicação de outros CTs ou horários (sem alterar código/constants)

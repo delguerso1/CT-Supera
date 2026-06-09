@@ -42,7 +42,16 @@ class CadastroWellhubAdmin(admin.ModelAdmin):
 
 @admin.register(WellhubBooking)
 class WellhubBookingAdmin(admin.ModelAdmin):
-    list_display = ("wellhub_booking_id", "slot", "cadastro", "status", "late_cancel", "criado_em")
+    list_display = (
+        "wellhub_booking_id",
+        "slot",
+        "cadastro",
+        "status",
+        "checkin_validado",
+        "presenca_confirmada",
+        "late_cancel",
+        "criado_em",
+    )
     list_filter = ("status", "late_cancel")
 
 
