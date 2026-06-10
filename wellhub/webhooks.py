@@ -194,7 +194,7 @@ def is_checkin_event(event_type: str) -> bool:
     """Check-in físico no app Wellhub (Access Control)."""
     n = normalize_event_type(event_type)
     return (
-        n in ("checkinoccurred", "checkinbookingoccurred")
+        n in ("checkin", "checkinoccurred", "checkinbookingoccurred")
         or "checkinoccurred" in n
         or "checkinbookingoccurred" in n
     )

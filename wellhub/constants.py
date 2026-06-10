@@ -39,6 +39,7 @@ BOOKING_STATUS_LATE_CANCELLED = "late_cancelled"
 WEBHOOK_EVENT_REQUESTED = "booking.requested"
 WEBHOOK_EVENT_CANCELATION = "booking.cancelation"
 WEBHOOK_EVENT_LATE_CANCELATION = "booking.latecancelation"
+WEBHOOK_EVENT_CHECKIN = "checkin"
 WEBHOOK_EVENT_CHECKIN_OCCURRED = "checkin.occurred"
 WEBHOOK_EVENT_CHECKIN_BOOKING_OCCURRED = "checkin-booking-occurred"
 

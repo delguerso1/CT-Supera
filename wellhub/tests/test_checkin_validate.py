@@ -59,6 +59,7 @@ class WellhubCheckinValidateTests(TestCase):
         )
 
     def test_is_checkin_event(self):
+        self.assertTrue(is_checkin_event("checkin"))
         self.assertTrue(is_checkin_event("checkin.occurred"))
         self.assertTrue(is_checkin_event("checkin-booking-occurred"))
         self.assertFalse(is_checkin_event("booking.requested"))
