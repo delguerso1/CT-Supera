@@ -24,11 +24,11 @@ def verify_gympass_signature(raw_body: bytes, signature_header: Optional[str]) -
         secret.encode("utf-8"),
         raw_body,
         hashlib.sha1,
-    ).hexdigest()
+    ).hexdigest().lower()
     received = signature_header.strip()
-    if received.startswith("sha1="):
+    if received.lower().startswith("sha1="):
         received = received[5:]
-    return hmac.compare_digest(expected, received)
+    return hmac.compare_digest(expected, received.lower())
 
 
 def _dig(data: dict, *keys: str, default=None):

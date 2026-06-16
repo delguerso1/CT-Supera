@@ -20,6 +20,11 @@ class SignatureTests(TestCase):
         sig = hmac.new(b"test-secret", body, hashlib.sha1).hexdigest()
         self.assertTrue(verify_gympass_signature(body, sig))
 
+    def test_assinatura_valida_maiusculas(self):
+        body = b'{"event":"booking.requested"}'
+        sig = hmac.new(b"test-secret", body, hashlib.sha1).hexdigest().upper()
+        self.assertTrue(verify_gympass_signature(body, sig))
+
     def test_assinatura_invalida(self):
         body = b'{"event":"booking.requested"}'
         self.assertFalse(verify_gympass_signature(body, "invalid"))
