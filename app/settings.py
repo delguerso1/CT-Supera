@@ -288,7 +288,7 @@ C6_BANK_PRODUCTION_URL = os.getenv('C6_BANK_PRODUCTION_URL', 'https://baas-api.c
 # Wellhub (Gympass) Booking API
 WELLHUB_API_BASE_URL = os.getenv(
     'WELLHUB_API_BASE_URL',
-    'https://api.partners.gympass-staging.com',
+    'https://apitesting.partners.gympass.com',
 )
 WELLHUB_API_KEY = os.getenv('WELLHUB_API_KEY', '')
 WELLHUB_GYM_ID = os.getenv('WELLHUB_GYM_ID', '')

@@ -10,7 +10,7 @@
 ## Variáveis de ambiente
 
 ```env
-WELLHUB_API_BASE_URL=https://api.partners.gympass-staging.com
+WELLHUB_API_BASE_URL=https://apitesting.partners.gympass.com
 WELLHUB_API_KEY=<JWT sandbox ou produção>
 WELLHUB_GYM_ID=438
 WELLHUB_WEBHOOK_SECRET=<secret registrado no portal Wellhub>

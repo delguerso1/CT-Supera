@@ -26,7 +26,7 @@ class WellhubClient:
         self.base_url = getattr(
             settings,
             "WELLHUB_API_BASE_URL",
-            "https://api.partners.gympass-staging.com",
+            "https://apitesting.partners.gympass.com",
         ).rstrip("/")
         self.api_key = getattr(settings, "WELLHUB_API_KEY", "") or ""
         raw_gym = getattr(settings, "WELLHUB_GYM_ID", None)
