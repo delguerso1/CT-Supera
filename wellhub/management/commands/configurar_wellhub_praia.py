@@ -2,6 +2,7 @@ from django.core.management.base import BaseCommand
 from django.conf import settings
 
 from wellhub.client import WellhubClient
+from wellhub.config_check import format_wellhub_config_hint, settings_wellhub_gym_id
 from wellhub.services.sync_classes import ensure_gym_config, setup_piloto_classes
 from wellhub.services.sync_slots import sync_all_published_slots
 
@@ -20,9 +21,10 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        gym_id = getattr(settings, "WELLHUB_GYM_ID", None)
+        gym_id = settings_wellhub_gym_id()
         if not gym_id:
             self.stderr.write(self.style.ERROR("WELLHUB_GYM_ID não configurado."))
+            self.stderr.write(format_wellhub_config_hint())
             return
 
         product_id = getattr(settings, "WELLHUB_PRODUCT_ID", 1)
@@ -35,6 +37,7 @@ class Command(BaseCommand):
             self.stdout.write(
                 self.style.WARNING("API Wellhub não chamada (--skip-api ou credenciais ausentes).")
             )
+            self.stdout.write(format_wellhub_config_hint(client))
 
         configs = setup_piloto_classes(client=client, call_api=call_api)
         for cfg in configs:

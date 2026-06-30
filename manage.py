@@ -3,10 +3,18 @@
 import os
 import sys
 
+from app.env_loader import load_project_env
+
+# .env antes do settings: na VPS, DJANGO_SETTINGS_MODULE=app.settings_hostinger vem do arquivo.
+load_project_env()
+
 
 def main():
     """Run administrative tasks."""
-    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'app.settings')
+    os.environ.setdefault(
+        'DJANGO_SETTINGS_MODULE',
+        os.getenv('DJANGO_SETTINGS_MODULE', 'app.settings'),
+    )
     try:
         from django.core.management import execute_from_command_line
     except ImportError as exc:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import time
 from typing import Any, Optional
 
@@ -10,6 +11,14 @@ import requests
 from django.conf import settings
 
 logger = logging.getLogger(__name__)
+
+
+def _wellhub_setting(name: str, default: Any = "") -> Any:
+    """Lê do Django settings; se vazio, tenta os.environ (ex.: systemd EnvironmentFile)."""
+    value = getattr(settings, name, None)
+    if value not in (None, ""):
+        return value
+    return os.getenv(name, default)
 
 
 class WellhubAPIError(Exception):
@@ -23,17 +32,18 @@ class WellhubClient:
     """Wrapper mínimo da Booking API (partners)."""
 
     def __init__(self):
-        self.base_url = getattr(
-            settings,
-            "WELLHUB_API_BASE_URL",
-            "https://apitesting.partners.gympass.com",
+        self.base_url = str(
+            _wellhub_setting(
+                "WELLHUB_API_BASE_URL",
+                "https://apitesting.partners.gympass.com",
+            )
         ).rstrip("/")
-        self.api_key = getattr(settings, "WELLHUB_API_KEY", "") or ""
-        raw_gym = getattr(settings, "WELLHUB_GYM_ID", None)
+        self.api_key = str(_wellhub_setting("WELLHUB_API_KEY", "") or "")
+        raw_gym = _wellhub_setting("WELLHUB_GYM_ID", None)
         self.gym_id = int(raw_gym) if raw_gym not in (None, "") else None
-        self.product_id = getattr(settings, "WELLHUB_PRODUCT_ID", 1)
-        self.timeout = getattr(settings, "WELLHUB_HTTP_TIMEOUT", 30)
-        self.max_retries = getattr(settings, "WELLHUB_HTTP_MAX_RETRIES", 2)
+        self.product_id = int(_wellhub_setting("WELLHUB_PRODUCT_ID", 1) or 1)
+        self.timeout = int(_wellhub_setting("WELLHUB_HTTP_TIMEOUT", 30) or 30)
+        self.max_retries = int(_wellhub_setting("WELLHUB_HTTP_MAX_RETRIES", 2) or 2)
 
     @property
     def configured(self) -> bool:

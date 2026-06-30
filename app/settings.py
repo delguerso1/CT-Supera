@@ -12,14 +12,11 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 import os
 from pathlib import Path
-from dotenv import load_dotenv
 
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
-BASE_DIR = Path(__file__).resolve().parent.parent
+from app.env_loader import BASE_DIR, load_project_env
 
 # Carrega as variáveis de ambiente do arquivo .env na raiz do projeto
-env_path = BASE_DIR / '.env'
-load_dotenv(dotenv_path=env_path)
+load_project_env()
 
 
 # Quick-start development settings - unsuitable for production
