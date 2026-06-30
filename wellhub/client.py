@@ -10,15 +10,24 @@ from typing import Any, Optional
 import requests
 from django.conf import settings
 
+from app.env_loader import read_env_file_value
+
 logger = logging.getLogger(__name__)
 
 
 def _wellhub_setting(name: str, default: Any = "") -> Any:
-    """Lê do Django settings; se vazio, tenta os.environ (ex.: systemd EnvironmentFile)."""
+    """Lê settings → os.environ → linha direta no .env (fallback para JWT)."""
     value = getattr(settings, name, None)
     if value not in (None, ""):
         return value
-    return os.getenv(name, default)
+    value = os.getenv(name)
+    if value not in (None, ""):
+        return value
+    if name in ("WELLHUB_API_KEY", "WELLHUB_WEBHOOK_SECRET"):
+        file_value = read_env_file_value(name)
+        if file_value:
+            return file_value
+    return default
 
 
 class WellhubAPIError(Exception):

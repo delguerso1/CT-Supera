@@ -8,11 +8,11 @@ from pathlib import Path
 def _bootstrap_env() -> None:
     """Lê /root/ct-supera/.env (ou BASE/.env) antes de importar o Django."""
     project_dir = Path(__file__).resolve().parent
-    env_path = Path(os.getenv("ENV_FILE", project_dir / ".env"))
-    if env_path.is_file():
-        from dotenv import load_dotenv
+    if str(project_dir) not in sys.path:
+        sys.path.insert(0, str(project_dir))
+    from app.env_loader import bootstrap_cli_env
 
-        load_dotenv(dotenv_path=env_path, override=True)
+    bootstrap_cli_env()
 
 
 _bootstrap_env()
