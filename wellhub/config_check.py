@@ -23,8 +23,8 @@ def format_wellhub_config_hint(client: WellhubClient | None = None) -> str:
     ]
     if not client.api_key:
         lines.append(
-            "  Dica: credenciais devem estar em /root/ct-supera/.env "
-            "(variáveis WELLHUB_*). Rode com --settings=app.settings_hostinger na VPS."
+            f"  Dica: confira WELLHUB_API_KEY em {env_path} "
+            "(nome exato da variável, uma linha, sem aspas quebradas)."
         )
     return "\n".join(lines)
 

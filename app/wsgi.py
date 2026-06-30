@@ -11,12 +11,7 @@ import os
 
 from django.core.wsgi import get_wsgi_application
 
-from app.env_loader import load_project_env
-
-load_project_env()
-os.environ.setdefault(
-    'DJANGO_SETTINGS_MODULE',
-    os.getenv('DJANGO_SETTINGS_MODULE', 'app.settings'),
-)
+# Na VPS o systemd (ctsupera.service) já injeta /root/ct-supera/.env via EnvironmentFile.
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'app.settings')
 
 application = get_wsgi_application()

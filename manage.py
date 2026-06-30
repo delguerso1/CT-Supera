@@ -2,11 +2,20 @@
 """Django's command-line utility for administrative tasks."""
 import os
 import sys
+from pathlib import Path
 
-from app.env_loader import load_project_env
 
-# .env antes do settings: na VPS, DJANGO_SETTINGS_MODULE=app.settings_hostinger vem do arquivo.
-load_project_env()
+def _bootstrap_env() -> None:
+    """Lê /root/ct-supera/.env (ou BASE/.env) antes de importar o Django."""
+    project_dir = Path(__file__).resolve().parent
+    env_path = Path(os.getenv("ENV_FILE", project_dir / ".env"))
+    if env_path.is_file():
+        from dotenv import load_dotenv
+
+        load_dotenv(dotenv_path=env_path, override=True)
+
+
+_bootstrap_env()
 
 
 def main():
