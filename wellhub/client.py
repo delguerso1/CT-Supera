@@ -10,7 +10,7 @@ from typing import Any, Optional
 import requests
 from django.conf import settings
 
-from app.env_loader import read_env_file_value
+from app.env_loader import read_env_file_value, sanitize_secret_value
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +36,12 @@ class WellhubAPIError(Exception):
         self.status_code = status_code
         self.body = body
 
+    def __str__(self) -> str:
+        base = super().__str__()
+        if self.body is not None:
+            return f"{base} | {self.body}"
+        return base
+
 
 class WellhubClient:
     """Wrapper mínimo da Booking API (partners)."""
@@ -47,7 +53,9 @@ class WellhubClient:
                 "https://apitesting.partners.gympass.com",
             )
         ).rstrip("/")
-        self.api_key = str(_wellhub_setting("WELLHUB_API_KEY", "") or "")
+        self.api_key = sanitize_secret_value(
+            str(_wellhub_setting("WELLHUB_API_KEY", "") or "")
+        )
         raw_gym = _wellhub_setting("WELLHUB_GYM_ID", None)
         self.gym_id = int(raw_gym) if raw_gym not in (None, "") else None
         self.product_id = int(_wellhub_setting("WELLHUB_PRODUCT_ID", 1) or 1)
@@ -127,6 +135,18 @@ class WellhubClient:
             f"/booking/v1/gyms/{gym_id}/classes",
             json_body=payload,
         )
+
+    def list_classes(self) -> list:
+        gym_id = self.gym_id
+        resp = self._request("GET", f"/booking/v1/gyms/{gym_id}/classes")
+        if isinstance(resp, list):
+            return resp
+        if isinstance(resp, dict):
+            for key in ("classes", "results", "data", "items"):
+                items = resp.get(key)
+                if isinstance(items, list):
+                    return items
+        return []
 
     def update_class(self, class_id: str, payload: dict) -> dict:
         gym_id = self.gym_id

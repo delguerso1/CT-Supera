@@ -3,7 +3,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from app.env_loader import patch_env_from_file, read_env_file_value
+from app.env_loader import patch_env_from_file, read_env_file_value, sanitize_secret_value
 
 
 class ReadEnvFileValueTests(unittest.TestCase):
@@ -25,6 +25,10 @@ class ReadEnvFileValueTests(unittest.TestCase):
             env_path.write_text('WELLHUB_API_KEY="quoted-key"\n', encoding="utf-8")
             with mock.patch("app.env_loader.project_env_path", return_value=env_path):
                 self.assertEqual(read_env_file_value("WELLHUB_API_KEY"), "quoted-key")
+
+    def test_remove_aspas_soltas(self):
+        self.assertEqual(sanitize_secret_value('"token"'), "token")
+        self.assertEqual(sanitize_secret_value('token"'), "token")
 
     def test_patch_preenche_variavel_ausente(self):
         with tempfile.TemporaryDirectory() as tmp:

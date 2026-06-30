@@ -1,7 +1,7 @@
 from django.core.management.base import BaseCommand
 from django.conf import settings
 
-from wellhub.client import WellhubClient
+from wellhub.client import WellhubClient, WellhubAPIError
 from wellhub.config_check import format_wellhub_config_hint, settings_wellhub_gym_id
 from wellhub.services.sync_classes import ensure_gym_config, setup_piloto_classes
 from wellhub.services.sync_slots import sync_all_published_slots
@@ -39,7 +39,16 @@ class Command(BaseCommand):
             )
             self.stdout.write(format_wellhub_config_hint(client))
 
-        configs = setup_piloto_classes(client=client, call_api=call_api)
+        if call_api:
+            self.stdout.write(
+                f"Chamando API Wellhub (gym_id={client.gym_id}, product_id={client.product_id})..."
+            )
+
+        try:
+            configs = setup_piloto_classes(client=client, call_api=call_api)
+        except WellhubAPIError as exc:
+            self.stderr.write(self.style.ERROR(f"Erro ao criar/atualizar classe na Wellhub: {exc}"))
+            return
         for cfg in configs:
             self.stdout.write(
                 f"  Turma {cfg.turma_id} ({cfg.turma.horario}) → class_id={cfg.wellhub_class_id or 'local'}"

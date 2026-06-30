@@ -31,6 +31,12 @@ def _strip_env_value(raw: str) -> str:
     return value
 
 
+def sanitize_secret_value(raw: str) -> str:
+    """Remove aspas extras comuns ao editar JWT manualmente no .env."""
+    value = _strip_env_value((raw or "").strip())
+    return value.strip('"').strip("'")
+
+
 def read_env_file_value(key: str) -> str:
     """
     Lê uma variável diretamente do .env (linha KEY=valor).
