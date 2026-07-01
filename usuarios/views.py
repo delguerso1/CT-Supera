@@ -3,7 +3,8 @@ from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIV
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework import status
-from rest_framework.exceptions import ParseError
+from rest_framework.exceptions import ParseError, PermissionDenied, NotAuthenticated
+from django.http import Http404
 from rest_framework.authtoken.models import Token
 from django.shortcuts import get_object_or_404
 from django.contrib.auth import authenticate, login, logout
@@ -15,6 +16,7 @@ from turmas.models import DiaSemana, Turma
 from turmas.views import DIASEMANA_WEEKDAY_MAP
 from usuarios.utils import obter_precadastro_por_token
 from usuarios.forms import DefinirSenhaForm
+from usuarios.permissions import IsGerente, IsStaffCT, PodeAcessarUsuario
 from usuarios.serializers import DefinirSenhaSerializer, SolicitarRecuperacaoSenhaSerializer, RedefinirSenhaSerializer
 from financeiro.models import Mensalidade
 from django.utils import timezone
@@ -535,7 +537,6 @@ class LoginAPIView(APIView):
                 )
             
             # Tenta autenticar
-            print(f"[DEBUG] Tentando autenticar com username: {cpf}, password: {password}")
             user = authenticate(request, username=cpf, password=password)
             print(f"[DEBUG] Resultado da autenticação: {user is not None}")
             if user is None:
@@ -733,10 +734,19 @@ class AtivarContaAPIView(APIView):
 
 
 class ListarCriarUsuariosAPIView(ListCreateAPIView):
-    """API para listar e criar usuários."""
-    permission_classes = [IsAuthenticated]
+    """API para listar e criar usuários.
+
+    Listagem: equipe do CT (gerente/professor). Criação: apenas gerente.
+    Antes, qualquer usuário autenticado (inclusive aluno) podia listar todos os
+    usuários com dados pessoais e criar contas.
+    """
     queryset = Usuario.objects.all()
     serializer_class = UsuarioSerializer
+
+    def get_permissions(self):
+        if self.request.method == 'POST':
+            return [IsGerente()]
+        return [IsStaffCT()]
 
     def get_queryset(self):
         queryset = Usuario.objects.all()
@@ -787,8 +797,14 @@ class ListarCriarUsuariosAPIView(ListCreateAPIView):
 
 
 class EditarExcluirUsuarioAPIView(RetrieveUpdateDestroyAPIView):
-    """API para editar, excluir ou visualizar um usuário."""
-    permission_classes = [IsAuthenticated]
+    """API para editar, excluir ou visualizar um usuário.
+
+    Acesso por objeto (``PodeAcessarUsuario``): gerente vê/edita/exclui qualquer
+    um; professor vê/edita; aluno só o próprio registro e não exclui. Campos
+    privilegiados (tipo, is_active, salário...) são ignorados para não-gerentes
+    no serializer, impedindo escalonamento de privilégio.
+    """
+    permission_classes = [PodeAcessarUsuario]
     queryset = Usuario.objects.all()
     serializer_class = UsuarioSerializer
 
@@ -801,10 +817,12 @@ class EditarExcluirUsuarioAPIView(RetrieveUpdateDestroyAPIView):
             print(f"[DEBUG] Usuário encontrado: {instance.id}, {instance.username}, {instance.tipo}")
             serializer = self.get_serializer(instance)
             return Response(serializer.data)
+        except (PermissionDenied, NotAuthenticated, Http404):
+            raise
         except Exception as e:
             print(f"[DEBUG] Erro ao buscar usuário: {str(e)}")
             return Response(
-                {"error": "Erro ao buscar dados do usuário."}, 
+                {"error": "Erro ao buscar dados do usuário."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
@@ -845,11 +863,13 @@ class EditarExcluirUsuarioAPIView(RetrieveUpdateDestroyAPIView):
             else:
                 print(f"[DEBUG] Erros de validação: {serializer.errors}")
                 return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-                
+
+        except (PermissionDenied, NotAuthenticated, Http404):
+            raise
         except Exception as e:
             print(f"[DEBUG] Erro ao atualizar usuário: {str(e)}")
             return Response(
-                {"error": f"Erro ao atualizar usuário: {str(e)}"}, 
+                {"error": f"Erro ao atualizar usuário: {str(e)}"},
                 status=status.HTTP_400_BAD_REQUEST
             )
 

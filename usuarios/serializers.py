@@ -394,8 +394,36 @@ class UsuarioSerializer(serializers.ModelSerializer):
                 instance.atualizar_mensalidades_pendentes()
         return instance
 
+    # Campos que só um gerente pode definir/alterar via API. Para qualquer outro
+    # usuário eles são ignorados (não geram erro), impedindo escalonamento de
+    # privilégio e alteração de dados financeiros por conta própria. O app reenvia
+    # o objeto inteiro no PUT, então ignorar é mais seguro do que rejeitar.
+    CAMPOS_SOMENTE_GERENTE = (
+        'tipo', 'is_active', 'ativo', 'password',
+        'salario_professor', 'pix_professor',
+        'valor_mensalidade', 'dia_vencimento',
+    )
+
+    def _requisicao_de_gerente(self):
+        """True quando não há request (uso interno confiável) ou o request é de um gerente."""
+        request = self.context.get('request')
+        if request is None:
+            return True
+        user = getattr(request, 'user', None)
+        return bool(user and user.is_authenticated and getattr(user, 'tipo', None) == 'gerente')
+
     def validate(self, attrs):
         attrs = super().validate(attrs)
+
+        # Blindagem de campos privilegiados para não-gerentes.
+        if not self._requisicao_de_gerente():
+            for campo in self.CAMPOS_SOMENTE_GERENTE:
+                attrs.pop(campo, None)
+            # CPF (usado como login) não pode ser trocado por não-gerente: mantém o
+            # valor atual do registro para não falhar a validação de CPF obrigatório.
+            if self.instance is not None:
+                attrs['cpf'] = self.instance.cpf
+
         if 'first_name' in attrs:
             attrs['first_name'] = self._formatar_nome(attrs['first_name'])
         if 'last_name' in attrs:

@@ -85,6 +85,7 @@ def get_or_create_cadastro(user_data: dict) -> CadastroWellhub:
 
 def _resolve_slot(payload: dict) -> Optional[WellhubSlot]:
     from wellhub.webhooks import normalize_webhook_payload
+    from wellhub.services.sync_slots import _parse_remote_occur, find_slot_by_wellhub_id
 
     payload = normalize_webhook_payload(payload)
     slot_id = extract_slot_id(payload)
@@ -93,23 +94,39 @@ def _resolve_slot(payload: dict) -> Optional[WellhubSlot]:
         if slot:
             return slot
 
-    occur = payload.get("occur_date") or payload.get("slot_date")
-    class_id = payload.get("class_id")
+    slot_obj = payload.get("slot")
+    if not isinstance(slot_obj, dict):
+        slot_obj = {}
+
+    occur = (
+        payload.get("occur_date")
+        or payload.get("slot_date")
+        or payload.get("occurDate")
+        or slot_obj.get("occur_date")
+        or slot_obj.get("occurDate")
+        or slot_obj.get("slot_date")
+    )
+    class_id = (
+        payload.get("class_id")
+        or payload.get("classId")
+        or slot_obj.get("class_id")
+        or slot_obj.get("classId")
+    )
+    if not class_id:
+        class_obj = payload.get("class")
+        if isinstance(class_obj, dict):
+            class_id = class_obj.get("id") or class_obj.get("class_id")
+
     if occur and class_id:
         turma_config = WellhubTurmaConfig.objects.filter(
             wellhub_class_id=str(class_id)
         ).select_related("turma").first()
         if turma_config:
-            from django.utils.dateparse import parse_datetime
-
-            dt = parse_datetime(str(occur))
+            dt = _parse_remote_occur(str(occur))
             if dt:
-                if timezone.is_naive(dt):
-                    dt = timezone.make_aware(dt, timezone.get_current_timezone())
-                local_date = timezone.localtime(dt).date()
                 return WellhubSlot.objects.filter(
                     turma=turma_config.turma,
-                    data_aula=local_date,
+                    data_aula=dt.date(),
                 ).first()
     return None
 

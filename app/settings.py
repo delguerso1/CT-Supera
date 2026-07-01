@@ -13,6 +13,8 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 import os
 from pathlib import Path
 
+from django.core.exceptions import ImproperlyConfigured
+
 from app.env_loader import BASE_DIR, load_project_env
 
 # Carrega as variáveis de ambiente do arquivo .env na raiz do projeto
@@ -22,11 +24,20 @@ load_project_env()
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'chave-secreta-padrao')
-
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv('DJANGO_DEBUG', 'False') == 'True'
+
+# SECURITY WARNING: keep the secret key used in production secret!
+# Sem fallback previsível: uma chave conhecida permitiria forjar tokens de sessão
+# e de redefinição de senha. Em produção (DEBUG=False) a variável é obrigatória.
+SECRET_KEY = os.getenv('DJANGO_SECRET_KEY')
+if not SECRET_KEY:
+    if DEBUG:
+        SECRET_KEY = 'dev-insecure-secret-key-nao-usar-em-producao'
+    else:
+        raise ImproperlyConfigured(
+            'DJANGO_SECRET_KEY não está definido. Defina-o no ambiente antes de iniciar em produção.'
+        )
 
 ALLOWED_HOSTS = [
     'localhost',
@@ -127,7 +138,9 @@ REST_FRAMEWORK = {
         'rest_framework.authentication.BasicAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.AllowAny',  # Permite acesso por padrão
+        # Seguro por padrão: exige autenticação. Endpoints públicos (login, webhooks,
+        # recuperação de senha, formulários públicos) declaram AllowAny explicitamente.
+        'rest_framework.permissions.IsAuthenticated',
     ],
 }
 
@@ -271,9 +284,10 @@ if C6_BANK_ENVIRONMENT == 'production':
     C6_BANK_KEY_PATH = os.getenv('C6_BANK_PRODUCTION_KEY_PATH', 'certificados/Producao/cert.key')
     C6_BANK_BASE_URL = os.getenv('C6_BANK_PRODUCTION_URL', 'https://baas-api.c6bank.info')
 else:  # sandbox (padrão)
-    C6_BANK_CLIENT_ID = os.getenv('C6_BANK_SANDBOX_CLIENT_ID', '77ad35b0-d34e-4e97-b394-6bd6889c358a')
-    C6_BANK_CLIENT_SECRET = os.getenv('C6_BANK_SANDBOX_CLIENT_SECRET', '6haSDzRpSCNBBv9Z1Cvw4VlerEbk4ga7')
-    C6_BANK_CHAVE_PIX = os.getenv('C6_BANK_SANDBOX_CHAVE_PIX', '54a61847-7b38-4f71-8b3a-b49179bce9c8')
+    # Credenciais (mesmo em sandbox) vêm apenas do ambiente — sem defaults no código-fonte.
+    C6_BANK_CLIENT_ID = os.getenv('C6_BANK_SANDBOX_CLIENT_ID')
+    C6_BANK_CLIENT_SECRET = os.getenv('C6_BANK_SANDBOX_CLIENT_SECRET')
+    C6_BANK_CHAVE_PIX = os.getenv('C6_BANK_SANDBOX_CHAVE_PIX')
     C6_BANK_CERT_PATH = os.getenv('C6_BANK_SANDBOX_CERT_PATH', 'certificados/Sandbox/certificado.crt')
     C6_BANK_KEY_PATH = os.getenv('C6_BANK_SANDBOX_KEY_PATH', 'certificados/Sandbox/chave.key')
     C6_BANK_BASE_URL = os.getenv('C6_BANK_SANDBOX_URL', 'https://baas-api-sandbox.c6bank.info')

@@ -1312,16 +1312,17 @@ class C6BankWebhookAPIView(APIView):
     
     def _process_pix_received(self, pix_data):
         """
-        Processa um objeto PIX recebido
-        Conforme pix-api.yaml schema Pix (linha 4042-4098):
-        - endToEndId (obrigatório)
-        - txid (opcional, mas presente quando PIX pagou uma cobrança)
-        - valor (obrigatório)
-        - horario (obrigatório)
-        - infoPagador (opcional)
+        Processa um objeto PIX recebido no webhook.
+
+        SEGURANÇA: o corpo do webhook NÃO é confiável para dar baixa. Um atacante
+        poderia POSTar um txid válido com um valor forjado. Por isso reconsultamos
+        a cobrança no C6 (``sincronizar_transacao_pix_c6``), que só marca a
+        mensalidade como paga se o banco confirmar o status ``CONCLUIDA``. O corpo
+        é usado apenas para localizar a transação (txid) e para auditoria.
 
         Returns:
-            True se vinculou a uma transação e atualizou o registro; False se ignorou o item.
+            True se, após reconsulta ao C6, a transação está aprovada; False caso
+            contrário (PIX espontâneo, txid desconhecido ou ainda não confirmado).
         """
         if not isinstance(pix_data, dict):
             logger.warning("Webhook PIX: item ignorado (não é objeto JSON): %s", type(pix_data))
@@ -1333,7 +1334,7 @@ class C6BankWebhookAPIView(APIView):
         valor = pix_data.get('valor')
         horario = pix_data.get('horario')
 
-        logger.info(f"Processando PIX: txid={txid}, endToEndId={end_to_end_id}, valor={valor}")
+        logger.info("Processando PIX webhook: txid=%s endToEndId=%s valor=%s", txid, end_to_end_id, valor)
 
         if not txid:
             logger.warning(
@@ -1351,61 +1352,58 @@ class C6BankWebhookAPIView(APIView):
             )
             return False
 
-        # Verifica se já foi processado (pode ter múltiplos webhooks para mesma cobrança)
+        # Fonte da verdade: reconsulta a cobrança no C6. Só marca como paga se o
+        # banco confirmar. Nunca confia no status/valor vindos do corpo do webhook.
+        status_anterior = transacao.status
+        try:
+            sincronizar_transacao_pix_c6(transacao)
+        except Exception as e:
+            logger.error("Erro ao reconsultar cobrança PIX no C6 (txid=%s): %s", txid, e)
+            return False
+        transacao.refresh_from_db()
+
+        # Registra os dados informativos do PIX recebido (auditoria), sem alterar status.
+        self._registrar_pix_recebido_info(
+            transacao,
+            {
+                'endToEndId': end_to_end_id,
+                'txid': txid,
+                'valor': valor,
+                'horario': horario,
+                'infoPagador': pix_data.get('infoPagador'),
+                'data_recebimento': format_datetime_api(timezone.now()),
+            },
+        )
+
         if transacao.status == 'aprovado':
-            logger.info(f"Transação {transacao.id} já estava aprovada. Atualizando dados do PIX recebido.")
+            if status_anterior != 'aprovado':
+                logger.info("PIX confirmado com o C6 e mensalidade baixada (txid=%s).", txid)
+            else:
+                logger.info("PIX já estava aprovado (webhook duplicado) (txid=%s).", txid)
+            return True
 
-        # Atualiza o status da transação
-        transacao.status = 'aprovado'
-        transacao.data_aprovacao = timezone.now()
+        logger.info(
+            "Webhook PIX recebido, mas o C6 ainda não confirmou o pagamento (txid=%s, status=%s).",
+            txid,
+            transacao.status,
+        )
+        return False
 
-        # Armazena os dados completos do PIX recebido
+    def _registrar_pix_recebido_info(self, transacao, pix_info):
+        """Anexa metadados do PIX recebido em ``resposta_api`` para auditoria (não altera status)."""
         if not transacao.resposta_api:
             transacao.resposta_api = {}
-
-        # Adiciona/atualiza informações do PIX recebido
         if 'pix_recebidos' not in transacao.resposta_api:
             transacao.resposta_api['pix_recebidos'] = []
 
-        pix_info = {
-            'endToEndId': end_to_end_id,
-            'txid': txid,
-            'valor': valor,
-            'horario': horario,
-            'infoPagador': pix_data.get('infoPagador'),
-            'data_recebimento': format_datetime_api(timezone.now())
-        }
-
-        # Verifica se este PIX já foi registrado (pelo endToEndId)
-        pix_existente = False
         for pix_exist in transacao.resposta_api['pix_recebidos']:
-            if pix_exist.get('endToEndId') == end_to_end_id:
-                # Atualiza o PIX existente
+            if pix_exist.get('endToEndId') == pix_info.get('endToEndId'):
                 pix_exist.update(pix_info)
-                pix_existente = True
                 break
-
-        if not pix_existente:
+        else:
             transacao.resposta_api['pix_recebidos'].append(pix_info)
 
-        transacao.save()
-
-        # Atualiza o status da mensalidade e o valor efetivamente recebido
-        mensalidade = transacao.mensalidade
-        if mensalidade.status != 'pago':
-            mensalidade.status = 'pago'
-            # Registra o valor efetivamente pago (com multa/juros) - transação já tem o total correto
-            mensalidade.valor_pago = transacao.valor
-            mensalidade.save()
-            proxima = Mensalidade.criar_proxima_mensalidade(mensalidade)
-            if proxima:
-                logger.info(
-                    "Mensalidade %s criada para %s/%s após pagamento",
-                    proxima.id,
-                    str(proxima.data_vencimento.month).zfill(2),
-                    proxima.data_vencimento.year
-                )
-            logger.info(f"Mensalidade {mensalidade.id} marcada como paga")
+        transacao.save(update_fields=['resposta_api'])
 
         logger.info(f"✅ PIX processado com sucesso: Transação {transacao.id}, EndToEndId: {end_to_end_id}, Valor: R$ {valor}")
         return True

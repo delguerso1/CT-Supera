@@ -57,6 +57,6 @@ class WellhubBookingAdmin(admin.ModelAdmin):
 
 @admin.register(WellhubWebhookEvent)
 class WellhubWebhookEventAdmin(admin.ModelAdmin):
-    list_display = ("event_id", "event_type", "processed", "criado_em")
+    list_display = ("event_id", "event_type", "processed", "error_message", "criado_em")
     list_filter = ("processed", "event_type")
     readonly_fields = ("payload",)

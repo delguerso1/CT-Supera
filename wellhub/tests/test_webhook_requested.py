@@ -147,3 +147,34 @@ class BookingRequestedTests(TestCase):
             }
             action, _ = handle_booking_requested(payload)
         self.assertEqual(action, "rejected")
+
+    @patch("wellhub.services.bookings.WellhubClient")
+    def test_resolve_slot_via_event_data_class_id(self, mock_client_cls):
+        """Formato real Wellhub: class_id dentro de slot; id remoto pode divergir do banco."""
+        mock_client_cls.return_value.configured = False
+        self.slot.wellhub_slot_id = "id-salvo-no-banco"
+        self.slot.save(update_fields=["wellhub_slot_id"])
+        with patch(
+            "wellhub.services.sync_slots.timezone.now",
+            return_value=self.slot.opens_at + timedelta(hours=1),
+        ):
+            payload = {
+                "event_type": "booking.requested",
+                "event_data": {
+                    "user": {
+                        "unique_token": "gpw-fallback",
+                        "name": "Maria",
+                        "email": "maria@test.com",
+                    },
+                    "slot": {
+                        "id": 999999999,
+                        "class_id": self.turma_config.wellhub_class_id,
+                        "occur_date": self.slot.occur_date.isoformat(),
+                        "booking_number": "bk-fallback",
+                    },
+                },
+            }
+            action, _ = handle_booking_requested(payload)
+        self.assertEqual(action, "confirmed")
+        booking = WellhubBooking.objects.get(wellhub_booking_id="bk-fallback")
+        self.assertEqual(booking.slot_id, self.slot.pk)
