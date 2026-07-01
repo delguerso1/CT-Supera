@@ -343,20 +343,33 @@ def sync_slot_to_api(
             except WellhubAPIError as exc:
                 if exc.status_code != 409:
                     raise
-                logger.info(
-                    "Slot já existe na Wellhub (turma=%s, %s), vinculando...",
-                    slot.turma_id,
-                    slot.data_aula,
-                )
                 slot_id = find_remote_slot_id(
                     client, turma_config.wellhub_class_id, slot
                 )
                 if not slot_id:
-                    raise WellhubAPIError(
-                        "Slot já existe na Wellhub mas não foi localizado na listagem.",
-                        status_code=409,
-                        body=exc.body,
-                    ) from exc
+                    # O slot já existe na Wellhub (por isso o 409), mas não aparece
+                    # na listagem. É o caso normal de datas futuras: a Wellhub só
+                    # lista slots cuja janela de reserva já abriu (~OPENS_BEFORE
+                    # antes da aula). Não é erro — marca pendente e o cron diário
+                    # revincula o id quando a janela abrir. A reserva por webhook já
+                    # funciona nesse meio-tempo via fallback por class_id+occur_date.
+                    logger.info(
+                        "Slot já existe na Wellhub mas ainda não listável "
+                        "(turma=%s, data=%s) — vínculo pendente.",
+                        slot.turma_id,
+                        slot.data_aula,
+                    )
+                    slot.sync_status = WellhubSlot.SYNC_PENDING
+                    slot.sync_error = (
+                        "Existe na Wellhub; vínculo pendente (janela de reserva ainda não aberta)."
+                    )
+                    slot.save(update_fields=["sync_status", "sync_error"])
+                    return slot
+                logger.info(
+                    "Slot já existe na Wellhub (turma=%s, %s), vinculado.",
+                    slot.turma_id,
+                    slot.data_aula,
+                )
                 slot.wellhub_slot_id = slot_id
                 _apply_slot_patch(slot, turma_config, client, product_id)
 
@@ -401,7 +414,7 @@ def sync_all_published_slots(
         .prefetch_related("turma__dias_semana")
     )
 
-    stats = {"created": 0, "synced": 0, "errors": 0, "skipped": 0}
+    stats = {"created": 0, "synced": 0, "errors": 0, "skipped": 0, "pending": 0}
 
     for turma_config in configs:
         turma = turma_config.turma
@@ -420,6 +433,8 @@ def sync_all_published_slots(
                     stats["synced"] += 1
                 elif slot.sync_status == WellhubSlot.SYNC_ERROR:
                     stats["errors"] += 1
+                elif slot.sync_status == WellhubSlot.SYNC_PENDING:
+                    stats["pending"] += 1
 
     return stats
 
