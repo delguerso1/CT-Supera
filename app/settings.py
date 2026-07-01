@@ -13,8 +13,6 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 import os
 from pathlib import Path
 
-from django.core.exceptions import ImproperlyConfigured
-
 from app.env_loader import BASE_DIR, load_project_env
 
 # Carrega as variáveis de ambiente do arquivo .env na raiz do projeto
@@ -29,14 +27,23 @@ DEBUG = os.getenv('DJANGO_DEBUG', 'False') == 'True'
 
 # SECURITY WARNING: keep the secret key used in production secret!
 # Sem fallback previsível: uma chave conhecida permitiria forjar tokens de sessão
-# e de redefinição de senha. Em produção (DEBUG=False) a variável é obrigatória.
+# e de redefinição de senha. Quando a variável não está definida (ex.: CI/build),
+# geramos uma chave aleatória EFÊMERA — imprevisível, portanto segura, mas muda a
+# cada processo. Em produção real, DJANGO_SECRET_KEY DEVE estar no ambiente para
+# manter sessões e links de redefinição válidos entre reinícios.
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY')
 if not SECRET_KEY:
     if DEBUG:
         SECRET_KEY = 'dev-insecure-secret-key-nao-usar-em-producao'
     else:
-        raise ImproperlyConfigured(
-            'DJANGO_SECRET_KEY não está definido. Defina-o no ambiente antes de iniciar em produção.'
+        import warnings
+        from django.core.management.utils import get_random_secret_key
+
+        SECRET_KEY = get_random_secret_key()
+        warnings.warn(
+            'DJANGO_SECRET_KEY não definido; usando chave aleatória efêmera. '
+            'Defina DJANGO_SECRET_KEY no ambiente de produção.',
+            RuntimeWarning,
         )
 
 ALLOWED_HOSTS = [
