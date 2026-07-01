@@ -99,7 +99,9 @@ def build_slot_payload(
             "opens_at": _format_iso(slot.opens_at),
             "closes_at": _format_iso(slot.closes_at),
         },
+        "cancellable_until": _format_iso(slot.closes_at),
         "instructors": [],
+        "rating": 0,
         "virtual": False,
     }
 

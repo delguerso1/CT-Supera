@@ -129,11 +129,12 @@ class WellhubClient:
         raise WellhubAPIError(f"Erro de rede Wellhub: {last_exc}")
 
     def create_class(self, payload: dict) -> dict:
+        """POST create exige corpo {"classes": [ {...} ]} (Booking API Gympass)."""
         gym_id = self.gym_id
         return self._request(
             "POST",
             f"/booking/v1/gyms/{gym_id}/classes",
-            json_body=payload,
+            json_body={"classes": [payload]},
         )
 
     def list_classes(self) -> list:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 from django.db import transaction
 
@@ -48,6 +49,15 @@ def _class_id_from_item(item: dict) -> str | None:
     return str(class_id) if class_id is not None else None
 
 
+def _class_id_from_response(resp: Any) -> str | None:
+    if not isinstance(resp, dict):
+        return None
+    classes = resp.get("classes")
+    if isinstance(classes, list) and classes:
+        return _class_id_from_item(classes[0])
+    return _class_id_from_item(resp)
+
+
 def find_class_id_by_reference(client: WellhubClient, reference: str) -> str | None:
     if not reference:
         return None
@@ -86,7 +96,7 @@ def _create_or_update_class(
                 return
         raise
 
-    class_id = _class_id_from_item(resp) if isinstance(resp, dict) else None
+    class_id = _class_id_from_response(resp)
     if class_id:
         turma_config.wellhub_class_id = class_id
         turma_config.save(update_fields=["wellhub_class_id"])
