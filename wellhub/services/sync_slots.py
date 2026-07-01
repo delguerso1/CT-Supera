@@ -286,15 +286,19 @@ def find_remote_slot_id(
         return _slot_id_from_item(same_day[0])
 
     if collected:
+        # NUNCA vincular um slot que não casa por data/hora. Antes, quando a
+        # listagem trazia um único slot (ex.: a API ignora o filtro From/To e só
+        # existe o slot do dia 01), o código o vinculava a qualquer data — o que
+        # fazia todas as datas do mês herdarem o mesmo wellhub_slot_id (mislink).
+        # Retornando None, a aula é (re)criada e, se falhar, o erro fica visível.
         logger.warning(
-            "Slots Wellhub encontrados mas sem match (turma=%s, data=%s, horario=%s): %s",
+            "Slots Wellhub encontrados mas nenhum casa com data/hora da aula "
+            "(turma=%s, data=%s, horario=%s): %s. Não vinculando (evita mislink).",
             slot.turma_id,
             slot.data_aula,
             slot.turma.horario,
             [i.get("occur_date") or i.get("occurDate") for i in collected],
         )
-        if len(collected) == 1:
-            return _slot_id_from_item(collected[0])
     return None
 
 
