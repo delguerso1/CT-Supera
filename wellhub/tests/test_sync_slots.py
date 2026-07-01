@@ -1,5 +1,5 @@
-from datetime import date, time, timedelta
-from unittest.mock import patch
+from datetime import date, datetime, time, timedelta
+from unittest.mock import MagicMock, patch
 
 from django.test import TestCase, override_settings
 from django.utils import timezone
@@ -7,8 +7,14 @@ from django.utils import timezone
 from ct.models import CentroDeTreinamento
 from turmas.models import DiaSemana, Turma
 from wellhub.constants import CT_NOME_PILOTO, DIAS_WELLHUB
-from wellhub.services.sync_slots import iter_slot_dates, _is_wellhub_day, upsert_local_slot
-from wellhub.models import WellhubTurmaConfig
+from wellhub.models import WellhubSlot, WellhubTurmaConfig
+from wellhub.services.sync_slots import (
+    _slot_matches_local,
+    _slot_id_from_response,
+    iter_slot_dates,
+    _is_wellhub_day,
+    upsert_local_slot,
+)
 
 
 class IterSlotDatesTests(TestCase):
@@ -26,13 +32,39 @@ class IterSlotDatesTests(TestCase):
         self.assertTrue(all(d.weekday() != 4 for d in datas))
 
 
-from wellhub.services.sync_slots import _slot_id_from_response
-
-
 class SlotIdFromResponseTests(TestCase):
     def test_extrai_id_da_lista_slots(self):
         resp = {"slots": [{"id": 77}]}
         self.assertEqual(_slot_id_from_response(resp), "77")
+
+
+class SlotMatchesLocalTests(TestCase):
+    def setUp(self):
+        self.ct = CentroDeTreinamento.objects.create(nome=CT_NOME_PILOTO)
+        self.turma = Turma.objects.create(
+            ct=self.ct,
+            horario=time(7, 0),
+            capacidade_maxima=20,
+            ativo=True,
+        )
+        tz = timezone.get_current_timezone()
+        occur = timezone.make_aware(datetime(2026, 7, 1, 7, 0), tz)
+        self.slot = WellhubSlot(
+            turma=self.turma,
+            data_aula=date(2026, 7, 1),
+            occur_date=occur,
+            opens_at=occur,
+            closes_at=occur,
+            total_capacity=5,
+        )
+
+    def test_match_por_data_e_horario(self):
+        item = {"id": 99, "occur_date": "2026-07-01T07:00:00-03:00"}
+        self.assertTrue(_slot_matches_local(self.slot, item))
+
+    def test_nao_match_horario_diferente(self):
+        item = {"id": 99, "occur_date": "2026-07-01T08:00:00-03:00"}
+        self.assertFalse(_slot_matches_local(self.slot, item))
 
 
 class UpsertLocalSlotTests(TestCase):

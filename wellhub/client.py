@@ -140,14 +140,7 @@ class WellhubClient:
     def list_classes(self) -> list:
         gym_id = self.gym_id
         resp = self._request("GET", f"/booking/v1/gyms/{gym_id}/classes")
-        if isinstance(resp, list):
-            return resp
-        if isinstance(resp, dict):
-            for key in ("classes", "results", "data", "items"):
-                items = resp.get(key)
-                if isinstance(items, list):
-                    return items
-        return []
+        return self._extract_list(resp, "classes", "results", "data", "items")
 
     def update_class(self, class_id: str, payload: dict) -> dict:
         gym_id = self.gym_id
@@ -156,6 +149,20 @@ class WellhubClient:
             f"/booking/v1/gyms/{gym_id}/classes/{class_id}",
             json_body=payload,
         )
+
+    def _extract_list(self, resp: Any, *keys: str) -> list:
+        if isinstance(resp, list):
+            return resp
+        if isinstance(resp, dict):
+            for key in keys:
+                val = resp.get(key)
+                if isinstance(val, list):
+                    return val
+                if isinstance(val, dict):
+                    nested = self._extract_list(val, *keys)
+                    if nested:
+                        return nested
+        return []
 
     def list_slots(
         self,
@@ -168,16 +175,17 @@ class WellhubClient:
         resp = self._request(
             "GET",
             f"/booking/v1/gyms/{gym_id}/classes/{class_id}/slots",
-            params={"from": from_dt, "to": to_dt},
+            params={"From": from_dt, "To": to_dt},
         )
-        if isinstance(resp, list):
-            return resp
-        if isinstance(resp, dict):
-            for key in ("slots", "results", "data", "items"):
-                items = resp.get(key)
-                if isinstance(items, list):
-                    return items
-        return []
+        return self._extract_list(resp, "slots", "results", "data", "items")
+
+    def get_slot(self, class_id: str, slot_id: str) -> dict:
+        gym_id = self.gym_id
+        resp = self._request(
+            "GET",
+            f"/booking/v1/gyms/{gym_id}/classes/{class_id}/slots/{slot_id}",
+        )
+        return resp if isinstance(resp, dict) else {}
 
     def create_slot(self, class_id: str, payload: dict) -> dict:
         gym_id = self.gym_id

@@ -166,43 +166,124 @@ def _slot_id_from_response(resp: object) -> str | None:
     slots = resp.get("slots")
     if isinstance(slots, list) and slots:
         return _slot_id_from_item(slots[0])
+    for key in ("slot", "data", "result"):
+        nested = resp.get(key)
+        if isinstance(nested, dict):
+            found = _slot_id_from_item(nested)
+            if found:
+                return found
     return _slot_id_from_item(resp)
 
 
-def _same_occur_instant(api_value: str, local_dt: datetime) -> bool:
+def _parse_remote_occur(value: str) -> datetime | None:
     from django.utils.dateparse import parse_datetime
 
-    parsed = parse_datetime(str(api_value))
+    raw = str(value).strip()
+    parsed = parse_datetime(raw)
     if parsed is None:
-        return str(api_value).startswith(_format_iso(local_dt)[:16])
+        parsed = parse_datetime(raw.replace(" ", "T"))
+    if parsed is None:
+        return None
     if timezone.is_naive(parsed):
         parsed = timezone.make_aware(parsed, timezone.get_current_timezone())
-    delta = abs((timezone.localtime(parsed) - timezone.localtime(local_dt)).total_seconds())
-    return delta < 60
+    return timezone.localtime(parsed)
+
+
+def _slot_matches_local(slot: WellhubSlot, item: dict) -> bool:
+    remote_occur = item.get("occur_date") or item.get("occurDate")
+    if not remote_occur:
+        return False
+    local = _parse_remote_occur(str(remote_occur))
+    if local is None:
+        return False
+    horario = slot.turma.horario
+    return (
+        local.date() == slot.data_aula
+        and local.hour == horario.hour
+        and local.minute == horario.minute
+    )
+
+
+def _slot_search_windows(occur_date: datetime) -> list[tuple[str, str]]:
+    """Janelas from/to para GET slots (API sensível ao formato)."""
+    local = timezone.localtime(occur_date)
+    occur_start = local
+    occur_end = local + timedelta(minutes=SLOT_LENGTH_MINUTES)
+    day_start = local.replace(hour=0, minute=0, second=0, microsecond=0)
+    day_end = local.replace(hour=23, minute=59, second=59, microsecond=0)
+    month_start = day_start.replace(day=1)
+    if month_start.month == 12:
+        month_end = month_start.replace(
+            year=month_start.year + 1, month=1, day=1
+        ) - timedelta(seconds=1)
+    else:
+        month_end = month_start.replace(month=month_start.month + 1, day=1) - timedelta(
+            seconds=1
+        )
+
+    return [
+        (_format_iso(occur_start), _format_iso(occur_end)),
+        (_format_iso(day_start), _format_iso(day_end)),
+        (
+            day_start.strftime("%Y-%m-%dT00:00:00"),
+            day_end.strftime("%Y-%m-%dT23:59:59"),
+        ),
+        (_format_iso(month_start), _format_iso(month_end)),
+    ]
 
 
 def find_remote_slot_id(
     client: WellhubClient,
     class_id: str,
-    occur_date: datetime,
+    slot: WellhubSlot,
 ) -> str | None:
     """Localiza slot existente na Wellhub pela data/hora da aula."""
-    local_occur = timezone.localtime(occur_date)
-    day_start = local_occur.replace(hour=0, minute=0, second=0, microsecond=0)
-    day_end = day_start + timedelta(days=1)
-    try:
-        remote_slots = client.list_slots(
-            class_id,
-            from_dt=_format_iso(day_start),
-            to_dt=_format_iso(day_end),
-        )
-    except WellhubAPIError as exc:
-        logger.warning("Não foi possível listar slots Wellhub: %s", exc)
-        return None
-    for item in remote_slots:
+    seen_ids: set[str] = set()
+    collected: list[dict] = []
+
+    for from_dt, to_dt in _slot_search_windows(slot.occur_date):
+        try:
+            remote_slots = client.list_slots(class_id, from_dt=from_dt, to_dt=to_dt)
+        except WellhubAPIError as exc:
+            logger.warning(
+                "Listagem slots Wellhub falhou (class=%s, from=%s, to=%s): %s",
+                class_id,
+                from_dt,
+                to_dt,
+                exc,
+            )
+            continue
+        for item in remote_slots:
+            slot_id = _slot_id_from_item(item)
+            if slot_id and slot_id not in seen_ids:
+                seen_ids.add(slot_id)
+                collected.append(item)
+
+    matches = [item for item in collected if _slot_matches_local(slot, item)]
+    if len(matches) == 1:
+        return _slot_id_from_item(matches[0])
+    if len(matches) > 1:
+        return _slot_id_from_item(matches[0])
+
+    same_day = []
+    for item in collected:
         remote_occur = item.get("occur_date") or item.get("occurDate")
-        if remote_occur and _same_occur_instant(remote_occur, occur_date):
-            return _slot_id_from_item(item)
+        local = _parse_remote_occur(str(remote_occur)) if remote_occur else None
+        if local and local.date() == slot.data_aula:
+            same_day.append(item)
+    if len(same_day) == 1:
+        return _slot_id_from_item(same_day[0])
+
+    if collected:
+        logger.warning(
+            "Slots Wellhub encontrados mas sem match (turma=%s, data=%s, horario=%s): %s",
+            slot.turma_id,
+            slot.data_aula,
+            slot.turma.horario,
+            [i.get("occur_date") or i.get("occurDate") for i in collected],
+        )
+        if len(collected) == 1:
+            return _slot_id_from_item(collected[0])
     return None
 
 
@@ -253,16 +334,20 @@ def sync_slot_to_api(
                     slot.data_aula,
                 )
                 slot_id = find_remote_slot_id(
-                    client, turma_config.wellhub_class_id, slot.occur_date
+                    client, turma_config.wellhub_class_id, slot
                 )
                 if not slot_id:
-                    raise
+                    raise WellhubAPIError(
+                        "Slot já existe na Wellhub mas não foi localizado na listagem.",
+                        status_code=409,
+                        body=exc.body,
+                    ) from exc
                 slot.wellhub_slot_id = slot_id
                 _apply_slot_patch(slot, turma_config, client, product_id)
 
             if not slot.wellhub_slot_id:
                 slot_id = find_remote_slot_id(
-                    client, turma_config.wellhub_class_id, slot.occur_date
+                    client, turma_config.wellhub_class_id, slot
                 )
                 if slot_id:
                     slot.wellhub_slot_id = slot_id
