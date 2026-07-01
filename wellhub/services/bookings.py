@@ -21,7 +21,7 @@ from wellhub.constants import (
 )
 from wellhub.models import CadastroWellhub, WellhubBooking, WellhubSlot, WellhubTurmaConfig
 from wellhub.services.sync_slots import (
-    build_slot_payload,
+    build_slot_patch_payload,
     count_confirmed_bookings,
     find_slot_by_wellhub_id,
     is_slot_eligible,
@@ -136,7 +136,7 @@ def _push_slot_counts(slot: WellhubSlot, client: WellhubClient) -> None:
         return
     slot.total_booked = count_confirmed_bookings(slot)
     slot.save(update_fields=["total_booked"])
-    payload = build_slot_payload(slot, client.product_id)
+    payload = build_slot_patch_payload(slot, total_booked=slot.total_booked)
     try:
         client.patch_slot(
             turma_config.wellhub_class_id,

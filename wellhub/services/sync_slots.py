@@ -80,6 +80,19 @@ def count_confirmed_bookings(slot: WellhubSlot) -> int:
     return slot.bookings.filter(status="confirmed").count()
 
 
+def build_slot_patch_payload(
+    slot: WellhubSlot,
+    *,
+    total_booked: int | None = None,
+) -> dict:
+    """PATCH de slot na Wellhub aceita apenas limites (Booking API)."""
+    booked = total_booked if total_booked is not None else slot.total_booked
+    return {
+        "total_capacity": slot.total_capacity,
+        "total_booked": booked,
+    }
+
+
 def build_slot_payload(
     slot: WellhubSlot,
     product_id: int,
@@ -142,6 +155,71 @@ def upsert_local_slot(turma_config: WellhubTurmaConfig, data_aula: date) -> Well
     return slot
 
 
+def _slot_id_from_item(item: dict) -> str | None:
+    slot_id = item.get("id") or item.get("slot_id")
+    return str(slot_id) if slot_id is not None else None
+
+
+def _slot_id_from_response(resp: object) -> str | None:
+    if not isinstance(resp, dict):
+        return None
+    slots = resp.get("slots")
+    if isinstance(slots, list) and slots:
+        return _slot_id_from_item(slots[0])
+    return _slot_id_from_item(resp)
+
+
+def _same_occur_instant(api_value: str, local_dt: datetime) -> bool:
+    from django.utils.dateparse import parse_datetime
+
+    parsed = parse_datetime(str(api_value))
+    if parsed is None:
+        return str(api_value).startswith(_format_iso(local_dt)[:16])
+    if timezone.is_naive(parsed):
+        parsed = timezone.make_aware(parsed, timezone.get_current_timezone())
+    delta = abs((timezone.localtime(parsed) - timezone.localtime(local_dt)).total_seconds())
+    return delta < 60
+
+
+def find_remote_slot_id(
+    client: WellhubClient,
+    class_id: str,
+    occur_date: datetime,
+) -> str | None:
+    """Localiza slot existente na Wellhub pela data/hora da aula."""
+    local_occur = timezone.localtime(occur_date)
+    day_start = local_occur.replace(hour=0, minute=0, second=0, microsecond=0)
+    day_end = day_start + timedelta(days=1)
+    try:
+        remote_slots = client.list_slots(
+            class_id,
+            from_dt=_format_iso(day_start),
+            to_dt=_format_iso(day_end),
+        )
+    except WellhubAPIError as exc:
+        logger.warning("Não foi possível listar slots Wellhub: %s", exc)
+        return None
+    for item in remote_slots:
+        remote_occur = item.get("occur_date") or item.get("occurDate")
+        if remote_occur and _same_occur_instant(remote_occur, occur_date):
+            return _slot_id_from_item(item)
+    return None
+
+
+def _apply_slot_patch(
+    slot: WellhubSlot,
+    turma_config: WellhubTurmaConfig,
+    client: WellhubClient,
+    product_id: int,
+) -> None:
+    patch_payload = build_slot_patch_payload(slot, total_booked=slot.total_booked)
+    client.patch_slot(
+        turma_config.wellhub_class_id,
+        slot.wellhub_slot_id,
+        patch_payload,
+    )
+
+
 def sync_slot_to_api(
     slot: WellhubSlot,
     turma_config: WellhubTurmaConfig,
@@ -155,20 +233,44 @@ def sync_slot_to_api(
         return slot
 
     slot.total_booked = count_confirmed_bookings(slot)
-    payload = build_slot_payload(slot, product_id, total_booked=slot.total_booked)
+    create_payload = build_slot_payload(slot, product_id, total_booked=slot.total_booked)
 
     try:
         if slot.wellhub_slot_id:
-            client.patch_slot(
-                turma_config.wellhub_class_id,
-                slot.wellhub_slot_id,
-                payload,
-            )
+            _apply_slot_patch(slot, turma_config, client, product_id)
         else:
-            resp = client.create_slot(turma_config.wellhub_class_id, payload)
-            slot_id = resp.get("id") or resp.get("slot_id")
-            if slot_id is not None:
-                slot.wellhub_slot_id = str(slot_id)
+            try:
+                resp = client.create_slot(turma_config.wellhub_class_id, create_payload)
+                slot_id = _slot_id_from_response(resp)
+                if slot_id:
+                    slot.wellhub_slot_id = slot_id
+            except WellhubAPIError as exc:
+                if exc.status_code != 409:
+                    raise
+                logger.info(
+                    "Slot já existe na Wellhub (turma=%s, %s), vinculando...",
+                    slot.turma_id,
+                    slot.data_aula,
+                )
+                slot_id = find_remote_slot_id(
+                    client, turma_config.wellhub_class_id, slot.occur_date
+                )
+                if not slot_id:
+                    raise
+                slot.wellhub_slot_id = slot_id
+                _apply_slot_patch(slot, turma_config, client, product_id)
+
+            if not slot.wellhub_slot_id:
+                slot_id = find_remote_slot_id(
+                    client, turma_config.wellhub_class_id, slot.occur_date
+                )
+                if slot_id:
+                    slot.wellhub_slot_id = slot_id
+                    _apply_slot_patch(slot, turma_config, client, product_id)
+
+        if not slot.wellhub_slot_id:
+            raise WellhubAPIError("Slot criado na Wellhub sem id retornado.")
+
         slot.sync_status = WellhubSlot.SYNC_OK
         slot.sync_error = ""
         slot.save(

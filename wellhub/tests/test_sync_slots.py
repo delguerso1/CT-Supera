@@ -26,6 +26,15 @@ class IterSlotDatesTests(TestCase):
         self.assertTrue(all(d.weekday() != 4 for d in datas))
 
 
+from wellhub.services.sync_slots import _slot_id_from_response
+
+
+class SlotIdFromResponseTests(TestCase):
+    def test_extrai_id_da_lista_slots(self):
+        resp = {"slots": [{"id": 77}]}
+        self.assertEqual(_slot_id_from_response(resp), "77")
+
+
 class UpsertLocalSlotTests(TestCase):
     def setUp(self):
         self.ct = CentroDeTreinamento.objects.create(nome=CT_NOME_PILOTO)

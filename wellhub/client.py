@@ -157,6 +157,28 @@ class WellhubClient:
             json_body=payload,
         )
 
+    def list_slots(
+        self,
+        class_id: str,
+        *,
+        from_dt: str,
+        to_dt: str,
+    ) -> list:
+        gym_id = self.gym_id
+        resp = self._request(
+            "GET",
+            f"/booking/v1/gyms/{gym_id}/classes/{class_id}/slots",
+            params={"from": from_dt, "to": to_dt},
+        )
+        if isinstance(resp, list):
+            return resp
+        if isinstance(resp, dict):
+            for key in ("slots", "results", "data", "items"):
+                items = resp.get(key)
+                if isinstance(items, list):
+                    return items
+        return []
+
     def create_slot(self, class_id: str, payload: dict) -> dict:
         gym_id = self.gym_id
         return self._request(
