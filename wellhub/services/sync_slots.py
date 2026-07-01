@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import calendar
 import logging
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone as dt_timezone
 from typing import Iterator, Tuple
 
 from django.db import transaction
@@ -175,17 +175,28 @@ def _slot_id_from_response(resp: object) -> str | None:
     return _slot_id_from_item(resp)
 
 
+def _normalize_wellhub_datetime(raw: str) -> str:
+    """Wellhub retorna ex.: 2026-07-01T10:00:00Z[UTC] (07:00 em BRT)."""
+    value = str(raw).strip()
+    if value.endswith("[UTC]"):
+        value = value[:-5]
+    return value
+
+
 def _parse_remote_occur(value: str) -> datetime | None:
     from django.utils.dateparse import parse_datetime
 
-    raw = str(value).strip()
+    raw = _normalize_wellhub_datetime(value)
     parsed = parse_datetime(raw)
     if parsed is None:
         parsed = parse_datetime(raw.replace(" ", "T"))
     if parsed is None:
         return None
     if timezone.is_naive(parsed):
-        parsed = timezone.make_aware(parsed, timezone.get_current_timezone())
+        if raw.upper().endswith("Z"):
+            parsed = timezone.make_aware(parsed, dt_timezone.utc)
+        else:
+            parsed = timezone.make_aware(parsed, timezone.get_current_timezone())
     return timezone.localtime(parsed)
 
 

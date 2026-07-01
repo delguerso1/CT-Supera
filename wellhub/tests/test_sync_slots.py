@@ -9,6 +9,8 @@ from turmas.models import DiaSemana, Turma
 from wellhub.constants import CT_NOME_PILOTO, DIAS_WELLHUB
 from wellhub.models import WellhubSlot, WellhubTurmaConfig
 from wellhub.services.sync_slots import (
+    _normalize_wellhub_datetime,
+    _parse_remote_occur,
     _slot_matches_local,
     _slot_id_from_response,
     iter_slot_dates,
@@ -61,6 +63,23 @@ class SlotMatchesLocalTests(TestCase):
     def test_match_por_data_e_horario(self):
         item = {"id": 99, "occur_date": "2026-07-01T07:00:00-03:00"}
         self.assertTrue(_slot_matches_local(self.slot, item))
+
+    def test_match_formato_wellhub_utc(self):
+        item = {"id": 99, "occur_date": "2026-07-01T10:00:00Z[UTC]"}
+        self.assertTrue(_slot_matches_local(self.slot, item))
+
+    def test_parse_wellhub_utc_suffix(self):
+        parsed = _parse_remote_occur("2026-07-01T10:00:00Z[UTC]")
+        self.assertIsNotNone(parsed)
+        self.assertEqual(parsed.date(), date(2026, 7, 1))
+        self.assertEqual(parsed.hour, 7)
+        self.assertEqual(parsed.minute, 0)
+
+    def test_normalize_wellhub_datetime(self):
+        self.assertEqual(
+            _normalize_wellhub_datetime("2026-07-01T10:00:00Z[UTC]"),
+            "2026-07-01T10:00:00Z",
+        )
 
     def test_nao_match_horario_diferente(self):
         item = {"id": 99, "occur_date": "2026-07-01T08:00:00-03:00"}
