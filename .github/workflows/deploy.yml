@@ -49,7 +49,12 @@ jobs:
         run: |
           python manage.py check
 
-  build-frontend:
+      - name: Testes Wellhub e env
+        env:
+          DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
+          DJANGO_SETTINGS_MODULE: app.settings
+        run: |
+          python manage.py test wellhub app.tests --settings=app.settings
     name: Build do Frontend
     needs: test
     runs-on: ubuntu-latest
@@ -210,7 +215,7 @@ jobs:
             sudo systemctl restart ctsupera
             
             echo "⏳ Aguardando serviço iniciar..."
-            sleep 5
+            sleep 10
             
             echo "🏥 Verificando saúde da aplicação..."
             # Verificar se o serviço está ativo

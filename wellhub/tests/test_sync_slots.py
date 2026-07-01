@@ -1,12 +1,11 @@
 from datetime import date, datetime, time, timedelta
-from unittest.mock import MagicMock, patch
 
-from django.test import TestCase, override_settings
+from django.test import TestCase
 from django.utils import timezone
 
 from ct.models import CentroDeTreinamento
 from turmas.models import DiaSemana, Turma
-from wellhub.constants import CT_NOME_PILOTO, DIAS_WELLHUB
+from wellhub.constants import CT_NOME_PILOTO
 from wellhub.models import WellhubSlot, WellhubTurmaConfig
 from wellhub.services.sync_slots import (
     _normalize_wellhub_datetime,
