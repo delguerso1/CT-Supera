@@ -55,6 +55,8 @@ jobs:
           DJANGO_SETTINGS_MODULE: app.settings
         run: |
           python manage.py test wellhub app.tests --settings=app.settings
+
+  build-frontend:
     name: Build do Frontend
     needs: test
     runs-on: ubuntu-latest
