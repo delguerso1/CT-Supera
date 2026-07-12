@@ -138,6 +138,31 @@ class Command(BaseCommand):
                 f"{bk.slot.data_aula} {bk.slot.turma.horario} | {nome}"
             )
 
+        hoje = timezone.localdate()
+        hoje_qs = (
+            WellhubBooking.objects.filter(
+                slot__data_aula=hoje,
+                status="confirmed",
+                cadastro__isnull=False,
+            )
+            .select_related("slot", "slot__turma", "cadastro")
+            .order_by("slot__turma__horario", "cadastro__first_name")
+        )
+        self.stdout.write(f"\n--- Presença professor (reservas confirmed de hoje {hoje}) ---")
+        if not hoje_qs.exists():
+            self.stdout.write(
+                self.style.WARNING(
+                    "  Nenhuma reserva confirmed para hoje. "
+                    "A lista do professor só mostra Wellhub no dia da aula."
+                )
+            )
+        else:
+            for bk in hoje_qs:
+                self.stdout.write(
+                    f"  turma_id={bk.slot.turma_id} {bk.slot.turma.horario} | "
+                    f"{bk.cadastro} | booking={bk.wellhub_booking_id}"
+                )
+
         slots_sem_id = WellhubSlot.objects.filter(wellhub_slot_id="").count()
         slots_ok = WellhubSlot.objects.filter(sync_status=WellhubSlot.SYNC_OK).count()
         slots_pending = WellhubSlot.objects.filter(sync_status=WellhubSlot.SYNC_PENDING).count()

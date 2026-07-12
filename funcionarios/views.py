@@ -149,13 +149,13 @@ class VerificarCheckinAlunosAPIView(APIView):
             if not cadastro:
                 continue
             email_wh = (cadastro.email or "").strip().lower()
-            if email_wh and email_wh in emails_alunos:
-                continue
             nome_wh = f"{cadastro.first_name} {cadastro.last_name or ''}".strip()
-            key_wh = (email_wh, nome_wh.lower())
+            key_wh = (email_wh, nome_wh.lower(), booking.id)
             if key_wh in wellhub_adicionados:
                 continue
             wellhub_adicionados.add(key_wh)
+            # Sempre inclui a reserva Wellhub na lista (mesmo se o e-mail coincidir
+            # com aluno CT — o professor precisa ver o cliente Wellhub do dia).
             status_alunos.append({
                 "id": f"wellhub_{booking.id}",
                 "nome": nome_wh or "Cliente Wellhub",

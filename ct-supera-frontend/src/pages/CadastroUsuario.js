@@ -1488,13 +1488,11 @@ function CadastroUsuario({ onUserChange }) {
               ? 'Gerenciar Ex-alunos'
               : `Gerenciar ${activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}`}
         </h2>
-        {activeTab !== 'alunos' && (
+        {activeTab !== 'alunos' && activeTab !== 'exalunos' && (
           <button style={styles.button} onClick={handleNewUser}>
             {activeTab === 'precadastros'
               ? 'Novo Pré-cadastro'
-              : activeTab === 'exalunos'
-                ? 'Novo Ex-aluno'
-                : `Novo ${singularEntidadePorTab(activeTab)}`}
+              : `Novo ${singularEntidadePorTab(activeTab)}`}
           </button>
         )}
       </div>

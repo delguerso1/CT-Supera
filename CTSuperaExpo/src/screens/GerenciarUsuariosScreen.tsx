@@ -926,7 +926,7 @@ const GerenciarUsuariosScreen: React.FC<GerenciarUsuariosProps> = ({
                 ? 'Ex-alunos'
                 : `Gerenciar ${activeTab}`}
           </Text>
-          {activeTab !== 'alunos' && (
+          {activeTab !== 'alunos' && activeTab !== 'exalunos' && (
             <TouchableOpacity style={styles.addButton} onPress={handleNewUser}>
               <Text style={styles.addButtonText}>+ Novo</Text>
             </TouchableOpacity>

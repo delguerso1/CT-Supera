@@ -1,10 +1,12 @@
-from datetime import time, timedelta
+from datetime import datetime, time, timedelta
 
 from django.test import TestCase
 from django.utils import timezone
+from rest_framework.test import APIClient
 
 from ct.models import CentroDeTreinamento
 from turmas.models import DiaSemana, Turma
+from usuarios.models import Usuario
 from wellhub.models import CadastroWellhub, WellhubBooking, WellhubSlot, WellhubTurmaConfig
 from wellhub.services.presenca_professor import wellhub_bookings_presenca_turma
 
@@ -28,9 +30,7 @@ class WellhubPresencaProfessorTests(TestCase):
         )
         self.hoje = timezone.localdate()
         tz = timezone.get_current_timezone()
-        occur = timezone.make_aware(
-            timezone.datetime.combine(self.hoje, self.turma.horario), tz
-        )
+        occur = timezone.make_aware(datetime.combine(self.hoje, self.turma.horario), tz)
         self.slot = WellhubSlot.objects.create(
             turma=self.turma,
             data_aula=self.hoje,
@@ -61,3 +61,36 @@ class WellhubPresencaProfessorTests(TestCase):
         outro_dia = self.hoje + timedelta(days=7)
         qs = wellhub_bookings_presenca_turma(self.turma, outro_dia)
         self.assertEqual(qs.count(), 0)
+
+    def test_api_presenca_inclui_wellhub_mesmo_com_email_de_aluno(self):
+        """Reserva Wellhub não pode ser omitida só porque o e-mail já é de aluno CT."""
+        professor = Usuario.objects.create_user(
+            username="prof_wh",
+            password="x",
+            tipo="professor",
+            first_name="Prof",
+            email="prof@test.com",
+        )
+        aluno = Usuario.objects.create_user(
+            username="aluno_wh",
+            password="x",
+            tipo="aluno",
+            first_name="João",
+            last_name="CT",
+            email="joao@wellhub.test",
+            ativo=True,
+        )
+        self.turma.alunos.add(aluno)
+        self.turma.professores.add(professor)
+
+        client = APIClient()
+        client.force_authenticate(user=professor)
+        resp = client.get(f"/api/funcionarios/verificar-checkin/{self.turma.id}/")
+        self.assertEqual(resp.status_code, 200)
+        alunos = resp.data["alunos"]
+        tipos = [a["tipo"] for a in alunos]
+        self.assertIn("aluno", tipos)
+        self.assertIn("wellhub", tipos)
+        wh = next(a for a in alunos if a["tipo"] == "wellhub")
+        self.assertEqual(wh["id"], f"wellhub_{self.booking_ok.id}")
+        self.assertIn("João", wh["nome"])

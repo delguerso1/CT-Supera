@@ -620,9 +620,11 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
                 ? 'Ex-alunos'
                 : `Gerenciar ${activeTab}`}
           </Text>
-          <TouchableOpacity style={styles.addButton} onPress={handleNewUser}>
-            <Text style={styles.addButtonText}>+ Novo</Text>
-          </TouchableOpacity>
+          {activeTab !== 'alunos' && activeTab !== 'exalunos' && (
+            <TouchableOpacity style={styles.addButton} onPress={handleNewUser}>
+              <Text style={styles.addButtonText}>+ Novo</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {isPrecadastroLikeTab(activeTab) && (
