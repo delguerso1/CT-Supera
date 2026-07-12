@@ -255,9 +255,12 @@ function CadastroUsuario({ onUserChange }) {
       professores: 'Professor',
       gerentes: 'Gerente',
       precadastros: 'Pré-cadastro',
+      exalunos: 'Ex-aluno',
     };
     return map[tab] || tab;
   };
+
+  const isPrecadastroLikeTab = (tab) => tab === 'precadastros' || tab === 'exalunos';
 
   const [activeTab, setActiveTab] = useState('alunos');
   const [users, setUsers] = useState([]);
@@ -361,12 +364,16 @@ function CadastroUsuario({ onUserChange }) {
       console.log('[DEBUG] Iniciando busca de usuários...');
       console.log('[DEBUG] Tab ativa:', activeTab);
 
-      if (activeTab === 'precadastros') {
-        console.log('[DEBUG] Buscando pré-cadastros...');
+      if (isPrecadastroLikeTab(activeTab)) {
+        console.log('[DEBUG] Buscando pré-cadastros...', activeTab);
         let url = 'usuarios/precadastros/';
         const params = [];
         if (filtroStatusPrecadastro) params.push(`status=${encodeURIComponent(filtroStatusPrecadastro)}`);
-        if (filtroOrigemPrecadastro) params.push(`origem=${encodeURIComponent(filtroOrigemPrecadastro)}`);
+        if (activeTab === 'exalunos') {
+          params.push('origem=ex_aluno');
+        } else if (filtroOrigemPrecadastro) {
+          params.push(`origem=${encodeURIComponent(filtroOrigemPrecadastro)}`);
+        }
         if (params.length) url += `?${params.join('&')}`;
         const resultados = await fetchAllPages(url);
         console.log('[DEBUG] Total pré-cadastros:', Array.isArray(resultados) ? resultados.length : 0);
@@ -433,7 +440,7 @@ function CadastroUsuario({ onUserChange }) {
 
   // Buscar turmas (usado em filtro de alunos, matrícula e pré-cadastro)
   useEffect(() => {
-    if (activeTab !== 'alunos' && activeTab !== 'precadastros') return;
+    if (activeTab !== 'alunos' && !isPrecadastroLikeTab(activeTab)) return;
     const fetchTurmas = async () => {
       try {
         const turmasData = await fetchAllPages('turmas/?page_size=500');
@@ -788,7 +795,7 @@ function CadastroUsuario({ onUserChange }) {
     setSuccess('');
 
     const cpfDigitos = apenasDigitosCpf(formData.cpf);
-    if (activeTab === 'precadastros') {
+    if (isPrecadastroLikeTab(activeTab)) {
       if (cpfDigitos.length > 0 && cpfDigitos.length !== 11) {
         setError(MSG_CPF_11_DIGITOS);
         return;
@@ -805,7 +812,7 @@ function CadastroUsuario({ onUserChange }) {
       return;
     }
 
-    if (formData.tipo === 'aluno' && activeTab !== 'precadastros') {
+    if (formData.tipo === 'aluno' && !isPrecadastroLikeTab(activeTab)) {
       const dVen = parseInt(String(diaVencimento).trim(), 10);
       if (diaVencimento === '' || Number.isNaN(dVen) || dVen < 1 || dVen > 31) {
         setError('Informe o dia de vencimento da mensalidade entre 1 e 31.');
@@ -845,7 +852,7 @@ function CadastroUsuario({ onUserChange }) {
       if (pixProfessor) dados.pix_professor = pixProfessor;
     }
 
-    if (formData.tipo === 'aluno' && editingUser && activeTab !== 'precadastros') {
+    if (formData.tipo === 'aluno' && editingUser && !isPrecadastroLikeTab(activeTab)) {
       const ids = (formData.turmas || [])
         .map((id) => parseInt(id, 10))
         .filter((n) => !Number.isNaN(n));
@@ -857,7 +864,8 @@ function CadastroUsuario({ onUserChange }) {
 
     try {
       let response;
-      if (activeTab === 'precadastros') {
+      if (isPrecadastroLikeTab(activeTab)) {
+        const origemPadrao = activeTab === 'exalunos' ? 'ex_aluno' : 'formulario';
         const payloadPrecadastro = {
           first_name: formData.first_name,
           last_name: formData.last_name || '',
@@ -867,17 +875,17 @@ function CadastroUsuario({ onUserChange }) {
             ? inputDateToApiDate(formData.data_nascimento) || formData.data_nascimento
             : formData.data_nascimento,
           cpf: cpfDigitos.length > 0 ? cpfDigitos : null,
-          origem: formData.origem || (editingUser && editingUser.origem) || 'formulario',
+          origem: formData.origem || (editingUser && editingUser.origem) || origemPadrao,
         };
         const turmaId = formData.turma || (editingUser && editingUser.turma && (typeof editingUser.turma === 'object' ? editingUser.turma.id : editingUser.turma));
         payloadPrecadastro.turma = turmaId ? parseInt(turmaId, 10) : null;
         if (editingUser) {
           response = await api.put(`usuarios/precadastros/${editingUser.id}/`, payloadPrecadastro);
-          setSuccess('Pré-cadastro atualizado com sucesso!');
+          setSuccess(activeTab === 'exalunos' ? 'Ex-aluno atualizado com sucesso!' : 'Pré-cadastro atualizado com sucesso!');
         } else {
           response = await api.post('usuarios/precadastros/', payloadPrecadastro);
           if (response.data && response.data.id) {
-            setSuccess('Pré-cadastro criado com sucesso!');
+            setSuccess(activeTab === 'exalunos' ? 'Ex-aluno cadastrado com sucesso!' : 'Pré-cadastro criado com sucesso!');
           } else {
             setError('Erro inesperado: resposta sem id.');
             return;
@@ -930,7 +938,7 @@ function CadastroUsuario({ onUserChange }) {
         nome_responsavel: user.nome_responsavel || '',
         ficha_medica: user.ficha_medica || '',
         turma: (() => {
-          if (activeTab === 'precadastros') {
+          if (isPrecadastroLikeTab(activeTab)) {
             if (user.turma != null && user.turma !== '') {
               return String(typeof user.turma === 'object' ? user.turma.id : user.turma);
             }
@@ -988,27 +996,120 @@ function CadastroUsuario({ onUserChange }) {
     // }
   };
 
+  const handleSuspenderContrato = async (aluno) => {
+    if (!aluno?.id) return;
+    const diasStr = window.prompt(
+      'Suspender contrato por quantos dias?\nDigite 30 ou 60:',
+      '30'
+    );
+    if (diasStr == null) return;
+    const duracao = parseInt(String(diasStr).trim(), 10);
+    if (duracao !== 30 && duracao !== 60) {
+      setError('Informe 30 ou 60 dias para a suspensão.');
+      return;
+    }
+    try {
+      setError('');
+      const previewResp = await api.post(`usuarios/suspender-contrato/${aluno.id}/`, {
+        duracao_dias: duracao,
+      });
+      const susp = previewResp.data?.suspensao;
+      const cob = susp?.cobranca || {};
+      const aulas = cob.aulas_presentes ?? 0;
+      const valor = cob.valor_proporcional || cob.valor_encerramento || '0.00';
+      const ok = window.confirm(
+        `Suspensão de contrato (${duracao} dias)\n\n` +
+        `De: ${susp?.suspenso_desde || '-'}\n` +
+        `Até: ${susp?.suspenso_ate || '-'}\n\n` +
+        `Aulas após o último pagamento: ${aulas}\n` +
+        `Aulas esperadas no mês: ${cob.aulas_esperadas_mes ?? '-'}\n` +
+        `Valor mensalidade: R$ ${cob.valor_mensalidade ?? '-'}\n` +
+        `Cobrança proporcional: R$ ${valor}\n\n` +
+        (Number(valor) > 0
+          ? 'Confirma suspender e gerar a mensalidade?'
+          : 'Confirma suspender o contrato?')
+      );
+      if (!ok) return;
+
+      const response = await api.post(`usuarios/suspender-contrato/${aluno.id}/`, {
+        duracao_dias: duracao,
+        confirmar: true,
+      });
+      setSuccess(response.data?.message || 'Contrato suspenso com sucesso!');
+      setShowModal(false);
+      fetchUsers();
+      if (onUserChange) onUserChange();
+    } catch (error) {
+      console.error('[DEBUG] Erro ao suspender contrato:', error);
+      setError(error.response?.data?.error || 'Erro ao suspender contrato.');
+    }
+  };
+
+  const handleReativarContrato = async (aluno) => {
+    if (!aluno?.id) return;
+    if (!window.confirm('Reativar o contrato deste aluno agora?')) return;
+    try {
+      setError('');
+      const response = await api.post(`usuarios/suspender-contrato/${aluno.id}/`, {
+        reativar: true,
+      });
+      setSuccess(response.data?.message || 'Contrato reativado!');
+      setShowModal(false);
+      fetchUsers();
+      if (onUserChange) onUserChange();
+    } catch (error) {
+      console.error('[DEBUG] Erro ao reativar contrato:', error);
+      setError(error.response?.data?.error || 'Erro ao reativar contrato.');
+    }
+  };
+
   const handleDelete = async (userId) => {
-    const confirmMsg = activeTab === 'precadastros'
-      ? 'Tem certeza que deseja excluir este pré-cadastro?'
+    const confirmMsg = isPrecadastroLikeTab(activeTab)
+      ? (activeTab === 'exalunos'
+        ? 'Tem certeza que deseja excluir este ex-aluno?'
+        : 'Tem certeza que deseja excluir este pré-cadastro?')
       : 'Tem certeza que deseja excluir este registro?';
     const confirm2Msg = 'Esta ação é irreversível. Confirma a exclusão?';
 
     if (!window.confirm(confirmMsg)) return;
 
-    if (activeTab === 'precadastros' && !window.confirm(confirm2Msg)) return;
+    if (isPrecadastroLikeTab(activeTab) && !window.confirm(confirm2Msg)) return;
 
     try {
       if (activeTab === 'alunos') {
-        const response = await api.post(`usuarios/reverter-aluno/${userId}/`);
-        if (response.data?.message) {
-          setSuccess('Aluno movido para pré-cadastro com sucesso!');
-          fetchUsers();
+        // 1) Preview do encerramento (aulas após último pagamento)
+        const previewResp = await api.post(`usuarios/reverter-aluno/${userId}/`, {});
+        const enc = previewResp.data?.encerramento;
+        let confirmEncerramento = true;
+        if (enc) {
+          const aulas = enc.aulas_presentes ?? 0;
+          const valor = enc.valor_encerramento ?? '0.00';
+          const ref = enc.data_referencia
+            ? `\nReferência (último pagamento): ${enc.data_referencia}`
+            : '\nNenhum pagamento registrado — contagem desde a matrícula.';
+          confirmEncerramento = window.confirm(
+            `Encerramento de contrato\n\n` +
+            `Aulas após o último pagamento: ${aulas}\n` +
+            `Aulas esperadas no mês: ${enc.aulas_esperadas_mes}\n` +
+            `Valor da mensalidade: R$ ${enc.valor_mensalidade}\n` +
+            `Mensalidade de encerramento: R$ ${valor}` +
+            `${ref}\n\n` +
+            `Confirma mover o aluno para ex-alunos` +
+            (Number(valor) > 0 ? ' e gerar a cobrança de encerramento?' : '?')
+          );
         }
-      } else if (activeTab === 'precadastros') {
+        if (!confirmEncerramento) return;
+
+        const response = await api.post(`usuarios/reverter-aluno/${userId}/`, { confirmar: true });
+        if (response.data?.message) {
+          setSuccess(response.data.message);
+          fetchUsers();
+          if (onUserChange) onUserChange();
+        }
+      } else if (isPrecadastroLikeTab(activeTab)) {
         const response = await api.delete(`usuarios/precadastros/${userId}/`);
         if (response.status === 204) {
-          setSuccess('Pré-cadastro excluído com sucesso!');
+          setSuccess(activeTab === 'exalunos' ? 'Ex-aluno excluído com sucesso!' : 'Pré-cadastro excluído com sucesso!');
           fetchUsers();
         }
       } else {
@@ -1061,7 +1162,11 @@ function CadastroUsuario({ onUserChange }) {
       ficha_medica: '',
       turma: '',
       turmas: [],
-      origem: activeTab === 'precadastros' ? 'formulario' : undefined,
+      origem: activeTab === 'precadastros'
+        ? 'formulario'
+        : activeTab === 'exalunos'
+          ? 'ex_aluno'
+          : undefined,
     });
     
     // Limpar campos específicos
@@ -1084,7 +1189,7 @@ function CadastroUsuario({ onUserChange }) {
     setMatriculaForm({
       cpf: formatarCpfMascara(precadastro.cpf || ''),
       dia_vencimento: '1',
-      ja_aluno: false,
+      ja_aluno: precadastro.origem === 'ex_aluno',
       valor_mensalidade: '',
       valor_mensalidade_proporcional: '',
       valor_mensalidade_mes_seguinte: '',
@@ -1377,13 +1482,19 @@ function CadastroUsuario({ onUserChange }) {
     <div style={styles.container}>
       <div style={styles.header}>
         <h2 style={styles.title}>
-          {activeTab === 'precadastros' ? 'Gerenciar Pré-cadastros' : `Gerenciar ${activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}`}
+          {activeTab === 'precadastros'
+            ? 'Gerenciar Pré-cadastros'
+            : activeTab === 'exalunos'
+              ? 'Gerenciar Ex-alunos'
+              : `Gerenciar ${activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}`}
         </h2>
         {activeTab !== 'alunos' && (
           <button style={styles.button} onClick={handleNewUser}>
             {activeTab === 'precadastros'
               ? 'Novo Pré-cadastro'
-              : `Novo ${singularEntidadePorTab(activeTab)}`}
+              : activeTab === 'exalunos'
+                ? 'Novo Ex-aluno'
+                : `Novo ${singularEntidadePorTab(activeTab)}`}
           </button>
         )}
       </div>
@@ -1425,9 +1536,22 @@ function CadastroUsuario({ onUserChange }) {
             ...styles.tab,
             ...(activeTab === 'precadastros' ? styles.activeTab : {}),
           }}
-          onClick={() => setActiveTab('precadastros')}
+          onClick={() => {
+            setFiltroOrigemPrecadastro('');
+            setActiveTab('precadastros');
+          }}
         >
           Pré-cadastros
+        </button>
+        <button
+          className="gestao-usuarios-tab"
+          style={{
+            ...styles.tab,
+            ...(activeTab === 'exalunos' ? styles.activeTab : {}),
+          }}
+          onClick={() => setActiveTab('exalunos')}
+        >
+          Ex-alunos
         </button>
       </div>
 
@@ -1447,7 +1571,6 @@ function CadastroUsuario({ onUserChange }) {
           >
             <option value="">Todos os tipos</option>
             <option value="pendente">Pendente (cadastro pelo gerente)</option>
-            <option value="ex_aluno">Ex-aluno</option>
             <option value="aula_experimental">Aula experimental</option>
           </select>
           <label style={{ fontWeight: '500', color: '#333' }}>
@@ -1469,6 +1592,38 @@ function CadastroUsuario({ onUserChange }) {
           {(filtroOrigemPrecadastro || filtroStatusPrecadastro) && (
             <button
               onClick={() => { setFiltroOrigemPrecadastro(''); setFiltroStatusPrecadastro(''); }}
+              style={{
+                ...styles.actionButton,
+                backgroundColor: '#757575',
+                padding: '0.5rem 1rem',
+              }}
+            >
+              Limpar filtros
+            </button>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'exalunos' && (
+        <div style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+          <label style={{ fontWeight: '500', color: '#333' }}>
+            Status:
+          </label>
+          <select
+            value={filtroStatusPrecadastro}
+            onChange={(e) => setFiltroStatusPrecadastro(e.target.value)}
+            style={{
+              ...styles.select,
+              minWidth: '180px',
+            }}
+          >
+            <option value="">Aguardando rematrícula</option>
+            <option value="cancelado">Cancelados</option>
+            <option value="todos">Todos</option>
+          </select>
+          {filtroStatusPrecadastro && (
+            <button
+              onClick={() => setFiltroStatusPrecadastro('')}
               style={{
                 ...styles.actionButton,
                 backgroundColor: '#757575',
@@ -1654,8 +1809,8 @@ function CadastroUsuario({ onUserChange }) {
                 {activeTab === 'alunos' && <th style={styles.th}>Centro(s) de Treinamento</th>}
                 {activeTab === 'alunos' && <th style={styles.th}>Par-Q</th>}
                 {activeTab === 'alunos' && <th style={styles.th}>Status</th>}
-                {activeTab === 'precadastros' && <th style={styles.th}>Tipo</th>}
-                {activeTab === 'precadastros' && <th style={styles.th}>Status</th>}
+                {isPrecadastroLikeTab(activeTab) && <th style={styles.th}>Tipo</th>}
+                {isPrecadastroLikeTab(activeTab) && <th style={styles.th}>Status</th>}
                 <th style={styles.th}>Ações</th>
               </tr>
             </thead>
@@ -1663,7 +1818,7 @@ function CadastroUsuario({ onUserChange }) {
             {getUsersToDisplay().map(user => (
               <tr key={user.id}>
                 <td style={{ ...styles.td, position: 'relative' }}>
-                  {activeTab === 'precadastros' ? (
+                  {isPrecadastroLikeTab(activeTab) ? (
                     <div style={{ position: 'relative', display: 'inline-block' }}>
                       <span
                         role="button"
@@ -1833,24 +1988,37 @@ function CadastroUsuario({ onUserChange }) {
                 )}
                 {activeTab === 'alunos' && (
                   <td style={styles.td}>
-                    <span style={{
-                      padding: '4px 12px',
-                      borderRadius: '12px',
-                      fontSize: '12px',
-                      fontWeight: 'bold',
-                      backgroundColor: user.is_active ? '#e8f5e9' : '#ffebee',
-                      color: user.is_active ? '#2e7d32' : '#c62828',
-                    }}>
-                      {user.is_active ? 'Ativo' : 'Inativo'}
-                    </span>
+                    {user.contrato_suspenso ? (
+                      <span style={{
+                        padding: '4px 12px',
+                        borderRadius: '12px',
+                        fontSize: '12px',
+                        fontWeight: 'bold',
+                        backgroundColor: '#fff3e0',
+                        color: '#e65100',
+                      }}>
+                        Suspenso{user.suspenso_ate ? ` até ${user.suspenso_ate}` : ''}
+                      </span>
+                    ) : (
+                      <span style={{
+                        padding: '4px 12px',
+                        borderRadius: '12px',
+                        fontSize: '12px',
+                        fontWeight: 'bold',
+                        backgroundColor: user.is_active ? '#e8f5e9' : '#ffebee',
+                        color: user.is_active ? '#2e7d32' : '#c62828',
+                      }}>
+                        {user.is_active ? 'Ativo' : 'Inativo'}
+                      </span>
+                    )}
                   </td>
                 )}
-                {activeTab === 'precadastros' && (
+                {isPrecadastroLikeTab(activeTab) && (
                   <td style={styles.td}>
-                    {user.origem_display || 'Pendente'}
+                    {user.origem_display || (activeTab === 'exalunos' ? 'Ex-aluno' : 'Pendente')}
                   </td>
                 )}
-                {activeTab === 'precadastros' && (
+                {isPrecadastroLikeTab(activeTab) && (
                   <td style={styles.td}>
                     {user.status === 'matriculado'
                       ? 'Matriculado'
@@ -1873,7 +2041,7 @@ function CadastroUsuario({ onUserChange }) {
                     >
                       Excluir
                     </button>
-                    {activeTab === 'precadastros' && user.status !== 'matriculado' && (
+                    {isPrecadastroLikeTab(activeTab) && user.status !== 'matriculado' && (
                       <button
                         style={{ ...styles.actionButton, ...styles.editButton }}
                         onClick={() => handleConvertPreCadastro(user.id)}
@@ -1957,10 +2125,14 @@ function CadastroUsuario({ onUserChange }) {
               {editingUser
                 ? activeTab === 'precadastros'
                   ? 'Editar Pré-cadastro'
-                  : `Editar ${singularEntidadePorTab(activeTab)}`
+                  : activeTab === 'exalunos'
+                    ? 'Editar Ex-aluno'
+                    : `Editar ${singularEntidadePorTab(activeTab)}`
                 : activeTab === 'precadastros'
                   ? 'Novo Pré-cadastro'
-                  : `Novo ${singularEntidadePorTab(activeTab)}`}
+                  : activeTab === 'exalunos'
+                    ? 'Novo Ex-aluno'
+                    : `Novo ${singularEntidadePorTab(activeTab)}`}
             </h2>
 
             <form style={styles.form} onSubmit={handleSubmit}>
@@ -2009,7 +2181,7 @@ function CadastroUsuario({ onUserChange }) {
                   maxLength={14}
                   inputMode="numeric"
                   autoComplete="off"
-                  required={activeTab !== 'precadastros'}
+                  required={!isPrecadastroLikeTab(activeTab)}
                 />
               </div>
 
@@ -2028,7 +2200,7 @@ function CadastroUsuario({ onUserChange }) {
                 />
               </div>
 
-              {!editingUser && activeTab !== 'precadastros' && (
+              {!editingUser && !isPrecadastroLikeTab(activeTab) && (
                 <div style={styles.formGroup}>
                   <div style={{ 
                     backgroundColor: '#e3f2fd', 
@@ -2060,24 +2232,25 @@ function CadastroUsuario({ onUserChange }) {
                 />
               </div>
 
-              {activeTab === 'precadastros' && (
+              {isPrecadastroLikeTab(activeTab) && (
                 <>
-                  <div style={styles.formGroup}>
-                    <label style={styles.label} htmlFor="precadastro_origem">
-                      Tipo
-                    </label>
-                    <select
-                      id="precadastro_origem"
-                      name="origem"
-                      value={formData.origem || 'formulario'}
-                      onChange={handleChange}
-                      style={styles.input}
-                    >
-                      <option value="formulario">Pendente (cadastro pelo gerente)</option>
-                      <option value="aula_experimental">Aula experimental</option>
-                      <option value="ex_aluno">Ex-aluno</option>
-                    </select>
-                  </div>
+                  {activeTab === 'precadastros' && (
+                    <div style={styles.formGroup}>
+                      <label style={styles.label} htmlFor="precadastro_origem">
+                        Tipo
+                      </label>
+                      <select
+                        id="precadastro_origem"
+                        name="origem"
+                        value={formData.origem || 'formulario'}
+                        onChange={handleChange}
+                        style={styles.input}
+                      >
+                        <option value="formulario">Pendente (cadastro pelo gerente)</option>
+                        <option value="aula_experimental">Aula experimental</option>
+                      </select>
+                    </div>
+                  )}
                   <div style={styles.formGroup}>
                     <label style={styles.label} htmlFor="precadastro_turma">
                       Turma (opcional)
@@ -2111,7 +2284,7 @@ function CadastroUsuario({ onUserChange }) {
                   value={formData.endereco}
                   onChange={handleChange}
                   style={styles.input}
-                  required={formData.tipo === 'aluno' && !editingUser && activeTab !== 'precadastros'}
+                  required={formData.tipo === 'aluno' && !editingUser && !isPrecadastroLikeTab(activeTab)}
                 />
               </div>
 
@@ -2174,7 +2347,7 @@ function CadastroUsuario({ onUserChange }) {
                         value={formData.telefone_emergencia}
                         onChange={handleChange}
                         style={styles.input}
-                        required={activeTab !== 'precadastros'}
+                        required={!isPrecadastroLikeTab(activeTab)}
                         placeholder="(00) 00000-0000"
                       />
                     </div>
@@ -2202,7 +2375,7 @@ function CadastroUsuario({ onUserChange }) {
                 </div>
               )}
 
-              {formData.tipo === 'aluno' && activeTab !== 'precadastros' && (
+              {formData.tipo === 'aluno' && !isPrecadastroLikeTab(activeTab) && (
                 <>
                   <div style={styles.formGroup}>
                     <label style={styles.label} htmlFor="diaVencimento">
@@ -2217,7 +2390,7 @@ function CadastroUsuario({ onUserChange }) {
                       style={styles.input}
                       min={1}
                       max={31}
-                      required={activeTab !== 'precadastros'}
+                      required={!isPrecadastroLikeTab(activeTab)}
                     />
                   </div>
                   <div style={styles.formGroup}>
@@ -2234,7 +2407,7 @@ function CadastroUsuario({ onUserChange }) {
                       min="0"
                       step="0.01"
                       placeholder="Valor da mensalidade"
-                      required={activeTab !== 'precadastros'}
+                      required={!isPrecadastroLikeTab(activeTab)}
                     />
                   </div>
                   {editingUser && (
@@ -2349,7 +2522,34 @@ function CadastroUsuario({ onUserChange }) {
                 </>
               )}
 
-              <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+              <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem', flexWrap: 'wrap' }}>
+                {editingUser && activeTab === 'alunos' && (
+                  editingUser.contrato_suspenso ? (
+                    <button
+                      type="button"
+                      onClick={() => handleReativarContrato(editingUser)}
+                      style={{
+                        ...styles.button,
+                        backgroundColor: '#2e7d32',
+                        flex: '1 1 100%',
+                      }}
+                    >
+                      Reativar contrato
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => handleSuspenderContrato(editingUser)}
+                      style={{
+                        ...styles.button,
+                        backgroundColor: '#ef6c00',
+                        flex: '1 1 100%',
+                      }}
+                    >
+                      Suspender contrato
+                    </button>
+                  )
+                )}
                 <button
                   type="button"
                   onClick={() => {

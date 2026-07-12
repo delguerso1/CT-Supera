@@ -73,7 +73,7 @@ class VerificarCheckinAlunosAPIView(APIView):
 
         # Busca todos os alunos da turma (distinct evita duplicidades por JOIN/M2M)
         alunos = (
-            Usuario.objects.filter(tipo="aluno", ativo=True, turmas_aluno=turma)
+            Usuario.objects.filter(tipo="aluno", ativo=True, turmas_aluno=turma, contrato_suspenso=False)
             .distinct()
             .order_by("first_name", "last_name", "id")
         )
@@ -255,7 +255,9 @@ class RegistrarPresencaAPIView(APIView):
             )
 
         presencas_registradas = 0
-        alunos = Usuario.objects.filter(tipo="aluno", ativo=True, turmas_aluno=turma)
+        alunos = Usuario.objects.filter(
+            tipo="aluno", ativo=True, turmas_aluno=turma, contrato_suspenso=False
+        )
 
         for aluno in alunos:
             sid = str(aluno.id)
@@ -451,7 +453,9 @@ class RelatorioPresencaAPIView(APIView):
                 while cur <= parsed_fim:
                     nome_dia = _WEEKDAY_NOME_PT[cur.weekday()]
                     if nome_dia in dia_nomes:
-                        alunos_qs = turma.alunos.filter(tipo="aluno", ativo=True)
+                        alunos_qs = turma.alunos.filter(
+                            tipo="aluno", ativo=True, contrato_suspenso=False
+                        )
                         if aluno_id:
                             alunos_qs = alunos_qs.filter(id=int(aluno_id))
                         if aluno_nome:
@@ -629,8 +633,8 @@ class PainelGerenteAPIView(APIView):
                 data_vencimento__month=mes
             ).count()
 
-            # Pré-cadastros pendentes
-            precadastros = PreCadastro.objects.filter(status='pendente').count()
+            # Pré-cadastros pendentes (ex-alunos têm aba própria)
+            precadastros = PreCadastro.objects.filter(status='pendente').exclude(origem='ex_aluno').count()
 
             # Aulas experimentais (só status pendente, alinhado à listagem de pré-cadastros)
             aulas_experimentais_futuras = PreCadastro.objects.filter(
@@ -731,10 +735,10 @@ class PainelGerenteAPIView(APIView):
                     '_ts': timezone.localtime(aluno.date_joined).timestamp(),
                 })
 
-            # Pré-cadastros criados nos últimos 7 dias (feed alinhado ao painel)
+            # Pré-cadastros criados nos últimos 7 dias (feed alinhado ao painel; ex-alunos têm aba própria)
             for pc in PreCadastro.objects.filter(
                 criado_em__gte=timezone.now() - timedelta(days=7)
-            ).order_by('-criado_em')[:5]:
+            ).exclude(origem='ex_aluno').order_by('-criado_em')[:5]:
                 nome_pc = (pc.first_name or '').strip() or '—'
                 atividades.append({
                     'id': f'precadastro_{pc.id}',
@@ -876,8 +880,12 @@ class ListarPrecadastrosAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        # Lista apenas pré-cadastros pendentes (não matriculados ou cancelados)
-        precadastros = PreCadastro.objects.filter(status='pendente').order_by('-criado_em')
+        # Lista apenas pré-cadastros pendentes (ex-alunos ficam na aba própria)
+        precadastros = (
+            PreCadastro.objects.filter(status='pendente')
+            .exclude(origem='ex_aluno')
+            .order_by('-criado_em')
+        )
         serializer = PreCadastroSerializer(precadastros, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 

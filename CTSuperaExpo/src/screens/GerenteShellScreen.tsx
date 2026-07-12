@@ -23,7 +23,7 @@ type BottomKey = 'cts' | 'turmas' | 'news' | 'galeria' | 'candidatos' | 'wellhub
 
 type FocusState = { area: 'top' | 'bottom'; tab: TopKey | BottomKey };
 
-type UsuariosTabKey = 'alunos' | 'professores' | 'gerentes' | 'precadastros';
+type UsuariosTabKey = 'alunos' | 'professores' | 'gerentes' | 'precadastros' | 'exalunos';
 
 const TOP_TABS: { key: TopKey; label: string }[] = [
   { key: 'dashboard', label: 'Dashboard' },

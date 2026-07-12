@@ -85,28 +85,34 @@ class Mensalidade(models.Model):
 
     @classmethod
     def criar_proxima_mensalidade(cls, mensalidade_base):
+        aluno = mensalidade_base.aluno
+        # Ex-aluno / encerrado ou contrato suspenso: não gera nova mensalidade
+        if aluno and getattr(aluno, "ativo", True) is False:
+            return None
+        if aluno and hasattr(aluno, "esta_suspenso") and aluno.esta_suspenso():
+            return None
         referencia = mensalidade_base.data_vencimento
         if not referencia:
             return None
         ano = referencia.year + 1 if referencia.month == 12 else referencia.year
         mes = 1 if referencia.month == 12 else referencia.month + 1
         data_vencimento = cls._calcular_data_vencimento(
-            mensalidade_base.aluno,
+            aluno,
             ano,
             mes,
             referencia.day
         )
         existe = cls.objects.filter(
-            aluno=mensalidade_base.aluno,
+            aluno=aluno,
             data_vencimento__year=ano,
             data_vencimento__month=mes
         ).exists()
         if existe:
             return None
-        valor = mensalidade_base.aluno.valor_mensalidade or mensalidade_base.valor
+        valor = aluno.valor_mensalidade or mensalidade_base.valor
         try:
             return cls.objects.create(
-                aluno=mensalidade_base.aluno,
+                aluno=aluno,
                 valor=valor,
                 data_vencimento=data_vencimento,
             )

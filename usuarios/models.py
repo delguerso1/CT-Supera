@@ -112,6 +112,11 @@ class PreCadastro(models.Model):
             if plano is not None:
                 existente.plano = plano
             existente.ativo = True
+            existente.data_inativacao = None
+            existente.contrato_suspenso = False
+            existente.suspenso_desde = None
+            existente.suspenso_ate = None
+            existente.duracao_suspensao_dias = None
             existente.matriculado_em = agora
             if dias_habilitados:
                 existente.dias_habilitados.set(dias_habilitados)
@@ -229,6 +234,21 @@ class Usuario(AbstractUser):
         blank=True,
         help_text="Data em que o aluno foi inativado (desistência). Preenchida automaticamente ao marcar ativo=False.",
     )
+    contrato_suspenso = models.BooleanField(
+        default=False,
+        help_text="Contrato temporariamente suspenso (30/60 dias). Diferente de ativo=False (encerramento).",
+    )
+    suspenso_desde = models.DateField(null=True, blank=True)
+    suspenso_ate = models.DateField(
+        null=True,
+        blank=True,
+        help_text="Data final da suspensão (inclusive). Após essa data o contrato pode ser reativado.",
+    )
+    duracao_suspensao_dias = models.PositiveSmallIntegerField(
+        null=True,
+        blank=True,
+        help_text="Duração escolhida na suspensão (30 ou 60 dias).",
+    )
     matriculado_em = models.DateTimeField(
         null=True,
         blank=True,
@@ -276,6 +296,30 @@ class Usuario(AbstractUser):
         return self.tipo == "professor"
     def is_aluno(self):
         return self.tipo == "aluno"
+
+    def esta_suspenso(self, na_data=None):
+        """True se o contrato está suspenso e ainda dentro do período."""
+        if not self.contrato_suspenso:
+            return False
+        if not self.suspenso_ate:
+            return True
+        ref = na_data or django_timezone.localdate()
+        return self.suspenso_ate >= ref
+
+    def limpar_suspensao(self, save=True):
+        self.contrato_suspenso = False
+        self.suspenso_desde = None
+        self.suspenso_ate = None
+        self.duracao_suspensao_dias = None
+        if save:
+            self.save(
+                update_fields=[
+                    "contrato_suspenso",
+                    "suspenso_desde",
+                    "suspenso_ate",
+                    "duracao_suspensao_dias",
+                ]
+            )
 
     def limite_aulas_semanais(self):
         """Retorna o limite de aulas semanais de acordo com o plano."""

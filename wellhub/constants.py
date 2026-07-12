@@ -20,7 +20,8 @@ DIAS_SEMANA_NOMES = (
 )
 
 COTA_PADRAO = 5
-OPENS_BEFORE = timedelta(days=2)
+# Reserva abre no 1º dia do mês da aula (clientes podem marcar o mês inteiro).
+# Fecha CLOSES_BEFORE antes do horário da aula.
 CLOSES_BEFORE = timedelta(minutes=10)
 SLOT_LENGTH_MINUTES = 60
 SLOT_STATUS_ACTIVE = 1

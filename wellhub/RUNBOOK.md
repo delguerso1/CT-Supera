@@ -80,7 +80,7 @@ python manage.py test wellhub
 | `Esperadas 3 turmas` no setup | Verificar CT e horários no admin |
 | Slots com `sync_error` | Ver logs; conferir `WELLHUB_API_KEY`, `product_id`, class_id |
 | Webhook 403 | Conferir `WELLHUB_WEBHOOK_SECRET` e body bruto (HMAC-SHA1) |
-| Reserva rejeitada “janela” | `opens_at` / `closes_at` do slot; re-sync |
+| Reserva rejeitada “janela” | `opens_at` / `closes_at` do slot; re-sync (`opens_at` = 1º dia do mês) |
 | `total_booked` dessincronizado | `POST /api/wellhub/sync/slots/` ou cron |
 
 ## Reprocessar evento webhook

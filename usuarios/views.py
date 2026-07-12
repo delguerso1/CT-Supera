@@ -99,6 +99,9 @@ class ListarPrecadastrosAPIView(ListCreateAPIView):
             qs = qs.filter(origem=origem_param)
         elif origem_param == 'pendente':
             qs = qs.filter(origem='formulario')
+        else:
+            # Ex-alunos ficam na aba própria; a listagem padrão de pré-cadastros não os inclui
+            qs = qs.exclude(origem='ex_aluno')
 
         if self.request.method == 'GET':
             qs = qs.select_related('turma__ct').prefetch_related('turma__dias_semana')
@@ -632,7 +635,19 @@ class AceitarContratoAPIView(APIView):
 
 
 class ReverterAlunoParaPreCadastroAPIView(APIView):
-    """API para mover aluno para pré-cadastro."""
+    """
+    Move aluno para ex-aluno (pré-cadastro com origem=ex_aluno).
+
+    Fluxo:
+    1. Sem ``confirmar=true``: retorna preview do encerramento (aulas após último pagamento).
+    2. Com ``confirmar=true``: cria mensalidade de encerramento (se houver aulas),
+       marca o aluno como inativo no CT (``ativo=False``), remove das turmas e
+       cria/atualiza pré-cadastro de ex-aluno.
+
+    Mantém ``is_active=True`` para o ex-aluno poder logar e pagar o encerramento.
+    O registro de Usuario não é apagado, para a mensalidade continuar cobrável
+    e o reingresso pelo CPF funcionar.
+    """
     permission_classes = [IsAuthenticated]
 
     def post(self, request, usuario_id):
@@ -640,7 +655,35 @@ class ReverterAlunoParaPreCadastroAPIView(APIView):
         if request.user.tipo not in ["gerente", "professor"]:
             return Response({"error": "Permissão negada."}, status=status.HTTP_403_FORBIDDEN)
 
+        from financeiro.services import (
+            calcular_encerramento_contrato,
+            criar_mensalidade_encerramento,
+        )
+
+        confirmar = str(request.data.get("confirmar", "")).lower() in ("1", "true", "sim", "yes")
+        calculo = calcular_encerramento_contrato(usuario)
+
+        if not confirmar:
+            return Response(
+                {
+                    "preview": True,
+                    "message": (
+                        "Confirme o encerramento do contrato. "
+                        "Será calculada a cobrança pelas aulas após o último pagamento."
+                    ),
+                    "aluno": {
+                        "id": usuario.id,
+                        "nome": usuario.get_full_name(),
+                        "cpf": usuario.cpf,
+                    },
+                    "encerramento": calculo,
+                },
+                status=status.HTTP_200_OK,
+            )
+
         with transaction.atomic():
+            mensalidade, calculo = criar_mensalidade_encerramento(usuario, calculo=calculo)
+
             precadastro = None
             if usuario.cpf:
                 precadastro = PreCadastro.objects.filter(cpf=usuario.cpf).first()
@@ -671,15 +714,154 @@ class ReverterAlunoParaPreCadastroAPIView(APIView):
                     data_nascimento=usuario.data_nascimento,
                     email=usuario.email or "pendente",
                     status="pendente",
-                    origem="ex_aluno"
+                    origem="ex_aluno",
                 )
 
-            usuario.delete()
+            # Soft-delete operacional: sai das turmas e deixa de ser aluno ativo no CT,
+            # mas mantém is_active=True para o ex-aluno poder logar e pagar o encerramento.
+            usuario.ativo = False
+            usuario.data_inativacao = timezone.localdate()
+            usuario.save(update_fields=["ativo", "data_inativacao"])
 
-        return Response(
-            {"message": "Aluno movido para pré-cadastro com sucesso!", "precadastro_id": precadastro.id},
-            status=status.HTTP_200_OK
+            # Remove das turmas para não aparecer em listas de aula / check-in
+            if hasattr(usuario, "turmas_aluno"):
+                usuario.turmas_aluno.clear()
+
+        payload = {
+            "message": "Aluno movido para ex-alunos com sucesso!",
+            "precadastro_id": precadastro.id,
+            "encerramento": calculo,
+        }
+        if mensalidade:
+            payload["mensalidade_encerramento_id"] = mensalidade.id
+            payload["message"] = (
+                f"Aluno movido para ex-alunos. Mensalidade de encerramento "
+                f"criada: R$ {calculo['valor_encerramento']} "
+                f"({calculo['aulas_presentes']} aula(s))."
+            )
+        elif not calculo.get("precisa_cobrar"):
+            payload["message"] = (
+                "Aluno movido para ex-alunos. Nenhuma aula após o último pagamento — "
+                "sem mensalidade de encerramento."
+            )
+
+        return Response(payload, status=status.HTTP_200_OK)
+
+
+class SuspenderContratoAPIView(APIView):
+    """
+    Suspende o contrato do aluno por 30 ou 60 dias.
+
+    Sem confirmar: preview (datas + cobrança pelas aulas após o último pagamento).
+    Com confirmar=true + duracao_dias: aplica suspensão e gera mensalidade proporcional.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, usuario_id):
+        usuario = get_object_or_404(Usuario, id=usuario_id, tipo="aluno")
+        if request.user.tipo not in ["gerente", "professor"]:
+            return Response({"error": "Permissão negada."}, status=status.HTTP_403_FORBIDDEN)
+
+        if not usuario.ativo:
+            return Response(
+                {"error": "Aluno encerrado (ex-aluno). Rematricule antes de suspender."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        from financeiro.services import (
+            aplicar_suspensao_contrato,
+            calcular_preview_suspensao,
+            reativar_contrato_aluno,
         )
+
+        # Reativação antecipada
+        if str(request.data.get("reativar", "")).lower() in ("1", "true", "sim", "yes"):
+            if not usuario.contrato_suspenso:
+                return Response(
+                    {"error": "Este aluno não está com contrato suspenso."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            reativar_contrato_aluno(usuario)
+            return Response(
+                {
+                    "message": "Contrato reativado com sucesso!",
+                    "aluno": UsuarioSerializer(usuario).data,
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        try:
+            duracao = int(request.data.get("duracao_dias") or 0)
+        except (TypeError, ValueError):
+            duracao = 0
+        if duracao not in (30, 60):
+            return Response(
+                {"error": "Informe duracao_dias: 30 ou 60."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if usuario.esta_suspenso():
+            return Response(
+                {
+                    "error": (
+                        f"Contrato já suspenso até "
+                        f"{usuario.suspenso_ate.strftime('%d/%m/%Y') if usuario.suspenso_ate else '?'}."
+                    )
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            preview = calcular_preview_suspensao(usuario, duracao)
+        except ValueError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        confirmar = str(request.data.get("confirmar", "")).lower() in ("1", "true", "sim", "yes")
+        if not confirmar:
+            return Response(
+                {
+                    "preview": True,
+                    "message": (
+                        "Confirme a suspensão. Será cobrada a proporção das aulas "
+                        "realizadas após o último pagamento."
+                    ),
+                    "aluno": {
+                        "id": usuario.id,
+                        "nome": usuario.get_full_name(),
+                        "cpf": usuario.cpf,
+                    },
+                    "suspensao": preview,
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        with transaction.atomic():
+            mensalidade, preview = aplicar_suspensao_contrato(usuario, duracao)
+            usuario.refresh_from_db()
+
+        cobranca = preview.get("cobranca") or {}
+        payload = {
+            "message": (
+                f"Contrato suspenso por {duracao} dias "
+                f"(até {preview['suspenso_ate']})."
+            ),
+            "suspensao": preview,
+            "aluno": UsuarioSerializer(usuario).data,
+        }
+        if mensalidade:
+            payload["mensalidade_suspensao_id"] = mensalidade.id
+            payload["message"] = (
+                f"Contrato suspenso por {duracao} dias. "
+                f"Mensalidade gerada: R$ {cobranca.get('valor_proporcional') or cobranca.get('valor_encerramento')} "
+                f"({cobranca.get('aulas_presentes', 0)} aula(s))."
+            )
+        elif not cobranca.get("precisa_cobrar"):
+            payload["message"] = (
+                f"Contrato suspenso por {duracao} dias. "
+                "Nenhuma aula após o último pagamento — sem cobrança proporcional."
+            )
+
+        return Response(payload, status=status.HTTP_200_OK)
 
 
 class AtivarContaAPIView(APIView):
@@ -753,6 +935,16 @@ class ListarCriarUsuariosAPIView(ListCreateAPIView):
         tipo = self.request.query_params.get('tipo', None)
         if tipo:
             queryset = queryset.filter(tipo=tipo)
+        # Alunos encerrados (ex-aluno) ficam inativos; por padrão a aba Alunos
+        # lista só ativos. Use ?ativo=todos ou ?ativo=false para ver inativos.
+        if tipo == 'aluno':
+            ativo_param = (self.request.query_params.get('ativo') or '').strip().lower()
+            if ativo_param in ('0', 'false', 'nao', 'não', 'inativo', 'inativos'):
+                queryset = queryset.filter(ativo=False)
+            elif ativo_param in ('todos', 'all'):
+                pass
+            else:
+                queryset = queryset.filter(ativo=True)
         turma_id = self.request.query_params.get('turma', None)
         if turma_id:
             queryset = queryset.filter(turmas_aluno__id=turma_id).distinct()

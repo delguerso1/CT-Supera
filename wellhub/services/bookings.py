@@ -117,6 +117,36 @@ def _resolve_slot(payload: dict) -> Optional[WellhubSlot]:
         if isinstance(class_obj, dict):
             class_id = class_obj.get("id") or class_obj.get("class_id")
 
+    # Webhook real da Wellhub costuma vir só com slot.id + class_id (sem occur_date).
+    # Se o wellhub_slot_id ainda não está vinculado no banco, busca o slot na API.
+    if slot_id and class_id and not occur:
+        try:
+            client = WellhubClient()
+            if client.configured:
+                remote = client.get_slot(str(class_id), str(slot_id))
+                if isinstance(remote, dict):
+                    occur = (
+                        remote.get("occur_date")
+                        or remote.get("occurDate")
+                        or (remote.get("slot") or {}).get("occur_date")
+                        or (remote.get("slot") or {}).get("occurDate")
+                        or (remote.get("data") or {}).get("occur_date")
+                    )
+                    if occur:
+                        logger.info(
+                            "Slot Wellhub %s resolvido via API (class=%s, occur=%s)",
+                            slot_id,
+                            class_id,
+                            occur,
+                        )
+        except WellhubAPIError as exc:
+            logger.warning(
+                "Falha ao buscar slot %s na Wellhub (class=%s): %s",
+                slot_id,
+                class_id,
+                exc,
+            )
+
     if occur and class_id:
         turma_config = WellhubTurmaConfig.objects.filter(
             wellhub_class_id=str(class_id)
@@ -124,10 +154,23 @@ def _resolve_slot(payload: dict) -> Optional[WellhubSlot]:
         if turma_config:
             dt = _parse_remote_occur(str(occur))
             if dt:
-                return WellhubSlot.objects.filter(
+                slot = WellhubSlot.objects.filter(
                     turma=turma_config.turma,
                     data_aula=dt.date(),
                 ).first()
+                if slot and slot_id and not slot.wellhub_slot_id:
+                    slot.wellhub_slot_id = str(slot_id)
+                    slot.sync_status = WellhubSlot.SYNC_OK
+                    slot.sync_error = ""
+                    slot.save(
+                        update_fields=["wellhub_slot_id", "sync_status", "sync_error"]
+                    )
+                    logger.info(
+                        "Vinculado wellhub_slot_id=%s ao slot local pk=%s",
+                        slot_id,
+                        slot.pk,
+                    )
+                return slot
     return None
 
 

@@ -537,6 +537,22 @@ export const usuarioService = {
     await api.delete(`usuarios/${id}/`);
   },
 
+  reverterAlunoParaExAluno: async (
+    id: number,
+    data?: { confirmar?: boolean }
+  ): Promise<any> => {
+    const response = await api.post(`usuarios/reverter-aluno/${id}/`, data || {});
+    return response.data;
+  },
+
+  suspenderContrato: async (
+    id: number,
+    data: { duracao_dias?: number; confirmar?: boolean; reativar?: boolean }
+  ): Promise<any> => {
+    const response = await api.post(`usuarios/suspender-contrato/${id}/`, data);
+    return response.data;
+  },
+
   resetParq: async (id: number): Promise<User> => {
     const response = await api.patch(`usuarios/${id}/`, {
       parq_completed: false,

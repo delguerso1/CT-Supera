@@ -5,6 +5,7 @@ from .views import (
     FinalizarAgendamentoAPIView, LoginAPIView, LogoutAPIView, AtivarContaAPIView,
     ListarCriarUsuariosAPIView, EditarExcluirUsuarioAPIView, ReenviarConviteAPIView, AceitarContratoAPIView,
     ReverterAlunoParaPreCadastroAPIView,
+    SuspenderContratoAPIView,
     SolicitarPrimeiroAcessoAPIView,
     SolicitarRecuperacaoSenhaAPIView, RedefinirSenhaAPIView
 )
@@ -25,6 +26,7 @@ urlpatterns = [
     path('logout/', LogoutAPIView.as_view(), name='logout_api'),
     path('aceitar-contrato/', AceitarContratoAPIView.as_view(), name='aceitar_contrato_api'),
     path('reverter-aluno/<int:usuario_id>/', ReverterAlunoParaPreCadastroAPIView.as_view(), name='reverter_aluno_precadastro_api'),
+    path('suspender-contrato/<int:usuario_id>/', SuspenderContratoAPIView.as_view(), name='suspender_contrato_api'),
     path('ativar-conta/<str:uidb64>/<str:token>/', AtivarContaAPIView.as_view(), name='ativar_conta_api'),
     path('reenviar-convite/<int:usuario_id>/', ReenviarConviteAPIView.as_view(), name='reenviar_convite_api'),
     path('esqueci-senha/', SolicitarRecuperacaoSenhaAPIView.as_view(), name='solicitar_recuperacao_senha_api'),

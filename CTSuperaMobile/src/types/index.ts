@@ -6,6 +6,11 @@ export interface User {
   email: string;
   tipo: 'aluno' | 'professor' | 'gerente';
   ativo: boolean;
+  data_inativacao?: string | null;
+  contrato_suspenso?: boolean;
+  suspenso_desde?: string | null;
+  suspenso_ate?: string | null;
+  duracao_suspensao_dias?: number | null;
   telefone?: string;
   endereco?: string;
   data_nascimento?: string;

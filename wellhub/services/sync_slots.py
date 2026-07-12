@@ -15,7 +15,6 @@ from wellhub.constants import (
     COTA_PADRAO,
     DIAS_SEMANA_NOMES,
     DIAS_WELLHUB,
-    OPENS_BEFORE,
     CLOSES_BEFORE,
     PRECREATE_NEXT_MONTH_LAST_N_DAYS,
     SLOT_LENGTH_MINUTES,
@@ -62,12 +61,22 @@ def iter_slot_dates(hoje: date) -> Iterator[date]:
 
 
 def slot_datetimes(data_aula: date, horario, tz) -> Tuple[datetime, datetime, datetime]:
+    """
+    Retorna (occur_date, opens_at, closes_at).
+
+    opens_at: 00:00 do 1º dia do mês da aula (reserva aberta o mês inteiro).
+    closes_at: CLOSES_BEFORE antes do início da aula.
+    """
     naive_start = datetime.combine(data_aula, horario)
     if timezone.is_naive(naive_start):
         occur_date = timezone.make_aware(naive_start, tz)
     else:
         occur_date = naive_start
-    opens_at = occur_date - OPENS_BEFORE
+    naive_opens = datetime.combine(date(data_aula.year, data_aula.month, 1), datetime.min.time())
+    if timezone.is_naive(naive_opens):
+        opens_at = timezone.make_aware(naive_opens, tz)
+    else:
+        opens_at = naive_opens
     closes_at = occur_date - CLOSES_BEFORE
     return occur_date, opens_at, closes_at
 
@@ -84,13 +93,25 @@ def build_slot_patch_payload(
     slot: WellhubSlot,
     *,
     total_booked: int | None = None,
+    include_booking_window: bool = False,
 ) -> dict:
-    """PATCH de slot na Wellhub aceita apenas limites (Booking API)."""
+    """
+    PATCH de slot na Wellhub.
+    Por padrão só cotas (usado após reserva). Com include_booking_window=True
+    também envia opens_at/closes_at (re-sync da janela mensal).
+    """
     booked = total_booked if total_booked is not None else slot.total_booked
-    return {
+    payload = {
         "total_capacity": slot.total_capacity,
         "total_booked": booked,
     }
+    if include_booking_window:
+        payload["booking_window"] = {
+            "opens_at": _format_iso(slot.opens_at),
+            "closes_at": _format_iso(slot.closes_at),
+        }
+        payload["cancellable_until"] = _format_iso(slot.closes_at)
+    return payload
 
 
 def build_slot_payload(
@@ -160,19 +181,54 @@ def _slot_id_from_item(item: dict) -> str | None:
     return str(slot_id) if slot_id is not None else None
 
 
+def _slot_id_from_text(text: str) -> str | None:
+    """Extrai id numérico de mensagens de erro 409 (quando a API não devolve JSON estruturado)."""
+    import re
+
+    patterns = (
+        r"(?:slot[_\s]?id|id)\s*[:=]?\s*[\"']?(\d{5,})",
+        r"already exists[^\d]*(\d{5,})",
+        r"\b(\d{8,})\b",
+    )
+    for pat in patterns:
+        m = re.search(pat, text, re.IGNORECASE)
+        if m:
+            return m.group(1)
+    return None
+
+
 def _slot_id_from_response(resp: object) -> str | None:
+    if isinstance(resp, str):
+        return _slot_id_from_text(resp)
     if not isinstance(resp, dict):
         return None
     slots = resp.get("slots")
     if isinstance(slots, list) and slots:
         return _slot_id_from_item(slots[0])
-    for key in ("slot", "data", "result"):
+    for key in ("slot", "data", "result", "error", "errors"):
         nested = resp.get(key)
         if isinstance(nested, dict):
-            found = _slot_id_from_item(nested)
+            found = _slot_id_from_item(nested) or _slot_id_from_response(nested)
             if found:
                 return found
-    return _slot_id_from_item(resp)
+        if isinstance(nested, str):
+            found = _slot_id_from_text(nested)
+            if found:
+                return found
+        if isinstance(nested, list) and nested and isinstance(nested[0], dict):
+            found = _slot_id_from_item(nested[0])
+            if found:
+                return found
+    found = _slot_id_from_item(resp)
+    if found:
+        return found
+    for key in ("message", "detail", "description", "msg"):
+        val = resp.get(key)
+        if isinstance(val, str):
+            found = _slot_id_from_text(val)
+            if found:
+                return found
+    return None
 
 
 def _normalize_wellhub_datetime(raw: str) -> str:
@@ -308,12 +364,28 @@ def _apply_slot_patch(
     client: WellhubClient,
     product_id: int,
 ) -> None:
-    patch_payload = build_slot_patch_payload(slot, total_booked=slot.total_booked)
-    client.patch_slot(
-        turma_config.wellhub_class_id,
-        slot.wellhub_slot_id,
-        patch_payload,
+    patch_payload = build_slot_patch_payload(
+        slot,
+        total_booked=slot.total_booked,
+        include_booking_window=True,
     )
+    try:
+        client.patch_slot(
+            turma_config.wellhub_class_id,
+            slot.wellhub_slot_id,
+            patch_payload,
+        )
+    except WellhubAPIError:
+        # Algumas versões da API rejeitam booking_window no PATCH — tenta só cotas.
+        client.patch_slot(
+            turma_config.wellhub_class_id,
+            slot.wellhub_slot_id,
+            build_slot_patch_payload(slot, total_booked=slot.total_booked),
+        )
+        logger.warning(
+            "PATCH slot %s sem booking_window (API rejeitou janela); cotas atualizadas.",
+            slot.pk,
+        )
 
 
 def sync_slot_to_api(
@@ -326,6 +398,32 @@ def sync_slot_to_api(
         slot.sync_status = WellhubSlot.SYNC_ERROR
         slot.sync_error = "wellhub_class_id ausente"
         slot.save(update_fields=["sync_status", "sync_error"])
+        return slot
+
+    agora = timezone.now()
+    if slot.occur_date <= agora:
+        if slot.wellhub_slot_id:
+            slot.total_booked = count_confirmed_bookings(slot)
+            try:
+                _apply_slot_patch(slot, turma_config, client, product_id)
+                slot.sync_status = WellhubSlot.SYNC_OK
+                slot.sync_error = ""
+                slot.save(
+                    update_fields=["total_booked", "sync_status", "sync_error"]
+                )
+            except WellhubAPIError as exc:
+                slot.sync_status = WellhubSlot.SYNC_ERROR
+                slot.sync_error = str(exc)[:2000]
+                slot.save(update_fields=["sync_status", "sync_error"])
+                logger.exception("Erro sync slot passado %s: %s", slot.pk, exc)
+        else:
+            slot.sync_error = "Aula já passou; slot não criado na Wellhub."
+            slot.save(update_fields=["sync_error"])
+            logger.info(
+                "Slot ignorado (aula passada, turma=%s, data=%s).",
+                slot.turma_id,
+                slot.data_aula,
+            )
         return slot
 
     slot.total_booked = count_confirmed_bookings(slot)
@@ -343,25 +441,23 @@ def sync_slot_to_api(
             except WellhubAPIError as exc:
                 if exc.status_code != 409:
                     raise
-                slot_id = find_remote_slot_id(
-                    client, turma_config.wellhub_class_id, slot
-                )
+                # 409: slot já existe. Tenta id no body da resposta; senão lista.
+                slot_id = _slot_id_from_response(exc.body) if exc.body else None
                 if not slot_id:
-                    # O slot já existe na Wellhub (por isso o 409), mas não aparece
-                    # na listagem. É o caso normal de datas futuras: a Wellhub só
-                    # lista slots cuja janela de reserva já abriu (~OPENS_BEFORE
-                    # antes da aula). Não é erro — marca pendente e o cron diário
-                    # revincula o id quando a janela abrir. A reserva por webhook já
-                    # funciona nesse meio-tempo via fallback por class_id+occur_date.
+                    slot_id = find_remote_slot_id(
+                        client, turma_config.wellhub_class_id, slot
+                    )
+                if not slot_id:
                     logger.info(
                         "Slot já existe na Wellhub mas ainda não listável "
-                        "(turma=%s, data=%s) — vínculo pendente.",
+                        "(turma=%s, data=%s) — vínculo pendente. body=%s",
                         slot.turma_id,
                         slot.data_aula,
+                        str(exc.body)[:500] if exc.body else None,
                     )
                     slot.sync_status = WellhubSlot.SYNC_PENDING
                     slot.sync_error = (
-                        "Existe na Wellhub; vínculo pendente (janela de reserva ainda não aberta)."
+                        "Existe na Wellhub; vínculo pendente (ainda não listável)."
                     )
                     slot.save(update_fields=["sync_status", "sync_error"])
                     return slot
@@ -428,6 +524,9 @@ def sync_all_published_slots(
             slot = upsert_local_slot(turma_config, data_aula)
             stats["created"] += 1
             if call_api and client.configured:
+                if slot.occur_date <= timezone.now() and not slot.wellhub_slot_id:
+                    stats["skipped"] += 1
+                    continue
                 sync_slot_to_api(slot, turma_config, client, product_id)
                 if slot.sync_status == WellhubSlot.SYNC_OK:
                     stats["synced"] += 1

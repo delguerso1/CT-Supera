@@ -132,6 +132,7 @@ class UsuarioSerializer(serializers.ModelSerializer):
             'id', 'username', 'email', 'first_name', 'last_name',
             'tipo', 'tipo_display', 'nome_completo', 'telefone',
             'endereco', 'data_nascimento', 'ativo', 'data_inativacao', 'is_active',
+            'contrato_suspenso', 'suspenso_desde', 'suspenso_ate', 'duracao_suspensao_dias',
             'dia_vencimento', 'valor_mensalidade', 'cpf',
             'plano', 'dias_habilitados', 'dias_habilitados_nomes',
             'nome_responsavel', 'telefone_responsavel', 'telefone_emergencia',
@@ -149,6 +150,18 @@ class UsuarioSerializer(serializers.ModelSerializer):
         extra_kwargs = {
             'password': {'write_only': True},
             'data_inativacao': {
+                'format': DATA_API_FMT,
+                'input_formats': DATE_INPUT_FORMATS,
+                'required': False,
+                'allow_null': True,
+            },
+            'suspenso_desde': {
+                'format': DATA_API_FMT,
+                'input_formats': DATE_INPUT_FORMATS,
+                'required': False,
+                'allow_null': True,
+            },
+            'suspenso_ate': {
                 'format': DATA_API_FMT,
                 'input_formats': DATE_INPUT_FORMATS,
                 'required': False,
@@ -402,6 +415,7 @@ class UsuarioSerializer(serializers.ModelSerializer):
         'tipo', 'is_active', 'ativo', 'password',
         'salario_professor', 'pix_professor',
         'valor_mensalidade', 'dia_vencimento',
+        'contrato_suspenso', 'suspenso_desde', 'suspenso_ate', 'duracao_suspensao_dias',
     )
 
     def _requisicao_de_gerente(self):

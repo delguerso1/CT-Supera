@@ -25,7 +25,9 @@ import {
 import { normalizarTelefoneBrParaApi, telefoneBrValido } from '../utils/telefone';
 import { formatApiDateLocale } from '../utils/dateApi';
 
-type TabKey = 'alunos' | 'professores' | 'gerentes' | 'precadastros';
+type TabKey = 'alunos' | 'professores' | 'gerentes' | 'precadastros' | 'exalunos';
+
+const isPrecadastroLikeTab = (tab: TabKey) => tab === 'precadastros' || tab === 'exalunos';
 
 const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
   const { user } = useAuth();
@@ -82,9 +84,12 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      if (activeTab === 'precadastros') {
+      if (isPrecadastroLikeTab(activeTab)) {
+        const precParams: { status?: string; origem?: string } = {};
+        if (filtroStatusPrecadastro) precParams.status = filtroStatusPrecadastro;
+        if (activeTab === 'exalunos') precParams.origem = 'ex_aluno';
         const data = await usuarioService.listarPrecadastros(
-          filtroStatusPrecadastro ? { status: filtroStatusPrecadastro } : undefined
+          Object.keys(precParams).length ? precParams : undefined
         );
         setPrecadastros(data);
         setUsers([]);
@@ -171,22 +176,23 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
     const payload: any = {
       first_name: formData.first_name,
       last_name: formData.last_name,
-      cpf: activeTab === 'precadastros' ? (cpfDigits.length > 0 ? cpfDigits : null) : cpfDigits,
+      cpf: isPrecadastroLikeTab(activeTab) ? (cpfDigits.length > 0 ? cpfDigits : null) : cpfDigits,
       email: formData.email,
       telefone:
-        activeTab === 'precadastros'
+        isPrecadastroLikeTab(activeTab)
           ? normalizarTelefoneBrParaApi(formData.telefone)
           : formData.telefone,
       endereco: formData.endereco,
       data_nascimento: formData.data_nascimento || null,
     };
 
-    if (activeTab !== 'precadastros') {
+    if (!isPrecadastroLikeTab(activeTab)) {
       payload.tipo = activeTab === 'alunos' ? 'aluno' : activeTab === 'professores' ? 'professor' : 'gerente';
     } else {
+      const origemPadrao = activeTab === 'exalunos' ? 'ex_aluno' : 'formulario';
       payload.origem = editingUser
-        ? (editingUser as PreCadastro).origem || 'formulario'
-        : 'formulario';
+        ? (editingUser as PreCadastro).origem || origemPadrao
+        : origemPadrao;
     }
 
     if (payload.tipo === 'aluno') {
@@ -209,7 +215,7 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
 
   const handleSave = async () => {
     const cpfDigits = apenasDigitosCpf(formData.cpf);
-    if (activeTab === 'precadastros') {
+    if (isPrecadastroLikeTab(activeTab)) {
       if (cpfDigits.length > 0 && cpfDigits.length !== 11) {
         Alert.alert('Validação', MSG_CPF_11_DIGITOS);
         return;
@@ -228,7 +234,7 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
     try {
       setSaving(true);
       const payload = buildPayload();
-      if (activeTab === 'precadastros') {
+      if (isPrecadastroLikeTab(activeTab)) {
         if (editingUser) {
           await usuarioService.atualizarPrecadastro((editingUser as PreCadastro).id, payload);
         } else {
@@ -250,24 +256,128 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
     }
   };
 
+
+  const handleSuspenderContrato = (aluno: User) => {
+    Alert.alert('Suspender contrato', 'Escolha a duração da suspensão:', [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: '30 dias', onPress: () => confirmarSuspensao(aluno, 30) },
+      { text: '60 dias', onPress: () => confirmarSuspensao(aluno, 60) },
+    ]);
+  };
+
+  const confirmarSuspensao = async (aluno: User, duracao: 30 | 60) => {
+    try {
+      const preview = await usuarioService.suspenderContrato(aluno.id, { duracao_dias: duracao });
+      const susp = preview?.suspensao;
+      const cob = susp?.cobranca || {};
+      const valor = cob.valor_proporcional || cob.valor_encerramento || '0.00';
+      const msg =
+        `Duração: ${duracao} dias\n` +
+        `Até: ${susp?.suspenso_ate || '-'}\n` +
+        `Aulas após último pagamento: ${cob.aulas_presentes ?? 0}\n` +
+        `Cobrança proporcional: R$ ${valor}\n\n` +
+        (Number(valor) > 0
+          ? 'Confirma suspender e gerar a mensalidade?'
+          : 'Confirma suspender o contrato?');
+      Alert.alert('Confirmar suspensão', msg, [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Confirmar',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const result = await usuarioService.suspenderContrato(aluno.id, {
+                duracao_dias: duracao,
+                confirmar: true,
+              });
+              setShowForm(false);
+              await fetchUsers();
+              Alert.alert('Sucesso', result?.message || 'Contrato suspenso.');
+            } catch (error: any) {
+              Alert.alert('Erro', error.response?.data?.error || 'Erro ao suspender.');
+            }
+          },
+        },
+      ]);
+    } catch (error: any) {
+      Alert.alert('Erro', error.response?.data?.error || 'Erro ao suspender.');
+    }
+  };
+
+  const handleReativarContrato = (aluno: User) => {
+    Alert.alert('Reativar contrato', 'Reativar o contrato deste aluno agora?', [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Reativar',
+        onPress: async () => {
+          try {
+            const result = await usuarioService.suspenderContrato(aluno.id, { reativar: true });
+            setShowForm(false);
+            await fetchUsers();
+            Alert.alert('Sucesso', result?.message || 'Contrato reativado.');
+          } catch (error: any) {
+            Alert.alert('Erro', error.response?.data?.error || 'Erro ao reativar.');
+          }
+        },
+      },
+    ]);
+  };
+
   const handleDelete = (target: User | PreCadastro) => {
     const onConfirmDelete = async () => {
       try {
-        if (activeTab === 'precadastros') {
+        if (isPrecadastroLikeTab(activeTab)) {
           await usuarioService.excluirPrecadastro((target as PreCadastro).id);
-        } else {
-          await usuarioService.excluirUsuario((target as User).id);
+          await fetchUsers();
+          return;
         }
+        if (activeTab === 'alunos') {
+          const preview = await usuarioService.reverterAlunoParaExAluno((target as User).id);
+          const enc = preview?.encerramento;
+          const aulas = enc?.aulas_presentes ?? 0;
+          const valor = enc?.valor_encerramento ?? '0.00';
+          const msg =
+            `Aulas após o último pagamento: ${aulas}\n` +
+            `Aulas esperadas no mês: ${enc?.aulas_esperadas_mes ?? '-'}\n` +
+            `Valor mensalidade: R$ ${enc?.valor_mensalidade ?? '-'}\n` +
+            `Encerramento: R$ ${valor}\n\n` +
+            (Number(valor) > 0
+              ? 'Confirma mover para ex-alunos e gerar a cobrança?'
+              : 'Confirma mover para ex-alunos?');
+          Alert.alert('Encerramento de contrato', msg, [
+            { text: 'Cancelar', style: 'cancel' },
+            {
+              text: 'Confirmar',
+              style: 'destructive',
+              onPress: async () => {
+                try {
+                  const result = await usuarioService.reverterAlunoParaExAluno(
+                    (target as User).id,
+                    { confirmar: true }
+                  );
+                  await fetchUsers();
+                  Alert.alert('Sucesso', result?.message || 'Aluno movido para ex-alunos.');
+                } catch (error: any) {
+                  Alert.alert('Erro', error.response?.data?.error || 'Erro ao excluir.');
+                }
+              },
+            },
+          ]);
+          return;
+        }
+        await usuarioService.excluirUsuario((target as User).id);
         await fetchUsers();
       } catch (error: any) {
         Alert.alert('Erro', error.response?.data?.error || 'Erro ao excluir.');
       }
     };
 
-    if (activeTab === 'precadastros') {
+    if (isPrecadastroLikeTab(activeTab)) {
       Alert.alert(
-        'Excluir pré-cadastro',
-        'Deseja realmente excluir este pré-cadastro?',
+        activeTab === 'exalunos' ? 'Excluir ex-aluno' : 'Excluir pré-cadastro',
+        activeTab === 'exalunos'
+          ? 'Deseja realmente excluir este ex-aluno?'
+          : 'Deseja realmente excluir este pré-cadastro?',
         [
           { text: 'Cancelar', style: 'cancel' },
           {
@@ -284,6 +394,15 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
               );
             },
           },
+        ]
+      );
+    } else if (activeTab === 'alunos') {
+      Alert.alert(
+        'Encerrar aluno',
+        'O aluno será movido para ex-alunos. Deseja continuar?',
+        [
+          { text: 'Cancelar', style: 'cancel' },
+          { text: 'Continuar', style: 'destructive', onPress: onConfirmDelete },
         ]
       );
     } else {
@@ -335,7 +454,7 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
       setMatriculaForm({
         cpf: formatarCpfMascara(precadastro.cpf || ''),
         dia_vencimento: '1',
-        ja_aluno: false,
+        ja_aluno: precadastro.origem === 'ex_aluno',
         valor_mensalidade: '',
         valor_mensalidade_proporcional: '',
         valor_mensalidade_mes_seguinte: '',
@@ -478,6 +597,7 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
           { key: 'professores', label: 'Professores' },
           { key: 'gerentes', label: 'Gerentes' },
           { key: 'precadastros', label: 'Pré-cadastros' },
+          { key: 'exalunos', label: 'Ex-alunos' },
         ].map(tab => (
           <TouchableOpacity
             key={tab.key}
@@ -494,14 +614,18 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
       <View style={styles.content}>
         <View style={styles.headerRow}>
           <Text style={styles.title}>
-            {activeTab === 'precadastros' ? 'Pré-cadastros' : `Gerenciar ${activeTab}`}
+            {activeTab === 'precadastros'
+              ? 'Pré-cadastros'
+              : activeTab === 'exalunos'
+                ? 'Ex-alunos'
+                : `Gerenciar ${activeTab}`}
           </Text>
           <TouchableOpacity style={styles.addButton} onPress={handleNewUser}>
             <Text style={styles.addButtonText}>+ Novo</Text>
           </TouchableOpacity>
         </View>
 
-        {activeTab === 'precadastros' && (
+        {isPrecadastroLikeTab(activeTab) && (
           <View style={styles.filterRow}>
             <Text style={styles.filterLabel}>Status:</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll}>
@@ -535,9 +659,11 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
           </View>
         ) : (
           <ScrollView>
-            {activeTab === 'precadastros' ? (
+            {isPrecadastroLikeTab(activeTab) ? (
               precadastros.length === 0 ? (
-                <Text style={styles.noData}>Nenhum pré-cadastro encontrado.</Text>
+                <Text style={styles.noData}>
+                  {activeTab === 'exalunos' ? 'Nenhum ex-aluno encontrado.' : 'Nenhum pré-cadastro encontrado.'}
+                </Text>
               ) : (
                 precadastros.map((item) => (
                   <View key={item.id} style={styles.card}>
@@ -759,6 +885,23 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
               )}
             </ScrollView>
             <View style={styles.modalActions}>
+              {editingUser && activeTab === 'alunos' && (
+                (editingUser as User).contrato_suspenso ? (
+                  <TouchableOpacity
+                    style={[styles.actionButton, { backgroundColor: '#2e7d32', flex: 1 }]}
+                    onPress={() => handleReativarContrato(editingUser as User)}
+                  >
+                    <Text style={styles.actionButtonText}>Reativar contrato</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity
+                    style={[styles.actionButton, { backgroundColor: '#ef6c00', flex: 1 }]}
+                    onPress={() => handleSuspenderContrato(editingUser as User)}
+                  >
+                    <Text style={styles.actionButtonText}>Suspender contrato</Text>
+                  </TouchableOpacity>
+                )
+              )}
               <TouchableOpacity style={[styles.actionButton, styles.actionSecondary]} onPress={() => setShowForm(false)}>
                 <Text style={styles.actionButtonText}>Cancelar</Text>
               </TouchableOpacity>
@@ -1078,7 +1221,9 @@ const styles = StyleSheet.create({
   },
   modalActions: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'space-between',
+    gap: 8,
     marginTop: 8,
   },
   sectionTitle: {

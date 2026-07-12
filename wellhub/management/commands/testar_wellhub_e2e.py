@@ -71,7 +71,10 @@ class Command(BaseCommand):
 
             from django.conf import settings
 
-            ensure_gym_config(int(settings.WELLHUB_GYM_ID or 438), 1)
+            ensure_gym_config(
+                int(settings.WELLHUB_GYM_ID or 438),
+                int(getattr(settings, "WELLHUB_PRODUCT_ID", 1) or 1),
+            )
             setup_piloto_classes(call_api=False)
             for tc in WellhubTurmaConfig.objects.filter(publicar_wellhub=True):
                 if not tc.wellhub_class_id:
@@ -89,16 +92,25 @@ class Command(BaseCommand):
                     slot.save(update_fields=["wellhub_slot_id", "sync_status"])
             self.stdout.write(self.style.WARNING("Modo local: slots fictícios criados."))
 
+        agora = timezone.now()
         slot = (
-            WellhubSlot.objects.filter(turma__ct__nome=CT_NOME_PILOTO)
+            WellhubSlot.objects.filter(
+                turma__ct__nome=CT_NOME_PILOTO,
+                occur_date__gt=agora,
+            )
             .order_by("occur_date")
             .first()
         )
         if not slot:
+            slot = (
+                WellhubSlot.objects.filter(turma__ct__nome=CT_NOME_PILOTO)
+                .order_by("-occur_date")
+                .first()
+            )
+        if not slot:
             raise SystemExit("Nenhum slot disponível para teste.")
 
         # Garantir janela aberta para o teste local
-        agora = timezone.now()
         if agora < slot.opens_at or agora > slot.closes_at:
             slot.opens_at = agora - timedelta(hours=1)
             slot.closes_at = agora + timedelta(days=1)
@@ -125,7 +137,7 @@ class Command(BaseCommand):
                 },
                 "slot": {
                     "id": int(slot.wellhub_slot_id) if str(slot.wellhub_slot_id).isdigit() else slot.wellhub_slot_id,
-                    "gym_id": 438,
+                    "gym_id": int(settings.WELLHUB_GYM_ID or 438),
                     "class_id": slot.turma.wellhub_config.wellhub_class_id,
                     "booking_number": booking_number,
                 },
@@ -155,6 +167,12 @@ class Command(BaseCommand):
             self.stdout.write(self.style.ERROR("FALHA: booking não confirmado."))
         else:
             self.stdout.write(self.style.SUCCESS("OK: booking confirmado + cadastro Wellhub."))
+            self.stdout.write(
+                self.style.WARNING(
+                    "Nota: PATCH remoto com booking fictício (BK_E2E_*) pode retornar "
+                    "404 booking.not.updated — isso é esperado; o webhook local funcionou."
+                )
+            )
 
         cancel_payload = {
             "event_type": "booking.cancelation",

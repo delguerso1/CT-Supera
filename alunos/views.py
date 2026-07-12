@@ -141,6 +141,10 @@ class PainelAlunoAPIView(APIView):
 
     def get(self, request):
         usuario = request.user
+        # Reativação automática se a suspensão já expirou
+        if getattr(usuario, "contrato_suspenso", False) and not usuario.esta_suspenso():
+            usuario.limpar_suspensao(save=True)
+
         historico_aulas = (
             Presenca.objects.filter(usuario=usuario)
             .select_related("turma", "turma__ct")
@@ -192,6 +196,19 @@ class PainelAlunoAPIView(APIView):
         if mensalidades_atrasadas.exists():
             pode_fazer_checkin = False
             motivo_checkin_bloqueado = "Você possui pendências de pagamento."
+        elif not getattr(usuario, "ativo", True):
+            pode_fazer_checkin = False
+            motivo_checkin_bloqueado = (
+                "Seu vínculo com o CT foi encerrado. Você ainda pode acessar o financeiro "
+                "para quitar pendências."
+            )
+        elif hasattr(usuario, "esta_suspenso") and usuario.esta_suspenso():
+            ate = usuario.suspenso_ate.strftime("%d/%m/%Y") if usuario.suspenso_ate else ""
+            pode_fazer_checkin = False
+            motivo_checkin_bloqueado = (
+                f"Seu contrato está suspenso até {ate}." if ate
+                else "Seu contrato está temporariamente suspenso."
+            )
         elif not turma:
             pode_fazer_checkin = False
             motivo_checkin_bloqueado = "Você não está matriculado em nenhuma turma ativa."
@@ -234,6 +251,23 @@ class RealizarCheckinAPIView(APIView):
 
     def post(self, request):
         usuario = request.user
+        if not getattr(usuario, "ativo", True):
+            return Response({
+                "error": (
+                    "Seu vínculo com o CT foi encerrado. Você ainda pode acessar o financeiro "
+                    "para quitar pendências."
+                )
+            }, status=status.HTTP_403_FORBIDDEN)
+
+        if hasattr(usuario, "esta_suspenso") and usuario.esta_suspenso():
+            ate = usuario.suspenso_ate.strftime("%d/%m/%Y") if usuario.suspenso_ate else ""
+            return Response({
+                "error": (
+                    f"Seu contrato está suspenso até {ate}." if ate
+                    else "Seu contrato está temporariamente suspenso."
+                )
+            }, status=status.HTTP_403_FORBIDDEN)
+
         hoje = timezone.localdate()
         mensalidades_nao_pagas_atrasadas = Mensalidade.objects.filter(
             aluno=usuario

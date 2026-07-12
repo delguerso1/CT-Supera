@@ -38,6 +38,16 @@ class SlotIdFromResponseTests(TestCase):
         resp = {"slots": [{"id": 77}]}
         self.assertEqual(_slot_id_from_response(resp), "77")
 
+    def test_extrai_id_de_mensagem_texto(self):
+        self.assertEqual(
+            _slot_id_from_response("Slot already exists with id 228699094"),
+            "228699094",
+        )
+
+    def test_extrai_id_de_erro_aninhado(self):
+        resp = {"error": {"message": "conflict: slot_id=228699094"}}
+        self.assertEqual(_slot_id_from_response(resp), "228699094")
+
 
 class SlotMatchesLocalTests(TestCase):
     def setUp(self):
@@ -110,3 +120,7 @@ class UpsertLocalSlotTests(TestCase):
         self.assertEqual(slot.total_capacity, 5)
         self.assertEqual(slot.data_aula, data_aula)
         self.assertEqual(slot.closes_at, slot.occur_date - timedelta(minutes=10))
+        # Reserva abre no 1º dia do mês da aula
+        self.assertEqual(timezone.localtime(slot.opens_at).date(), date(2026, 5, 1))
+        self.assertEqual(timezone.localtime(slot.opens_at).hour, 0)
+        self.assertEqual(timezone.localtime(slot.opens_at).minute, 0)
