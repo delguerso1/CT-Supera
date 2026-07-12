@@ -70,6 +70,7 @@ class WellhubPresencaProfessorTests(TestCase):
             tipo="professor",
             first_name="Prof",
             email="prof@test.com",
+            cpf="11111111111",
         )
         aluno = Usuario.objects.create_user(
             username="aluno_wh",
@@ -79,6 +80,7 @@ class WellhubPresencaProfessorTests(TestCase):
             last_name="CT",
             email="joao@wellhub.test",
             ativo=True,
+            cpf="22222222222",
         )
         self.turma.alunos.add(aluno)
         self.turma.professores.add(professor)
