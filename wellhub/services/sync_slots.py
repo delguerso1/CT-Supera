@@ -271,6 +271,13 @@ def _slot_matches_local(slot: WellhubSlot, item: dict) -> bool:
     )
 
 
+def _format_iso_utc_z(dt: datetime) -> str:
+    """ISO em UTC com sufixo Z (formato comum nas respostas Wellhub)."""
+    aware = dt if timezone.is_aware(dt) else timezone.make_aware(dt, timezone.get_current_timezone())
+    utc = aware.astimezone(dt_timezone.utc)
+    return utc.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
 def _slot_search_windows(occur_date: datetime) -> list[tuple[str, str]]:
     """Janelas from/to para GET slots (API sensível ao formato)."""
     local = timezone.localtime(occur_date)
@@ -290,12 +297,15 @@ def _slot_search_windows(occur_date: datetime) -> list[tuple[str, str]]:
 
     return [
         (_format_iso(occur_start), _format_iso(occur_end)),
+        (_format_iso_utc_z(occur_start), _format_iso_utc_z(occur_end)),
         (_format_iso(day_start), _format_iso(day_end)),
+        (_format_iso_utc_z(day_start), _format_iso_utc_z(day_end)),
         (
             day_start.strftime("%Y-%m-%dT00:00:00"),
             day_end.strftime("%Y-%m-%dT23:59:59"),
         ),
         (_format_iso(month_start), _format_iso(month_end)),
+        (_format_iso_utc_z(month_start), _format_iso_utc_z(month_end)),
     ]
 
 
@@ -540,6 +550,125 @@ def sync_all_published_slots(
 
 def find_slot_by_wellhub_id(slot_id: str) -> WellhubSlot | None:
     return WellhubSlot.objects.filter(wellhub_slot_id=slot_id).select_related("turma").first()
+
+
+def bind_slot_id_and_patch(
+    slot: WellhubSlot,
+    turma_config: WellhubTurmaConfig,
+    client: WellhubClient,
+    slot_id: str,
+    *,
+    product_id: int | None = None,
+) -> WellhubSlot:
+    """Grava wellhub_slot_id e aplica PATCH (cotas + janela mensal de reserva)."""
+    slot.wellhub_slot_id = str(slot_id)
+    slot.sync_status = WellhubSlot.SYNC_OK
+    slot.sync_error = ""
+    slot.total_booked = count_confirmed_bookings(slot)
+    slot.save(
+        update_fields=["wellhub_slot_id", "sync_status", "sync_error", "total_booked"]
+    )
+    try:
+        _apply_slot_patch(
+            slot,
+            turma_config,
+            client,
+            product_id if product_id is not None else client.product_id,
+        )
+    except WellhubAPIError as exc:
+        logger.warning(
+            "Slot %s vinculado (id=%s) mas PATCH falhou: %s",
+            slot.pk,
+            slot_id,
+            exc,
+        )
+        slot.sync_error = f"Vinculado; PATCH falhou: {exc}"[:2000]
+        slot.save(update_fields=["sync_error"])
+    return slot
+
+
+def discover_slots_near_id(
+    client: WellhubClient,
+    center_slot_id: int | str,
+    *,
+    radius: int = 120,
+    configs: list[WellhubTurmaConfig] | None = None,
+) -> list[tuple[WellhubSlot, str]]:
+    """
+    Varre ids próximos a um slot conhecido via GET /slots/{id}.
+    Útil quando a listagem vem vazia e o 409 não devolve o id.
+    """
+    try:
+        center = int(str(center_slot_id).strip())
+    except (TypeError, ValueError):
+        return []
+
+    if configs is None:
+        configs = list(
+            WellhubTurmaConfig.objects.filter(publicar_wellhub=True)
+            .exclude(wellhub_class_id="")
+            .select_related("turma")
+        )
+    if not configs:
+        return []
+
+    pending_by_key: dict[tuple[int, date], WellhubSlot] = {}
+    for slot in (
+        WellhubSlot.objects.filter(wellhub_slot_id="")
+        .filter(occur_date__gte=timezone.now())
+        .select_related("turma")
+    ):
+        pending_by_key[(slot.turma_id, slot.data_aula)] = slot
+
+    if not pending_by_key:
+        return []
+
+    linked: list[tuple[WellhubSlot, str]] = []
+    already: set[str] = set()
+
+    for delta in range(-radius, radius + 1):
+        sid = str(center + delta)
+        if sid in already:
+            continue
+        for cfg in configs:
+            try:
+                remote = client.get_slot(cfg.wellhub_class_id, sid)
+            except WellhubAPIError as exc:
+                if exc.status_code not in (404, 400):
+                    logger.debug(
+                        "GET slot scan %s class=%s: %s",
+                        sid,
+                        cfg.wellhub_class_id,
+                        exc,
+                    )
+                continue
+            if not isinstance(remote, dict) or not remote:
+                continue
+            occur = (
+                remote.get("occur_date")
+                or remote.get("occurDate")
+                or (remote.get("slot") or {}).get("occur_date")
+                or (remote.get("slot") or {}).get("occurDate")
+                or (remote.get("data") or {}).get("occur_date")
+            )
+            if not occur:
+                continue
+            dt = _parse_remote_occur(str(occur))
+            if not dt:
+                continue
+            local = pending_by_key.get((cfg.turma_id, dt.date()))
+            if not local:
+                continue
+            rid = _slot_id_from_item(remote) or sid
+            bind_slot_id_and_patch(local, cfg, client, rid)
+            already.add(rid)
+            pending_by_key.pop((cfg.turma_id, dt.date()), None)
+            linked.append((local, rid))
+            break
+        if not pending_by_key:
+            break
+
+    return linked
 
 
 def is_slot_eligible(slot: WellhubSlot, agora: datetime | None = None) -> Tuple[bool, str]:

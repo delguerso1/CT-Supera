@@ -171,13 +171,20 @@ class WellhubClient:
         from_dt: str,
         to_dt: str,
     ) -> list:
+        """Lista slots. Tenta From/To (docs Booking) e from/to (SDK legado)."""
         gym_id = self.gym_id
-        resp = self._request(
-            "GET",
-            f"/booking/v1/gyms/{gym_id}/classes/{class_id}/slots",
-            params={"From": from_dt, "To": to_dt},
-        )
-        return self._extract_list(resp, "slots", "results", "data", "items")
+        path = f"/booking/v1/gyms/{gym_id}/classes/{class_id}/slots"
+        last: list = []
+        for params in (
+            {"From": from_dt, "To": to_dt},
+            {"from": from_dt, "to": to_dt},
+        ):
+            resp = self._request("GET", path, params=params)
+            items = self._extract_list(resp, "slots", "results", "data", "items")
+            if items:
+                return items
+            last = items
+        return last
 
     def get_slot(self, class_id: str, slot_id: str) -> dict:
         gym_id = self.gym_id

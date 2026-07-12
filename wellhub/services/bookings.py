@@ -85,7 +85,11 @@ def get_or_create_cadastro(user_data: dict) -> CadastroWellhub:
 
 def _resolve_slot(payload: dict) -> Optional[WellhubSlot]:
     from wellhub.webhooks import normalize_webhook_payload
-    from wellhub.services.sync_slots import _parse_remote_occur, find_slot_by_wellhub_id
+    from wellhub.services.sync_slots import (
+        _parse_remote_occur,
+        bind_slot_id_and_patch,
+        find_slot_by_wellhub_id,
+    )
 
     payload = normalize_webhook_payload(payload)
     slot_id = extract_slot_id(payload)
@@ -159,12 +163,40 @@ def _resolve_slot(payload: dict) -> Optional[WellhubSlot]:
                     data_aula=dt.date(),
                 ).first()
                 if slot and slot_id and not slot.wellhub_slot_id:
-                    slot.wellhub_slot_id = str(slot_id)
-                    slot.sync_status = WellhubSlot.SYNC_OK
-                    slot.sync_error = ""
-                    slot.save(
-                        update_fields=["wellhub_slot_id", "sync_status", "sync_error"]
-                    )
+                    try:
+                        client = WellhubClient()
+                        if client.configured:
+                            bind_slot_id_and_patch(
+                                slot, turma_config, client, str(slot_id)
+                            )
+                        else:
+                            slot.wellhub_slot_id = str(slot_id)
+                            slot.sync_status = WellhubSlot.SYNC_OK
+                            slot.sync_error = ""
+                            slot.save(
+                                update_fields=[
+                                    "wellhub_slot_id",
+                                    "sync_status",
+                                    "sync_error",
+                                ]
+                            )
+                    except WellhubAPIError as exc:
+                        logger.warning(
+                            "Vinculou slot local pk=%s id=%s sem PATCH: %s",
+                            slot.pk,
+                            slot_id,
+                            exc,
+                        )
+                        slot.wellhub_slot_id = str(slot_id)
+                        slot.sync_status = WellhubSlot.SYNC_OK
+                        slot.sync_error = ""
+                        slot.save(
+                            update_fields=[
+                                "wellhub_slot_id",
+                                "sync_status",
+                                "sync_error",
+                            ]
+                        )
                     logger.info(
                         "Vinculado wellhub_slot_id=%s ao slot local pk=%s",
                         slot_id,
