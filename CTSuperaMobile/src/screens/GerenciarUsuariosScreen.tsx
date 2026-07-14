@@ -274,11 +274,12 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
       const msg =
         `Duração: ${duracao} dias\n` +
         `Até: ${susp?.suspenso_ate || '-'}\n` +
-        `Aulas após último pagamento: ${cob.aulas_presentes ?? 0}\n` +
+        `Aulas no mês: ${cob.aulas_presentes ?? 0}\n` +
+        `Mês: ${cob.mes_referencia || cob.data_referencia || '-'}\n` +
         `Cobrança proporcional: R$ ${valor}\n\n` +
         (Number(valor) > 0
           ? 'Confirma suspender e gerar a mensalidade?'
-          : 'Confirma suspender o contrato?');
+          : 'Sem frequência neste mês — sem cobrança. Confirma suspender?');
       Alert.alert('Confirmar suspensão', msg, [
         { text: 'Cancelar', style: 'cancel' },
         {
@@ -337,8 +338,9 @@ const GerenciarUsuariosScreen: React.FC<NavigationProps> = () => {
           const aulas = enc?.aulas_presentes ?? 0;
           const valor = enc?.valor_encerramento ?? '0.00';
           const msg =
-            `Aulas após o último pagamento: ${aulas}\n` +
+            `Aulas frequentadas no mês: ${aulas}\n` +
             `Aulas esperadas no mês: ${enc?.aulas_esperadas_mes ?? '-'}\n` +
+            `Mês: ${enc?.mes_referencia || enc?.data_referencia || '-'}\n` +
             `Valor mensalidade: R$ ${enc?.valor_mensalidade ?? '-'}\n` +
             `Encerramento: R$ ${valor}\n\n` +
             (Number(valor) > 0

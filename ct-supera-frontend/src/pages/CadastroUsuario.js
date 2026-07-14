@@ -1021,13 +1021,14 @@ function CadastroUsuario({ onUserChange }) {
         `Suspensão de contrato (${duracao} dias)\n\n` +
         `De: ${susp?.suspenso_desde || '-'}\n` +
         `Até: ${susp?.suspenso_ate || '-'}\n\n` +
-        `Aulas após o último pagamento: ${aulas}\n` +
+        `Aulas frequentadas no mês: ${aulas}\n` +
         `Aulas esperadas no mês: ${cob.aulas_esperadas_mes ?? '-'}\n` +
+        `Mês de referência: ${cob.mes_referencia || cob.data_referencia || '-'}\n` +
         `Valor mensalidade: R$ ${cob.valor_mensalidade ?? '-'}\n` +
         `Cobrança proporcional: R$ ${valor}\n\n` +
         (Number(valor) > 0
           ? 'Confirma suspender e gerar a mensalidade?'
-          : 'Confirma suspender o contrato?')
+          : 'Sem frequência neste mês — sem cobrança. Confirma suspender o contrato?')
       );
       if (!ok) return;
 
@@ -1084,12 +1085,12 @@ function CadastroUsuario({ onUserChange }) {
         if (enc) {
           const aulas = enc.aulas_presentes ?? 0;
           const valor = enc.valor_encerramento ?? '0.00';
-          const ref = enc.data_referencia
-            ? `\nReferência (último pagamento): ${enc.data_referencia}`
-            : '\nNenhum pagamento registrado — contagem desde a matrícula.';
+          const ref = enc.mes_referencia || enc.data_referencia
+            ? `\nMês de referência: ${enc.mes_referencia || enc.data_referencia}`
+            : '';
           confirmEncerramento = window.confirm(
             `Encerramento de contrato\n\n` +
-            `Aulas após o último pagamento: ${aulas}\n` +
+            `Aulas frequentadas no mês: ${aulas}\n` +
             `Aulas esperadas no mês: ${enc.aulas_esperadas_mes}\n` +
             `Valor da mensalidade: R$ ${enc.valor_mensalidade}\n` +
             `Mensalidade de encerramento: R$ ${valor}` +

@@ -639,8 +639,8 @@ class ReverterAlunoParaPreCadastroAPIView(APIView):
     Move aluno para ex-aluno (pré-cadastro com origem=ex_aluno).
 
     Fluxo:
-    1. Sem ``confirmar=true``: retorna preview do encerramento (aulas após último pagamento).
-    2. Com ``confirmar=true``: cria mensalidade de encerramento (se houver aulas),
+    1. Sem ``confirmar=true``: retorna preview do encerramento (aulas do mês corrente).
+    2. Com ``confirmar=true``: cria mensalidade de encerramento (se houver aulas no mês),
        marca o aluno como inativo no CT (``ativo=False``), remove das turmas e
        cria/atualiza pré-cadastro de ex-aluno.
 
@@ -669,7 +669,7 @@ class ReverterAlunoParaPreCadastroAPIView(APIView):
                     "preview": True,
                     "message": (
                         "Confirme o encerramento do contrato. "
-                        "Será calculada a cobrança pelas aulas após o último pagamento."
+                        "Será calculada a cobrança pelas aulas frequentadas no mês corrente."
                     ),
                     "aluno": {
                         "id": usuario.id,
@@ -741,7 +741,7 @@ class ReverterAlunoParaPreCadastroAPIView(APIView):
             )
         elif not calculo.get("precisa_cobrar"):
             payload["message"] = (
-                "Aluno movido para ex-alunos. Nenhuma aula após o último pagamento — "
+                "Aluno movido para ex-alunos. Nenhuma aula no mês corrente — "
                 "sem mensalidade de encerramento."
             )
 
@@ -752,7 +752,7 @@ class SuspenderContratoAPIView(APIView):
     """
     Suspende o contrato do aluno por 30 ou 60 dias.
 
-    Sem confirmar: preview (datas + cobrança pelas aulas após o último pagamento).
+    Sem confirmar: preview (datas + cobrança pelas aulas do mês corrente).
     Com confirmar=true + duracao_dias: aplica suspensão e gera mensalidade proporcional.
     """
     permission_classes = [IsAuthenticated]
@@ -823,7 +823,7 @@ class SuspenderContratoAPIView(APIView):
                     "preview": True,
                     "message": (
                         "Confirme a suspensão. Será cobrada a proporção das aulas "
-                        "realizadas após o último pagamento."
+                        "frequentadas no mês corrente."
                     ),
                     "aluno": {
                         "id": usuario.id,
@@ -853,12 +853,15 @@ class SuspenderContratoAPIView(APIView):
             payload["message"] = (
                 f"Contrato suspenso por {duracao} dias. "
                 f"Mensalidade gerada: R$ {cobranca.get('valor_proporcional') or cobranca.get('valor_encerramento')} "
-                f"({cobranca.get('aulas_presentes', 0)} aula(s))."
+                f"({cobranca.get('aulas_presentes', 0)} aula(s) no mês)."
             )
         elif not cobranca.get("precisa_cobrar"):
+            if cobranca.get("mes_ja_pago"):
+                msg_cob = "Mês já pago — sem cobrança adicional."
+            else:
+                msg_cob = "Nenhuma aula no mês corrente — sem cobrança proporcional."
             payload["message"] = (
-                f"Contrato suspenso por {duracao} dias. "
-                "Nenhuma aula após o último pagamento — sem cobrança proporcional."
+                f"Contrato suspenso por {duracao} dias. {msg_cob}"
             )
 
         return Response(payload, status=status.HTTP_200_OK)

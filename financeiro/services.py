@@ -401,56 +401,77 @@ def _aulas_esperadas_no_mes(aluno, ano, mes):
     return total
 
 
+def _info_ultimo_pagamento(aluno):
+    ultima_paga = (
+        Mensalidade.objects.filter(aluno=aluno, status="pago")
+        .order_by("-data_pagamento", "-data_vencimento", "-id")
+        .first()
+    )
+    if not ultima_paga:
+        return None
+    return {
+        "id": ultima_paga.id,
+        "valor": str(ultima_paga.valor_pago or ultima_paga.valor),
+        "data_pagamento": (
+            timezone.localtime(ultima_paga.data_pagamento).isoformat()
+            if ultima_paga.data_pagamento
+            else None
+        ),
+        "data_vencimento": ultima_paga.data_vencimento.isoformat()
+        if ultima_paga.data_vencimento
+        else None,
+    }
+
+
+def _mes_ja_pago(aluno, ano, mes) -> bool:
+    return Mensalidade.objects.filter(
+        aluno=aluno,
+        status="pago",
+        data_vencimento__year=ano,
+        data_vencimento__month=mes,
+    ).exists()
+
+
 def calcular_encerramento_contrato(aluno, data_referencia=None):
     """
-    Calcula cobrança proporcional pelas aulas presentes após o último pagamento.
-    Usado em encerramento e suspensão de contrato.
+    Calcula cobrança proporcional pelas aulas presentes no mês corrente.
+
+    Regra de negócio: o pagamento do dia de vencimento cobre aquele mês.
+    Na suspensão/encerramento, só se rateia o mês em aberto (mês de
+    ``data_referencia`` / hoje), pelas frequências daquele mês.
+    Se não houve presença no mês → R$ 0. Se o mês já foi pago → R$ 0.
     """
     from django.db.models import Q
     from funcionarios.models import Presenca
 
     hoje = data_referencia or timezone.localdate()
     valor_mensal = Decimal(str(aluno.valor_mensalidade or 150))
+    ano, mes = hoje.year, hoje.month
+    inicio_mes = date(ano, mes, 1)
+    ref_label = f"{ano:04d}-{mes:02d}"
+    ultima_paga_info = _info_ultimo_pagamento(aluno)
 
-    ultima_paga = (
-        Mensalidade.objects.filter(aluno=aluno, status="pago")
-        .order_by("-data_pagamento", "-data_vencimento", "-id")
-        .first()
-    )
-
-    if ultima_paga:
-        ref = _data_referencia_ultimo_pagamento(ultima_paga)
-        data_inicio_contagem = ref
-        filtro_data = {"data__gt": data_inicio_contagem}
-        ref_label = ref.isoformat()
-        ultima_paga_info = {
-            "id": ultima_paga.id,
-            "valor": str(ultima_paga.valor_pago or ultima_paga.valor),
-            "data_pagamento": (
-                timezone.localtime(ultima_paga.data_pagamento).isoformat()
-                if ultima_paga.data_pagamento
-                else None
-            ),
-            "data_vencimento": ultima_paga.data_vencimento.isoformat()
-            if ultima_paga.data_vencimento
-            else None,
+    if _mes_ja_pago(aluno, ano, mes):
+        return {
+            "aulas_presentes": 0,
+            "aulas_esperadas_mes": _aulas_esperadas_no_mes(aluno, ano, mes) or 0,
+            "aulas_datas": [],
+            "valor_mensalidade": str(valor_mensal),
+            "valor_encerramento": "0.00",
+            "valor_proporcional": "0.00",
+            "data_referencia": ref_label,
+            "mes_referencia": ref_label,
+            "ultimo_pagamento": ultima_paga_info,
+            "mes_ja_pago": True,
+            "precisa_cobrar": False,
         }
-    else:
-        if aluno.matriculado_em:
-            data_inicio_contagem = timezone.localtime(aluno.matriculado_em).date()
-            filtro_data = {"data__gte": data_inicio_contagem}
-            ref_label = data_inicio_contagem.isoformat()
-        else:
-            data_inicio_contagem = None
-            filtro_data = {}
-            ref_label = None
-        ultima_paga_info = None
 
     qs = (
         Presenca.objects.filter(
             usuario=aluno,
             ausencia_registrada=False,
-            **filtro_data,
+            data__gte=inicio_mes,
+            data__lte=hoje,
         )
         .filter(Q(presenca_confirmada=True) | Q(checkin_realizado=True))
         .order_by("data")
@@ -464,10 +485,7 @@ def calcular_encerramento_contrato(aluno, data_referencia=None):
         aulas_datas.append(p.data.isoformat())
 
     aulas_presentes = len(aulas_datas)
-
-    base_ano = (data_inicio_contagem or hoje).year
-    base_mes = (data_inicio_contagem or hoje).month
-    aulas_esperadas = _aulas_esperadas_no_mes(aluno, base_ano, base_mes)
+    aulas_esperadas = _aulas_esperadas_no_mes(aluno, ano, mes)
     if aulas_esperadas <= 0:
         n_dias = aluno.dias_habilitados.count() or 1
         aulas_esperadas = n_dias * 4
@@ -487,9 +505,31 @@ def calcular_encerramento_contrato(aluno, data_referencia=None):
         "valor_encerramento": str(valor_proporcional),
         "valor_proporcional": str(valor_proporcional),
         "data_referencia": ref_label,
+        "mes_referencia": ref_label,
         "ultimo_pagamento": ultima_paga_info,
+        "mes_ja_pago": False,
         "precisa_cobrar": valor_proporcional > 0,
     }
+
+
+def _cancelar_mensalidade_pendente_mes(aluno, ano, mes, motivo: str):
+    """Remove cobrança pendente do mês quando a proporção do mês é zero."""
+    qs = Mensalidade.objects.filter(
+        aluno=aluno,
+        data_vencimento__year=ano,
+        data_vencimento__month=mes,
+    ).exclude(status="pago")
+    removidas = 0
+    for m in qs:
+        logger.info(
+            "Cancelando mensalidade pendente id=%s aluno=%s (%s)",
+            m.pk,
+            aluno.pk,
+            motivo,
+        )
+        m.delete()
+        removidas += 1
+    return removidas
 
 
 def criar_mensalidade_proporcional_aulas(
@@ -499,13 +539,31 @@ def criar_mensalidade_proporcional_aulas(
     tipo="encerramento",
 ):
     """
-    Cria mensalidade proporcional pelas aulas após o último pagamento.
+    Cria mensalidade proporcional pelas aulas do mês corrente.
     tipo: 'encerramento' | 'suspensao'
     Retorna (mensalidade|None, calculo).
     """
     calculo = calculo or calcular_encerramento_contrato(aluno)
     valor = Decimal(str(calculo.get("valor_proporcional") or calculo["valor_encerramento"]))
+    hoje = timezone.localdate()
+    mes_ref = calculo.get("mes_referencia") or f"{hoje.year:04d}-{hoje.month:02d}"
+    try:
+        ano_ref, mes_ref_n = int(mes_ref[:4]), int(mes_ref[5:7])
+    except (TypeError, ValueError):
+        ano_ref, mes_ref_n = hoje.year, hoje.month
+
     if valor <= 0:
+        removidas = _cancelar_mensalidade_pendente_mes(
+            aluno,
+            ano_ref,
+            mes_ref_n,
+            motivo=f"{tipo}: sem frequência no mês {mes_ref}",
+        )
+        calculo = {
+            **calculo,
+            "precisa_cobrar": False,
+            "mensalidades_canceladas": removidas,
+        }
         return None, calculo
 
     if not _aluno_tem_ct_com_financeiro(aluno):
@@ -517,22 +575,16 @@ def criar_mensalidade_proporcional_aulas(
         calculo = {**calculo, "sem_financeiro": True, "precisa_cobrar": False}
         return None, calculo
 
-    hoje = timezone.localdate()
     venc = data_vencimento or hoje
     venc = proximo_dia_util_br(venc)
 
-    ref_txt = (
-        f" (ref. {calculo['data_referencia']})"
-        if calculo.get("data_referencia")
-        else ""
-    )
     if tipo == "suspensao":
         titulo = "Suspensão de contrato"
     else:
         titulo = "Encerramento de contrato"
     obs = (
         f"{titulo} — {calculo['aulas_presentes']} aula(s) "
-        f"após o último pagamento{ref_txt}. "
+        f"no mês {mes_ref}. "
         f"Cálculo: R$ {calculo['valor_mensalidade']} × "
         f"{calculo['aulas_presentes']}/{calculo['aulas_esperadas_mes']}."
     )
@@ -545,27 +597,16 @@ def criar_mensalidade_proporcional_aulas(
 
     if existente:
         if existente.status == "pago":
-            ano, mes = venc.year, venc.month
-            for _ in range(12):
-                if mes == 12:
-                    ano, mes = ano + 1, 1
-                else:
-                    mes += 1
-                conflito = Mensalidade.objects.filter(
-                    aluno=aluno,
-                    data_vencimento__year=ano,
-                    data_vencimento__month=mes,
-                ).exists()
-                if not conflito:
-                    dia = min(aluno.dia_vencimento or venc.day, monthrange(ano, mes)[1])
-                    venc = proximo_dia_util_br(date(ano, mes, dia))
-                    break
-            mensalidade = Mensalidade.objects.create(
-                aluno=aluno,
-                valor=valor,
-                data_vencimento=venc,
-                observacoes=obs,
-            )
+            # Mês do vencimento já pago: não gera cobrança extra
+            # (o rateio só vale para mês em aberto).
+            calculo = {
+                **calculo,
+                "precisa_cobrar": False,
+                "mes_ja_pago": True,
+                "valor_proporcional": "0.00",
+                "valor_encerramento": "0.00",
+            }
+            return None, calculo
         else:
             existente.valor = valor
             existente.data_vencimento = venc
@@ -610,7 +651,7 @@ def criar_mensalidade_suspensao(aluno, calculo=None, data_vencimento=None):
 
 
 def calcular_preview_suspensao(aluno, duracao_dias):
-    """Preview da suspensão: datas + cobrança proporcional."""
+    """Preview da suspensão: datas + cobrança proporcional do mês corrente."""
     duracao = int(duracao_dias)
     if duracao not in (30, 60):
         raise ValueError("Duração deve ser 30 ou 60 dias.")
