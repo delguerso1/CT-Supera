@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import api from '../services/api';
+import Seo from '../components/Seo';
+import { PAGE_META } from '../seo/pageMeta';
 import { formatarCpfMascara, apenasDigitosCpf, MSG_CPF_11_DIGITOS } from '../utils/cpf';
 import { normalizarTelefoneBrParaApi } from '../utils/telefone';
 import { formatApiDateDisplay, inputDateToApiDate, localYmdForDateInput } from '../utils/dateApi';
@@ -498,9 +500,9 @@ function AgendamentoPage() {
 
   return (
     <>
-      
+      <Seo {...PAGE_META.agendamento} />
       <div style={styles.container}>
-        <h2 style={styles.title}>Agende sua Aula Experimental</h2>
+        <h1 style={styles.title}>Agende sua Aula Experimental de Vôlei de Praia</h1>
         {error && <div style={styles.error}>{error}</div>}
         {success && <div style={styles.success}>{success}</div>}
         <form onSubmit={handleSubmit} style={styles.form}>

@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api, { MEDIA_URL } from '../services/api';
+import Seo from '../components/Seo';
+import { PAGE_META } from '../seo/pageMeta';
 import { formatApiDateDisplay } from '../utils/dateApi';
 
 const styles = {
@@ -262,10 +264,12 @@ function SuperaNews() {
 
   return (
     <div style={styles.container}>
+      <Seo {...PAGE_META.superaNews} />
       <div style={styles.header}>
-        <h1 style={styles.title}>Supera News</h1>
+        <h1 style={styles.title}>Supera News — esporte e vôlei de praia</h1>
         <p style={styles.subtitle}>
-          Aqui você encontra as últimas notícias e novidades do CT Supera.
+          Notícias e novidades do CT Supera sobre treinos, vôlei de praia, saúde e comunidade
+          esportiva.
         </p>
       </div>
 

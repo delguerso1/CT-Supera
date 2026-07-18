@@ -1,6 +1,7 @@
 {
-  "short_name": "React App",
-  "name": "Create React App Sample",
+  "short_name": "CT Supera",
+  "name": "CT Supera — Vôlei de Praia e Saúde",
+  "description": "Centro de treinamento de vôlei de praia, esporte, exercício físico e saúde.",
   "icons": [
     {
       "src": "favicon.ico",
@@ -20,6 +21,8 @@
   ],
   "start_url": ".",
   "display": "standalone",
-  "theme_color": "#000000",
-  "background_color": "#ffffff"
+  "theme_color": "#1F6C86",
+  "background_color": "#ffffff",
+  "lang": "pt-BR",
+  "categories": ["sports", "health", "fitness"]
 }

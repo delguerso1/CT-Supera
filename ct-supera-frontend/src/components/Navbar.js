@@ -300,7 +300,7 @@ function Navbar() {
         
         {/* Menu desktop */}
         <div className="nav-links" style={styles.navLinks}>
-          <Link to="/quem-somos" style={styles.navLink}>
+          <Link to={{ pathname: '/', hash: 'quem-somos' }} style={styles.navLink}>
             Quem Somos
           </Link>
           <Link to="/supera-news" style={styles.navLink}>
@@ -409,7 +409,7 @@ function Navbar() {
           role="menu"
         >
           <Link 
-            to="/quem-somos" 
+            to={{ pathname: '/', hash: 'quem-somos' }}
             style={styles.mobileNavLink}
             onClick={() => setShowMobileMenu(false)}
           >

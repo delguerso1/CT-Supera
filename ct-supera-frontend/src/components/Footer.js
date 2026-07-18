@@ -44,7 +44,7 @@ function Footer() {
   return (
     <footer style={styles.footer}>
       <div style={styles.links}>
-        <a href="/quem-somos" style={styles.link}>Quem Somos</a>
+        <a href="/#quem-somos" style={styles.link}>Quem Somos</a>
         <a href="/supera-news" style={styles.link}>Supera News</a>
         <a href="/galeria" style={styles.link}>Galeria de Fotos</a>
         <a href="/trabalhe-conosco" style={styles.link}>Trabalhe conosco</a>

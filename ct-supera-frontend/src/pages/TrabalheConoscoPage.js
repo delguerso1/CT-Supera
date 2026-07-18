@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import api from '../services/api';
+import Seo from '../components/Seo';
+import { PAGE_META } from '../seo/pageMeta';
 import { normalizarTelefoneBrParaApi } from '../utils/telefone';
 
 const styles = {
@@ -245,11 +247,13 @@ function TrabalheConoscoPage() {
 
   return (
     <div style={styles.wrap}>
+      <Seo {...PAGE_META.trabalheConosco} />
       <header style={styles.hero}>
-        <h1 style={styles.title}>Trabalhe conosco</h1>
+        <h1 style={styles.title}>Trabalhe conosco — educação física e vôlei de praia</h1>
         <p style={styles.lead}>
           Envie seus dados e currículo em PDF para concorrer às vagas de professor ou estagiário nas
-          modalidades vôlei de praia e quadra.
+          modalidades vôlei de praia e quadra. Faça parte de um centro de treinamento focado em
+          esporte, exercício físico e saúde.
         </p>
       </header>
 

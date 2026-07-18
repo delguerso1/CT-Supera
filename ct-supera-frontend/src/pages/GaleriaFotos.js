@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api, { MEDIA_URL } from '../services/api';
+import Seo from '../components/Seo';
+import { PAGE_META } from '../seo/pageMeta';
 import { formatApiDateDisplay } from '../utils/dateApi';
 
 const styles = {
@@ -291,10 +293,11 @@ function GaleriaFotos() {
 
   return (
     <div style={styles.container}>
+      <Seo {...PAGE_META.galeria} />
       <div style={styles.header}>
-        <h1 style={styles.title}>Galeria de Fotos</h1>
+        <h1 style={styles.title}>Galeria — vôlei de praia e treinos</h1>
         <p style={styles.subtitle}>
-          Veja fotos dos nossos eventos, treinos e conquistas!
+          Fotos de treinos de vôlei de praia, exercício físico, eventos e conquistas no CT Supera.
         </p>
       </div>
 

@@ -1,5 +1,7 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { Link, useLocation } from 'react-router-dom';
+import Seo from '../components/Seo';
+import { PAGE_META } from '../seo/pageMeta';
 import './HomePage.css';
 
 const whatsappButtonStyle = {
@@ -21,17 +23,26 @@ const whatsappButtonStyle = {
 };
 
 function HomePage() {
+  const location = useLocation();
   const whatsappNumber = '5521964835368';
   const whatsappUrl = `https://wa.me/${whatsappNumber}`;
 
+  useEffect(() => {
+    if (location.hash === '#quem-somos') {
+      const el = document.getElementById('quem-somos');
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [location.hash]);
+
   return (
     <div className="home-page" style={{ position: 'relative', minHeight: '100vh' }}>
+      <Seo {...PAGE_META.home} />
       <header className="home-hero">
-        <div className="home-hero__media" aria-hidden>
+        <div className="home-hero__media">
           <img
             className="home-hero__img"
             src="/hero-volei-praia.png"
-            alt=""
+            alt="Atletas treinando vôlei de praia no CT Supera — esporte, exercício físico e saúde na areia"
             decoding="async"
             fetchPriority="high"
           />
@@ -44,9 +55,12 @@ function HomePage() {
               Projetos Escolares
             </span>
           </div>
-          <h1 className="home-hero__title">Bem-vindo ao CT Supera</h1>
+          <h1 className="home-hero__title">
+            CT Supera — vôlei de praia, esporte e saúde
+          </h1>
           <p className="home-hero__subtitle">
-            Formando campeões dentro e fora das quadras
+            Treino, exercício físico e bem-estar na praia. Formando campeões dentro e fora das
+            quadras.
           </p>
           <Link to="/agendamento" className="home-cta agendamento-button">
             Agendar aula experimental
@@ -55,7 +69,11 @@ function HomePage() {
       </header>
 
       <main className="home-main">
-        <section className="home-section quem-somos" aria-labelledby="quem-somos-heading">
+        <section
+          id="quem-somos"
+          className="home-section quem-somos"
+          aria-labelledby="quem-somos-heading"
+        >
           <div className="home-section__head">
             <span className="home-section__label">Institucional</span>
             <h2 id="quem-somos-heading" className="home-section__title">
@@ -134,7 +152,51 @@ function HomePage() {
               experimental e descubra por que somos referência em treinamento de vôlei de praia.
             </p>
           </div>
+        </section>
 
+        <section
+          className="home-section home-section--pilares"
+          aria-labelledby="pilares-heading"
+        >
+          <div className="home-section__head">
+            <span className="home-section__label">Metodologia</span>
+            <h2 id="pilares-heading" className="home-section__title">
+              Esporte, praia, exercício e saúde
+            </h2>
+          </div>
+          <div className="home-prose content">
+            <p>
+              O vôlei de praia une técnica esportiva, exercício físico intenso e o ambiente natural
+              da praia. Treinar na areia fortalece o corpo, melhora o condicionamento cardiovascular
+              e contribui diretamente para a saúde física e mental.
+            </p>
+            <p>
+              No CT Supera, cada sessão de treino é pensada para quem busca performance, qualidade
+              de vida ou simplesmente um esporte ao ar livre. Crianças, jovens e adultos encontram
+              um espaço preparado para evoluir com segurança, orientação profissional e foco em
+              bem-estar.
+            </p>
+          </div>
+          <ul className="home-pilares">
+            <li className="home-pilares__item">
+              <h3 className="home-pilares__title">Vôlei de praia</h3>
+              <p className="home-pilares__text">
+                Fundamentos, jogos e preparação física específica para a modalidade na areia.
+              </p>
+            </li>
+            <li className="home-pilares__item">
+              <h3 className="home-pilares__title">Exercício físico</h3>
+              <p className="home-pilares__text">
+                Condicionamento, força e mobilidade com treinos técnicos e funcionais.
+              </p>
+            </li>
+            <li className="home-pilares__item">
+              <h3 className="home-pilares__title">Saúde e bem-estar</h3>
+              <p className="home-pilares__text">
+                Atividade ao ar livre, equilíbrio emocional e hábitos para uma vida mais ativa.
+              </p>
+            </li>
+          </ul>
           <div className="home-cta-row">
             <Link to="/agendamento" className="home-cta home-cta--secondary agendamento-button">
               Agendar aula experimental
