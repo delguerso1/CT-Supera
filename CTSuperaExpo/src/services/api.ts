@@ -246,6 +246,11 @@ export const turmaService = {
     const response = await api.get('turmas/diassemana/');
     return response.data;
   },
+
+  getDatasAulaExperimental: async (turmaId: number): Promise<string[]> => {
+    const response = await api.get(`turmas/${turmaId}/datas-aula-experimental/`);
+    return Array.isArray(response.data?.datas) ? response.data.datas : [];
+  },
 };
 
 export const ctService = {

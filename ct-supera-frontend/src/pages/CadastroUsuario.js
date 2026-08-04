@@ -10,6 +10,7 @@ import {
 import { normalizarTelefoneBrParaApi } from '../utils/telefone';
 import {
   apiDateToInputDate,
+  formatApiDateDisplay,
   formatApiDateLocale,
   formatApiDateTimeDisplay,
   inputDateToApiDate,
@@ -282,6 +283,7 @@ function CadastroUsuario({ onUserChange }) {
     turma: '',
     turmas: [],
     origem: 'formulario',
+    data_aula_experimental: '',
   });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -295,6 +297,8 @@ function CadastroUsuario({ onUserChange }) {
   const [diasHabilitadosAluno, setDiasHabilitadosAluno] = useState([]);
   const [centrosTreinamento, setCentrosTreinamento] = useState([]);
   const [turmas, setTurmas] = useState([]);
+  const [datasAulaDisponiveis, setDatasAulaDisponiveis] = useState([]);
+  const [loadingDatasAula, setLoadingDatasAula] = useState(false);
   const [diasSemana, setDiasSemana] = useState([]);
   const [filtroCtSelecionado, setFiltroCtSelecionado] = useState('');
   const [filtroBuscaNomeAluno, setFiltroBuscaNomeAluno] = useState('');
@@ -452,6 +456,41 @@ function CadastroUsuario({ onUserChange }) {
     };
     fetchTurmas();
   }, [activeTab]);
+
+  // Datas disponíveis da aula experimental (turma + origem)
+  useEffect(() => {
+    const turmaId = formData.turma;
+    const isAulaExp =
+      isPrecadastroLikeTab(activeTab) &&
+      activeTab === 'precadastros' &&
+      formData.origem === 'aula_experimental';
+
+    if (!isAulaExp || !turmaId) {
+      setDatasAulaDisponiveis([]);
+      setLoadingDatasAula(false);
+      return;
+    }
+
+    let cancelled = false;
+    const fetchDatas = async () => {
+      setLoadingDatasAula(true);
+      try {
+        const resp = await api.get(`turmas/${turmaId}/datas-aula-experimental/`);
+        if (!cancelled) {
+          setDatasAulaDisponiveis(Array.isArray(resp.data?.datas) ? resp.data.datas : []);
+        }
+      } catch (error) {
+        console.error('[DEBUG] Erro ao carregar datas da aula experimental:', error);
+        if (!cancelled) setDatasAulaDisponiveis([]);
+      } finally {
+        if (!cancelled) setLoadingDatasAula(false);
+      }
+    };
+    fetchDatas();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, formData.origem, formData.turma]);
 
   // Buscar dias da semana para matrícula
   useEffect(() => {
@@ -765,10 +804,22 @@ function CadastroUsuario({ onUserChange }) {
       valorFormatado = formatarCpfMascara(value);
     }
 
-    setFormData(prev => ({
-      ...prev,
-      [name]: valorFormatado,
-    }));
+    setFormData(prev => {
+      const next = {
+        ...prev,
+        [name]: valorFormatado,
+      };
+      if (name === 'origem' && valorFormatado !== 'aula_experimental') {
+        next.data_aula_experimental = '';
+      }
+      if (name === 'turma') {
+        next.data_aula_experimental = '';
+      }
+      if (name === 'origem' && valorFormatado === 'aula_experimental' && !prev.turma) {
+        next.data_aula_experimental = '';
+      }
+      return next;
+    });
   };
 
   const handleToggleTurmaAluno = (turmaId) => {
@@ -806,6 +857,20 @@ function CadastroUsuario({ onUserChange }) {
           'Pré-cadastro: informe telefone com DDD (10 ou 11 dígitos). Pode colar com +55.'
         );
         return;
+      }
+      const origemEnvio =
+        formData.origem ||
+        (editingUser && editingUser.origem) ||
+        (activeTab === 'exalunos' ? 'ex_aluno' : 'formulario');
+      if (origemEnvio === 'aula_experimental') {
+        if (!formData.turma) {
+          setError('Para aula experimental, selecione a turma.');
+          return;
+        }
+        if (!formData.data_aula_experimental) {
+          setError('Para aula experimental, selecione a data da aula.');
+          return;
+        }
       }
     } else if (cpfDigitos.length !== 11) {
       setError(MSG_CPF_11_DIGITOS);
@@ -866,6 +931,8 @@ function CadastroUsuario({ onUserChange }) {
       let response;
       if (isPrecadastroLikeTab(activeTab)) {
         const origemPadrao = activeTab === 'exalunos' ? 'ex_aluno' : 'formulario';
+        const origemEnvio =
+          formData.origem || (editingUser && editingUser.origem) || origemPadrao;
         const payloadPrecadastro = {
           first_name: formData.first_name,
           last_name: formData.last_name || '',
@@ -875,10 +942,17 @@ function CadastroUsuario({ onUserChange }) {
             ? inputDateToApiDate(formData.data_nascimento) || formData.data_nascimento
             : formData.data_nascimento,
           cpf: cpfDigitos.length > 0 ? cpfDigitos : null,
-          origem: formData.origem || (editingUser && editingUser.origem) || origemPadrao,
+          origem: origemEnvio,
         };
         const turmaId = formData.turma || (editingUser && editingUser.turma && (typeof editingUser.turma === 'object' ? editingUser.turma.id : editingUser.turma));
         payloadPrecadastro.turma = turmaId ? parseInt(turmaId, 10) : null;
+        if (origemEnvio === 'aula_experimental') {
+          payloadPrecadastro.data_aula_experimental =
+            formData.data_aula_experimental || undefined;
+        } else if (editingUser && editingUser.origem === 'aula_experimental') {
+          // Ao mudar a origem para outro tipo, limpa a data no backend
+          payloadPrecadastro.data_aula_experimental = null;
+        }
         if (editingUser) {
           response = await api.put(`usuarios/precadastros/${editingUser.id}/`, payloadPrecadastro);
           setSuccess(activeTab === 'exalunos' ? 'Ex-aluno atualizado com sucesso!' : 'Pré-cadastro atualizado com sucesso!');
@@ -913,11 +987,20 @@ function CadastroUsuario({ onUserChange }) {
     } catch (err) {
       console.error('[DEBUG] Erro detalhado:', err.response?.data);
       const data = err.response?.data;
+      const firstFieldError = (field) => {
+        if (!data?.[field]) return null;
+        return Array.isArray(data[field]) ? data[field][0] : data[field];
+      };
       let errorMessage =
-        data?.parq_question_1 || data?.error || data?.detail || 'Erro ao cadastrar usuário.';
-      if (data?.cpf) {
-        errorMessage = Array.isArray(data.cpf) ? data.cpf[0] : data.cpf;
-      }
+        firstFieldError('data_aula_experimental') ||
+        firstFieldError('turma') ||
+        firstFieldError('telefone') ||
+        firstFieldError('email') ||
+        firstFieldError('cpf') ||
+        data?.parq_question_1 ||
+        data?.error ||
+        data?.detail ||
+        'Erro ao cadastrar usuário.';
       setError(Array.isArray(errorMessage) ? errorMessage[0] : errorMessage);
     }
   };
@@ -959,6 +1042,9 @@ function CadastroUsuario({ onUserChange }) {
           return [];
         })(),
         origem: user.origem || 'formulario',
+        data_aula_experimental: user.data_aula_experimental
+          ? formatApiDateDisplay(user.data_aula_experimental)
+          : '',
       });
     
     // Carregar campos específicos de professor
@@ -1168,6 +1254,7 @@ function CadastroUsuario({ onUserChange }) {
         : activeTab === 'exalunos'
           ? 'ex_aluno'
           : undefined,
+      data_aula_experimental: '',
     });
     
     // Limpar campos específicos
@@ -1176,6 +1263,7 @@ function CadastroUsuario({ onUserChange }) {
     setDiaVencimento('');
     setValorMensalidadeNovo('');
     setDiasHabilitadosAluno([]);
+    setDatasAulaDisponiveis([]);
     
     setShowModal(true);
   };
@@ -2252,7 +2340,7 @@ function CadastroUsuario({ onUserChange }) {
                   )}
                   <div style={styles.formGroup}>
                     <label style={styles.label} htmlFor="precadastro_turma">
-                      Turma (opcional)
+                      {formData.origem === 'aula_experimental' ? 'Turma *' : 'Turma (opcional)'}
                     </label>
                     <select
                       id="precadastro_turma"
@@ -2260,8 +2348,13 @@ function CadastroUsuario({ onUserChange }) {
                       value={formData.turma || ''}
                       onChange={handleChange}
                       style={styles.input}
+                      required={formData.origem === 'aula_experimental'}
                     >
-                      <option value="">Selecione uma turma (opcional)</option>
+                      <option value="">
+                        {formData.origem === 'aula_experimental'
+                          ? 'Selecione uma turma'
+                          : 'Selecione uma turma (opcional)'}
+                      </option>
                       {Array.isArray(turmas) && turmas.filter(t => t.ativo !== false).map(t => (
                         <option key={t.id} value={t.id}>
                           {t.ct_nome || 'CT'} - {(t.dias_semana_nomes || []).join(', ')} às {t.horario || ''}
@@ -2269,6 +2362,49 @@ function CadastroUsuario({ onUserChange }) {
                       ))}
                     </select>
                   </div>
+                  {formData.origem === 'aula_experimental' && (
+                    <div style={styles.formGroup}>
+                      <label style={styles.label} htmlFor="precadastro_data_aula">
+                        Data da aula experimental *
+                      </label>
+                      {!formData.turma ? (
+                        <div style={{ color: '#666', fontSize: '0.9rem' }}>
+                          Selecione a turma para carregar as datas disponíveis.
+                        </div>
+                      ) : loadingDatasAula ? (
+                        <div style={{ color: '#666', fontSize: '0.9rem' }}>
+                          Carregando datas disponíveis...
+                        </div>
+                      ) : datasAulaDisponiveis.length === 0 ? (
+                        <div style={{ color: '#c62828', fontSize: '0.9rem' }}>
+                          Nenhuma data disponível para esta turma no período atual.
+                        </div>
+                      ) : (
+                        <select
+                          id="precadastro_data_aula"
+                          name="data_aula_experimental"
+                          value={formData.data_aula_experimental || ''}
+                          onChange={handleChange}
+                          style={styles.input}
+                          required
+                        >
+                          <option value="">Selecione a data</option>
+                          {datasAulaDisponiveis.map((d) => (
+                            <option key={d} value={d}>
+                              {formatApiDateDisplay(d)}
+                            </option>
+                          ))}
+                          {/* Mantém a data já salva mesmo se sair da janela de agendamento */}
+                          {formData.data_aula_experimental &&
+                            !datasAulaDisponiveis.includes(formData.data_aula_experimental) && (
+                              <option value={formData.data_aula_experimental}>
+                                {formatApiDateDisplay(formData.data_aula_experimental)} (atual)
+                              </option>
+                            )}
+                        </select>
+                      )}
+                    </div>
+                  )}
                 </>
               )}
 
