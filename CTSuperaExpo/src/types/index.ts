@@ -338,6 +338,7 @@ export interface PreCadastro {
   criado_em: string;
   data_nascimento?: string;
   data_aula_experimental?: string;
+  turma?: number | null;
   turma_ct_nome?: string | null;
   turma_horario?: string | null;
   turma_dias_semana_nomes?: string[];

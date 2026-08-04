@@ -136,6 +136,9 @@ const GerenciarUsuariosScreen: React.FC<GerenciarUsuariosProps> = ({
     nome_responsavel: '',
     telefone_responsavel: '',
     telefone_emergencia: '',
+    origem: 'formulario' as 'formulario' | 'aula_experimental' | 'ex_aluno',
+    turma: '' as string | number,
+    data_aula_experimental: '',
   });
   const [diaVencimento, setDiaVencimento] = useState('');
   const [valorMensalidade, setValorMensalidade] = useState('');
@@ -148,6 +151,10 @@ const GerenciarUsuariosScreen: React.FC<GerenciarUsuariosProps> = ({
   /** Edição de aluno: até 2 turmas (mesma regra da API / web) */
   const [turmasEdicaoAluno, setTurmasEdicaoAluno] = useState<number[]>([]);
   const [turmasCatalogoEdicao, setTurmasCatalogoEdicao] = useState<Turma[]>([]);
+  /** Turmas e datas para pré-cadastro (aula experimental) */
+  const [turmasPrecadastro, setTurmasPrecadastro] = useState<Turma[]>([]);
+  const [datasAulaDisponiveis, setDatasAulaDisponiveis] = useState<string[]>([]);
+  const [loadingDatasAula, setLoadingDatasAula] = useState(false);
 
   const [matriculaForm, setMatriculaForm] = useState({
     cpf: '',
@@ -184,6 +191,35 @@ const GerenciarUsuariosScreen: React.FC<GerenciarUsuariosProps> = ({
       setFiltroBuscaAlunoUsuario('');
     }
   }, [activeTab]);
+
+  useEffect(() => {
+    const isAulaExp =
+      showForm &&
+      activeTab === 'precadastros' &&
+      formData.origem === 'aula_experimental';
+    const turmaId = formData.turma ? Number(formData.turma) : NaN;
+    if (!isAulaExp || Number.isNaN(turmaId)) {
+      setDatasAulaDisponiveis([]);
+      setLoadingDatasAula(false);
+      return;
+    }
+    let cancelled = false;
+    setLoadingDatasAula(true);
+    turmaService
+      .getDatasAulaExperimental(turmaId)
+      .then((datas) => {
+        if (!cancelled) setDatasAulaDisponiveis(datas);
+      })
+      .catch(() => {
+        if (!cancelled) setDatasAulaDisponiveis([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingDatasAula(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [showForm, activeTab, formData.origem, formData.turma]);
 
   useEffect(() => {
     if (user?.tipo !== 'gerente' || activeTab !== 'alunos') return;
@@ -321,6 +357,9 @@ const GerenciarUsuariosScreen: React.FC<GerenciarUsuariosProps> = ({
       nome_responsavel: '',
       telefone_responsavel: '',
       telefone_emergencia: '',
+      origem: activeTab === 'exalunos' ? 'ex_aluno' : 'formulario',
+      turma: '',
+      data_aula_experimental: '',
     });
     setDiaVencimento('');
     setValorMensalidade('');
@@ -329,6 +368,7 @@ const GerenciarUsuariosScreen: React.FC<GerenciarUsuariosProps> = ({
     setDiasHabilitadosAluno([]);
     setTurmasEdicaoAluno([]);
     setTurmasCatalogoEdicao([]);
+    setDatasAulaDisponiveis([]);
   };
 
   const handleNewUser = () => {
@@ -338,6 +378,15 @@ const GerenciarUsuariosScreen: React.FC<GerenciarUsuariosProps> = ({
       turmaService.getDiasSemana().then(setDiasSemana).catch(() => {
         Alert.alert('Erro', 'Erro ao carregar dias da semana.');
       });
+    }
+    if (isPrecadastroLikeTab(activeTab)) {
+      turmaService
+        .getTurmas({ page_size: 500 })
+        .then((data) => setTurmasPrecadastro(Array.isArray(data) ? data : []))
+        .catch(() => {
+          setTurmasPrecadastro([]);
+          Alert.alert('Aviso', 'Não foi possível carregar a lista de turmas.');
+        });
     }
     setShowForm(true);
   };
@@ -357,6 +406,11 @@ const GerenciarUsuariosScreen: React.FC<GerenciarUsuariosProps> = ({
 
   const handleEditUser = async (target: User | PreCadastro) => {
     setEditingUser(target);
+    const pc = isPrecadastroLikeTab(activeTab) ? (target as PreCadastro) : null;
+    const turmaId =
+      pc?.turma != null && pc.turma !== ('' as any)
+        ? String(typeof pc.turma === 'object' ? (pc.turma as any).id : pc.turma)
+        : '';
     setFormData({
       first_name: (target as any).first_name || '',
       last_name: (target as any).last_name || '',
@@ -371,7 +425,24 @@ const GerenciarUsuariosScreen: React.FC<GerenciarUsuariosProps> = ({
       nome_responsavel: (target as any).nome_responsavel || '',
       telefone_responsavel: (target as any).telefone_responsavel || '',
       telefone_emergencia: (target as any).telefone_emergencia || '',
+      origem:
+        (pc?.origem as 'formulario' | 'aula_experimental' | 'ex_aluno') ||
+        (activeTab === 'exalunos' ? 'ex_aluno' : 'formulario'),
+      turma: turmaId,
+      data_aula_experimental: pc?.data_aula_experimental
+        ? formatApiDateLocale(pc.data_aula_experimental)
+        : '',
     });
+
+    if (isPrecadastroLikeTab(activeTab)) {
+      try {
+        const turmasData = await turmaService.getTurmas({ page_size: 500 });
+        setTurmasPrecadastro(Array.isArray(turmasData) ? turmasData : []);
+      } catch {
+        setTurmasPrecadastro([]);
+        Alert.alert('Aviso', 'Não foi possível carregar a lista de turmas.');
+      }
+    }
 
     const isAlunoNaAbaAlunos = activeTab === 'alunos' && (target as User).tipo === 'aluno';
 
@@ -438,9 +509,22 @@ const GerenciarUsuariosScreen: React.FC<GerenciarUsuariosProps> = ({
       payload.username = cpfDigits;
     } else {
       const origemPadrao = activeTab === 'exalunos' ? 'ex_aluno' : 'formulario';
-      payload.origem = editingUser
-        ? (editingUser as PreCadastro).origem || origemPadrao
-        : origemPadrao;
+      const origemEnvio =
+        activeTab === 'exalunos'
+          ? 'ex_aluno'
+          : formData.origem ||
+            (editingUser ? (editingUser as PreCadastro).origem : undefined) ||
+            origemPadrao;
+      payload.origem = origemEnvio;
+      const turmaId = formData.turma
+        ? parseInt(String(formData.turma), 10)
+        : null;
+      payload.turma = turmaId && !Number.isNaN(turmaId) ? turmaId : null;
+      if (origemEnvio === 'aula_experimental') {
+        payload.data_aula_experimental = formData.data_aula_experimental || undefined;
+      } else if (editingUser && (editingUser as PreCadastro).origem === 'aula_experimental') {
+        payload.data_aula_experimental = null;
+      }
     }
 
     if (payload.tipo === 'aluno') {
@@ -477,6 +561,22 @@ const GerenciarUsuariosScreen: React.FC<GerenciarUsuariosProps> = ({
           'Informe o telefone com DDD (10 ou 11 dígitos). Pode colar com +55; o sistema ajusta automaticamente.'
         );
         return;
+      }
+      const origemEnvio =
+        activeTab === 'exalunos'
+          ? 'ex_aluno'
+          : formData.origem ||
+            (editingUser ? (editingUser as PreCadastro).origem : undefined) ||
+            'formulario';
+      if (origemEnvio === 'aula_experimental') {
+        if (!formData.turma) {
+          Alert.alert('Validação', 'Para aula experimental, selecione a turma.');
+          return;
+        }
+        if (!formData.data_aula_experimental) {
+          Alert.alert('Validação', 'Para aula experimental, selecione a data da aula.');
+          return;
+        }
       }
     } else if (cpfDigits.length !== 11) {
       Alert.alert('Validação', MSG_CPF_11_DIGITOS);
@@ -1318,6 +1418,134 @@ const GerenciarUsuariosScreen: React.FC<GerenciarUsuariosProps> = ({
                   setFormData(prev => ({ ...prev, data_nascimento: formatarDataBrMascara(value) }))
                 }
               />
+
+              {activeTab === 'precadastros' && (
+                <>
+                  <Text style={styles.fieldLabel}>Tipo</Text>
+                  <View style={styles.filterRow}>
+                    {(
+                      [
+                        { key: 'formulario', label: 'Pendente' },
+                        { key: 'aula_experimental', label: 'Aula experimental' },
+                      ] as const
+                    ).map(({ key, label }) => (
+                      <TouchableOpacity
+                        key={key}
+                        style={[
+                          styles.filterChip,
+                          formData.origem === key && styles.filterChipActive,
+                        ]}
+                        onPress={() =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            origem: key,
+                            data_aula_experimental:
+                              key === 'aula_experimental' ? prev.data_aula_experimental : '',
+                          }))
+                        }
+                      >
+                        <Text
+                          style={[
+                            styles.filterChipText,
+                            formData.origem === key && styles.filterChipTextActive,
+                          ]}
+                        >
+                          {label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+
+                  <Text style={styles.fieldLabel}>
+                    {formData.origem === 'aula_experimental' ? 'Turma *' : 'Turma (opcional)'}
+                  </Text>
+                  {turmasPrecadastro.filter((t) => t.ativo !== false).length === 0 ? (
+                    <Text style={styles.noData}>Nenhuma turma disponível.</Text>
+                  ) : (
+                    turmasPrecadastro
+                      .filter((t) => t.ativo !== false)
+                      .map((turma) => {
+                        const tid = turma.id as number;
+                        const sel = String(formData.turma) === String(tid);
+                        const label = `${turma.ct_nome || 'CT'} · ${(turma.dias_semana_nomes || []).join(', ') || '—'} · ${turma.horario || ''}`;
+                        return (
+                          <TouchableOpacity
+                            key={tid}
+                            style={styles.dayItem}
+                            onPress={() =>
+                              setFormData((prev) => ({
+                                ...prev,
+                                turma: sel ? '' : tid,
+                                data_aula_experimental: '',
+                              }))
+                            }
+                          >
+                            <Text style={styles.dayText} numberOfLines={2}>
+                              {label}
+                            </Text>
+                            <Text style={styles.daySelected}>{sel ? '✓' : ''}</Text>
+                          </TouchableOpacity>
+                        );
+                      })
+                  )}
+
+                  {formData.origem === 'aula_experimental' && (
+                    <>
+                      <Text style={styles.fieldLabel}>Data da aula experimental *</Text>
+                      {!formData.turma ? (
+                        <Text style={styles.hintEmail}>
+                          Selecione a turma para carregar as datas disponíveis.
+                        </Text>
+                      ) : loadingDatasAula ? (
+                        <Text style={styles.hintEmail}>Carregando datas disponíveis...</Text>
+                      ) : datasAulaDisponiveis.length === 0 ? (
+                        <Text style={styles.hintError}>
+                          Nenhuma data disponível para esta turma no período atual.
+                        </Text>
+                      ) : (
+                        <View style={[styles.filterRow, { flexWrap: 'wrap' }]}>
+                          {datasAulaDisponiveis.map((d) => {
+                            const sel = formData.data_aula_experimental === d;
+                            return (
+                              <TouchableOpacity
+                                key={d}
+                                style={[styles.filterChip, sel && styles.filterChipActive]}
+                                onPress={() =>
+                                  setFormData((prev) => ({
+                                    ...prev,
+                                    data_aula_experimental: d,
+                                  }))
+                                }
+                              >
+                                <Text
+                                  style={[
+                                    styles.filterChipText,
+                                    sel && styles.filterChipTextActive,
+                                  ]}
+                                >
+                                  {formatApiDateLocale(d)}
+                                </Text>
+                              </TouchableOpacity>
+                            );
+                          })}
+                          {formData.data_aula_experimental &&
+                            !datasAulaDisponiveis.includes(formData.data_aula_experimental) && (
+                              <TouchableOpacity
+                                style={[styles.filterChip, styles.filterChipActive]}
+                                onPress={() => undefined}
+                              >
+                                <Text style={[styles.filterChipText, styles.filterChipTextActive]}>
+                                  {formatApiDateLocale(formData.data_aula_experimental)} (atual)
+                                </Text>
+                              </TouchableOpacity>
+                            )}
+                        </View>
+                      )}
+                    </>
+                  )}
+                </>
+              )}
+
               {!!formData.data_nascimento.trim() && (
                 <>
                   {dataNascimentoInvalida ? (
