@@ -395,13 +395,11 @@ class FinalizarAgendamentoAPIView(APIView):
             aluno = precadastro.usuario
             if aluno:
                 try:
-                    aluno.dia_vencimento = dia_vencimento
-                    aluno.valor_mensalidade = valor_mensalidade
-                    aluno.matriculado_em = timezone.now()
-                    aluno.save()
-                    if dias_habilitados is not None:
-                        aluno.dias_habilitados.set(dias_habilitados)
-                    aluno.atualizar_mensalidades_pendentes()
+                    aluno.reativar_para_reingresso(
+                        dia_vencimento=dia_vencimento,
+                        valor_mensalidade=valor_mensalidade,
+                        dias_habilitados=dias_habilitados,
+                    )
                     if turma_ref:
                         turma_ref.alunos.add(aluno)
                         from financeiro.services import criar_mensalidade_ao_vincular_turma
@@ -528,35 +526,44 @@ class LoginAPIView(APIView):
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
-            # Verifica se o usuário existe
-            try:
-                user = Usuario.objects.get(username=cpf)
-                print(f"[DEBUG] Usuário encontrado: {user.username}, Tipo: {user.tipo}, Ativo: {user.is_active}")
-            except Usuario.DoesNotExist:
+            # Login usa CPF; username deve ser o CPF, mas cadastros antigos podem divergir.
+            user = Usuario.objects.filter(username=cpf).first()
+            if user is None:
+                user = Usuario.objects.filter(cpf=cpf).first()
+            if user is None:
                 print(f"[DEBUG] Usuário não encontrado para CPF: {cpf}")
                 return Response(
-                    {"error": "Usuário não encontrado."}, 
+                    {"error": "Usuário não encontrado."},
                     status=status.HTTP_401_UNAUTHORIZED
                 )
-            
-            # Tenta autenticar
-            user = authenticate(request, username=cpf, password=password)
-            print(f"[DEBUG] Resultado da autenticação: {user is not None}")
-            if user is None:
-                print(f"[DEBUG] Falha na autenticação - verificando se usuário existe...")
-                try:
-                    user_check = Usuario.objects.get(username=cpf)
-                    print(f"[DEBUG] Usuário existe no banco: {user_check.username}")
-                    print(f"[DEBUG] Verificando senha manualmente...")
-                    if user_check.check_password(password):
-                        print(f"[DEBUG] Senha está correta!")
-                        user = user_check
-                    else:
-                        print(f"[DEBUG] Senha está incorreta!")
-                except Usuario.DoesNotExist:
-                    print(f"[DEBUG] Usuário não encontrado no banco")
-            
-            if user is not None:
+            print(f"[DEBUG] Usuário encontrado: {user.username}, Tipo: {user.tipo}, is_active: {user.is_active}, ativo: {user.ativo}")
+
+            # Tenta autenticar com o username real (pode diferir do CPF digitado)
+            user_auth = authenticate(request, username=user.username, password=password)
+            print(f"[DEBUG] Resultado da autenticação: {user_auth is not None}")
+            if user_auth is None:
+                if not user.has_usable_password():
+                    print(f"[DEBUG] Conta sem senha definida (pendente de ativação): {cpf}")
+                    return Response(
+                        {
+                            "error": (
+                                "Sua conta ainda não tem senha. Use 'Primeiro acesso' "
+                                "com o CPF para receber o e-mail e definir a senha."
+                            )
+                        },
+                        status=status.HTTP_401_UNAUTHORIZED,
+                    )
+                print(f"[DEBUG] Falha na autenticação para CPF: {cpf}")
+                if user.check_password(password):
+                    user_auth = user
+                else:
+                    return Response(
+                        {"error": "CPF ou senha inválidos."},
+                        status=status.HTTP_401_UNAUTHORIZED,
+                    )
+
+            if user_auth is not None:
+                user = user_auth
                 if user.is_active:
                     # Gera ou obtém o token
                     token, created = Token.objects.get_or_create(user=user)
@@ -571,17 +578,10 @@ class LoginAPIView(APIView):
                             user.tipo == "aluno" and not getattr(user, "contrato_aceito", False)
                         )
                     }, status=status.HTTP_200_OK)
-                else:
-                    print(f"[DEBUG] Tentativa de login para usuário inativo: {cpf}")
-                    return Response(
-                        {"error": "Conta desativada. Entre em contato com o administrador."}, 
-                        status=status.HTTP_401_UNAUTHORIZED
-                    )
-            else:
-                print(f"[DEBUG] Falha na autenticação para CPF: {cpf}")
+                print(f"[DEBUG] Tentativa de login para usuário inativo: {cpf}")
                 return Response(
-                    {"error": "CPF ou senha inválidos."}, 
-                    status=status.HTTP_401_UNAUTHORIZED
+                    {"error": "Conta desativada. Entre em contato com o administrador."},
+                    status=status.HTTP_401_UNAUTHORIZED,
                 )
         except Exception as e:
             print(f"[DEBUG] Erro durante o login: {str(e)}")
@@ -640,13 +640,14 @@ class ReverterAlunoParaPreCadastroAPIView(APIView):
 
     Fluxo:
     1. Sem ``confirmar=true``: retorna preview do encerramento (aulas do mês corrente).
-    2. Com ``confirmar=true``: cria mensalidade de encerramento (se houver aulas no mês),
+    2. Com ``confirmar=true``: cancela todas as mensalidades em aberto (qualquer mês),
+       cria mensalidade de encerramento se houver aulas no mês corrente,
        marca o aluno como inativo no CT (``ativo=False``), remove das turmas e
        cria/atualiza pré-cadastro de ex-aluno.
 
     Mantém ``is_active=True`` para o ex-aluno poder logar e pagar o encerramento.
-    O registro de Usuario não é apagado, para a mensalidade continuar cobrável
-    e o reingresso pelo CPF funcionar.
+    O registro de Usuario não é apagado, para a mensalidade proporcional continuar
+    cobrável e o reingresso pelo CPF funcionar.
     """
     permission_classes = [IsAuthenticated]
 

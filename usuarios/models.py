@@ -88,9 +88,15 @@ class PreCadastro(models.Model):
         if usuario.tipo not in ['professor', 'gerente']:
             raise PermissionDenied("⚠️ Apenas professores e gerentes podem finalizar o agendamento.")
 
-        # Legado: ainda havia vínculo pré-cadastro ↔ aluno — remove só o pré-cadastro
+        # Legado: ainda havia vínculo pré-cadastro ↔ aluno — reativa a conta e remove o pré-cadastro
         if self.usuario_id:
             u = self.usuario
+            u.reativar_para_reingresso(
+                dia_vencimento=dia_vencimento,
+                valor_mensalidade=valor_mensalidade,
+                plano=plano,
+                dias_habilitados=dias_habilitados,
+            )
             pk_del = self.pk
             if pk_del:
                 PreCadastro.objects.filter(pk=pk_del).delete()
@@ -107,22 +113,12 @@ class PreCadastro(models.Model):
         # Reingresso / ex-aluno: já existe cadastro com este CPF — atualiza e apaga o pré-cadastro
         existente = Usuario.objects.filter(tipo='aluno', cpf=cpf_digits).first()
         if existente:
-            existente.dia_vencimento = dia_vencimento
-            existente.valor_mensalidade = valor_mensalidade
-            if plano is not None:
-                existente.plano = plano
-            existente.ativo = True
-            existente.data_inativacao = None
-            existente.contrato_suspenso = False
-            existente.suspenso_desde = None
-            existente.suspenso_ate = None
-            existente.duracao_suspensao_dias = None
-            existente.matriculado_em = agora
-            if dias_habilitados:
-                existente.dias_habilitados.set(dias_habilitados)
-            existente.save()
-            if hasattr(existente, 'atualizar_mensalidades_pendentes'):
-                existente.atualizar_mensalidades_pendentes()
+            existente.reativar_para_reingresso(
+                dia_vencimento=dia_vencimento,
+                valor_mensalidade=valor_mensalidade,
+                plano=plano,
+                dias_habilitados=dias_habilitados,
+            )
             pk_del = self.pk
             if pk_del:
                 PreCadastro.objects.filter(pk=pk_del).delete()
@@ -469,6 +465,55 @@ class Usuario(AbstractUser):
             self.username = self.cpf  # 🔹 Usa CPF sem pontos como `username`
         
         super().save(*args, **kwargs)
+
+    def reativar_para_reingresso(
+        self,
+        *,
+        dia_vencimento=None,
+        valor_mensalidade=None,
+        plano=None,
+        dias_habilitados=None,
+    ):
+        """
+        Reabre o aluno no CT e o login Django após rematrícula de ex-aluno.
+
+        ``ativo`` volta a True (aparece na aba Alunos).
+        ``is_active`` só é ligado se já houver senha: senão a conta segue
+        pendente de 'Primeiro acesso' / e-mail de ativação.
+        """
+        if dia_vencimento is not None:
+            self.dia_vencimento = dia_vencimento
+        if valor_mensalidade is not None:
+            self.valor_mensalidade = valor_mensalidade
+        if plano is not None:
+            self.plano = plano
+        self.ativo = True
+        # Sem senha definida, a conta continua pendente de ativação (e-mail / primeiro acesso).
+        # Quem já tinha senha volta a logar na hora.
+        if self.has_usable_password():
+            self.is_active = True
+        self.data_inativacao = None
+        self.contrato_suspenso = False
+        self.suspenso_desde = None
+        self.suspenso_ate = None
+        self.duracao_suspensao_dias = None
+        self.matriculado_em = django_timezone.now()
+        cpf_digits = "".join(c for c in str(self.cpf or "") if c.isdigit())
+        if len(cpf_digits) == 11 and self.username != cpf_digits:
+            taken = (
+                type(self)
+                .objects.filter(username=cpf_digits)
+                .exclude(pk=self.pk)
+                .exists()
+            )
+            if not taken:
+                self.username = cpf_digits
+        self.save()
+        if dias_habilitados:
+            self.dias_habilitados.set(dias_habilitados)
+        if hasattr(self, "atualizar_mensalidades_pendentes"):
+            self.atualizar_mensalidades_pendentes()
+        return self
 
     def atualizar_mensalidades_pendentes(self):
         """Atualiza as mensalidades pendentes/atrasadas com o novo vencimento e valor."""

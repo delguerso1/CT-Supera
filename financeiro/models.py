@@ -87,7 +87,7 @@ class Mensalidade(models.Model):
     def criar_proxima_mensalidade(cls, mensalidade_base):
         aluno = mensalidade_base.aluno
         # Ex-aluno / encerrado ou contrato suspenso: não gera nova mensalidade
-        if aluno and getattr(aluno, "ativo", True) is False:
+        if not aluno or not getattr(aluno, "ativo", True):
             return None
         if aluno and hasattr(aluno, "esta_suspenso") and aluno.esta_suspenso():
             return None

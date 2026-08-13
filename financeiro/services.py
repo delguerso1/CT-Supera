@@ -94,6 +94,9 @@ def gerar_mensalidades_para_mes(ano: int, mes: int) -> int:
     alunos = Usuario.objects.filter(tipo='aluno', ativo=True, is_active=True)
 
     for aluno in alunos:
+        # Cinto e suspensório: ex-aluno nunca recebe parcela na virada de mês.
+        if not aluno.ativo:
+            continue
         if getattr(aluno, "contrato_suspenso", False) and aluno.esta_suspenso():
             continue
         if not _aluno_tem_ct_com_financeiro(aluno):
@@ -512,24 +515,57 @@ def calcular_encerramento_contrato(aluno, data_referencia=None):
     }
 
 
-def _cancelar_mensalidade_pendente_mes(aluno, ano, mes, motivo: str):
-    """Remove cobrança pendente do mês quando a proporção do mês é zero."""
-    qs = Mensalidade.objects.filter(
-        aluno=aluno,
-        data_vencimento__year=ano,
-        data_vencimento__month=mes,
-    ).exclude(status="pago")
+def _cancelar_mensalidades_qs(qs, aluno, motivo: str):
+    """Remove mensalidades do queryset (não pagas) e devolve a quantidade."""
     removidas = 0
     for m in qs:
         logger.info(
-            "Cancelando mensalidade pendente id=%s aluno=%s (%s)",
+            "Cancelando mensalidade pendente id=%s aluno=%s venc=%s (%s)",
             m.pk,
             aluno.pk,
+            m.data_vencimento,
             motivo,
         )
         m.delete()
         removidas += 1
     return removidas
+
+
+def _cancelar_mensalidade_pendente_mes(aluno, ano, mes, motivo: str):
+    """Remove cobrança pendente do mês quando a proporção do mês é zero (suspensão)."""
+    qs = Mensalidade.objects.filter(
+        aluno=aluno,
+        data_vencimento__year=ano,
+        data_vencimento__month=mes,
+    ).exclude(status="pago")
+    return _cancelar_mensalidades_qs(qs, aluno, motivo)
+
+
+def _cancelar_mensalidades_em_aberto(aluno, motivo: str):
+    """Remove todas as mensalidades não pagas do aluno (qualquer mês)."""
+    qs = Mensalidade.objects.filter(aluno=aluno).exclude(status="pago")
+    return _cancelar_mensalidades_qs(qs, aluno, motivo)
+
+
+def listar_exalunos_com_mensalidade_aberta():
+    """
+    Ex-alunos (ativo=False) com parcela pendente/atrasada.
+    Usado na auditoria e no comando de diagnóstico.
+    """
+    qs = (
+        Mensalidade.objects.filter(aluno__tipo="aluno", aluno__ativo=False)
+        .exclude(status="pago")
+        .select_related("aluno")
+        .order_by("aluno__first_name", "aluno__last_name", "data_vencimento", "id")
+    )
+    agrupado = []
+    atual = None
+    for m in qs:
+        if atual is None or atual["aluno"].pk != m.aluno_id:
+            atual = {"aluno": m.aluno, "mensalidades": []}
+            agrupado.append(atual)
+        atual["mensalidades"].append(m)
+    return agrupado
 
 
 def criar_mensalidade_proporcional_aulas(
@@ -541,6 +577,8 @@ def criar_mensalidade_proporcional_aulas(
     """
     Cria mensalidade proporcional pelas aulas do mês corrente.
     tipo: 'encerramento' | 'suspensao'
+    Encerramento cancela todas as parcelas em aberto do aluno; suspensão
+    cancela só o mês de referência quando o proporcional é zero.
     Retorna (mensalidade|None, calculo).
     """
     calculo = calculo or calcular_encerramento_contrato(aluno)
@@ -552,7 +590,30 @@ def criar_mensalidade_proporcional_aulas(
     except (TypeError, ValueError):
         ano_ref, mes_ref_n = hoje.year, hoje.month
 
-    if valor <= 0:
+    # Encerramento: limpa TODAS as parcelas em aberto (mês anterior, atual e já
+    # gerada do mês seguinte). Depois, se houver presença, recria só a proporcional.
+    if tipo == "encerramento":
+        removidas = _cancelar_mensalidades_em_aberto(
+            aluno,
+            motivo=f"encerramento: parcelas em aberto (mês ref {mes_ref})",
+        )
+        tem_financeiro = _aluno_tem_ct_com_financeiro(aluno)
+        if valor <= 0 or not tem_financeiro:
+            if valor > 0 and not tem_financeiro:
+                logger.info(
+                    "encerramento sem cobrança: aluno %s só em CT sem_financeiro",
+                    aluno.pk,
+                )
+            calculo = {
+                **calculo,
+                "precisa_cobrar": False,
+                "mensalidades_canceladas": removidas,
+            }
+            if not tem_financeiro:
+                calculo["sem_financeiro"] = True
+            return None, calculo
+        calculo = {**calculo, "mensalidades_canceladas": removidas}
+    elif valor <= 0:
         removidas = _cancelar_mensalidade_pendente_mes(
             aluno,
             ano_ref,
@@ -565,8 +626,7 @@ def criar_mensalidade_proporcional_aulas(
             "mensalidades_canceladas": removidas,
         }
         return None, calculo
-
-    if not _aluno_tem_ct_com_financeiro(aluno):
+    elif not _aluno_tem_ct_com_financeiro(aluno):
         logger.info(
             "%s sem cobrança: aluno %s só em CT sem_financeiro",
             tipo,
