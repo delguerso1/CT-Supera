@@ -30,6 +30,44 @@ from wellhub.webhooks import extract_booking_number, extract_slot_id, extract_us
 
 logger = logging.getLogger(__name__)
 
+# Nome usado quando o webhook da Wellhub não envia o nome real do membro
+# (a Gympass costuma omitir dados pessoais na reserva por privacidade).
+NOME_PLACEHOLDER_WELLHUB = "Wellhub"
+
+
+def _nome_real_recebido(user_data: dict) -> tuple[str, str]:
+    """Retorna (first, last) apenas quando é um nome real (não o placeholder)."""
+    first = (user_data.get("first_name") or "").strip()
+    last = (user_data.get("last_name") or "").strip()
+    if not first or first == NOME_PLACEHOLDER_WELLHUB:
+        return "", ""
+    return first, last
+
+
+def enrich_cadastro_identity(cadastro: CadastroWellhub, user_data: dict) -> bool:
+    """Preenche nome/e-mail/telefone reais no cadastro.
+
+    Nunca sobrescreve um nome real já existente pelo placeholder "Wellhub"
+    (webhooks de check-in frequentemente chegam sem nome).
+    """
+    updated = False
+    first, last = _nome_real_recebido(user_data)
+    if first and (cadastro.first_name != first or cadastro.last_name != last):
+        cadastro.first_name = first
+        cadastro.last_name = last
+        updated = True
+    email = (user_data.get("email") or "").strip()
+    if email and cadastro.email != email:
+        cadastro.email = email
+        updated = True
+    telefone = normalizar_telefone_br_para_precadastro(user_data.get("telefone"))
+    if telefone and cadastro.telefone != telefone:
+        cadastro.telefone = telefone
+        updated = True
+    if updated:
+        cadastro.save()
+    return updated
+
 
 def get_or_create_cadastro(user_data: dict) -> CadastroWellhub:
     wellhub_user_id = user_data.get("wellhub_user_id") or ""
@@ -39,28 +77,14 @@ def get_or_create_cadastro(user_data: dict) -> CadastroWellhub:
         cadastro, created = CadastroWellhub.objects.get_or_create(
             wellhub_user_id=wellhub_user_id,
             defaults={
-                "first_name": user_data.get("first_name") or "Wellhub",
+                "first_name": user_data.get("first_name") or NOME_PLACEHOLDER_WELLHUB,
                 "last_name": user_data.get("last_name") or "",
                 "email": user_data.get("email") or "",
                 "telefone": telefone,
             },
         )
         if not created:
-            updated = False
-            if user_data.get("first_name") and cadastro.first_name != user_data["first_name"]:
-                cadastro.first_name = user_data["first_name"]
-                updated = True
-            if user_data.get("last_name") and cadastro.last_name != user_data["last_name"]:
-                cadastro.last_name = user_data["last_name"]
-                updated = True
-            if user_data.get("email") and cadastro.email != user_data["email"]:
-                cadastro.email = user_data["email"]
-                updated = True
-            if telefone and cadastro.telefone != telefone:
-                cadastro.telefone = telefone
-                updated = True
-            if updated:
-                cadastro.save()
+            enrich_cadastro_identity(cadastro, user_data)
         return cadastro
 
     email = (user_data.get("email") or "").strip().lower()

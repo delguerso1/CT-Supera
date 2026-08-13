@@ -1,6 +1,6 @@
 from datetime import datetime, time, timedelta
 
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
 
@@ -62,6 +62,7 @@ class WellhubPresencaProfessorTests(TestCase):
         qs = wellhub_bookings_presenca_turma(self.turma, outro_dia)
         self.assertEqual(qs.count(), 0)
 
+    @override_settings(ALLOWED_HOSTS=["testserver"], SECURE_SSL_REDIRECT=False)
     def test_api_presenca_inclui_wellhub_mesmo_com_email_de_aluno(self):
         """Reserva Wellhub não pode ser omitida só porque o e-mail já é de aluno CT."""
         professor = Usuario.objects.create_user(

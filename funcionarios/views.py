@@ -15,7 +15,10 @@ from django.utils import timezone
 from datetime import datetime, timedelta
 import logging
 from app.date_api import format_data_api, format_datetime_api, parse_data_api
-from wellhub.services.presenca_professor import wellhub_bookings_presenca_turma
+from wellhub.services.presenca_professor import (
+    nome_exibicao_wellhub,
+    wellhub_bookings_presenca_turma,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -149,7 +152,9 @@ class VerificarCheckinAlunosAPIView(APIView):
             if not cadastro:
                 continue
             email_wh = (cadastro.email or "").strip().lower()
-            nome_wh = f"{cadastro.first_name} {cadastro.last_name or ''}".strip()
+            # Rótulo identificável: usa nome real quando existir; senão, e-mail +
+            # sufixo do booking para o professor distinguir cada cliente Wellhub.
+            nome_wh = nome_exibicao_wellhub(booking)
             key_wh = (email_wh, nome_wh.lower(), booking.id)
             if key_wh in wellhub_adicionados:
                 continue
