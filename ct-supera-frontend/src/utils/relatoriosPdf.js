@@ -528,3 +528,151 @@ export function downloadPdfRelatorioFinanceiro({
 
   doc.save(`relatorio-financeiro-${ano}-${String(mes).padStart(2, '0')}.pdf`);
 }
+
+/**
+ * @param {object} params
+ * @param {number} params.mes
+ * @param {number} params.ano
+ * @param {object} params.totais
+ * @param {Array<object>} params.reservas
+ */
+export function downloadPdfRelatorioWellhub({ mes, ano, totais = {}, reservas = [] }) {
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  const mesNome = MESES[mes - 1] || String(mes);
+  let y = 14;
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(14);
+  doc.text(`Relatório Wellhub — ${mesNome} ${ano}`, 14, y);
+  y += 7;
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`Gerado em ${formatApiDateTimeDisplay(new Date().toISOString())}`, 14, y);
+  y += 10;
+
+  autoTable(doc, {
+    startY: y,
+    head: [['Indicador', 'Quantidade']],
+    body: [
+      ['Reservas no período', String(totais.reservas ?? reservas.length ?? 0)],
+      ['Confirmadas', String(totais.confirmadas ?? 0)],
+      ['Canceladas', String(totais.canceladas ?? 0)],
+      ['Presenças confirmadas', String(totais.presencas ?? 0)],
+      ['Faltas', String(totais.faltas ?? 0)],
+      ['Check-ins validados na Wellhub', String(totais.checkins_validados ?? 0)],
+    ],
+    theme: 'grid',
+    headStyles: { fillColor: COL_PRIMARY, textColor: 255, fontStyle: 'bold' },
+    styles: { fontSize: 9, cellPadding: 2 },
+    margin: { left: 14, right: 14 },
+  });
+
+  const body = reservas.map((r) => [
+    String(r.data_aula || ''),
+    String(r.turma_horario || ''),
+    String(r.turma_ct || ''),
+    String(r.cadastro_nome || '—'),
+    String(r.status_display || r.status || ''),
+    String(r.presenca_display || '—'),
+    r.checkin_validado ? 'Sim' : 'Não',
+  ]);
+
+  autoTable(doc, {
+    startY: doc.lastAutoTable.finalY + 10,
+    head: [['Data', 'Horário', 'CT', 'Cliente', 'Reserva', 'Presença', 'Check-in']],
+    body: body.length ? body : [['—', '', 'Nenhuma reserva Wellhub no período', '', '', '', '']],
+    theme: 'striped',
+    headStyles: { fillColor: COL_PRIMARY, fontSize: 8 },
+    styles: { fontSize: 7, cellPadding: 1 },
+    margin: { left: 14, right: 14 },
+  });
+
+  doc.save(`relatorio-wellhub-${ano}-${String(mes).padStart(2, '0')}.pdf`);
+}
+
+/**
+ * @param {object} params
+ * @param {number} params.total_ex_alunos
+ * @param {number} params.total_parcelas
+ * @param {string|number} params.valor_total
+ * @param {Array<object>} params.itens
+ */
+export function downloadPdfRelatorioExAlunosPendencias({
+  total_ex_alunos = 0,
+  total_parcelas = 0,
+  valor_total = 0,
+  itens = [],
+}) {
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  let y = 14;
+  const fmtMoney = (n) =>
+    Number(n || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(14);
+  doc.text('Pendências financeiras de ex-alunos', 14, y);
+  y += 7;
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  doc.text(
+    `Situação atual · gerado em ${formatApiDateTimeDisplay(new Date().toISOString())}`,
+    14,
+    y
+  );
+  y += 10;
+
+  autoTable(doc, {
+    startY: y,
+    head: [['Indicador', 'Valor']],
+    body: [
+      ['Ex-alunos com pendência', String(total_ex_alunos)],
+      ['Parcelas em aberto', String(total_parcelas)],
+      ['Valor total', fmtMoney(valor_total)],
+    ],
+    theme: 'grid',
+    headStyles: { fillColor: [183, 28, 28], textColor: 255, fontStyle: 'bold' },
+    styles: { fontSize: 9, cellPadding: 2 },
+    margin: { left: 14, right: 14 },
+  });
+
+  const body = [];
+  for (const item of itens) {
+    const parcelas = Array.isArray(item.parcelas) ? item.parcelas : [];
+    if (parcelas.length === 0) {
+      body.push([
+        String(item.nome || ''),
+        String(item.cpf || ''),
+        String(item.data_inativacao || '—'),
+        '—',
+        '—',
+        fmtMoney(item.valor_total),
+      ]);
+      continue;
+    }
+    parcelas.forEach((p, idx) => {
+      body.push([
+        idx === 0 ? String(item.nome || '') : '',
+        idx === 0 ? String(item.cpf || '') : '',
+        idx === 0 ? String(item.data_inativacao || '—') : '',
+        String(p.data_vencimento || ''),
+        String(p.status || ''),
+        fmtMoney(p.valor),
+      ]);
+    });
+  }
+
+  autoTable(doc, {
+    startY: doc.lastAutoTable.finalY + 10,
+    head: [['Ex-aluno', 'CPF', 'Inativação', 'Vencimento', 'Status', 'Valor']],
+    body: body.length
+      ? body
+      : [['—', '', 'Nenhuma pendência de ex-aluno', '', '', '']],
+    theme: 'striped',
+    headStyles: { fillColor: [183, 28, 28], fontSize: 8 },
+    styles: { fontSize: 8, cellPadding: 1.5 },
+    margin: { left: 14, right: 14 },
+  });
+
+  const stamp = localDateTimeStampForFilename();
+  doc.save(`relatorio-ex-alunos-pendencias-${stamp}.pdf`);
+}

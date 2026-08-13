@@ -9,6 +9,7 @@ from django.db import transaction
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 from .models import Mensalidade, Despesa, Salario, TransacaoC6Bank
+from .services import serializar_exalunos_com_mensalidade_aberta
 from .salarios import ensure_salarios_competencia
 from .serializers import MensalidadeSerializer, DespesaSerializer, SalarioSerializer, TransacaoC6BankSerializer
 from .pagination import MensalidadePagination
@@ -452,7 +453,18 @@ class RelatorioFinanceiroAPIView(APIView):
                 "total_paginas": total_paginas,
             },
         })
-    
+
+
+class RelatorioExAlunosPendenciasAPIView(APIView):
+    """Ex-alunos (ativo=False) com mensalidade pendente ou atrasada."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if request.user.tipo != "gerente":
+            return Response({"error": "Permissão negada."}, status=403)
+        return Response(serializar_exalunos_com_mensalidade_aberta())
+
 
 class GerarPixAPIView(APIView):
     """

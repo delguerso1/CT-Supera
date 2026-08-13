@@ -388,7 +388,51 @@ export interface WellhubReserva {
   data_aula?: string;
   turma_horario?: string;
   turma_ct?: string;
+  turma_id?: number;
+  presenca_confirmada?: boolean;
+  ausencia_registrada?: boolean;
+  checkin_validado?: boolean;
+  presenca_display?: string;
   criado_em?: string;
+}
+
+export interface RelatorioWellhub {
+  mes: number;
+  ano: number;
+  totais: {
+    reservas: number;
+    confirmadas: number;
+    canceladas: number;
+    presencas: number;
+    faltas: number;
+    checkins_validados: number;
+  };
+  reservas: WellhubReserva[];
+}
+
+export interface RelatorioExAlunoParcela {
+  id: number;
+  valor: string;
+  data_vencimento: string | null;
+  status: string;
+}
+
+export interface RelatorioExAlunoItem {
+  aluno_id: number;
+  nome: string;
+  cpf: string;
+  telefone?: string;
+  email?: string;
+  data_inativacao: string | null;
+  valor_total: string;
+  parcelas: RelatorioExAlunoParcela[];
+}
+
+export interface RelatorioExAlunosPendencias {
+  total_ex_alunos: number;
+  total_parcelas: number;
+  valor_total: string;
+  itens: RelatorioExAlunoItem[];
 }
 
 export interface PainelGerente {

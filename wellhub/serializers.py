@@ -91,7 +91,9 @@ class WellhubBookingListSerializer(serializers.ModelSerializer):
     data_aula = serializers.SerializerMethodField()
     turma_horario = serializers.SerializerMethodField()
     turma_ct = serializers.SerializerMethodField()
+    turma_id = serializers.SerializerMethodField()
     status_display = serializers.SerializerMethodField()
+    presenca_display = serializers.SerializerMethodField()
 
     class Meta:
         model = WellhubBooking
@@ -107,6 +109,11 @@ class WellhubBookingListSerializer(serializers.ModelSerializer):
             "data_aula",
             "turma_horario",
             "turma_ct",
+            "turma_id",
+            "presenca_confirmada",
+            "ausencia_registrada",
+            "checkin_validado",
+            "presenca_display",
             "criado_em",
         ]
 
@@ -126,3 +133,13 @@ class WellhubBookingListSerializer(serializers.ModelSerializer):
 
     def get_turma_ct(self, obj):
         return obj.slot.turma.ct.nome
+
+    def get_turma_id(self, obj):
+        return obj.slot.turma_id
+
+    def get_presenca_display(self, obj):
+        if obj.ausencia_registrada:
+            return "Falta"
+        if obj.presenca_confirmada:
+            return "Presente"
+        return "—"
