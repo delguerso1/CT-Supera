@@ -94,6 +94,59 @@ def calcular_multa_mora(mensalidade):
     }
 
 
+def _ids_iguais(a, b) -> bool:
+    try:
+        return a is not None and b is not None and int(a) == int(b)
+    except (TypeError, ValueError):
+        return False
+
+
+def _usuario_autorizado_na_mensalidade(user, mensalidade) -> bool:
+    """Aluno só opera mensalidade própria. Compara PK (não identidade da instância)."""
+    if getattr(user, "tipo", None) != "aluno":
+        return True
+    return _ids_iguais(getattr(mensalidade, "aluno_id", None), getattr(user, "pk", None))
+
+
+def _resolver_mensalidade_do_aluno(user, mensalidade_pk):
+    """
+    Localiza a mensalidade para pagamento.
+    Alguns clientes enviavam o id do usuário no lugar do id da mensalidade;
+    nesse caso usa a parcela em aberto mais antiga da própria conta.
+    """
+    mensalidade = Mensalidade.objects.filter(pk=mensalidade_pk).first()
+    if mensalidade and _usuario_autorizado_na_mensalidade(user, mensalidade):
+        return mensalidade, None
+
+    if getattr(user, "tipo", None) == "aluno" and _ids_iguais(mensalidade_pk, getattr(user, "pk", None)):
+        propria = (
+            Mensalidade.objects.filter(aluno_id=user.pk)
+            .exclude(status="pago")
+            .order_by("data_vencimento", "id")
+            .first()
+        )
+        if propria:
+            logger.warning(
+                "Pagamento: aluno %s enviou user id como mensalidade_id=%s; usando mensalidade %s",
+                user.pk,
+                mensalidade_pk,
+                propria.pk,
+            )
+            return propria, None
+
+    if mensalidade is None:
+        return None, "not_found"
+
+    logger.warning(
+        "Pagamento negado: user_id=%s tipo=%s mensalidade_id=%s dono_id=%s",
+        getattr(user, "pk", None),
+        getattr(user, "tipo", None),
+        getattr(mensalidade, "pk", None),
+        getattr(mensalidade, "aluno_id", None),
+    )
+    return None, "forbidden"
+
+
 # Mensalidades API
 class MensalidadeListCreateView(ListCreateAPIView):
     serializer_class = MensalidadeSerializer
@@ -479,10 +532,13 @@ class GerarPixAPIView(APIView):
         try:
             # Suporta tanto pk quanto mensalidade_id para compatibilidade
             mensalidade_pk = pk or mensalidade_id
-            mensalidade = get_object_or_404(Mensalidade, pk=mensalidade_pk)
-            
-            # Verifica se o usuário tem permissão (aluno só pode gerar PIX de suas próprias mensalidades)
-            if request.user.tipo == 'aluno' and mensalidade.aluno != request.user:
+            mensalidade, motivo = _resolver_mensalidade_do_aluno(request.user, mensalidade_pk)
+            if mensalidade is None:
+                if motivo == "not_found":
+                    return Response(
+                        {"error": "Mensalidade não encontrada."},
+                        status=status.HTTP_404_NOT_FOUND,
+                    )
                 return Response({
                     'error': 'Você não tem permissão para gerar PIX desta mensalidade.'
                 }, status=status.HTTP_403_FORBIDDEN)
@@ -687,7 +743,7 @@ class ConsultarStatusPixPorTransacaoAPIView(APIView):
             transacao = get_object_or_404(TransacaoC6Bank, id=transacao_id, tipo='pix')
             
             # Verifica se o usuário tem permissão
-            if request.user.tipo == 'aluno' and transacao.mensalidade.aluno != request.user:
+            if not _usuario_autorizado_na_mensalidade(request.user, transacao.mensalidade):
                 return Response({
                     'error': 'Você não tem permissão para consultar esta transação.'
                 }, status=status.HTTP_403_FORBIDDEN)
@@ -731,7 +787,7 @@ class ConsultarStatusPixAPIView(APIView):
             mensalidade = get_object_or_404(Mensalidade, pk=pk)
             
             # Verifica se o usuário tem permissão
-            if request.user.tipo == 'aluno' and mensalidade.aluno != request.user:
+            if not _usuario_autorizado_na_mensalidade(request.user, mensalidade):
                 return Response({
                     'error': 'Você não tem permissão para consultar esta mensalidade.'
                 }, status=status.HTTP_403_FORBIDDEN)
@@ -934,7 +990,7 @@ class CriarPagamentoBancarioAPIView(APIView):
             mensalidade = get_object_or_404(Mensalidade, pk=mensalidade_id)
             
             # Verifica se o usuário tem permissão (aluno só pode pagar suas próprias mensalidades)
-            if request.user.tipo == 'aluno' and mensalidade.aluno != request.user:
+            if not _usuario_autorizado_na_mensalidade(request.user, mensalidade):
                 return Response({
                     'error': 'Você não tem permissão para gerar pagamento desta mensalidade.'
                 }, status=status.HTTP_403_FORBIDDEN)
@@ -1060,7 +1116,7 @@ class ConsultarCheckoutStatusAPIView(APIView):
         try:
             transacao = get_object_or_404(TransacaoC6Bank, id=transacao_id, tipo='cartao')
 
-            if request.user.tipo == 'aluno' and transacao.mensalidade.aluno != request.user:
+            if not _usuario_autorizado_na_mensalidade(request.user, transacao.mensalidade):
                 return Response({
                     'error': 'Você não tem permissão para consultar este pagamento.'
                 }, status=status.HTTP_403_FORBIDDEN)
@@ -1440,7 +1496,7 @@ class GerarBoletoAPIView(APIView):
             mensalidade = get_object_or_404(Mensalidade, pk=mensalidade_pk)
             
             # Verifica se o usuário tem permissão (aluno só pode gerar boleto de suas próprias mensalidades)
-            if request.user.tipo == 'aluno' and mensalidade.aluno != request.user:
+            if not _usuario_autorizado_na_mensalidade(request.user, mensalidade):
                 return Response({
                     'error': 'Você não tem permissão para gerar boleto desta mensalidade.'
                 }, status=status.HTTP_403_FORBIDDEN)
@@ -1916,7 +1972,7 @@ class ConsultarBoletoAPIView(APIView):
             transacao = get_object_or_404(TransacaoC6Bank, id=transacao_id, tipo='boleto')
             
             # Verifica se o usuário tem permissão
-            if request.user.tipo == 'aluno' and transacao.mensalidade.aluno != request.user:
+            if not _usuario_autorizado_na_mensalidade(request.user, transacao.mensalidade):
                 return Response({
                     'error': 'Você não tem permissão para consultar este boleto.'
                 }, status=status.HTTP_403_FORBIDDEN)
@@ -2098,7 +2154,7 @@ class DownloadBoletoPDFAPIView(APIView):
             transacao = get_object_or_404(TransacaoC6Bank, id=transacao_id, tipo='boleto')
             
             # Verifica se o usuário tem permissão
-            if request.user.tipo == 'aluno' and transacao.mensalidade.aluno != request.user:
+            if not _usuario_autorizado_na_mensalidade(request.user, transacao.mensalidade):
                 return Response({
                     'error': 'Você não tem permissão para baixar este boleto.'
                 }, status=status.HTTP_403_FORBIDDEN)
