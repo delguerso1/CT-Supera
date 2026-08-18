@@ -4,7 +4,8 @@ from .views import (
     BaixarMensalidadeAPIView, AumentoMensalidadeGlobalAPIView,
     DespesaListCreateView, DespesaRetrieveUpdateDestroyView,
     SalarioListCreateView, SalarioRetrieveUpdateDestroyView,
-    PagarSalarioAPIView, DashboardFinanceiroAPIView, RelatorioFinanceiroAPIView, 
+    PagarSalarioAPIView, DashboardFinanceiroAPIView, RelatorioFinanceiroAPIView,
+    RelatorioExAlunosPendenciasAPIView,
     GerarPixAPIView, ConsultarStatusPixAPIView, ConsultarStatusPixPorTransacaoAPIView,
     # Integração C6 Bank
     C6BankTestConnectionAPIView, C6BankCreatePixPaymentAPIView, C6BankCheckPaymentStatusAPIView,
@@ -41,6 +42,11 @@ urlpatterns = [
 
     # API para o relatório financeiro
     path('relatorio/', RelatorioFinanceiroAPIView.as_view(), name='relatorio_financeiro_api'),
+    path(
+        'relatorio/ex-alunos-pendencias/',
+        RelatorioExAlunosPendenciasAPIView.as_view(),
+        name='relatorio_ex_alunos_pendencias',
+    ),
 
     # Pagamentos PIX - Rotas alternativas para compatibilidade com frontend
     # Frontend chama: financeiro/pix/gerar/${mensalidadeId}/

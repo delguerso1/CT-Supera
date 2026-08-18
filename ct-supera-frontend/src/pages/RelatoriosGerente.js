@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import api from '../services/api';
-import { downloadPdfRelatorioAlunos, downloadPdfRelatorioFinanceiro } from '../utils/relatoriosPdf';
+import { downloadPdfRelatorioAlunos, downloadPdfRelatorioFinanceiro, downloadPdfRelatorioWellhub, downloadPdfRelatorioExAlunosPendencias } from '../utils/relatoriosPdf';
 import { formatApiDateDisplay, formatApiDateTimeDisplay } from '../utils/dateApi';
 
 function todayApiDate() {
@@ -132,6 +132,42 @@ function RelatoriosGerente({ user }) {
       });
     } catch (e) {
       window.alert(e.response?.data?.error || 'Erro ao gerar relatório financeiro.');
+    } finally {
+      setRelatorioGerando(false);
+    }
+  };
+
+  const handleGerarRelatorioWellhub = async () => {
+    if (user?.tipo !== 'gerente') return;
+    setRelatorioGerando(true);
+    try {
+      const { data } = await api.get('wellhub/relatorio/', { params: { mes, ano } });
+      downloadPdfRelatorioWellhub({
+        mes: data?.mes ?? mes,
+        ano: data?.ano ?? ano,
+        totais: data?.totais || {},
+        reservas: Array.isArray(data?.reservas) ? data.reservas : [],
+      });
+    } catch (e) {
+      window.alert(e.response?.data?.error || 'Erro ao gerar relatório Wellhub.');
+    } finally {
+      setRelatorioGerando(false);
+    }
+  };
+
+  const handleGerarRelatorioExAlunosPendencias = async () => {
+    if (user?.tipo !== 'gerente') return;
+    setRelatorioGerando(true);
+    try {
+      const { data } = await api.get('financeiro/relatorio/ex-alunos-pendencias/');
+      downloadPdfRelatorioExAlunosPendencias({
+        total_ex_alunos: data?.total_ex_alunos ?? 0,
+        total_parcelas: data?.total_parcelas ?? 0,
+        valor_total: data?.valor_total ?? 0,
+        itens: Array.isArray(data?.itens) ? data.itens : [],
+      });
+    } catch (e) {
+      window.alert(e.response?.data?.error || 'Erro ao gerar relatório de pendências de ex-alunos.');
     } finally {
       setRelatorioGerando(false);
     }
@@ -347,8 +383,9 @@ function RelatoriosGerente({ user }) {
           Exportar PDF
         </h3>
         <p style={{ margin: '0 0 12px', fontSize: 14, color: '#455a64', lineHeight: 1.45 }}>
-          O PDF de alunos agrupa por Centro de Treinamento e turma. O PDF financeiro usa o{' '}
-          <strong>mês e ano</strong> selecionados abaixo.
+          O PDF de alunos agrupa por Centro de Treinamento e turma. O financeiro e o Wellhub usam o{' '}
+          <strong>mês e ano</strong> selecionados abaixo. As pendências de ex-alunos mostram a situação atual
+          (parcelas em aberto de quem já encerrou o contrato).
         </p>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', alignItems: 'center', marginBottom: 12 }}>
           <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -410,6 +447,40 @@ function RelatoriosGerente({ user }) {
             }}
           >
             {relatorioGerando ? 'Gerando…' : 'Relatório financeiro do período'}
+          </button>
+          <button
+            type="button"
+            disabled={relatorioGerando}
+            onClick={handleGerarRelatorioWellhub}
+            style={{
+              background: '#0d47a1',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 4,
+              padding: '0.65rem 1rem',
+              fontSize: 15,
+              cursor: relatorioGerando ? 'not-allowed' : 'pointer',
+              minHeight: 44,
+            }}
+          >
+            {relatorioGerando ? 'Gerando…' : 'Relatório Wellhub do período'}
+          </button>
+          <button
+            type="button"
+            disabled={relatorioGerando}
+            onClick={handleGerarRelatorioExAlunosPendencias}
+            style={{
+              background: '#b71c1c',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 4,
+              padding: '0.65rem 1rem',
+              fontSize: 15,
+              cursor: relatorioGerando ? 'not-allowed' : 'pointer',
+              minHeight: 44,
+            }}
+          >
+            {relatorioGerando ? 'Gerando…' : 'Pendências de ex-alunos'}
           </button>
         </div>
       </section>

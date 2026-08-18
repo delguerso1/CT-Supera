@@ -25,10 +25,12 @@ import {
   CentroTreinamento,
   SuperaNews,
   GaleriaFoto,
-  CandidaturaTrabalho
+  CandidaturaTrabalho,
   CadastroWellhub,
   WellhubTurmaOpcao,
   WellhubReserva,
+  RelatorioWellhub,
+  RelatorioExAlunosPendencias,
 } from '../types';
 import CONFIG from '../config';
 
@@ -464,6 +466,11 @@ export const financeiroService = {
     return response.data;
   },
 
+  getRelatorioExAlunosPendencias: async (): Promise<RelatorioExAlunosPendencias> => {
+    const response = await api.get('financeiro/relatorio/ex-alunos-pendencias/');
+    return response.data;
+  },
+
   getDespesas: async (params?: any): Promise<Despesa[]> => {
     const query = params ? `?${new URLSearchParams(params).toString()}` : '';
     return fetchAllPages(`financeiro/despesas/${query}`);
@@ -772,6 +779,11 @@ export const wellhubService = {
 
   sincronizarSlots: async (): Promise<{ message: string; stats: Record<string, number> }> => {
     const response = await api.post('wellhub/sync/slots/');
+    return response.data;
+  },
+
+  getRelatorio: async (params?: { mes?: number; ano?: number; turma_id?: number }): Promise<RelatorioWellhub> => {
+    const response = await api.get('wellhub/relatorio/', { params });
     return response.data;
   },
 };

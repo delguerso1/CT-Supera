@@ -9,7 +9,10 @@ import { colors } from '../theme';
 import { useAuth } from '../utils/AuthContext';
 import { funcionarioService } from '../services/api';
 import { PainelGerente } from '../types';
-import DashboardGerenteScreen, { type GerenteNavigateTarget } from './DashboardGerenteScreen';
+import DashboardGerenteScreen, {
+  type GerenteNavigateTarget,
+  type RelatorioPainelKey,
+} from './DashboardGerenteScreen';
 import GerenciarUsuariosScreen from './GerenciarUsuariosScreen';
 import GerenciarCTsScreen from './GerenciarCTsScreen';
 import GerenciarTurmasScreen from './GerenciarTurmasScreen';
@@ -101,7 +104,7 @@ const GerenteShellScreen: React.FC = () => {
   const [focus, setFocus] = useState<FocusState>({ area: 'top', tab: 'dashboard' });
   const [pendingUsuariosTab, setPendingUsuariosTab] = useState<UsuariosTabKey | null>(null);
   const [pendingRelatorioPanel, setPendingRelatorioPanel] = useState<
-    'presenca' | 'alunos' | 'turmas' | null
+    RelatorioPainelKey | null
   >(null);
 
   const handleGerenteNavigate = (target: GerenteNavigateTarget) => {

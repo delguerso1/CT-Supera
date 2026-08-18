@@ -550,7 +550,7 @@ def _cancelar_mensalidades_em_aberto(aluno, motivo: str):
 def listar_exalunos_com_mensalidade_aberta():
     """
     Ex-alunos (ativo=False) com parcela pendente/atrasada.
-    Usado na auditoria e no comando de diagnóstico.
+    Usado na auditoria, no comando de diagnóstico e no relatório do gerente.
     """
     qs = (
         Mensalidade.objects.filter(aluno__tipo="aluno", aluno__ativo=False)
@@ -566,6 +566,54 @@ def listar_exalunos_com_mensalidade_aberta():
             agrupado.append(atual)
         atual["mensalidades"].append(m)
     return agrupado
+
+
+def serializar_exalunos_com_mensalidade_aberta():
+    """Payload JSON do relatório de pendências financeiras de ex-alunos."""
+    from app.date_api import format_data_api
+
+    grupos = listar_exalunos_com_mensalidade_aberta()
+    itens = []
+    valor_total = Decimal("0.00")
+    total_parcelas = 0
+    for grupo in grupos:
+        aluno = grupo["aluno"]
+        parcelas = []
+        subtotal = Decimal("0.00")
+        for m in grupo["mensalidades"]:
+            valor = Decimal(str(m.valor or 0))
+            subtotal += valor
+            parcelas.append(
+                {
+                    "id": m.id,
+                    "valor": str(valor),
+                    "data_vencimento": format_data_api(m.data_vencimento) if m.data_vencimento else None,
+                    "status": m.status_efetivo,
+                }
+            )
+        valor_total += subtotal
+        total_parcelas += len(parcelas)
+        nome = (aluno.get_full_name() or f"{aluno.first_name or ''} {aluno.last_name or ''}").strip()
+        itens.append(
+            {
+                "aluno_id": aluno.id,
+                "nome": nome or aluno.username,
+                "cpf": aluno.cpf or aluno.username or "",
+                "telefone": aluno.telefone or "",
+                "email": aluno.email or "",
+                "data_inativacao": (
+                    format_data_api(aluno.data_inativacao) if aluno.data_inativacao else None
+                ),
+                "valor_total": str(subtotal),
+                "parcelas": parcelas,
+            }
+        )
+    return {
+        "total_ex_alunos": len(itens),
+        "total_parcelas": total_parcelas,
+        "valor_total": str(valor_total),
+        "itens": itens,
+    }
 
 
 def criar_mensalidade_proporcional_aulas(

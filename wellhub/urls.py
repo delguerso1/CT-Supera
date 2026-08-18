@@ -3,6 +3,7 @@ from django.urls import path
 from wellhub.views import (
     CadastroWellhubDetailAPIView,
     CadastroWellhubListAPIView,
+    WellhubRelatorioAPIView,
     WellhubReservaListAPIView,
     WellhubSyncSlotsAPIView,
     WellhubTurmasOpcoesAPIView,
@@ -17,5 +18,6 @@ urlpatterns = [
     path("cadastros/", CadastroWellhubListAPIView.as_view(), name="cadastros_list"),
     path("cadastros/<int:pk>/", CadastroWellhubDetailAPIView.as_view(), name="cadastros_detail"),
     path("reservas/", WellhubReservaListAPIView.as_view(), name="reservas_list"),
+    path("relatorio/", WellhubRelatorioAPIView.as_view(), name="relatorio"),
     path("sync/slots/", WellhubSyncSlotsAPIView.as_view(), name="sync_slots"),
 ]

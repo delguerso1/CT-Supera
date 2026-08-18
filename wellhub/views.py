@@ -10,6 +10,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from django.utils import timezone
+
 from wellhub.filters import (
     parse_mes_param,
     parse_turma_id_param,
@@ -232,6 +234,53 @@ class WellhubReservaListAPIView(ListAPIView):
             qs = qs.filter(slot__turma_id=int(turma_id))
 
         return qs
+
+
+class WellhubRelatorioAPIView(APIView):
+    """Reservas Wellhub do mês, com totais de presença e check-in."""
+
+    permission_classes = [IsAuthenticated, IsGerente]
+
+    def get(self, request):
+        hoje = timezone.localdate()
+        try:
+            mes = int(request.query_params.get("mes", hoje.month))
+            ano = int(request.query_params.get("ano", hoje.year))
+        except (TypeError, ValueError):
+            mes, ano = hoje.month, hoje.year
+        if not (1 <= mes <= 12) or ano < 2000:
+            mes, ano = hoje.month, hoje.year
+
+        qs = WellhubBooking.objects.select_related(
+            "slot", "slot__turma", "slot__turma__ct", "cadastro"
+        ).filter(
+            slot__data_aula__year=ano,
+            slot__data_aula__month=mes,
+        )
+
+        turma_id = parse_turma_id_param(request.query_params.get("turma_id"))
+        if turma_id:
+            qs = qs.filter(slot__turma_id=turma_id)
+
+        qs = qs.order_by("slot__data_aula", "slot__turma__horario", "cadastro__first_name")
+        reservas = list(qs)
+
+        totais = {
+            "reservas": len(reservas),
+            "confirmadas": sum(1 for b in reservas if b.status == "confirmed"),
+            "canceladas": sum(1 for b in reservas if b.status in ("cancelled", "late_cancelled")),
+            "presencas": sum(1 for b in reservas if b.presenca_confirmada),
+            "faltas": sum(1 for b in reservas if b.ausencia_registrada),
+            "checkins_validados": sum(1 for b in reservas if b.checkin_validado),
+        }
+        return Response(
+            {
+                "mes": mes,
+                "ano": ano,
+                "totais": totais,
+                "reservas": WellhubBookingListSerializer(reservas, many=True).data,
+            }
+        )
 
 
 class WellhubSyncSlotsAPIView(APIView):

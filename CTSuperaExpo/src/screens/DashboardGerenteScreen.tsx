@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useAuth } from '../utils/AuthContext';
-import { funcionarioService, financeiroService, turmaService, usuarioService, userService, presencaService } from '../services/api';
+import { funcionarioService, financeiroService, turmaService, usuarioService, userService, presencaService, wellhubService } from '../services/api';
 import {
   User,
   PainelGerente,
@@ -26,6 +26,8 @@ import {
   PresencaRelatorioResponse,
   PresencaRelatorioItem,
   ObservacaoAulaResponse,
+  RelatorioWellhub,
+  RelatorioExAlunosPendencias,
 } from '../types';
 import { NavigationProps } from '../types';
 import CONFIG from '../config';
@@ -45,12 +47,14 @@ import {
 } from '../utils/dateApi';
 
 /** Navegação a partir do dashboard embutido no shell do gerente (abas topo/fundo). */
+export type RelatorioPainelKey = 'presenca' | 'alunos' | 'turmas' | 'wellhub' | 'exalunos';
+
 export type GerenteNavigateTarget =
   | {
       area: 'top';
       tab: 'dashboard' | 'perfil' | 'usuarios' | 'financeiro' | 'relatorios';
       usuariosTab?: 'alunos' | 'professores' | 'gerentes' | 'precadastros';
-      openRelatorioPanel?: 'presenca' | 'alunos' | 'turmas';
+      openRelatorioPanel?: RelatorioPainelKey;
     }
   | {
       area: 'bottom';
@@ -62,7 +66,7 @@ type DashboardGerenteProps = NavigationProps & {
   shellActiveTop?: 'dashboard' | 'perfil' | 'financeiro' | 'relatorios';
   onGerenteNavigate?: (target: GerenteNavigateTarget) => void;
   /** Definido pelo shell ao abrir Relatórios a partir de um card do dashboard */
-  pendingRelatorioPanel?: 'presenca' | 'alunos' | 'turmas' | null;
+  pendingRelatorioPanel?: RelatorioPainelKey | null;
   onPendingRelatorioPanelConsumed?: () => void;
 };
 
@@ -111,9 +115,13 @@ const DashboardGerenteScreen: React.FC<DashboardGerenteProps> = ({
   const [filtroAlunoBusca, setFiltroAlunoBusca] = useState('');
   const [filtroTurmaBusca, setFiltroTurmaBusca] = useState('');
   /** Acordeão na aba Relatórios: uma seção aberta por vez reduz poluição visual */
-  const [relatorioPainelAberto, setRelatorioPainelAberto] = useState<'presenca' | 'alunos' | 'turmas' | null>(
+  const [relatorioPainelAberto, setRelatorioPainelAberto] = useState<RelatorioPainelKey | null>(
     'presenca'
   );
+  const [wellhubRelatorio, setWellhubRelatorio] = useState<RelatorioWellhub | null>(null);
+  const [loadingWellhubRelatorio, setLoadingWellhubRelatorio] = useState(false);
+  const [exAlunosPendencias, setExAlunosPendencias] = useState<RelatorioExAlunosPendencias | null>(null);
+  const [loadingExAlunosPendencias, setLoadingExAlunosPendencias] = useState(false);
   const [showDespesaModal, setShowDespesaModal] = useState(false);
   const [showListaNomesModal, setShowListaNomesModal] = useState(false);
   const [tituloListaNomesModal, setTituloListaNomesModal] = useState('');
@@ -352,6 +360,40 @@ const DashboardGerenteScreen: React.FC<DashboardGerenteProps> = ({
       setLoadingRelatorios(false);
     }
   };
+
+  const loadWellhubRelatorio = async () => {
+    try {
+      setLoadingWellhubRelatorio(true);
+      const data = await wellhubService.getRelatorio({ mes, ano });
+      setWellhubRelatorio(data);
+    } catch (error: any) {
+      Alert.alert('Erro', error.response?.data?.error || 'Erro ao gerar relatório Wellhub.');
+    } finally {
+      setLoadingWellhubRelatorio(false);
+    }
+  };
+
+  const loadExAlunosPendencias = async () => {
+    try {
+      setLoadingExAlunosPendencias(true);
+      const data = await financeiroService.getRelatorioExAlunosPendencias();
+      setExAlunosPendencias(data);
+    } catch (error: any) {
+      Alert.alert('Erro', error.response?.data?.error || 'Erro ao carregar pendências de ex-alunos.');
+    } finally {
+      setLoadingExAlunosPendencias(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeSection !== 'relatorios' || !user) return;
+    if (relatorioPainelAberto === 'wellhub') {
+      void loadWellhubRelatorio();
+    }
+    if (relatorioPainelAberto === 'exalunos') {
+      void loadExAlunosPendencias();
+    }
+  }, [activeSection, relatorioPainelAberto, user, mes, ano]);
 
   const handleEnviarNotificacaoApp = async () => {
     const t = notifTitulo.trim();
@@ -1592,12 +1634,12 @@ const DashboardGerenteScreen: React.FC<DashboardGerenteProps> = ({
     const turmasAtivas = turmas.filter((t) => t.ativo !== false).length;
     const turmasInativas = turmas.length - turmasAtivas;
 
-    const toggleRelatorioPainel = (k: 'presenca' | 'alunos' | 'turmas') => {
+    const toggleRelatorioPainel = (k: RelatorioPainelKey) => {
       setRelatorioPainelAberto((prev) => (prev === k ? null : k));
     };
 
     const cabecalhoPainel = (
-      k: 'presenca' | 'alunos' | 'turmas',
+      k: RelatorioPainelKey,
       titulo: string,
       subtitulo: string
     ) => {
@@ -1629,8 +1671,8 @@ const DashboardGerenteScreen: React.FC<DashboardGerenteProps> = ({
       >
         <Text style={styles.relatorioPageTitle}>Relatórios</Text>
         <Text style={styles.relatorioPageHint}>
-          Toque em cada bloco para abrir ou fechar. O financeiro gera PDF; presenças exige datas e o botão
-          &quot;Gerar&quot;.
+          Toque em cada bloco para abrir ou fechar. O financeiro gera um resumo; Wellhub usa o mês do
+          financeiro; pendências de ex-alunos mostram a situação atual.
         </Text>
 
         <TouchableOpacity
@@ -1857,6 +1899,150 @@ const DashboardGerenteScreen: React.FC<DashboardGerenteProps> = ({
                       </View>
                     ))
                   )}
+                </>
+              )}
+            </View>
+          )}
+        </View>
+
+        <View style={styles.relatorioPainel}>
+          {cabecalhoPainel('wellhub', 'Wellhub', 'Reservas, presenças e check-ins do mês')}
+          {relatorioPainelAberto === 'wellhub' && (
+            <View style={styles.relatorioPainelBody}>
+              <View style={styles.monthControls}>
+                <TouchableOpacity style={styles.monthButton} onPress={handleMesAnterior}>
+                  <Text style={styles.monthButtonText}>◀</Text>
+                </TouchableOpacity>
+                <Text style={styles.monthLabel}>
+                  {String(mes).padStart(2, '0')}/{ano}
+                </Text>
+                <TouchableOpacity style={styles.monthButton} onPress={handleMesProximo}>
+                  <Text style={styles.monthButtonText}>▶</Text>
+                </TouchableOpacity>
+              </View>
+              {loadingWellhubRelatorio && (
+                <View style={styles.loadingInline}>
+                  <ActivityIndicator size="small" color={colors.primary} />
+                  <Text style={styles.loadingInlineText}>Carregando Wellhub...</Text>
+                </View>
+              )}
+              {wellhubRelatorio && (
+                <>
+                  <View style={styles.relatorioKpiRow}>
+                    <View style={styles.relatorioKpi}>
+                      <Text style={styles.relatorioKpiVal}>{wellhubRelatorio.totais.reservas}</Text>
+                      <Text style={styles.relatorioKpiLbl}>Reservas</Text>
+                    </View>
+                    <View style={styles.relatorioKpi}>
+                      <Text style={styles.relatorioKpiVal}>{wellhubRelatorio.totais.confirmadas}</Text>
+                      <Text style={styles.relatorioKpiLbl}>Confirmadas</Text>
+                    </View>
+                    <View style={styles.relatorioKpi}>
+                      <Text style={styles.relatorioKpiVal}>{wellhubRelatorio.totais.presencas}</Text>
+                      <Text style={styles.relatorioKpiLbl}>Presenças</Text>
+                    </View>
+                    <View style={styles.relatorioKpi}>
+                      <Text style={[styles.relatorioKpiVal, { color: '#c62828' }]}>
+                        {wellhubRelatorio.totais.faltas}
+                      </Text>
+                      <Text style={styles.relatorioKpiLbl}>Faltas</Text>
+                    </View>
+                    <View style={styles.relatorioKpi}>
+                      <Text style={styles.relatorioKpiVal}>
+                        {wellhubRelatorio.totais.checkins_validados}
+                      </Text>
+                      <Text style={styles.relatorioKpiLbl}>Check-ins</Text>
+                    </View>
+                  </View>
+                  <View style={styles.relatorioListShell}>
+                    {wellhubRelatorio.reservas.length === 0 ? (
+                      <Text style={styles.noData}>Nenhuma reserva Wellhub neste mês.</Text>
+                    ) : (
+                      wellhubRelatorio.reservas.map((item) => (
+                        <View key={item.id} style={styles.reportListItem}>
+                          <Text style={styles.reportListTitle}>
+                            {item.cadastro_nome || 'Cliente Wellhub'}
+                          </Text>
+                          <Text style={styles.reportListSubtitle}>
+                            {formatDate(item.data_aula)} • {item.turma_horario} • {item.turma_ct}
+                          </Text>
+                          <Text style={styles.reportListSubtitle}>
+                            {item.status_display || item.status} • Presença:{' '}
+                            {item.presenca_display || '—'}
+                            {item.checkin_validado ? ' • Check-in validado' : ''}
+                          </Text>
+                        </View>
+                      ))
+                    )}
+                  </View>
+                </>
+              )}
+            </View>
+          )}
+        </View>
+
+        <View style={styles.relatorioPainel}>
+          {cabecalhoPainel(
+            'exalunos',
+            'Pendências de ex-alunos',
+            'Mensalidades em aberto de quem já encerrou o contrato'
+          )}
+          {relatorioPainelAberto === 'exalunos' && (
+            <View style={styles.relatorioPainelBody}>
+              {loadingExAlunosPendencias && (
+                <View style={styles.loadingInline}>
+                  <ActivityIndicator size="small" color={colors.primary} />
+                  <Text style={styles.loadingInlineText}>Carregando pendências...</Text>
+                </View>
+              )}
+              {exAlunosPendencias && (
+                <>
+                  <View style={styles.relatorioKpiRow}>
+                    <View style={styles.relatorioKpi}>
+                      <Text style={styles.relatorioKpiVal}>
+                        {exAlunosPendencias.total_ex_alunos}
+                      </Text>
+                      <Text style={styles.relatorioKpiLbl}>Ex-alunos</Text>
+                    </View>
+                    <View style={styles.relatorioKpi}>
+                      <Text style={styles.relatorioKpiVal}>
+                        {exAlunosPendencias.total_parcelas}
+                      </Text>
+                      <Text style={styles.relatorioKpiLbl}>Parcelas</Text>
+                    </View>
+                    <View style={styles.relatorioKpi}>
+                      <Text style={[styles.relatorioKpiVal, { fontSize: 14 }]}>
+                        {formatCurrency(exAlunosPendencias.valor_total)}
+                      </Text>
+                      <Text style={styles.relatorioKpiLbl}>Total</Text>
+                    </View>
+                  </View>
+                  <View style={styles.relatorioListShell}>
+                    {exAlunosPendencias.itens.length === 0 ? (
+                      <Text style={styles.noData}>Nenhum ex-aluno com pendência financeira.</Text>
+                    ) : (
+                      exAlunosPendencias.itens.map((item) => (
+                        <View key={item.aluno_id} style={styles.reportListItem}>
+                          <Text style={styles.reportListTitle}>{item.nome}</Text>
+                          <Text style={styles.reportListSubtitle}>
+                            CPF {item.cpf}
+                            {item.data_inativacao
+                              ? ` • Inativação ${formatDate(item.data_inativacao)}`
+                              : ''}
+                          </Text>
+                          {item.parcelas.map((p) => (
+                            <Text key={p.id} style={styles.reportListSubtitle}>
+                              {formatDate(p.data_vencimento || undefined)} • {p.status} •{' '}
+                              {formatCurrency(p.valor)}
+                            </Text>
+                          ))}
+                          <Text style={[styles.reportListTitle, { marginTop: 4, fontSize: 14 }]}>
+                            {formatCurrency(item.valor_total)}
+                          </Text>
+                        </View>
+                      ))
+                    )}
+                  </View>
                 </>
               )}
             </View>
