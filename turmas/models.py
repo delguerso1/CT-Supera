@@ -13,8 +13,8 @@ class Turma(models.Model):
     dias_semana = models.ManyToManyField(DiaSemana)  # 🔹 Agora aceita vários dias!
     horario = models.TimeField()
     capacidade_maxima = models.PositiveIntegerField(default=0)
-    aceita_kids = models.BooleanField(default=False, help_text='Aceita crianças até 12 anos')
-    aceita_teen = models.BooleanField(default=False, help_text='Aceita adolescentes de 13 a 17 anos')
+    aceita_kids = models.BooleanField(default=False, help_text='Aceita crianças até 10 anos')
+    aceita_teen = models.BooleanField(default=False, help_text='Aceita adolescentes de 11 a 17 anos')
     aceita_adultos = models.BooleanField(default=True, help_text='Aceita 18 anos ou mais')
     professores = models.ManyToManyField(
         Usuario,

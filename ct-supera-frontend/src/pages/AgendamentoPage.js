@@ -189,10 +189,10 @@ function AgendamentoPage() {
     return idade;
   };
 
-  // Kids: até 12; teen: 13 a 17; adultos: 18 anos ou mais (maioridade)
+  // Kids: até 10; teen: 11 a 17; adultos: 18 anos ou mais (maioridade)
   const obterFaixaEtaria = (idade) => {
     if (idade === null || idade === undefined) return null;
-    if (idade <= 12) return 'kids';
+    if (idade <= 10) return 'kids';
     if (idade < 18) return 'teen';
     return 'adultos';
   };
