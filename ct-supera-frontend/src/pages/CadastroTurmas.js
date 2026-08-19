@@ -525,7 +525,7 @@ function CadastroTurmas({ centroId, styles }) {
                   checked={Boolean(formData.aceita_teen)}
                   onChange={(e) => setFormData(prev => ({ ...prev, aceita_teen: e.target.checked }))}
                 />
-                Teen (adolescentes até 18 anos)
+                Teen (adolescentes de 13 a 17 anos)
               </label>
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
                 <input
@@ -534,7 +534,7 @@ function CadastroTurmas({ centroId, styles }) {
                   checked={formData.aceita_adultos !== false}
                   onChange={(e) => setFormData(prev => ({ ...prev, aceita_adultos: e.target.checked }))}
                 />
-                Adultos (maiores de 18 anos)
+                Adultos (18 anos ou mais)
               </label>
             </div>
             <span style={{ fontSize: '0.85rem', color: '#666' }}>Marque todas que se aplicam.</span>

@@ -411,8 +411,8 @@ const GerenciarTurmasScreen: React.FC<NavigationProps> = ({ navigation }) => {
               <View style={{ gap: 8 }}>
                 {[
                   { key: 'aceita_kids' as const, label: 'Kids (até 12 anos)' },
-                  { key: 'aceita_teen' as const, label: 'Teen (até 18 anos)' },
-                  { key: 'aceita_adultos' as const, label: 'Adultos (>18 anos)' },
+                  { key: 'aceita_teen' as const, label: 'Teen (13 a 17 anos)' },
+                  { key: 'aceita_adultos' as const, label: 'Adultos (18 anos ou mais)' },
                 ].map((opt) => (
                   <TouchableOpacity
                     key={opt.key}

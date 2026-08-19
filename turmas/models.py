@@ -14,8 +14,8 @@ class Turma(models.Model):
     horario = models.TimeField()
     capacidade_maxima = models.PositiveIntegerField(default=0)
     aceita_kids = models.BooleanField(default=False, help_text='Aceita crianças até 12 anos')
-    aceita_teen = models.BooleanField(default=False, help_text='Aceita adolescentes até 18 anos')
-    aceita_adultos = models.BooleanField(default=True, help_text='Aceita maiores de 18 anos')
+    aceita_teen = models.BooleanField(default=False, help_text='Aceita adolescentes de 13 a 17 anos')
+    aceita_adultos = models.BooleanField(default=True, help_text='Aceita 18 anos ou mais')
     professores = models.ManyToManyField(
         Usuario,
         blank=True,
