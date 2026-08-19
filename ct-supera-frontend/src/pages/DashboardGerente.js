@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import api, { mediaProfileBackgroundImageUrl } from '../services/api';
 import CadastroUsuario from '../pages/CadastroUsuario';
 import ControleFinanceiro from '../pages/ControleFinanceiro';
 import RelatoriosGerente from '../pages/RelatoriosGerente';
 import CadastroCentroTreinamento from '../pages/CadastroCentroTreinamento';
+import CadastroTurmas from '../pages/CadastroTurmas';
 import GerenciarCandidaturasTrabalho from '../pages/GerenciarCandidaturasTrabalho';
 import GerenciarCadastrosWellhub from '../pages/GerenciarCadastrosWellhub';
 import { NAVBAR_HEIGHT_CSS } from '../constants/layout';
@@ -387,7 +388,9 @@ function getInitials(name) {
 
 function DashboardGerente({ user }) {
   const { isMobile, isTablet } = useResponsive();
-  const [activeSection, setActiveSection] = useState('dashboard');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [activeSection, setActiveSection] = useState(() => searchParams.get('section') || 'dashboard');
+  const [centroTurmasId, setCentroTurmasId] = useState(() => searchParams.get('centro') || null);
   const [stats, setStats] = useState({
     alunosAtivos: 0,
     alunosInativos: 0,
@@ -438,6 +441,18 @@ function DashboardGerente({ user }) {
   const [listaModalNomes, setListaModalNomes] = useState([]);
   const navigate = useNavigate();
   const prevActiveSectionRef = useRef(null);
+
+  const abrirTurmasCentro = (centroId) => {
+    setCentroTurmasId(String(centroId));
+    setActiveSection('centros');
+    setSearchParams({ section: 'centros', centro: String(centroId) }, { replace: true });
+  };
+
+  const voltarListaCentros = () => {
+    setCentroTurmasId(null);
+    setActiveSection('centros');
+    setSearchParams({ section: 'centros' }, { replace: true });
+  };
 
   const abrirModalAlunosInativos = async () => {
     setErroListaInativos('');
@@ -1326,11 +1341,21 @@ function DashboardGerente({ user }) {
 
   const renderCentros = () => (
     <div>
-      <h2 style={styles.contentTitle}>
-        <span>🏢</span>
-        Centros de Treinamento
-      </h2>
-      <CadastroCentroTreinamento styles={styles} />
+      {centroTurmasId ? (
+        <CadastroTurmas
+          centroId={centroTurmasId}
+          styles={styles}
+          onVoltar={voltarListaCentros}
+        />
+      ) : (
+        <>
+          <h2 style={styles.contentTitle}>
+            <span>🏢</span>
+            Centros de Treinamento
+          </h2>
+          <CadastroCentroTreinamento styles={styles} onAbrirTurmas={abrirTurmasCentro} />
+        </>
+      )}
     </div>
   );
 
@@ -1499,7 +1524,11 @@ function DashboardGerente({ user }) {
               ...styles.menuItem,
               ...(activeSection === 'centros' && styles.activeMenuItem)
             }}
-            onClick={() => setActiveSection('centros')}
+            onClick={() => {
+              setActiveSection('centros');
+              setCentroTurmasId(null);
+              setSearchParams({ section: 'centros' }, { replace: true });
+            }}
             title="Centros de Treinamento"
           >
             <span style={styles.menuIcon}>🏢</span>

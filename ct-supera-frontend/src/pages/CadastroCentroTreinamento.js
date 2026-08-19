@@ -1,8 +1,30 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom'; // Adicione esta importação
 import api from '../services/api';
 
-function CadastroCentroTreinamento({ styles }) {
+function formatarDiaCurto(nome) {
+  if (!nome) return '';
+  return String(nome).replace(/-feira/gi, '').trim();
+}
+
+const thEstilo = (extra = {}) => ({
+  padding: '12px 10px',
+  borderBottom: '2px solid #e0e0e0',
+  verticalAlign: 'middle',
+  fontWeight: 600,
+  color: '#555',
+  background: '#f5f5f5',
+  ...extra,
+});
+
+const tdEstilo = (extra = {}) => ({
+  padding: '12px 10px',
+  borderBottom: '1px solid #eee',
+  verticalAlign: 'middle',
+  color: '#333',
+  ...extra,
+});
+
+function CadastroCentroTreinamento({ styles, onAbrirTurmas }) {
   const [formData, setFormData] = useState({
     nome: '',
     endereco: '',
@@ -159,49 +181,56 @@ function CadastroCentroTreinamento({ styles }) {
 
       {/* Tabela de centros cadastrados */}
       <div style={{ overflowX: 'auto', marginBottom: 24 }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 400 }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', minWidth: 720 }}>
           <thead>
-            <tr style={{ background: '#f5f5f5' }}>
-              <th style={{ padding: 10, borderBottom: '2px solid #eee', textAlign: 'left' }}>Nome</th>
-              <th style={{ padding: 10, borderBottom: '2px solid #eee', textAlign: 'left' }}>Endereço</th>
-              <th style={{ padding: 10, borderBottom: '2px solid #eee', textAlign: 'left' }}>Telefone</th>
-              <th style={{ padding: 10, borderBottom: '2px solid #eee', textAlign: 'left' }}>Dias</th>
-              <th style={{ padding: 10, borderBottom: '2px solid #eee', textAlign: 'center' }}>Financeiro</th>
-              <th style={{ padding: 10, borderBottom: '2px solid #eee', textAlign: 'center' }}>Ações</th>
+            <tr>
+              <th style={thEstilo({ textAlign: 'left', width: '18%' })}>Nome</th>
+              <th style={thEstilo({ textAlign: 'left', width: '24%' })}>Endereço</th>
+              <th style={thEstilo({ textAlign: 'left', width: '14%' })}>Telefone</th>
+              <th style={thEstilo({ textAlign: 'left', width: '20%' })}>Dias</th>
+              <th style={thEstilo({ textAlign: 'center', width: '10%' })}>Financeiro</th>
+              <th style={thEstilo({ textAlign: 'center', width: '14%' })}>Ações</th>
             </tr>
           </thead>
           <tbody>
             {centros.length === 0 && (
               <tr>
-                <td colSpan={6} style={{ color: '#888', padding: 12, textAlign: 'center' }}>
+                <td colSpan={6} style={tdEstilo({ color: '#888', textAlign: 'center' })}>
                   Nenhum centro cadastrado.
                 </td>
               </tr>
             )}
             {centros.map((centro) => (
-              <tr key={centro.id} style={{ borderBottom: '1px solid #eee' }}>
-                <td style={{ padding: 10 }}>
-                  <Link
-                    to={`/centros/${centro.id}/turmas`}
+              <tr key={centro.id}>
+                <td style={tdEstilo({ textAlign: 'left' })}>
+                  <button
+                    type="button"
+                    onClick={() => onAbrirTurmas && onAbrirTurmas(centro.id)}
                     style={{
                       color: '#1F6C86',
                       fontWeight: 600,
                       cursor: 'pointer',
-                      textDecoration: 'none'
+                      background: 'none',
+                      border: 'none',
+                      padding: 0,
+                      font: 'inherit',
+                      textAlign: 'left',
                     }}
                   >
                     {centro.nome}
-                  </Link>
+                  </button>
                 </td>
-                <td style={{ padding: 10 }}>{centro.endereco}</td>
-                <td style={{ padding: 10 }}>{centro.telefone}</td>
-                <td style={{ padding: 10 }}>
-                  {centro.dias_semana_nomes?.length ? centro.dias_semana_nomes.join(', ') : '-'}
+                <td style={tdEstilo({ textAlign: 'left', wordBreak: 'break-word' })}>{centro.endereco}</td>
+                <td style={tdEstilo({ textAlign: 'left', whiteSpace: 'nowrap' })}>{centro.telefone}</td>
+                <td style={tdEstilo({ textAlign: 'left' })}>
+                  {centro.dias_semana_nomes?.length
+                    ? centro.dias_semana_nomes.map(formatarDiaCurto).join(', ')
+                    : '-'}
                 </td>
-                <td style={{ padding: 10, textAlign: 'center' }}>
-                  {centro.sem_financeiro ? 'Sem' : 'Sim'}
+                <td style={tdEstilo({ textAlign: 'center' })}>
+                  {centro.sem_financeiro ? 'Não' : 'Sim'}
                 </td>
-                <td style={{ padding: 10, textAlign: 'center' }}>
+                <td style={tdEstilo({ textAlign: 'center' })}>
                   <div className="centro-treinamento-actions" style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center', flexWrap: 'wrap' }}>
                     <button
                       className="centro-treinamento-action-btn"

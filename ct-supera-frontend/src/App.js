@@ -10,7 +10,6 @@ import DashboardAluno from './pages/DashboardAluno';
 import ContratoAceite from './pages/ContratoAceite';
 import AgendamentoPage from './pages/AgendamentoPage';
 import ReagendamentoPage from './pages/ReagendamentoPage';
-import CadastroTurmas from './pages/CadastroTurmas';
 import EsqueciMinhaSenha from './pages/EsqueciMinhaSenha';
 import RedefinirSenha from './pages/RedefinirSenha';
 import AtivarConta from './pages/AtivarConta';
@@ -20,12 +19,9 @@ import Footer from './components/Footer';
 import './App.css';
 import './styles/responsive.css';
 
-// Importe o objeto styles do DashboardGerente
-import { styles } from './pages/DashboardGerente';
-
-function CadastroTurmasWrapper() {
+function RedirectTurmasCentro() {
   const { centroId } = useParams();
-  return <CadastroTurmas centroId={centroId} styles={styles} />;
+  return <Navigate to={`/dashboard/gerente?section=centros&centro=${centroId}`} replace />;
 }
 
 // Componente para proteger rotas que requerem autenticação
@@ -141,13 +137,13 @@ function App() {
               </ProtectedRoute>
             } 
           />
-          <Route 
-            path="/centros/:centroId/turmas" 
+          <Route
+            path="/centros/:centroId/turmas"
             element={
               <ProtectedRoute requiredType="gerente">
-                <CadastroTurmasWrapper />
+                <RedirectTurmasCentro />
               </ProtectedRoute>
-            } 
+            }
           />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

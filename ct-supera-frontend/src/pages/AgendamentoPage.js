@@ -399,7 +399,16 @@ function AgendamentoPage() {
     });
   };
 
-  const ctSelecionado = cts.find(ct => String(ct.id) === String(form.ct));
+  const formatarRotuloTurma = (horario) => {
+    if (!horario) return 'Turma';
+    const [horaStr, minutoStr] = String(horario).split(':');
+    const hora = parseInt(horaStr, 10);
+    const minuto = parseInt(minutoStr, 10);
+    if (Number.isNaN(hora)) return 'Turma';
+    if (!minuto) return `Turma das ${hora}h`;
+    return `Turma das ${hora}h${String(minuto).padStart(2, '0')}`;
+  };
+
   const turmaSelecionada = turmasFiltradas.find(t => t.id === parseInt(form.turma));
 
   const hojeRef = new Date();
@@ -626,18 +635,13 @@ function AgendamentoPage() {
             </option>
             {turmasFiltradas.map(turma => {
               if (!turma) return null;
-              const vagasInfo = turma.tem_vagas 
-                ? `(${turma.vagas_disponiveis} vaga${turma.vagas_disponiveis !== 1 ? 's' : ''} ${turma.vagas_disponiveis !== 1 ? 'disponíveis' : 'disponível'})`
-                : '(Turma lotada)';
               return (
                 <option
                   key={turma.id}
                   value={turma.id}
                   disabled={!turma.tem_vagas}
                 >
-                  {ctSelecionado?.nome || 'CT não reconhecido'} -{' '}
-                  {Array.isArray(turma.dias_semana_nomes) ? turma.dias_semana_nomes.join(', ') : ''} -{' '}
-                  {formatarHorario(turma.horario)} - {vagasInfo}
+                  {formatarRotuloTurma(turma.horario)}
                 </option>
               );
             })}

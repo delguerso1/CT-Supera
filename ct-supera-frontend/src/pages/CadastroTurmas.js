@@ -1,7 +1,33 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
 
-function CadastroTurmas({ centroId, styles }) {
+function formatarDiaCurto(nome) {
+  if (!nome) return '';
+  return String(nome).replace(/-feira/gi, '').trim();
+}
+
+function formatarHorarioTurma(horario) {
+  if (!horario) return '';
+  const [horaStr, minutoStr] = String(horario).split(':');
+  const hora = parseInt(horaStr, 10);
+  const minuto = parseInt(minutoStr, 10);
+  if (Number.isNaN(hora)) return '';
+  const horaFmt = String(hora).padStart(2, '0');
+  if (!minuto) return `${horaFmt}h`;
+  return `${horaFmt}h${String(minuto).padStart(2, '0')}`;
+}
+
+function primeiroNome(nomeCompleto) {
+  if (!nomeCompleto) return '';
+  return String(nomeCompleto).trim().split(/\s+/)[0] || '';
+}
+
+function nomeAlunoCompleto(aluno) {
+  const nome = `${aluno?.first_name || ''} ${aluno?.last_name || ''}`.trim();
+  return nome || aluno?.username || 'Aluno';
+}
+
+function CadastroTurmas({ centroId, styles, onVoltar }) {
   const [turmas, setTurmas] = useState([]);
   const [diasSemana, setDiasSemana] = useState([]);
   const [professores, setProfessores] = useState([]);
@@ -18,15 +44,14 @@ function CadastroTurmas({ centroId, styles }) {
   const [success, setSuccess] = useState('');
   const [centroNome, setCentroNome] = useState('');
   const [diasCtPermitidos, setDiasCtPermitidos] = useState([]);
-  const [showAddAluno, setShowAddAluno] = useState(false);
-  const [showRemoveAluno, setShowRemoveAluno] = useState(false);
   const [turmaIdSelecionada, setTurmaIdSelecionada] = useState(null);
-  const [selectedAlunos, setSelectedAlunos] = useState([]);
   const [alunosDisponiveis, setAlunosDisponiveis] = useState([]);
-  const [alunosTurmaParaRemover, setAlunosTurmaParaRemover] = useState([]);
-  const [showAlunosModal, setShowAlunosModal] = useState(false);
+  const [showGerenciarAlunos, setShowGerenciarAlunos] = useState(false);
   const [alunosTurma, setAlunosTurma] = useState([]);
   const [turmaModalNome, setTurmaModalNome] = useState('');
+  const [buscaAluno, setBuscaAluno] = useState('');
+  const [erroAlunos, setErroAlunos] = useState('');
+  const [alunoEmAndamento, setAlunoEmAndamento] = useState(null);
 
   useEffect(() => {
     fetchCentro();
@@ -85,7 +110,13 @@ function CadastroTurmas({ centroId, styles }) {
   const fetchAlunosDisponiveis = async () => {
     try {
       const response = await api.get('usuarios/', { params: { tipo: 'aluno', ativo: true } });
-      setAlunosDisponiveis(response.data);
+      if (Array.isArray(response.data)) {
+        setAlunosDisponiveis(response.data);
+      } else if (Array.isArray(response.data?.results)) {
+        setAlunosDisponiveis(response.data.results);
+      } else {
+        setAlunosDisponiveis([]);
+      }
     } catch {
       setAlunosDisponiveis([]);
     }
@@ -216,76 +247,169 @@ function CadastroTurmas({ centroId, styles }) {
     setSuccess('');
   };
 
-  const handleShowAddAluno = (turmaId) => {
-    setTurmaIdSelecionada(turmaId);
-    setSelectedAlunos([]);
-    setShowAddAluno(true);
+  const carregarAlunosTurma = async (turmaId) => {
+    const response = await api.get(`turmas/${turmaId}/alunos/`);
+    setAlunosTurma(Array.isArray(response.data?.alunos) ? response.data.alunos : []);
+    return response.data;
   };
 
-  const handleShowRemoveAluno = async (turmaId) => {
+  const handleGerenciarAlunos = async (turma) => {
+    setTurmaIdSelecionada(turma.id);
+    setTurmaModalNome(`Turma das ${formatarHorarioTurma(turma.horario)}`);
+    setBuscaAluno('');
+    setErroAlunos('');
     try {
-      const response = await api.get(`turmas/${turmaId}/alunos/`);
-      setAlunosTurmaParaRemover(response.data.alunos);
-      setTurmaIdSelecionada(turmaId);
-      setSelectedAlunos([]);
-      setShowRemoveAluno(true);
-    } catch (error) {
-      setError('Erro ao buscar alunos da turma.');
-      setShowRemoveAluno(false);
-    }
-  };
-
-  const handleShowAlunosTurma = async (turmaId) => {
-    try {
-      const response = await api.get(`turmas/${turmaId}/alunos/`);
-      setAlunosTurma(response.data.alunos);
-      const nomes = response.data.turma.professor_nomes || [];
-      setTurmaModalNome(nomes.length ? nomes.join(', ') : 'Turma');
-      setShowAlunosModal(true);
+      await carregarAlunosTurma(turma.id);
+      setShowGerenciarAlunos(true);
     } catch {
-      setAlunosTurma([]);
-      setShowAlunosModal(false);
-      alert('Erro ao buscar alunos da turma.');
+      setError('Erro ao buscar alunos da turma.');
     }
   };
+
+  const fecharGerenciarAlunos = () => {
+    setShowGerenciarAlunos(false);
+    setTurmaIdSelecionada(null);
+    setAlunosTurma([]);
+    setBuscaAluno('');
+    setErroAlunos('');
+    setAlunoEmAndamento(null);
+  };
+
+  const handleAdicionarAlunoTurma = async (alunoId) => {
+    if (!turmaIdSelecionada || alunoEmAndamento) return;
+    setErroAlunos('');
+    setAlunoEmAndamento(alunoId);
+    try {
+      await api.post(`turmas/${turmaIdSelecionada}/adicionar-alunos/`, { alunos: [alunoId] });
+      await carregarAlunosTurma(turmaIdSelecionada);
+      fetchTurmas();
+    } catch (err) {
+      const data = err.response?.data;
+      const invalidos = data?.alunos_invalidos;
+      if (Array.isArray(invalidos) && invalidos.length) {
+        setErroAlunos(invalidos.map((a) => `${a.nome}: ${a.motivo}`).join(' '));
+      } else {
+        setErroAlunos(data?.error || 'Erro ao adicionar aluno.');
+      }
+    } finally {
+      setAlunoEmAndamento(null);
+    }
+  };
+
+  const handleRemoverAlunoTurma = async (alunoId) => {
+    if (!turmaIdSelecionada || alunoEmAndamento) return;
+    if (!window.confirm('Remover este aluno da turma?')) return;
+    setErroAlunos('');
+    setAlunoEmAndamento(alunoId);
+    try {
+      await api.post(`turmas/${turmaIdSelecionada}/remover-alunos/`, { alunos: [alunoId] });
+      await carregarAlunosTurma(turmaIdSelecionada);
+      fetchTurmas();
+    } catch (err) {
+      setErroAlunos(err.response?.data?.error || 'Erro ao remover aluno.');
+    } finally {
+      setAlunoEmAndamento(null);
+    }
+  };
+
+  const termoBusca = buscaAluno.trim().toLowerCase();
+  const idsNaTurma = new Set(alunosTurma.map((a) => a.id));
+  const alunosNaTurmaFiltrados = [...alunosTurma]
+    .filter((aluno) => !termoBusca || nomeAlunoCompleto(aluno).toLowerCase().includes(termoBusca))
+    .sort((a, b) => nomeAlunoCompleto(a).localeCompare(nomeAlunoCompleto(b), 'pt-BR'));
+  const alunosParaAdicionar = alunosDisponiveis
+    .filter((aluno) => !idsNaTurma.has(aluno.id))
+    .filter((aluno) => !termoBusca || nomeAlunoCompleto(aluno).toLowerCase().includes(termoBusca))
+    .sort((a, b) => nomeAlunoCompleto(a).localeCompare(nomeAlunoCompleto(b), 'pt-BR'));
 
   return (
     <div style={styles.card}>
-      <h2 style={styles.cardTitle}>
-        Turmas do Centro: <span style={{ color: '#1F6C86' }}>{centroNome}</span>
-      </h2>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'flex-start',
+          justifyContent: 'space-between',
+          gap: 16,
+          marginBottom: 24,
+          flexWrap: 'wrap',
+        }}
+      >
+        <div>
+          {onVoltar && (
+            <button
+              type="button"
+              onClick={onVoltar}
+              style={{
+                background: 'none',
+                border: 'none',
+                padding: 0,
+                marginBottom: 8,
+                color: '#1F6C86',
+                cursor: 'pointer',
+                fontSize: '0.95rem',
+                fontWeight: 600,
+              }}
+            >
+              ← Voltar aos centros
+            </button>
+          )}
+          <h2
+            style={{
+              ...(styles.cardTitle || {}),
+              margin: 0,
+              marginBottom: 4,
+              fontSize: '1.5rem',
+              color: '#1F6C86',
+            }}
+          >
+            Centro de Treinamento
+          </h2>
+          <p
+            style={{
+              margin: 0,
+              fontSize: '1.15rem',
+              color: '#333',
+              fontWeight: 600,
+            }}
+          >
+            {centroNome || '—'}
+          </p>
+        </div>
 
-      {!showForm && (
-        <button
-          onClick={handleNovaTurma}
-          style={{
-            backgroundColor: '#1F6C86',
-            color: 'white',
-            padding: '0.75rem 1.5rem',
-            borderRadius: '4px',
-            border: 'none',
-            fontSize: '1rem',
-            cursor: 'pointer',
-            marginBottom: 16,
-          }}
-          onMouseEnter={(e) => e.target.style.backgroundColor = '#151b60'}
-          onMouseLeave={(e) => e.target.style.backgroundColor = '#1F6C86'}
-        >
-          Cadastrar Nova Turma
-        </button>
-      )}
+        {!showForm && (
+          <button
+            onClick={handleNovaTurma}
+            style={{
+              backgroundColor: '#1F6C86',
+              color: 'white',
+              padding: '0.75rem 1.5rem',
+              borderRadius: '4px',
+              border: 'none',
+              fontSize: '1rem',
+              cursor: 'pointer',
+              marginLeft: 'auto',
+              flexShrink: 0,
+              whiteSpace: 'nowrap',
+            }}
+            onMouseEnter={(e) => e.target.style.backgroundColor = '#151b60'}
+            onMouseLeave={(e) => e.target.style.backgroundColor = '#1F6C86'}
+          >
+            Adicionar turma
+          </button>
+        )}
+      </div>
 
       <div style={{ overflowX: 'auto', marginBottom: 24 }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 400 }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', minWidth: 720 }}>
           <thead>
             <tr style={{ background: '#f5f5f5' }}>
-              <th style={{ padding: 12, borderBottom: '2px solid #eee', textAlign: 'center' }}>Dias</th>
-              <th style={{ padding: 12, borderBottom: '2px solid #eee', textAlign: 'center' }}>Horário</th>
-              <th style={{ padding: 12, borderBottom: '2px solid #eee', textAlign: 'center' }}>Faixa</th>
-              <th style={{ padding: 12, borderBottom: '2px solid #eee', textAlign: 'center' }}>Capacidade</th>
-              <th style={{ padding: 12, borderBottom: '2px solid #eee', textAlign: 'center' }}>Professores</th>
-              <th style={{ padding: 12, borderBottom: '2px solid #eee', textAlign: 'center' }}>Alunos</th>
-              <th style={{ padding: 12, borderBottom: '2px solid #eee', textAlign: 'center' }}>Ações</th>
+              <th style={{ padding: '12px 10px', borderBottom: '2px solid #e0e0e0', textAlign: 'left', verticalAlign: 'middle', width: '22%' }}>Dias</th>
+              <th style={{ padding: '12px 10px', borderBottom: '2px solid #e0e0e0', textAlign: 'center', verticalAlign: 'middle', width: '12%' }}>Horário</th>
+              <th style={{ padding: '12px 10px', borderBottom: '2px solid #e0e0e0', textAlign: 'left', verticalAlign: 'middle', width: '16%' }}>Faixa</th>
+              <th style={{ padding: '12px 10px', borderBottom: '2px solid #e0e0e0', textAlign: 'center', verticalAlign: 'middle', width: '10%' }}>Capacidade</th>
+              <th style={{ padding: '12px 10px', borderBottom: '2px solid #e0e0e0', textAlign: 'left', verticalAlign: 'middle', width: '14%' }}>Professores</th>
+              <th style={{ padding: '12px 10px', borderBottom: '2px solid #e0e0e0', textAlign: 'center', verticalAlign: 'middle', width: '8%' }}>Alunos</th>
+              <th style={{ padding: '12px 10px', borderBottom: '2px solid #e0e0e0', textAlign: 'center', verticalAlign: 'middle', width: '18%' }}>Ações</th>
             </tr>
           </thead>
           <tbody>
@@ -298,24 +422,22 @@ function CadastroTurmas({ centroId, styles }) {
             )}
             {turmas.map((turma) => (
               <tr key={turma.id} style={{ borderBottom: '1px solid #eee' }}>
-                <td style={{ padding: 12, textAlign: 'center' }}>
-                  {/* Exibe os nomes dos dias da semana, se vierem no objeto */}
-                  {turma.dias_semana_nomes
-                    ? turma.dias_semana_nomes.join(', ')
-                    : (turma.dias_semana || []).join(', ')
-                  }
-                </td>
-                <td style={{ padding: 12, textAlign: 'center' }}>{turma.horario}</td>
-                <td style={{ padding: 12, textAlign: 'center' }}>
-                  {[turma.aceita_kids && 'Kids', turma.aceita_teen && 'Teen', turma.aceita_adultos && 'Adultos'].filter(Boolean).join(', ') || '-'}
-                </td>
-                <td style={{ padding: 12, textAlign: 'center' }}>{turma.capacidade_maxima}</td>
-                <td style={{ padding: 12, textAlign: 'center' }}>
-                  {(turma.professor_nomes && turma.professor_nomes.length > 0)
-                    ? turma.professor_nomes.join(', ')
+                <td style={{ padding: '12px 10px', textAlign: 'left', verticalAlign: 'middle' }}>
+                  {Array.isArray(turma.dias_semana_nomes) && turma.dias_semana_nomes.length
+                    ? turma.dias_semana_nomes.map(formatarDiaCurto).join(', ')
                     : '-'}
                 </td>
-                <td style={{ padding: 12, textAlign: 'center' }}>
+                <td style={{ padding: '12px 10px', textAlign: 'center', verticalAlign: 'middle' }}>{formatarHorarioTurma(turma.horario) || '-'}</td>
+                <td style={{ padding: '12px 10px', textAlign: 'left', verticalAlign: 'middle' }}>
+                  {[turma.aceita_kids && 'Kids', turma.aceita_teen && 'Teen', turma.aceita_adultos && 'Adultos'].filter(Boolean).join(', ') || '-'}
+                </td>
+                <td style={{ padding: '12px 10px', textAlign: 'center', verticalAlign: 'middle' }}>{turma.capacidade_maxima}</td>
+                <td style={{ padding: '12px 10px', textAlign: 'left', verticalAlign: 'middle' }}>
+                  {(turma.professor_nomes && turma.professor_nomes.length > 0)
+                    ? turma.professor_nomes.map(primeiroNome).filter(Boolean).join(', ')
+                    : '-'}
+                </td>
+                <td style={{ padding: '12px 10px', textAlign: 'center', verticalAlign: 'middle' }}>
                   <button
                     style={{ 
                       color: '#1F6C86', 
@@ -330,13 +452,13 @@ function CadastroTurmas({ centroId, styles }) {
                     }}
                     onClick={(e) => {
                       e.preventDefault();
-                      handleShowAlunosTurma(turma.id);
+                      handleGerenciarAlunos(turma);
                     }}
                   >
                     {turma.alunos_count || 0}
                   </button>
                 </td>
-                <td style={{ padding: 12, textAlign: 'center' }}>
+                <td style={{ padding: '12px 10px', textAlign: 'center', verticalAlign: 'middle' }}>
                   <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
                     <button
                       onClick={() => handleEdit(turma)}
@@ -373,38 +495,21 @@ function CadastroTurmas({ centroId, styles }) {
                       Excluir
                     </button>
                     <button
-                      onClick={() => handleShowAddAluno(turma.id)}
+                      onClick={() => handleGerenciarAlunos(turma)}
                       style={{
                         padding: '0.5rem 1rem',
                         borderRadius: '4px',
                         border: 'none',
                         cursor: 'pointer',
                         fontSize: '0.9rem',
-                        backgroundColor: '#4caf50',
+                        backgroundColor: '#1F6C86',
                         color: 'white',
                         transition: 'background-color 0.2s',
                       }}
-                      onMouseEnter={(e) => e.target.style.backgroundColor = '#45a049'}
-                      onMouseLeave={(e) => e.target.style.backgroundColor = '#4caf50'}
+                      onMouseEnter={(e) => e.target.style.backgroundColor = '#155a70'}
+                      onMouseLeave={(e) => e.target.style.backgroundColor = '#1F6C86'}
                     >
-                      + Aluno
-                    </button>
-                    <button
-                      onClick={() => handleShowRemoveAluno(turma.id)}
-                      style={{
-                        padding: '0.5rem 1rem',
-                        borderRadius: '4px',
-                        border: 'none',
-                        cursor: 'pointer',
-                        fontSize: '0.9rem',
-                        backgroundColor: '#ff9800',
-                        color: 'white',
-                        transition: 'background-color 0.2s',
-                      }}
-                      onMouseEnter={(e) => e.target.style.backgroundColor = '#f57c00'}
-                      onMouseLeave={(e) => e.target.style.backgroundColor = '#ff9800'}
-                    >
-                      - Aluno
+                      Alunos
                     </button>
                   </div>
                 </td>
@@ -622,202 +727,167 @@ function CadastroTurmas({ centroId, styles }) {
         </form>
       )}
 
-      {showAddAluno && (
-        <form
-          onSubmit={async (e) => {
-            e.preventDefault();
-            try {
-              await api.post(`turmas/${turmaIdSelecionada}/adicionar-alunos/`, {
-                alunos: selectedAlunos.map(Number)
-              });
-              setShowAddAluno(false);
-              setTurmaIdSelecionada(null);
-              setSelectedAlunos([]);
-              setSuccess('Alunos adicionados com sucesso!');
-              fetchTurmas();
-            } catch (error) {
-              setError(error.response?.data?.error || 'Erro ao adicionar alunos.');
-            }
+      {showGerenciarAlunos && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100vw',
+            height: '100vh',
+            background: 'rgba(0,0,0,0.4)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: 16,
           }}
-          style={{ marginTop: 16, background: '#e8f5e9', padding: 16, borderRadius: 8, border: '2px solid #4caf50' }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) fecharGerenciarAlunos();
+          }}
         >
-          <h3 style={{ marginTop: 0, color: '#2e7d32' }}>➕ Adicionar Alunos à Turma</h3>
-          <label>Selecione os alunos: (segure Ctrl para selecionar múltiplos)</label>
-          <select
-            multiple
-            value={selectedAlunos}
-            onChange={e => setSelectedAlunos([...e.target.selectedOptions].map(opt => opt.value))}
-            style={{ width: '100%', marginBottom: 8, minHeight: '150px', padding: '8px' }}
-          >
-            {alunosDisponiveis.map(aluno => (
-              <option key={aluno.id} value={aluno.id}>
-                {aluno.first_name} {aluno.last_name} ({aluno.username})
-              </option>
-            ))}
-          </select>
-          <button 
-            type="button" 
-            onClick={() => setShowAddAluno(false)} 
-            style={{ 
-              backgroundColor: '#f5f5f5',
-              color: '#333',
-              padding: '0.75rem 1.5rem',
-              border: 'none',
-              borderRadius: '4px',
-              fontSize: '1rem',
-              cursor: 'pointer',
-              marginRight: 8,
-            }}
-            onMouseEnter={(e) => e.target.style.backgroundColor = '#e0e0e0'}
-            onMouseLeave={(e) => e.target.style.backgroundColor = '#f5f5f5'}
-          >
-            Cancelar
-          </button>
-          <button 
-            type="submit"
+          <div
             style={{
-              backgroundColor: '#4caf50',
-              color: 'white',
-              padding: '0.75rem 1.5rem',
-              border: 'none',
-              borderRadius: '4px',
-              fontSize: '1rem',
-              cursor: 'pointer',
+              background: '#fff',
+              padding: 24,
+              borderRadius: 8,
+              width: '100%',
+              maxWidth: 560,
+              maxHeight: '90vh',
+              overflowY: 'auto',
+              boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
             }}
-            onMouseEnter={(e) => e.target.style.backgroundColor = '#45a049'}
-            onMouseLeave={(e) => e.target.style.backgroundColor = '#4caf50'}
           >
-            Adicionar
-          </button>
-        </form>
-      )}
+            <h3 style={{ marginTop: 0, marginBottom: 4, color: '#1F6C86' }}>
+              Alunos da turma
+            </h3>
+            <p style={{ margin: '0 0 16px', color: '#555', fontWeight: 600 }}>
+              {turmaModalNome || 'Turma'}
+            </p>
 
-      {showRemoveAluno && (
-        <form
-          onSubmit={async (e) => {
-            e.preventDefault();
-            if (selectedAlunos.length === 0) {
-              setError('Selecione pelo menos um aluno para remover.');
-              return;
-            }
-            
-            if (!window.confirm(`Tem certeza que deseja remover ${selectedAlunos.length} aluno(s) desta turma?`)) {
-              return;
-            }
-            
-            try {
-              await api.post(`turmas/${turmaIdSelecionada}/remover-alunos/`, {
-                alunos: selectedAlunos.map(Number)
-              });
-              setShowRemoveAluno(false);
-              setTurmaIdSelecionada(null);
-              setSelectedAlunos([]);
-              setAlunosTurmaParaRemover([]);
-              setSuccess('Alunos removidos com sucesso!');
-              fetchTurmas();
-            } catch (error) {
-              setError(error.response?.data?.error || 'Erro ao remover alunos.');
-            }
-          }}
-          style={{ marginTop: 16, background: '#fff3e0', padding: 16, borderRadius: 8, border: '2px solid #ff9800' }}
-        >
-          <h3 style={{ marginTop: 0, color: '#f57c00' }}>➖ Remover Alunos da Turma</h3>
-          {alunosTurmaParaRemover.length === 0 ? (
-            <div style={{ color: '#888', marginBottom: 16 }}>Esta turma não possui alunos.</div>
-          ) : (
-            <>
-              <label>Selecione os alunos para remover: (segure Ctrl para selecionar múltiplos)</label>
-              <select
-                multiple
-                value={selectedAlunos}
-                onChange={e => setSelectedAlunos([...e.target.selectedOptions].map(opt => opt.value))}
-                style={{ width: '100%', marginBottom: 8, minHeight: '150px', padding: '8px' }}
-              >
-                {alunosTurmaParaRemover.map(aluno => (
-                  <option key={aluno.id} value={aluno.id}>
-                    {aluno.first_name} {aluno.last_name} ({aluno.username})
-                  </option>
-                ))}
-              </select>
-            </>
-          )}
-          <button 
-            type="button" 
-            onClick={() => {
-              setShowRemoveAluno(false);
-              setSelectedAlunos([]);
-              setAlunosTurmaParaRemover([]);
-            }} 
-            style={{ 
-              backgroundColor: '#f5f5f5',
-              color: '#333',
-              padding: '0.75rem 1.5rem',
-              border: 'none',
-              borderRadius: '4px',
-              fontSize: '1rem',
-              cursor: 'pointer',
-              marginRight: 8,
-            }}
-            onMouseEnter={(e) => e.target.style.backgroundColor = '#e0e0e0'}
-            onMouseLeave={(e) => e.target.style.backgroundColor = '#f5f5f5'}
-          >
-            Cancelar
-          </button>
-          {alunosTurmaParaRemover.length > 0 && (
-            <button 
-              type="submit"
+            <input
+              type="search"
+              value={buscaAluno}
+              onChange={(e) => setBuscaAluno(e.target.value)}
+              placeholder="Buscar aluno pelo nome"
               style={{
-                backgroundColor: '#ff9800',
-                color: 'white',
-                padding: '0.75rem 1.5rem',
-                border: 'none',
-                borderRadius: '4px',
+                width: '100%',
+                boxSizing: 'border-box',
+                padding: '10px 12px',
+                borderRadius: 4,
+                border: '1px solid #ccc',
                 fontSize: '1rem',
-                cursor: 'pointer',
+                marginBottom: 16,
               }}
-              onMouseEnter={(e) => e.target.style.backgroundColor = '#f57c00'}
-              onMouseLeave={(e) => e.target.style.backgroundColor = '#ff9800'}
-            >
-              Remover
-            </button>
-          )}
-        </form>
-      )}
+            />
 
-      {showAlunosModal && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
-          background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000
-        }}>
-          <div style={{
-            background: '#fff', padding: 24, borderRadius: 8, minWidth: 320, maxWidth: 400, boxShadow: '0 2px 8px #0002'
-          }}>
-            <h3 style={{ marginTop: 0, marginBottom: 16 }}>Alunos da turma {turmaModalNome && `- ${turmaModalNome}`}</h3>
-            {alunosTurma.length === 0 ? (
-              <div style={{ color: '#888' }}>Nenhum aluno atribuído a esta turma.</div>
+            {erroAlunos && (
+              <div style={{ color: '#c62828', background: '#ffebee', padding: 10, borderRadius: 4, marginBottom: 12, fontSize: '0.9rem' }}>
+                {erroAlunos}
+              </div>
+            )}
+
+            <h4 style={{ margin: '0 0 8px', fontSize: '0.95rem', color: '#333' }}>
+              Na turma ({alunosTurma.length})
+            </h4>
+            {alunosNaTurmaFiltrados.length === 0 ? (
+              <div style={{ color: '#888', marginBottom: 16, fontSize: '0.9rem' }}>
+                {alunosTurma.length === 0 ? 'Nenhum aluno nesta turma.' : 'Nenhum aluno encontrado na busca.'}
+              </div>
             ) : (
-              <ul style={{ paddingLeft: 18 }}>
-                {alunosTurma.map(aluno => (
-                  <li key={aluno.id}>
-                    {aluno.first_name} {aluno.last_name} <span style={{ color: '#888' }}>({aluno.username})</span>
+              <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 20px' }}>
+                {alunosNaTurmaFiltrados.map((aluno) => (
+                  <li
+                    key={aluno.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 12,
+                      padding: '8px 0',
+                      borderBottom: '1px solid #eee',
+                    }}
+                  >
+                    <span>{nomeAlunoCompleto(aluno)}</span>
+                    <button
+                      type="button"
+                      disabled={alunoEmAndamento === aluno.id}
+                      onClick={() => handleRemoverAlunoTurma(aluno.id)}
+                      style={{
+                        padding: '6px 12px',
+                        borderRadius: 4,
+                        border: 'none',
+                        cursor: alunoEmAndamento === aluno.id ? 'wait' : 'pointer',
+                        fontSize: '0.85rem',
+                        backgroundColor: '#f44336',
+                        color: 'white',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      Remover
+                    </button>
                   </li>
                 ))}
               </ul>
             )}
+
+            <h4 style={{ margin: '0 0 8px', fontSize: '0.95rem', color: '#333' }}>
+              Adicionar à turma
+            </h4>
+            {alunosParaAdicionar.length === 0 ? (
+              <div style={{ color: '#888', marginBottom: 16, fontSize: '0.9rem' }}>
+                {termoBusca ? 'Nenhum aluno encontrado para adicionar.' : 'Todos os alunos já estão nesta turma.'}
+              </div>
+            ) : (
+              <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 20px' }}>
+                {alunosParaAdicionar.map((aluno) => (
+                  <li
+                    key={aluno.id}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 12,
+                      padding: '8px 0',
+                      borderBottom: '1px solid #eee',
+                    }}
+                  >
+                    <span>{nomeAlunoCompleto(aluno)}</span>
+                    <button
+                      type="button"
+                      disabled={alunoEmAndamento === aluno.id}
+                      onClick={() => handleAdicionarAlunoTurma(aluno.id)}
+                      style={{
+                        padding: '6px 12px',
+                        borderRadius: 4,
+                        border: 'none',
+                        cursor: alunoEmAndamento === aluno.id ? 'wait' : 'pointer',
+                        fontSize: '0.85rem',
+                        backgroundColor: '#4caf50',
+                        color: 'white',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      Adicionar
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+
             <button
-              onClick={() => setShowAlunosModal(false)}
+              type="button"
+              onClick={fecharGerenciarAlunos}
               style={{
-                marginTop: 16,
                 backgroundColor: '#1F6C86',
                 color: 'white',
                 border: 'none',
-                borderRadius: '4px',
+                borderRadius: 4,
                 padding: '0.75rem 1.5rem',
                 fontSize: '1rem',
                 cursor: 'pointer',
+                width: '100%',
               }}
-              onMouseEnter={(e) => e.target.style.backgroundColor = '#151b60'}
-              onMouseLeave={(e) => e.target.style.backgroundColor = '#1F6C86'}
             >
               Fechar
             </button>
