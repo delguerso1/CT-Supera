@@ -58,6 +58,19 @@ function descricaoAulaCheckinParaAluno(status: PainelAluno['status_hoje']): stri
     : `da aula do dia ${dia}`;
 }
 
+const MENSAGEM_PAGAR_ATRASADA_PRIMEIRO =
+  'Pague primeiro a mensalidade atrasada e, depois, esta parcela pendente.';
+
+function temMensalidadeAtrasada(lista: Mensalidade[]): boolean {
+  return lista.some((m) => m.status === 'atrasado');
+}
+
+function podePagarMensalidadeAgora(mensalidade: Mensalidade, temAtrasada: boolean): boolean {
+  if (mensalidade.status === 'pago') return false;
+  if (!temAtrasada) return true;
+  return mensalidade.status === 'atrasado';
+}
+
 const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
   const { user, logout } = useAuth();
@@ -89,6 +102,20 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
   const boletoPollMaxTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const checkoutPollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const checkoutPollMaxTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const temAtrasadaAberta = useMemo(
+    () =>
+      temMensalidadeAtrasada([
+        ...(historicoPagamentos?.mensalidades_vencidas || []),
+        ...(historicoPagamentos?.mensalidades_vincendas || []),
+        ...mensalidadesPendentes,
+        ...(painelAluno?.historico_pagamentos || []),
+      ]),
+    [
+      historicoPagamentos,
+      mensalidadesPendentes,
+      painelAluno,
+    ]
+  );
   /** Avisos de push: um para permissão negada e outro para falha no servidor (independentes). */
   const pushAvisoPermissaoRef = useRef(false);
   const pushAvisoServidorRef = useRef(false);
@@ -1262,12 +1289,18 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
                     <Text style={styles.mensalidadeDate}>
                       Vencimento: {formatDate(mensalidade.data_vencimento)}
                     </Text>
-                    <TouchableOpacity
-                      style={styles.pagarButton}
-                      onPress={() => handlePagarMensalidade(mensalidade)}
-                    >
-                      <Text style={styles.pagarButtonText}>Pagar Agora</Text>
-                    </TouchableOpacity>
+                    {podePagarMensalidadeAgora(mensalidade, temAtrasadaAberta) ? (
+                      <TouchableOpacity
+                        style={styles.pagarButton}
+                        onPress={() => handlePagarMensalidade(mensalidade)}
+                      >
+                        <Text style={styles.pagarButtonText}>Pagar Agora</Text>
+                      </TouchableOpacity>
+                    ) : (
+                      <Text style={styles.orientacaoPagamento}>
+                        {MENSAGEM_PAGAR_ATRASADA_PRIMEIRO}
+                      </Text>
+                    )}
                   </View>
                 ))}
               </View>
@@ -1304,6 +1337,10 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
   };
 
   const handlePagarMensalidade = (mensalidade: Mensalidade) => {
+    if (!podePagarMensalidadeAgora(mensalidade, temAtrasadaAberta)) {
+      Alert.alert('Pague a atrasada primeiro', MENSAGEM_PAGAR_ATRASADA_PRIMEIRO);
+      return;
+    }
     setMensalidadeFormaPagamento(mensalidade);
     setFormaPagamentoModalVisible(true);
   };
@@ -1723,6 +1760,17 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
 
     return (
       <ScrollView style={styles.content}>
+        {temAtrasadaAberta &&
+          (historicoPagamentos.mensalidades_vincendas.length > 0 ||
+            mensalidadesPendentes.some((m) => m.status === 'pendente')) && (
+          <View style={styles.warningBox}>
+            <Text style={styles.warningText}>
+              Há mensalidade atrasada e outra pendente. Quite primeiro a atrasada;
+              em seguida você poderá pagar a pendente.
+            </Text>
+          </View>
+        )}
+
         {mensalidadesPendentes.length > 0 && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Mensalidades Pendentes</Text>
@@ -1747,12 +1795,18 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
                 <Text style={styles.mensalidadeDate}>
                   Vencimento: {formatDate(mensalidade.data_vencimento)}
                 </Text>
-                <TouchableOpacity
-                  style={styles.pagarButton}
-                  onPress={() => handlePagarMensalidade(mensalidade)}
-                >
-                  <Text style={styles.pagarButtonText}>Pagar Agora</Text>
-                </TouchableOpacity>
+                {podePagarMensalidadeAgora(mensalidade, temAtrasadaAberta) ? (
+                  <TouchableOpacity
+                    style={styles.pagarButton}
+                    onPress={() => handlePagarMensalidade(mensalidade)}
+                  >
+                    <Text style={styles.pagarButtonText}>Pagar Agora</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <Text style={styles.orientacaoPagamento}>
+                    {MENSAGEM_PAGAR_ATRASADA_PRIMEIRO}
+                  </Text>
+                )}
               </View>
             ))}
           </View>
@@ -1801,12 +1855,18 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
                 <Text style={styles.mensalidadeDate}>
                   Vencimento: {formatDate(mensalidade.data_vencimento)}
                 </Text>
-                <TouchableOpacity
-                  style={styles.pagarButton}
-                  onPress={() => handlePagarMensalidade(mensalidade)}
-                >
-                  <Text style={styles.pagarButtonText}>Pagar Agora</Text>
-                </TouchableOpacity>
+                {podePagarMensalidadeAgora(mensalidade, temAtrasadaAberta) ? (
+                  <TouchableOpacity
+                    style={styles.pagarButton}
+                    onPress={() => handlePagarMensalidade(mensalidade)}
+                  >
+                    <Text style={styles.pagarButtonText}>Pagar Agora</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <Text style={styles.orientacaoPagamento}>
+                    {MENSAGEM_PAGAR_ATRASADA_PRIMEIRO}
+                  </Text>
+                )}
               </View>
             ))}
           </View>
@@ -2626,6 +2686,12 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 14,
     fontWeight: 'bold',
+  },
+  orientacaoPagamento: {
+    fontSize: 13,
+    color: '#856404',
+    marginTop: 8,
+    lineHeight: 18,
   },
   parqInfo: {
     fontSize: 12,

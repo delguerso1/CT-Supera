@@ -1,6 +1,7 @@
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from financeiro.models import Mensalidade
+from financeiro.pagamento_ordem import resposta_pagamento_fora_de_ordem
 from datetime import timedelta
 from funcionarios.models import Presenca
 from turmas.models import Turma
@@ -86,6 +87,10 @@ class RealizarPagamentoAPIView(APIView):
 
         if mensalidade.status == "pago":
             return Response({"error": "Esta mensalidade já foi paga!"}, status=status.HTTP_400_BAD_REQUEST)
+
+        bloqueio = resposta_pagamento_fora_de_ordem(request.user, mensalidade)
+        if bloqueio:
+            return bloqueio
 
         mensalidade.status = "pago"
         mensalidade.save()

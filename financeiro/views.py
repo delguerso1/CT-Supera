@@ -9,6 +9,7 @@ from django.db import transaction
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 from .models import Mensalidade, Despesa, Salario, TransacaoC6Bank
+from .pagamento_ordem import resposta_pagamento_fora_de_ordem
 from .services import serializar_exalunos_com_mensalidade_aberta
 from .salarios import ensure_salarios_competencia
 from .serializers import MensalidadeSerializer, DespesaSerializer, SalarioSerializer, TransacaoC6BankSerializer
@@ -542,6 +543,10 @@ class GerarPixAPIView(APIView):
                 return Response({
                     'error': 'Você não tem permissão para gerar PIX desta mensalidade.'
                 }, status=status.HTTP_403_FORBIDDEN)
+
+            bloqueio = resposta_pagamento_fora_de_ordem(request.user, mensalidade)
+            if bloqueio:
+                return bloqueio
             
             # Verifica se já existe uma transação C6 Bank pendente
             transacao_existente = TransacaoC6Bank.objects.filter(
@@ -994,6 +999,10 @@ class CriarPagamentoBancarioAPIView(APIView):
                 return Response({
                     'error': 'Você não tem permissão para gerar pagamento desta mensalidade.'
                 }, status=status.HTTP_403_FORBIDDEN)
+
+            bloqueio = resposta_pagamento_fora_de_ordem(request.user, mensalidade)
+            if bloqueio:
+                return bloqueio
             
             # Verifica se já existe uma transação pendente
             transacao_existente = TransacaoC6Bank.objects.filter(
@@ -1500,6 +1509,10 @@ class GerarBoletoAPIView(APIView):
                 return Response({
                     'error': 'Você não tem permissão para gerar boleto desta mensalidade.'
                 }, status=status.HTTP_403_FORBIDDEN)
+
+            bloqueio = resposta_pagamento_fora_de_ordem(request.user, mensalidade)
+            if bloqueio:
+                return bloqueio
             
             # Verifica se já existe uma transação C6 Bank pendente do tipo boleto
             transacao_existente = TransacaoC6Bank.objects.filter(

@@ -45,6 +45,19 @@ function descricaoAulaCheckinParaAluno(status) {
     : `da aula do dia ${dia}`;
 }
 
+const MENSAGEM_PAGAR_ATRASADA_PRIMEIRO =
+  'Pague primeiro a mensalidade atrasada e, depois, esta parcela pendente.';
+
+function temMensalidadeAtrasada(lista) {
+  return (lista || []).some((m) => m.status === 'atrasado');
+}
+
+function podePagarMensalidadeAgora(mensalidade, temAtrasada) {
+  if (!mensalidade || mensalidade.status === 'pago') return false;
+  if (!temAtrasada) return true;
+  return mensalidade.status === 'atrasado';
+}
+
 const styles = {
   container: {
     display: 'flex',
@@ -810,7 +823,73 @@ function DashboardAluno({ user }) {
     }
   };
 
+  const temAtrasadaAberta = temMensalidadeAtrasada([
+    ...historicoMensalidades,
+    ...mensalidadesPendentes,
+  ]);
+
+  const garantirOrdemPagamento = (mensalidadeId) => {
+    const m = [...historicoMensalidades, ...mensalidadesPendentes].find(
+      (x) => x.id === mensalidadeId
+    );
+    if (m && !podePagarMensalidadeAgora(m, temAtrasadaAberta)) {
+      setErro(MENSAGEM_PAGAR_ATRASADA_PRIMEIRO);
+      setSuccess('');
+      return false;
+    }
+    return true;
+  };
+
+  const renderBotoesPagamento = (mensalidade) => {
+    if (mensalidade.status === 'pago') return null;
+    if (!podePagarMensalidadeAgora(mensalidade, temAtrasadaAberta)) {
+      return (
+        <span style={{ fontSize: 13, color: '#856404', lineHeight: 1.4 }}>
+          {MENSAGEM_PAGAR_ATRASADA_PRIMEIRO}
+        </span>
+      );
+    }
+    return (
+      <div className="payment-buttons" style={styles.paymentButtons}>
+        <button
+          className="pix-button"
+          onClick={() => handleGerarPix(mensalidade.id)}
+          disabled={pagamentoLoading || pagamentoBancarioLoading || pagamentoBoletoLoading}
+          style={{
+            ...styles.pixButton,
+            opacity: (pagamentoLoading || pagamentoBancarioLoading || pagamentoBoletoLoading) ? 0.7 : 1
+          }}
+        >
+          {pagamentoLoading ? 'Gerando PIX...' : 'Pagar com PIX'}
+        </button>
+        <button
+          className="bank-button"
+          onClick={() => handleGerarPagamentoBancario(mensalidade.id)}
+          disabled={pagamentoLoading || pagamentoBancarioLoading || pagamentoBoletoLoading}
+          style={{
+            ...styles.bankButton,
+            opacity: (pagamentoBancarioLoading || pagamentoLoading || pagamentoBoletoLoading) ? 0.7 : 1
+          }}
+        >
+          {pagamentoBancarioLoading ? 'Gerando Banco...' : 'Pagar com Cartão'}
+        </button>
+        <button
+          className="boleto-button"
+          onClick={() => handleGerarBoleto(mensalidade.id)}
+          disabled={pagamentoLoading || pagamentoBancarioLoading || pagamentoBoletoLoading}
+          style={{
+            ...styles.boletoButton,
+            opacity: (pagamentoBoletoLoading || pagamentoLoading || pagamentoBancarioLoading) ? 0.7 : 1
+          }}
+        >
+          {pagamentoBoletoLoading ? 'Gerando Boleto...' : 'Gerar Boleto'}
+        </button>
+      </div>
+    );
+  };
+
   const handleGerarPix = async (mensalidadeId) => {
+    if (!garantirOrdemPagamento(mensalidadeId)) return;
     try {
       setPagamentoLoading(true);
       setErro('');
@@ -856,6 +935,7 @@ function DashboardAluno({ user }) {
   };
 
   const handleGerarPagamentoBancario = async (mensalidadeId) => {
+    if (!garantirOrdemPagamento(mensalidadeId)) return;
     try {
       setPagamentoBancarioLoading(true);
       setErro('');
@@ -926,6 +1006,7 @@ function DashboardAluno({ user }) {
   };
 
   const handleGerarBoleto = async (mensalidadeId) => {
+    if (!garantirOrdemPagamento(mensalidadeId)) return;
     try {
       setPagamentoBoletoLoading(true);
       setErro('');
@@ -1845,6 +1926,20 @@ function DashboardAluno({ user }) {
         </div>
       )}
       
+      {temAtrasadaAberta &&
+        historicoMensalidades.some((m) => m.status === 'pendente') && (
+        <div style={{...styles.checkinCard, backgroundColor: '#fff8e1', borderColor: '#ff9800', marginBottom: 16}}>
+          <div style={{...styles.checkinTitle, color: '#f57c00'}}>
+            <span>⚠️</span>
+            Ordem de pagamento
+          </div>
+          <p style={{ margin: '8px 0 0', fontSize: 14, color: '#333' }}>
+            Há mensalidade atrasada e outra pendente. Quite primeiro a atrasada;
+            em seguida você poderá pagar a pendente.
+          </p>
+        </div>
+      )}
+
       {mensalidadesPendentes.length > 0 && (
         <div style={{...styles.checkinCard, backgroundColor: '#fff3e0', borderColor: '#ff9800'}}>
           <div style={{...styles.checkinTitle, color: '#f57c00'}}>
@@ -1883,41 +1978,7 @@ function DashboardAluno({ user }) {
                       </span>
                     </td>
                     <td style={styles.td}>
-                      <div className="payment-buttons" style={styles.paymentButtons}>
-                        <button
-                          className="pix-button"
-                          onClick={() => handleGerarPix(mensalidade.id)}
-                          disabled={pagamentoLoading || pagamentoBancarioLoading || pagamentoBoletoLoading}
-                          style={{
-                            ...styles.pixButton,
-                            opacity: (pagamentoLoading || pagamentoBancarioLoading || pagamentoBoletoLoading) ? 0.7 : 1
-                          }}
-                        >
-                          {pagamentoLoading ? 'Gerando PIX...' : 'Pagar com PIX'}
-                        </button>
-                        <button
-                          className="bank-button"
-                          onClick={() => handleGerarPagamentoBancario(mensalidade.id)}
-                          disabled={pagamentoLoading || pagamentoBancarioLoading || pagamentoBoletoLoading}
-                          style={{
-                            ...styles.bankButton,
-                            opacity: (pagamentoBancarioLoading || pagamentoLoading || pagamentoBoletoLoading) ? 0.7 : 1
-                          }}
-                        >
-                          {pagamentoBancarioLoading ? 'Gerando Banco...' : 'Pagar com Cartão'}
-                        </button>
-                        <button
-                          className="boleto-button"
-                          onClick={() => handleGerarBoleto(mensalidade.id)}
-                          disabled={pagamentoLoading || pagamentoBancarioLoading || pagamentoBoletoLoading}
-                          style={{
-                            ...styles.boletoButton,
-                            opacity: (pagamentoBoletoLoading || pagamentoLoading || pagamentoBancarioLoading) ? 0.7 : 1
-                          }}
-                        >
-                          {pagamentoBoletoLoading ? 'Gerando Boleto...' : 'Gerar Boleto'}
-                        </button>
-                      </div>
+                      {renderBotoesPagamento(mensalidade)}
                     </td>
                   </tr>
                 ))}
@@ -1960,9 +2021,17 @@ function DashboardAluno({ user }) {
                   <td style={styles.td}>
                     <span style={{
                       ...styles.statusBadge,
-                      ...(mensalidade.status === 'pago' ? styles.statusPaid : styles.statusPending)
+                      ...(mensalidade.status === 'pago'
+                        ? styles.statusPaid
+                        : mensalidade.status === 'atrasado'
+                          ? styles.statusAbsent
+                          : styles.statusPending)
                     }}>
-                      {mensalidade.status === 'pago' ? 'Pago' : 'Pendente'}
+                      {mensalidade.status === 'pago'
+                        ? 'Pago'
+                        : mensalidade.status === 'atrasado'
+                          ? 'Atrasado'
+                          : 'Pendente'}
                     </span>
                   </td>
                   <td style={styles.td}>
@@ -1971,43 +2040,7 @@ function DashboardAluno({ user }) {
                       : '-'}
                   </td>
                   <td style={styles.td}>
-                    {mensalidade.status !== 'pago' && (
-                      <div className="payment-buttons" style={styles.paymentButtons}>
-                        <button
-                          className="pix-button"
-                          onClick={() => handleGerarPix(mensalidade.id)}
-                          disabled={pagamentoLoading || pagamentoBancarioLoading || pagamentoBoletoLoading}
-                          style={{
-                            ...styles.pixButton,
-                            opacity: (pagamentoLoading || pagamentoBancarioLoading || pagamentoBoletoLoading) ? 0.7 : 1
-                          }}
-                        >
-                          {pagamentoLoading ? 'Gerando PIX...' : 'Pagar com PIX'}
-                        </button>
-                        <button
-                          className="bank-button"
-                          onClick={() => handleGerarPagamentoBancario(mensalidade.id)}
-                          disabled={pagamentoLoading || pagamentoBancarioLoading || pagamentoBoletoLoading}
-                          style={{
-                            ...styles.bankButton,
-                            opacity: (pagamentoBancarioLoading || pagamentoLoading || pagamentoBoletoLoading) ? 0.7 : 1
-                          }}
-                        >
-                          {pagamentoBancarioLoading ? 'Gerando Banco...' : 'Pagar com Cartão'}
-                        </button>
-                        <button
-                          className="boleto-button"
-                          onClick={() => handleGerarBoleto(mensalidade.id)}
-                          disabled={pagamentoLoading || pagamentoBancarioLoading || pagamentoBoletoLoading}
-                          style={{
-                            ...styles.boletoButton,
-                            opacity: (pagamentoBoletoLoading || pagamentoLoading || pagamentoBancarioLoading) ? 0.7 : 1
-                          }}
-                        >
-                          {pagamentoBoletoLoading ? 'Gerando Boleto...' : 'Gerar Boleto'}
-                        </button>
-                      </div>
-                    )}
+                    {renderBotoesPagamento(mensalidade)}
                   </td>
                 </tr>
               ))}
