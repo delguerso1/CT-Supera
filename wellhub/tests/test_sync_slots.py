@@ -19,18 +19,30 @@ from wellhub.services.sync_slots import (
 
 
 class IterSlotDatesTests(TestCase):
-    def test_apenas_segunda_e_quarta_no_mes(self):
-        # Maio 2026: 1º é sexta — pegamos seg 4 e qua 6 entre outros
+    def test_segunda_quarta_e_sexta_util_no_mes(self):
+        # Maio 2026: 1º é sexta feriado (Dia do Trabalhador)
         hoje = date(2026, 5, 4)  # segunda
         datas = list(iter_slot_dates(hoje))
+        weekdays = {d.weekday() for d in datas}
+        self.assertEqual(weekdays, {0, 2, 4})
         for d in datas:
             self.assertTrue(_is_wellhub_day(d), f"{d} não é dia Wellhub")
-            self.assertNotEqual(d.weekday(), 4, "Sexta não deve aparecer")
+        self.assertIn(date(2026, 5, 8), datas)  # sexta útil
+        self.assertNotIn(date(2026, 5, 1), datas)  # sexta feriado (antes de hoje)
 
-    def test_nao_inclui_sexta(self):
-        hoje = date(2026, 5, 1)  # sexta
+    def test_inclui_sexta_util_e_exclui_sexta_feriado(self):
+        hoje = date(2026, 5, 1)  # sexta feriado
         datas = list(iter_slot_dates(hoje))
-        self.assertTrue(all(d.weekday() != 4 for d in datas))
+        sextas = [d for d in datas if d.weekday() == 4]
+        self.assertNotIn(date(2026, 5, 1), sextas)
+        self.assertIn(date(2026, 5, 8), sextas)
+
+    def test_nao_inclui_sexta_feira_santa(self):
+        hoje = date(2026, 4, 1)
+        datas = list(iter_slot_dates(hoje))
+        self.assertNotIn(date(2026, 4, 3), datas)  # Sexta-feira Santa
+        self.assertFalse(_is_wellhub_day(date(2026, 4, 3)))
+        self.assertTrue(_is_wellhub_day(date(2026, 4, 10)))
 
 
 class SlotIdFromResponseTests(TestCase):

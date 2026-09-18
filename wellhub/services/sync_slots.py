@@ -1,4 +1,4 @@
-"""Geração e sincronização de slots Wellhub (mês corrente, seg/qua)."""
+"""Geração e sincronização de slots Wellhub (mês corrente, seg/qua/sex útil)."""
 
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ from typing import Iterator, Tuple
 from django.db import transaction
 from django.utils import timezone
 
+from app.aula_experimental_datas import eh_feriado_nacional_br
 from wellhub.client import WellhubClient, WellhubAPIError
 from wellhub.constants import (
     COTA_PADRAO,
@@ -29,12 +30,19 @@ def _weekday_nome(d: date) -> str:
     return DIAS_SEMANA_NOMES[d.weekday()]
 
 
+def _is_sexta_feriado(d: date) -> bool:
+    return _weekday_nome(d) == "Sexta-feira" and eh_feriado_nacional_br(d)
+
+
 def _is_wellhub_day(d: date) -> bool:
-    return _weekday_nome(d) in DIAS_WELLHUB
+    """Segunda, quarta e sexta útil (sexta feriado nacional fica de fora)."""
+    if _weekday_nome(d) not in DIAS_WELLHUB:
+        return False
+    return not _is_sexta_feriado(d)
 
 
 def iter_slot_dates(hoje: date) -> Iterator[date]:
-    """Datas do mês corrente (>= hoje) em seg/qua; opcional prévia do mês seguinte."""
+    """Datas do mês corrente (>= hoje) em seg/qua/sex útil; opcional prévia do mês seguinte."""
     year, month = hoje.year, hoje.month
     last_day = calendar.monthrange(year, month)[1]
     end = date(year, month, last_day)
@@ -674,7 +682,9 @@ def discover_slots_near_id(
 def is_slot_eligible(slot: WellhubSlot, agora: datetime | None = None) -> Tuple[bool, str]:
     agora = agora or timezone.now()
     if not _is_wellhub_day(slot.data_aula):
-        return False, "Aula fora dos dias Wellhub (segunda/quarta)."
+        if _is_sexta_feriado(slot.data_aula):
+            return False, "Sexta-feira feriado: Wellhub não agenda neste dia."
+        return False, "Aula fora dos dias Wellhub (segunda/quarta/sexta)."
     if slot.total_booked >= slot.total_capacity:
         return False, "Cota Wellhub esgotada."
     if agora > slot.closes_at:

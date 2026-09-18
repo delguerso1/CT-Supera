@@ -93,25 +93,28 @@ class BookingRequestedTests(TestCase):
         booking = WellhubBooking.objects.get(wellhub_booking_id="bk-1")
         self.assertEqual(booking.status, "confirmed")
 
-    @patch("wellhub.services.bookings.WellhubClient")
-    def test_rejeita_sexta(self, mock_client_cls):
-        mock_client_cls.return_value.configured = False
+    def _criar_slot(self, data_aula, slot_id):
         tz = timezone.get_current_timezone()
-        data_sex = date(2030, 6, 7)  # sexta
         occur = timezone.make_aware(
-            timezone.datetime.combine(data_sex, time(19, 0)),
+            timezone.datetime.combine(data_aula, time(19, 0)),
             tz,
         )
-        slot_sex = WellhubSlot.objects.create(
+        return WellhubSlot.objects.create(
             turma=self.turma,
-            data_aula=data_sex,
+            data_aula=data_aula,
             occur_date=occur,
-            wellhub_slot_id="slot-sex",
+            wellhub_slot_id=slot_id,
             total_capacity=5,
             total_booked=0,
             opens_at=occur - timedelta(days=2),
             closes_at=occur - timedelta(minutes=10),
-        )
+        ), occur
+
+    @patch("wellhub.services.bookings.WellhubClient")
+    def test_confirma_sexta_util(self, mock_client_cls):
+        mock_client_cls.return_value.configured = False
+        data_sex = date(2030, 6, 7)  # sexta útil
+        slot_sex, occur = self._criar_slot(data_sex, "slot-sex")
         with patch(
             "wellhub.services.sync_slots.timezone.now",
             return_value=occur - timedelta(hours=1),
@@ -122,9 +125,29 @@ class BookingRequestedTests(TestCase):
                 "slot_id": "slot-sex",
                 "user": {"first_name": "João", "email": "j@test.com"},
             }
+            action, _ = handle_booking_requested(payload)
+        self.assertEqual(action, "confirmed")
+        booking = WellhubBooking.objects.get(wellhub_booking_id="bk-sex")
+        self.assertEqual(booking.slot_id, slot_sex.pk)
+
+    @patch("wellhub.services.bookings.WellhubClient")
+    def test_rejeita_sexta_feriado(self, mock_client_cls):
+        mock_client_cls.return_value.configured = False
+        data_sex = date(2026, 5, 1)  # sexta, Dia do Trabalhador
+        _, occur = self._criar_slot(data_sex, "slot-sex-feriado")
+        with patch(
+            "wellhub.services.sync_slots.timezone.now",
+            return_value=occur - timedelta(hours=1),
+        ):
+            payload = {
+                "event": "booking.requested",
+                "booking_number": "bk-sex-feriado",
+                "slot_id": "slot-sex-feriado",
+                "user": {"first_name": "João", "email": "j@test.com"},
+            }
             action, motivo = handle_booking_requested(payload)
         self.assertEqual(action, "rejected")
-        self.assertIn("Wellhub", motivo)
+        self.assertIn("feriado", motivo.lower())
 
     @patch("wellhub.services.bookings.WellhubClient")
     def test_rejeita_sexta_cota(self, mock_client_cls):

@@ -6,7 +6,7 @@ from wellhub.services.sync_slots import sync_all_published_slots
 
 
 class Command(BaseCommand):
-    help = "Sincroniza slots Wellhub do mês corrente (seg/qua, Praia de Itaipuaçu)."
+    help = "Sincroniza slots Wellhub do mês corrente (seg/qua/sex útil, Praia de Itaipuaçu)."
 
     def add_arguments(self, parser):
         parser.add_argument(

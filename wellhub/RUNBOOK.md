@@ -4,7 +4,7 @@
 
 - **APIs:** Booking API + Access Control (validate check-in)
 - **Piloto:** CT **Praia de Itaipuaçu**, turmas **07:00, 08:00, 19:00**
-- **Dias Wellhub:** segunda e quarta (5 vagas/slot)
+- **Dias Wellhub:** segunda, quarta e sexta útil (5 vagas/slot; sexta feriado nacional não entra)
 - **Webhook:** `POST /api/wellhub/webhook/`
 
 ## Variáveis de ambiente
@@ -45,7 +45,7 @@ python manage.py configurar_wellhub_praia --skip-api
 
 ## Operação diária
 
-- **Cron (03:00):** `sincronizar_wellhub_slots` — recria/atualiza slots do mês (seg/qua)
+- **Cron (03:00):** `sincronizar_wellhub_slots` — recria/atualiza slots do mês (seg/qua/sex útil)
 - **Manual (gerente):** botão “Sincronizar slots Wellhub” no painel web/app
 - **Cadastros:** menu **Wellhub** → listar/editar `CadastroWellhub`
 
@@ -65,13 +65,13 @@ python manage.py test wellhub
 ## Homologação sandbox (checklist)
 
 1. [ ] Turmas 07h/08h/19h com classes na Wellhub
-2. [ ] Slots visíveis no app Wellhub **somente seg/qua**
+2. [ ] Slots visíveis no app Wellhub **seg/qua/sex útil** (sexta feriado nacional sem slot)
 3. [ ] Reserva teste → webhook → cadastro criado → booking **confirmed**
 4. [ ] 6ª reserva na mesma aula → **rejected**
 5. [ ] Cancelamento libera vaga (`total_booked` correto)
 6. [ ] Webhook com assinatura inválida → HTTP **403**
 7. [ ] Check-in teste no app → webhook `checkin.occurred` / `checkin-booking-occurred` → `POST /access/v1/validate`
-8. [ ] Sexta **sem** slot Wellhub; matriculados CT seguem check-in normal
+8. [ ] Sexta útil **com** slot Wellhub; sexta feriado nacional **sem** slot
 
 ## Troubleshooting
 

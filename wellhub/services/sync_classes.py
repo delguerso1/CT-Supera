@@ -28,7 +28,7 @@ def _class_description(turma: Turma) -> str:
     return (
         f"Vôlei de praia — CT Supera Praia de Itaipuaçu às {turma.horario.strftime('%H:%M')}. "
         f"Aulas disponíveis para Wellhub: {dias_wellhub}. "
-        f"Sextas exclusivas para alunos matriculados do CT Supera."
+        f"Sextas-feiras em feriado nacional não são disponibilizadas."
     )
 
 

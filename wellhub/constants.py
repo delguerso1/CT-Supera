@@ -6,7 +6,7 @@ CT_NOME_PILOTO = "Praia de Itaipuaçu"
 
 HORARIOS_PILOTO = (time(7, 0), time(8, 0), time(19, 0))
 
-DIAS_WELLHUB = ("Segunda-feira", "Quarta-feira")
+DIAS_WELLHUB = ("Segunda-feira", "Quarta-feira", "Sexta-feira")
 
 # Alinhado a alunos.checkin_utils._DIAS_SEMANA_NOMES (weekday() → nome)
 DIAS_SEMANA_NOMES = (
