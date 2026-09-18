@@ -135,9 +135,7 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
     status?: string;
   } | null>(null);
   const [checkoutStatusLoading, setCheckoutStatusLoading] = useState(false);
-  /** Android: Alert aceita no máx. 3 botões — cartão sumia. Modal lista todas as opções. */
-  const [formaPagamentoModalVisible, setFormaPagamentoModalVisible] = useState(false);
-  const [mensalidadeFormaPagamento, setMensalidadeFormaPagamento] = useState<Mensalidade | null>(null);
+  const [mensalidadeExpandidaId, setMensalidadeExpandidaId] = useState<number | null>(null);
   const [form, setForm] = useState({
     first_name: '',
     last_name: '',
@@ -1269,7 +1267,15 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Mensalidades Pendentes</Text>
                 {mensalidadesPendentes.map((mensalidade) => (
-                  <View key={mensalidade.id} style={styles.mensalidadeCard}>
+                  <TouchableOpacity
+                    key={mensalidade.id}
+                    style={[
+                      styles.mensalidadeCard,
+                      mensalidadeExpandidaId === mensalidade.id && styles.mensalidadeCardExpandida,
+                    ]}
+                    activeOpacity={0.88}
+                    onPress={() => toggleMensalidadeExpandida(mensalidade)}
+                  >
                     <View style={styles.mensalidadeHeader}>
                       <Text style={styles.mensalidadeValue}>
                         R$ {Number(mensalidade.valor_efetivo ?? mensalidade.valor).toFixed(2)}
@@ -1289,19 +1295,8 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
                     <Text style={styles.mensalidadeDate}>
                       Vencimento: {formatDate(mensalidade.data_vencimento)}
                     </Text>
-                    {podePagarMensalidadeAgora(mensalidade, temAtrasadaAberta) ? (
-                      <TouchableOpacity
-                        style={styles.pagarButton}
-                        onPress={() => handlePagarMensalidade(mensalidade)}
-                      >
-                        <Text style={styles.pagarButtonText}>Pagar Agora</Text>
-                      </TouchableOpacity>
-                    ) : (
-                      <Text style={styles.orientacaoPagamento}>
-                        {MENSAGEM_PAGAR_ATRASADA_PRIMEIRO}
-                      </Text>
-                    )}
-                  </View>
+                    {renderAcoesPagamentoMensalidade(mensalidade)}
+                  </TouchableOpacity>
                 ))}
               </View>
             )}
@@ -1336,23 +1331,57 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
     );
   };
 
-  const handlePagarMensalidade = (mensalidade: Mensalidade) => {
+  const toggleMensalidadeExpandida = (mensalidade: Mensalidade) => {
     if (!podePagarMensalidadeAgora(mensalidade, temAtrasadaAberta)) {
-      Alert.alert('Pague a atrasada primeiro', MENSAGEM_PAGAR_ATRASADA_PRIMEIRO);
       return;
     }
-    setMensalidadeFormaPagamento(mensalidade);
-    setFormaPagamentoModalVisible(true);
+    setMensalidadeExpandidaId((atual) =>
+      atual === mensalidade.id ? null : mensalidade.id
+    );
   };
 
-  const escolherFormaPagamento = (acao: 'pix' | 'boleto' | 'cartao') => {
-    const m = mensalidadeFormaPagamento;
-    setFormaPagamentoModalVisible(false);
-    setMensalidadeFormaPagamento(null);
-    if (!m) return;
-    if (acao === 'pix') void gerarPix(m);
-    else if (acao === 'boleto') void gerarBoleto(m);
-    else void criarCheckout(m);
+  const renderAcoesPagamentoMensalidade = (mensalidade: Mensalidade) => {
+    if (mensalidade.status === 'pago') return null;
+    if (!podePagarMensalidadeAgora(mensalidade, temAtrasadaAberta)) {
+      return (
+        <Text style={styles.orientacaoPagamento}>
+          {MENSAGEM_PAGAR_ATRASADA_PRIMEIRO}
+        </Text>
+      );
+    }
+    const expandida = mensalidadeExpandidaId === mensalidade.id;
+    return (
+      <View>
+        {!expandida && (
+          <Text style={styles.mensalidadeHint}>Toque para ver formas de pagamento</Text>
+        )}
+        {expandida && (
+          <View
+            style={styles.paymentOptions}
+            onStartShouldSetResponder={() => true}
+          >
+            <TouchableOpacity
+              style={[styles.paymentOptionInline, styles.pixOptionInline]}
+              onPress={() => void gerarPix(mensalidade)}
+            >
+              <Text style={styles.paymentOptionInlineText}>Pagar com PIX</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.paymentOptionInline, styles.cartaoOptionInline]}
+              onPress={() => void criarCheckout(mensalidade)}
+            >
+              <Text style={styles.paymentOptionInlineText}>Pagar com Cartão</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.paymentOptionInline, styles.boletoOptionInline]}
+              onPress={() => void gerarBoleto(mensalidade)}
+            >
+              <Text style={styles.paymentOptionInlineText}>Gerar Boleto</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
+    );
   };
 
   const pararPollingPix = () => {
@@ -1775,7 +1804,15 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Mensalidades Pendentes</Text>
             {mensalidadesPendentes.map((mensalidade) => (
-              <View key={mensalidade.id} style={styles.mensalidadeCard}>
+              <TouchableOpacity
+                key={mensalidade.id}
+                style={[
+                  styles.mensalidadeCard,
+                  mensalidadeExpandidaId === mensalidade.id && styles.mensalidadeCardExpandida,
+                ]}
+                activeOpacity={0.88}
+                onPress={() => toggleMensalidadeExpandida(mensalidade)}
+              >
                 <View style={styles.mensalidadeHeader}>
                   <Text style={styles.mensalidadeValue}>
                     R$ {Number(mensalidade.valor_efetivo ?? mensalidade.valor).toFixed(2)}
@@ -1795,19 +1832,8 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
                 <Text style={styles.mensalidadeDate}>
                   Vencimento: {formatDate(mensalidade.data_vencimento)}
                 </Text>
-                {podePagarMensalidadeAgora(mensalidade, temAtrasadaAberta) ? (
-                  <TouchableOpacity
-                    style={styles.pagarButton}
-                    onPress={() => handlePagarMensalidade(mensalidade)}
-                  >
-                    <Text style={styles.pagarButtonText}>Pagar Agora</Text>
-                  </TouchableOpacity>
-                ) : (
-                  <Text style={styles.orientacaoPagamento}>
-                    {MENSAGEM_PAGAR_ATRASADA_PRIMEIRO}
-                  </Text>
-                )}
-              </View>
+                {renderAcoesPagamentoMensalidade(mensalidade)}
+              </TouchableOpacity>
             ))}
           </View>
         )}
@@ -1816,7 +1842,15 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Mensalidades Vencidas</Text>
             {historicoPagamentos.mensalidades_vencidas.map((mensalidade) => (
-              <View key={mensalidade.id} style={styles.mensalidadeCard}>
+              <TouchableOpacity
+                key={mensalidade.id}
+                style={[
+                  styles.mensalidadeCard,
+                  mensalidadeExpandidaId === mensalidade.id && styles.mensalidadeCardExpandida,
+                ]}
+                activeOpacity={0.88}
+                onPress={() => toggleMensalidadeExpandida(mensalidade)}
+              >
                 <View style={styles.mensalidadeHeader}>
                   <Text style={styles.mensalidadeValue}>
                     R$ {Number(mensalidade.valor_efetivo ?? mensalidade.valor).toFixed(2)}
@@ -1828,13 +1862,8 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
                 <Text style={styles.mensalidadeDate}>
                   Vencimento: {formatDate(mensalidade.data_vencimento)}
                 </Text>
-                <TouchableOpacity
-                  style={styles.pagarButton}
-                  onPress={() => handlePagarMensalidade(mensalidade)}
-                >
-                  <Text style={styles.pagarButtonText}>Pagar Agora</Text>
-                </TouchableOpacity>
-              </View>
+                {renderAcoesPagamentoMensalidade(mensalidade)}
+              </TouchableOpacity>
             ))}
           </View>
         )}
@@ -1843,7 +1872,15 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Mensalidades a Vencer</Text>
             {historicoPagamentos.mensalidades_vincendas.map((mensalidade) => (
-              <View key={mensalidade.id} style={styles.mensalidadeCard}>
+              <TouchableOpacity
+                key={mensalidade.id}
+                style={[
+                  styles.mensalidadeCard,
+                  mensalidadeExpandidaId === mensalidade.id && styles.mensalidadeCardExpandida,
+                ]}
+                activeOpacity={0.88}
+                onPress={() => toggleMensalidadeExpandida(mensalidade)}
+              >
                 <View style={styles.mensalidadeHeader}>
                   <Text style={styles.mensalidadeValue}>
                     R$ {Number(mensalidade.valor_efetivo ?? mensalidade.valor).toFixed(2)}
@@ -1855,19 +1892,8 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
                 <Text style={styles.mensalidadeDate}>
                   Vencimento: {formatDate(mensalidade.data_vencimento)}
                 </Text>
-                {podePagarMensalidadeAgora(mensalidade, temAtrasadaAberta) ? (
-                  <TouchableOpacity
-                    style={styles.pagarButton}
-                    onPress={() => handlePagarMensalidade(mensalidade)}
-                  >
-                    <Text style={styles.pagarButtonText}>Pagar Agora</Text>
-                  </TouchableOpacity>
-                ) : (
-                  <Text style={styles.orientacaoPagamento}>
-                    {MENSAGEM_PAGAR_ATRASADA_PRIMEIRO}
-                  </Text>
-                )}
-              </View>
+                {renderAcoesPagamentoMensalidade(mensalidade)}
+              </TouchableOpacity>
             ))}
           </View>
         )}
@@ -2001,53 +2027,6 @@ const DashboardAlunoScreen: React.FC<NavigationProps> = ({ navigation, route }) 
       {activeSection === 'parq' && renderParq()}
       {activeSection === 'checkin' && renderCheckin()}
       {activeSection === 'pagamentos' && renderPagamentos()}
-
-      <Modal visible={formaPagamentoModalVisible} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { marginBottom: Math.max(insets.bottom, 8) }]}>
-            <Text style={styles.modalTitle}>Forma de pagamento</Text>
-            <Text style={styles.modalSubtitle}>
-              {`Mensalidade de R$ ${
-                mensalidadeFormaPagamento
-                  ? Number(
-                      mensalidadeFormaPagamento.valor_efetivo ?? mensalidadeFormaPagamento.valor
-                    ).toFixed(2)
-                  : '—'
-              }`}
-            </Text>
-            <Text style={styles.modalHint}>
-              Cartão de crédito abre o checkout seguro do banco no navegador.
-            </Text>
-            <TouchableOpacity
-              style={styles.paymentOptionButton}
-              onPress={() => escolherFormaPagamento('pix')}
-            >
-              <Text style={styles.paymentOptionButtonText}>PIX</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.paymentOptionButton}
-              onPress={() => escolherFormaPagamento('boleto')}
-            >
-              <Text style={styles.paymentOptionButtonText}>Boleto</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.paymentOptionButton, styles.paymentOptionButtonHighlight]}
-              onPress={() => escolherFormaPagamento('cartao')}
-            >
-              <Text style={styles.paymentOptionButtonText}>Cartão de crédito</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.modalButtonStack, styles.modalButtonStackSecondary]}
-              onPress={() => {
-                setFormaPagamentoModalVisible(false);
-                setMensalidadeFormaPagamento(null);
-              }}
-            >
-              <Text style={styles.modalButtonText}>Cancelar</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
 
       <Modal visible={pixModalVisible} transparent animationType="slide">
         <View style={styles.modalOverlay}>
@@ -2595,6 +2574,17 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 12,
   },
+  mensalidadeCardExpandida: {
+    borderWidth: 1,
+    borderColor: colors.primary,
+    backgroundColor: '#fff',
+  },
+  mensalidadeHint: {
+    fontSize: 13,
+    color: '#1F6C86',
+    fontWeight: '600',
+    marginTop: 4,
+  },
   mensalidadeHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -2686,6 +2676,32 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 14,
     fontWeight: 'bold',
+  },
+  paymentOptions: {
+    marginTop: 10,
+  },
+  paymentOptionInline: {
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    marginTop: 8,
+    minHeight: 48,
+    justifyContent: 'center',
+  },
+  pixOptionInline: {
+    backgroundColor: '#32BCAD',
+  },
+  cartaoOptionInline: {
+    backgroundColor: '#1976d2',
+  },
+  boletoOptionInline: {
+    backgroundColor: '#ff9800',
+  },
+  paymentOptionInlineText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '700',
   },
   orientacaoPagamento: {
     fontSize: 13,

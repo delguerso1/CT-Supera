@@ -316,38 +316,111 @@ const styles = {
   },
   paymentButtons: {
     display: 'flex',
+    flexDirection: 'column',
     gap: '8px',
-    flexWrap: 'wrap'
+    width: '100%',
+    marginTop: '4px',
   },
   pixButton: {
     backgroundColor: '#32BCAD',
     color: 'white',
     border: 'none',
-    borderRadius: '6px',
-    padding: '8px 16px',
-    fontSize: '14px',
+    borderRadius: '8px',
+    padding: '12px 16px',
+    fontSize: '15px',
+    fontWeight: '600',
     cursor: 'pointer',
+    width: '100%',
     transition: 'background-color 0.3s ease'
   },
   bankButton: {
     backgroundColor: '#1976d2',
     color: 'white',
     border: 'none',
-    borderRadius: '6px',
-    padding: '8px 16px',
-    fontSize: '14px',
+    borderRadius: '8px',
+    padding: '12px 16px',
+    fontSize: '15px',
+    fontWeight: '600',
     cursor: 'pointer',
+    width: '100%',
     transition: 'background-color 0.3s ease'
   },
   boletoButton: {
     backgroundColor: '#ff9800',
     color: 'white',
     border: 'none',
-    borderRadius: '6px',
-    padding: '8px 16px',
-    fontSize: '14px',
+    borderRadius: '8px',
+    padding: '12px 16px',
+    fontSize: '15px',
+    fontWeight: '600',
     cursor: 'pointer',
+    width: '100%',
     transition: 'background-color 0.3s ease'
+  },
+  mensalidadeList: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '12px',
+    marginTop: '12px',
+  },
+  mensalidadeCard: {
+    border: '1px solid #e0e0e0',
+    borderRadius: '12px',
+    backgroundColor: '#fff',
+    overflow: 'hidden',
+  },
+  mensalidadeCardExpandida: {
+    borderColor: '#1F6C86',
+    boxShadow: '0 2px 8px rgba(31, 108, 134, 0.12)',
+  },
+  mensalidadeCardHeader: {
+    width: '100%',
+    display: 'flex',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: '12px',
+    padding: '14px 16px',
+    background: 'none',
+    border: 'none',
+    textAlign: 'left',
+    fontFamily: 'inherit',
+  },
+  mensalidadeCardInfo: {
+    flex: 1,
+    minWidth: 0,
+  },
+  mensalidadeCardMes: {
+    fontSize: '16px',
+    fontWeight: '700',
+    color: '#1F6C86',
+    marginBottom: '4px',
+  },
+  mensalidadeCardValor: {
+    fontSize: '18px',
+    fontWeight: '700',
+    color: '#333',
+    marginBottom: '4px',
+  },
+  mensalidadeCardMeta: {
+    fontSize: '13px',
+    color: '#666',
+    lineHeight: 1.45,
+  },
+  mensalidadeCardRight: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'flex-end',
+    gap: '8px',
+    flexShrink: 0,
+  },
+  mensalidadeCardChevron: {
+    fontSize: '12px',
+    color: '#1F6C86',
+    fontWeight: '700',
+  },
+  mensalidadeCardBody: {
+    padding: '12px 16px 16px',
+    borderTop: '1px solid #f0f0f0',
   },
   error: {
     backgroundColor: '#ffebee',
@@ -452,6 +525,7 @@ function DashboardAluno({ user }) {
   const [pagamentoLoading, setPagamentoLoading] = useState(false);
   const [pagamentoBancarioLoading, setPagamentoBancarioLoading] = useState(false);
   const [pagamentoBoletoLoading, setPagamentoBoletoLoading] = useState(false);
+  const [mensalidadeExpandidaId, setMensalidadeExpandidaId] = useState(null);
   const [statusHoje, setStatusHoje] = useState({
     checkin_realizado: false,
     presenca_confirmada: false,
@@ -850,7 +924,7 @@ function DashboardAluno({ user }) {
       );
     }
     return (
-      <div className="payment-buttons" style={styles.paymentButtons}>
+      <div style={styles.paymentButtons}>
         <button
           className="pix-button"
           onClick={() => handleGerarPix(mensalidade.id)}
@@ -884,6 +958,86 @@ function DashboardAluno({ user }) {
         >
           {pagamentoBoletoLoading ? 'Gerando Boleto...' : 'Gerar Boleto'}
         </button>
+      </div>
+    );
+  };
+
+  const renderMensalidadeCard = (mensalidade) => {
+    const expandida = mensalidadeExpandidaId === mensalidade.id;
+    const podeExpandir = mensalidade.status !== 'pago';
+    const statusStyle =
+      mensalidade.status === 'pago'
+        ? styles.statusPaid
+        : mensalidade.status === 'atrasado'
+          ? styles.statusAbsent
+          : styles.statusPending;
+    const statusLabel =
+      mensalidade.status === 'pago'
+        ? 'Pago'
+        : mensalidade.status === 'atrasado'
+          ? 'Atrasado'
+          : 'Pendente';
+    const headerStyle = {
+      ...styles.mensalidadeCardHeader,
+      cursor: podeExpandir ? 'pointer' : 'default',
+    };
+    const headerContent = (
+      <>
+        <div style={styles.mensalidadeCardInfo}>
+          <div style={styles.mensalidadeCardMes}>
+            {formatApiMonthYearDisplay(mensalidade.data_vencimento)}
+          </div>
+          <div style={styles.mensalidadeCardValor}>
+            {formatCurrency(mensalidade.valor_efetivo ?? mensalidade.valor)}
+          </div>
+          <div style={styles.mensalidadeCardMeta}>
+            Vencimento: {formatDateOnly(mensalidade.data_vencimento)}
+            {mensalidade.data_pagamento
+              ? ` · Pago em ${formatApiDateTimeDisplay(mensalidade.data_pagamento)}`
+              : ''}
+            {podeExpandir && !expandida ? ' · Toque para pagar' : ''}
+          </div>
+        </div>
+        <div style={styles.mensalidadeCardRight}>
+          <span style={{ ...styles.statusBadge, ...statusStyle }}>
+            {statusLabel}
+          </span>
+          {podeExpandir && (
+            <span style={styles.mensalidadeCardChevron} aria-hidden="true">
+              {expandida ? '▲' : '▼'}
+            </span>
+          )}
+        </div>
+      </>
+    );
+
+    return (
+      <div
+        key={mensalidade.id}
+        style={{
+          ...styles.mensalidadeCard,
+          ...(expandida ? styles.mensalidadeCardExpandida : {}),
+        }}
+      >
+        {podeExpandir ? (
+          <button
+            type="button"
+            onClick={() =>
+              setMensalidadeExpandidaId(expandida ? null : mensalidade.id)
+            }
+            aria-expanded={expandida}
+            style={headerStyle}
+          >
+            {headerContent}
+          </button>
+        ) : (
+          <div style={headerStyle}>{headerContent}</div>
+        )}
+        {expandida && (
+          <div style={styles.mensalidadeCardBody}>
+            {renderBotoesPagamento(mensalidade)}
+          </div>
+        )}
       </div>
     );
   };
@@ -1946,44 +2100,8 @@ function DashboardAluno({ user }) {
             <span>⚠️</span>
             Mensalidades Pendentes
           </div>
-          <div className="table-responsive" style={{ overflowX: 'auto' }}>
-            <table className="table" style={styles.table}>
-              <thead>
-                <tr>
-                  <th style={styles.th}>Mês/Ano</th>
-                  <th style={styles.th}>Valor</th>
-                  <th style={styles.th}>Vencimento</th>
-                  <th style={styles.th}>Status</th>
-                  <th style={styles.th}>Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                {mensalidadesPendentes.map(mensalidade => (
-                  <tr key={mensalidade.id}>
-                    <td style={styles.td}>
-                      {formatApiMonthYearDisplay(mensalidade.data_vencimento)}
-                    </td>
-                    <td style={styles.td}>
-                      {formatCurrency(mensalidade.valor_efetivo ?? mensalidade.valor)}
-                    </td>
-                    <td style={styles.td}>
-                      {formatDateOnly(mensalidade.data_vencimento)}
-                    </td>
-                    <td style={styles.td}>
-                      <span style={{
-                        ...styles.statusBadge,
-                        ...(mensalidade.status === 'atrasado' ? styles.statusAbsent : styles.statusPending)
-                      }}>
-                        {mensalidade.status === 'atrasado' ? 'Atrasado' : 'Pendente'}
-                      </span>
-                    </td>
-                    <td style={styles.td}>
-                      {renderBotoesPagamento(mensalidade)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div style={styles.mensalidadeList}>
+            {mensalidadesPendentes.map(renderMensalidadeCard)}
           </div>
         </div>
       )}
@@ -1994,58 +2112,8 @@ function DashboardAluno({ user }) {
       </h3>
       
       {historicoMensalidades.length > 0 ? (
-        <div className="table-responsive" style={{ overflowX: 'auto' }}>
-          <table className="table" style={styles.table}>
-            <thead>
-              <tr>
-                <th style={styles.th}>Mês/Ano</th>
-                <th style={styles.th}>Valor</th>
-                <th style={styles.th}>Vencimento</th>
-                <th style={styles.th}>Status</th>
-                <th style={styles.th}>Data de Pagamento</th>
-                <th style={styles.th}>Ações</th>
-              </tr>
-            </thead>
-            <tbody>
-              {historicoMensalidades.map(mensalidade => (
-                <tr key={mensalidade.id}>
-                  <td style={styles.td}>
-                      {formatApiMonthYearDisplay(mensalidade.data_vencimento)}
-                  </td>
-                  <td style={styles.td}>
-                    {formatCurrency(mensalidade.valor_efetivo ?? mensalidade.valor)}
-                  </td>
-                  <td style={styles.td}>
-                      {formatDateOnly(mensalidade.data_vencimento)}
-                  </td>
-                  <td style={styles.td}>
-                    <span style={{
-                      ...styles.statusBadge,
-                      ...(mensalidade.status === 'pago'
-                        ? styles.statusPaid
-                        : mensalidade.status === 'atrasado'
-                          ? styles.statusAbsent
-                          : styles.statusPending)
-                    }}>
-                      {mensalidade.status === 'pago'
-                        ? 'Pago'
-                        : mensalidade.status === 'atrasado'
-                          ? 'Atrasado'
-                          : 'Pendente'}
-                    </span>
-                  </td>
-                  <td style={styles.td}>
-                    {mensalidade.data_pagamento
-                      ? formatApiDateTimeDisplay(mensalidade.data_pagamento)
-                      : '-'}
-                  </td>
-                  <td style={styles.td}>
-                    {renderBotoesPagamento(mensalidade)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div style={styles.mensalidadeList}>
+          {historicoMensalidades.map(renderMensalidadeCard)}
         </div>
       ) : (
         <p style={styles.noData}>Nenhuma mensalidade registrada.</p>
