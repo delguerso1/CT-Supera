@@ -1,7 +1,5 @@
-from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from financeiro.models import Mensalidade
-from financeiro.pagamento_ordem import resposta_pagamento_fora_de_ordem
 from datetime import timedelta
 from funcionarios.models import Presenca
 from turmas.models import Turma
@@ -79,24 +77,18 @@ class HistoricoPagamentosAPIView(APIView):
 
 
 class RealizarPagamentoAPIView(APIView):
-    """API para permitir que o aluno pague uma mensalidade pendente."""
+    """Não confirma pagamento. A baixa real é PIX, boleto, cartão ou o gerente."""
     permission_classes = [IsAuthenticated]
 
     def post(self, request, mensalidade_id):
-        mensalidade = get_object_or_404(Mensalidade, id=mensalidade_id, aluno=request.user)
-
-        if mensalidade.status == "pago":
-            return Response({"error": "Esta mensalidade já foi paga!"}, status=status.HTTP_400_BAD_REQUEST)
-
-        bloqueio = resposta_pagamento_fora_de_ordem(request.user, mensalidade)
-        if bloqueio:
-            return bloqueio
-
-        mensalidade.status = "pago"
-        mensalidade.save()
-        Mensalidade.criar_proxima_mensalidade(mensalidade)
-
-        return Response({"message": "Pagamento realizado com sucesso!", "mensalidade": MensalidadeSerializer(mensalidade).data}, status=status.HTTP_200_OK)
+        return Response(
+            {
+                "error": (
+                    "O pagamento só é confirmado por PIX, boleto, cartão ou pela baixa do gerente."
+                )
+            },
+            status=status.HTTP_403_FORBIDDEN,
+        )
 
 
 class PagamentoEmDiaAPIView(APIView):
