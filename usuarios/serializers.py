@@ -418,13 +418,22 @@ class UsuarioSerializer(serializers.ModelSerializer):
         'contrato_suspenso', 'suspenso_desde', 'suspenso_ate', 'duracao_suspensao_dias',
     )
 
+    def _usuario_da_requisicao(self):
+        request = self.context.get('request')
+        if request is None:
+            return None
+        user = getattr(request, 'user', None)
+        if user and user.is_authenticated:
+            return user
+        return None
+
     def _requisicao_de_gerente(self):
         """True quando não há request (uso interno confiável) ou o request é de um gerente."""
         request = self.context.get('request')
         if request is None:
             return True
-        user = getattr(request, 'user', None)
-        return bool(user and user.is_authenticated and getattr(user, 'tipo', None) == 'gerente')
+        user = self._usuario_da_requisicao()
+        return bool(user and getattr(user, 'tipo', None) == 'gerente')
 
     def validate(self, attrs):
         attrs = super().validate(attrs)
@@ -437,6 +446,11 @@ class UsuarioSerializer(serializers.ModelSerializer):
             # valor atual do registro para não falhar a validação de CPF obrigatório.
             if self.instance is not None:
                 attrs['cpf'] = self.instance.cpf
+                # E-mail de outra conta é canal de recuperação de senha. Só o gerente
+                # troca o e-mail de terceiros; o próprio usuário pode alterar o seu.
+                editor = self._usuario_da_requisicao()
+                if editor is None or editor.pk != self.instance.pk:
+                    attrs.pop('email', None)
 
         if 'first_name' in attrs:
             attrs['first_name'] = self._formatar_nome(attrs['first_name'])

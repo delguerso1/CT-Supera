@@ -123,8 +123,13 @@ class ListarPrecadastrosAPIView(ListCreateAPIView):
 
 
 class EditarExcluirPrecadastroAPIView(RetrieveUpdateDestroyAPIView):
-    """API para editar, excluir ou visualizar um pré-cadastro."""
-    permission_classes = [IsAuthenticated]
+    """API para editar, excluir ou visualizar um pré-cadastro.
+
+    Só a equipe do CT. O formulário público continua em POST /precadastros/.
+    Sem este limite, um aluno trocava o e-mail do lead e o convite de ativação
+    ia para a caixa dele.
+    """
+    permission_classes = [IsAuthenticated, IsStaffCT]
     queryset = PreCadastro.objects.select_related('turma__ct').prefetch_related('turma__dias_semana').all()
     serializer_class = PreCadastroSerializer
 

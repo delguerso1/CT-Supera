@@ -109,10 +109,15 @@ def _ids_iguais(a, b) -> bool:
 
 
 def _usuario_autorizado_na_mensalidade(user, mensalidade) -> bool:
-    """Aluno só opera mensalidade própria. Compara PK (não identidade da instância)."""
-    if getattr(user, "tipo", None) != "aluno":
+    """Gerente opera qualquer mensalidade. Aluno só a própria. Professor não cobra."""
+    if not user or not getattr(user, "is_authenticated", False):
+        return False
+    tipo = getattr(user, "tipo", None)
+    if tipo == "gerente":
         return True
-    return _ids_iguais(getattr(mensalidade, "aluno_id", None), getattr(user, "pk", None))
+    if tipo == "aluno":
+        return _ids_iguais(getattr(mensalidade, "aluno_id", None), getattr(user, "pk", None))
+    return False
 
 
 def _resolver_mensalidade_do_aluno(user, mensalidade_pk):

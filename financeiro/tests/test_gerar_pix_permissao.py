@@ -67,6 +67,26 @@ class GerarPixPermissaoTests(TestCase):
             data_vencimento=date(2025, 1, 10),
             status="atrasado",
         )
+        self.professor = Usuario.objects.create_user(
+            username="52998224725",
+            password="Professor123!",
+            tipo="professor",
+            first_name="Professor",
+            last_name="Pix",
+            email="professor.pix@test.com",
+            cpf="52998224725",
+            is_active=True,
+        )
+        self.gerente = Usuario.objects.create_user(
+            username="11144477735",
+            password="Gerente123!",
+            tipo="gerente",
+            first_name="Gerente",
+            last_name="Pix",
+            email="gerente.pix@test.com",
+            cpf="11144477735",
+            is_active=True,
+        )
         self.client = APIClient()
 
     def _post_pix(self, mensalidade_id, txid="txid-teste"):
@@ -92,6 +112,17 @@ class GerarPixPermissaoTests(TestCase):
         resp = self.client.post(f"/api/financeiro/pix/gerar/{self.mensalidade_outro_antiga.id}/")
         self.assertEqual(resp.status_code, 403)
         self.assertIn("permissão", resp.data.get("error", "").lower())
+
+    def test_professor_nao_gera_pix_de_aluno(self):
+        self.client.force_authenticate(user=self.professor)
+        resp = self.client.post(f"/api/financeiro/pix/gerar/{self.mensalidade.id}/")
+        self.assertEqual(resp.status_code, 403)
+        self.assertIn("permissão", resp.data.get("error", "").lower())
+
+    def test_gerente_gera_pix_de_qualquer_aluno(self):
+        self.client.force_authenticate(user=self.gerente)
+        resp = self._post_pix(self.mensalidade.id, txid="txid-gerente")
+        self.assertIn(resp.status_code, (200, 201), resp.data)
 
     def test_aluno_que_envia_o_proprio_id_usa_a_mensalidade_em_aberto(self):
         self.client.force_authenticate(user=self.aluno)
