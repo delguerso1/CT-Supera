@@ -36,7 +36,7 @@ jobs:
 
       - name: Listar backups disponíveis
         run: |
-          ssh ${{ secrets.USERNAME }}@${{ secrets.HOST }} << 'EOF'
+          ssh -T -o ServerAliveInterval=15 -o ServerAliveCountMax=40 ${{ secrets.USERNAME }}@${{ secrets.HOST }} << 'EOF'
             echo "📦 Backups disponíveis:"
             cd /root/backups
             ls -lht ct-supera-backup-*.tar.gz | head -10
@@ -44,7 +44,7 @@ jobs:
 
       - name: Executar rollback
         run: |
-          ssh ${{ secrets.USERNAME }}@${{ secrets.HOST }} << 'EOF'
+          ssh -T -o ServerAliveInterval=15 -o ServerAliveCountMax=40 ${{ secrets.USERNAME }}@${{ secrets.HOST }} << 'EOF'
             set -e
             cd /root/backups
             

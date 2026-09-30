@@ -120,7 +120,7 @@ jobs:
 
       - name: Criar backup no servidor
         run: |
-          ssh ${{ secrets.USERNAME }}@${{ secrets.HOST }} << 'EOF'
+          ssh -T -o ServerAliveInterval=15 -o ServerAliveCountMax=40 ${{ secrets.USERNAME }}@${{ secrets.HOST }} << 'EOF'
             cd /root
             mkdir -p backups
             timestamp=$(date +%Y%m%d-%H%M%S)
@@ -133,7 +133,7 @@ jobs:
 
       - name: Sincronizar código Backend
         run: |
-          rsync -avz --delete \
+          rsync -avz --delete -e "ssh -T -o ServerAliveInterval=15 -o ServerAliveCountMax=40" \
             --exclude 'venv/' \
             --exclude 'node_modules/' \
             --exclude '__pycache__/' \
@@ -157,13 +157,13 @@ jobs:
 
       - name: Sincronizar Frontend Build
         run: |
-          rsync -avz --delete \
+          rsync -avz --delete -e "ssh -T -o ServerAliveInterval=15 -o ServerAliveCountMax=40" \
             ct-supera-frontend/build/ \
             ${{ secrets.USERNAME }}@${{ secrets.HOST }}:/root/ct-supera/ct-supera-frontend/build/
 
       - name: Configurar cron (mensalidades, lembretes, sync checkout cartão, boletos e PIX C6)
         run: |
-          ssh ${{ secrets.USERNAME }}@${{ secrets.HOST }} << 'EOF'
+          ssh -T -o ServerAliveInterval=15 -o ServerAliveCountMax=40 ${{ secrets.USERNAME }}@${{ secrets.HOST }} << 'EOF'
             set -e
             chmod +x /root/ct-supera/scripts/gerar_mensalidades.sh 2>/dev/null || true
             chmod +x /root/ct-supera/scripts/sincronizar_checkouts_cartao_c6.sh 2>/dev/null || true
@@ -181,7 +181,7 @@ jobs:
 
       - name: Executar deploy no servidor
         run: |
-          ssh ${{ secrets.USERNAME }}@${{ secrets.HOST }} << 'EOF'
+          ssh -T -o ServerAliveInterval=15 -o ServerAliveCountMax=40 ${{ secrets.USERNAME }}@${{ secrets.HOST }} << 'EOF'
             set -e
             cd /root/ct-supera
             
@@ -249,7 +249,7 @@ jobs:
 
       - name: Verificar status do serviço
         run: |
-          ssh ${{ secrets.USERNAME }}@${{ secrets.HOST }} << 'EOF'
+          ssh -T -o ServerAliveInterval=15 -o ServerAliveCountMax=40 ${{ secrets.USERNAME }}@${{ secrets.HOST }} << 'EOF'
             echo "📊 Status dos serviços:"
             echo ""
             echo "=== Aplicação Django ==="
@@ -272,7 +272,7 @@ jobs:
       - name: Rollback em caso de falha
         if: failure()
         run: |
-          ssh ${{ secrets.USERNAME }}@${{ secrets.HOST }} << 'EOF'
+          ssh -T -o ServerAliveInterval=15 -o ServerAliveCountMax=40 ${{ secrets.USERNAME }}@${{ secrets.HOST }} << 'EOF'
             echo "❌ Deploy falhou! Iniciando rollback..."
             cd /root/backups
             latest_backup=$(ls -t ct-supera-backup-*.tar.gz | head -1)
