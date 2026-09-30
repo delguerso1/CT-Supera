@@ -8,6 +8,8 @@ from .serializers import UsuarioSerializer, PreCadastroSerializer, PresencaSeria
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+
+from usuarios.permissions import IsStaffCT
 from rest_framework import status
 from django.core.mail import send_mail
 from django.db.models import Count, Sum, Q, Max
@@ -896,8 +898,12 @@ class ListarPrecadastrosAPIView(APIView):
 
 
 class ConverterPrecadastroAPIView(APIView):
-    """API para converter um pré-cadastro em aluno e enviar convite de ativação."""
-    permission_classes = [IsAuthenticated]
+    """API para converter um pré-cadastro em aluno e enviar convite de ativação.
+
+    Mesma regra de ``PreCadastro.converter_para_aluno``: só professor ou gerente.
+    Aluno autenticado não cria conta nem dispara o e-mail de definição de senha.
+    """
+    permission_classes = [IsAuthenticated, IsStaffCT]
 
     def post(self, request, precadastro_id):
         precadastro = get_object_or_404(PreCadastro, id=precadastro_id)
