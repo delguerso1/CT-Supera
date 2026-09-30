@@ -1,8 +1,34 @@
 from django.utils import timezone
 from rest_framework import serializers
 from .models import Salario, Despesa, Mensalidade, TransacaoC6Bank
-from usuarios.serializers import UsuarioSerializer
+from usuarios.models import Usuario
 from app.date_api import DATA_API_FMT, DATE_INPUT_FORMATS, format_data_api, format_datetime_api
+
+# Campos que só a baixa do gerente e a conciliação com o banco podem gravar.
+_CAMPOS_PAGAMENTO_MENSALIDADE = ("status", "valor_pago", "data_pagamento")
+
+
+class AlunoResumoField(serializers.PrimaryKeyRelatedField):
+    """Aceita o id do aluno na escrita e devolve só nome na leitura."""
+
+    def __init__(self, **kwargs):
+        kwargs.setdefault("queryset", Usuario.objects.all())
+        super().__init__(**kwargs)
+
+    def use_pk_only_optimization(self):
+        return False
+
+    def to_representation(self, value):
+        return {
+            "id": value.pk,
+            "first_name": value.first_name or "",
+            "last_name": value.last_name or "",
+        }
+
+    def to_internal_value(self, data):
+        if isinstance(data, dict):
+            data = data.get("id")
+        return super().to_internal_value(data)
 
 
 class SalarioSerializer(serializers.ModelSerializer):
@@ -48,7 +74,7 @@ class DespesaSerializer(serializers.ModelSerializer):
         }
 
 class MensalidadeSerializer(serializers.ModelSerializer):
-    aluno = UsuarioSerializer(read_only=True)
+    aluno = AlunoResumoField()
     valor_efetivo = serializers.SerializerMethodField()
     aluno_nome = serializers.SerializerMethodField()
     forma_pagamento_label = serializers.SerializerMethodField()
@@ -96,6 +122,18 @@ class MensalidadeSerializer(serializers.ModelSerializer):
     def get_valor_efetivo(self, obj):
         """Valor a exibir: valor_pago (com multa/juros) se houver, senão valor base."""
         return obj.valor_pago if obj.valor_pago is not None else obj.valor
+
+    def create(self, validated_data):
+        for campo in _CAMPOS_PAGAMENTO_MENSALIDADE:
+            validated_data.pop(campo, None)
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        # Valor e status não mudam por PUT/PATCH. A baixa e o aumento global
+        # gravam direto no modelo.
+        for campo in (*_CAMPOS_PAGAMENTO_MENSALIDADE, "valor"):
+            validated_data.pop(campo, None)
+        return super().update(instance, validated_data)
 
     def to_representation(self, instance):
         """Status na API reflete vencimento (pendente / atrasado / pago), não só o valor gravado no BD."""

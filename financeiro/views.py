@@ -1,8 +1,14 @@
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIView
+from rest_framework.generics import (
+    ListAPIView,
+    ListCreateAPIView,
+    RetrieveAPIView,
+    RetrieveUpdateDestroyAPIView,
+)
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
+from .permissions import IsGerente, PodeConsultarMensalidade
 from django.db.models import Sum, Q
 from django.contrib.auth import get_user_model
 from django.db import transaction
@@ -148,13 +154,21 @@ def _resolver_mensalidade_do_aluno(user, mensalidade_pk):
     return None, "forbidden"
 
 
+def _restringir_mensalidades_ao_usuario(queryset, user):
+    """Aluno só enxerga as próprias parcelas. Gerente vê o queryset já filtrado."""
+    if getattr(user, "tipo", None) == "aluno":
+        return queryset.filter(aluno_id=user.pk)
+    return queryset
+
+
 # Mensalidades API
 class MensalidadeListCreateView(ListCreateAPIView):
     serializer_class = MensalidadeSerializer
     pagination_class = MensalidadePagination
+    permission_classes = [PodeConsultarMensalidade]
 
     def get_queryset(self):
-        queryset = Mensalidade.objects.all()
+        queryset = _restringir_mensalidades_ao_usuario(Mensalidade.objects.all(), self.request.user)
         aluno_id = self.request.query_params.get('aluno')
         if aluno_id:
             try:
@@ -198,13 +212,18 @@ class MensalidadeListCreateView(ListCreateAPIView):
         )
 
 class MensalidadeRetrieveUpdateDestroyView(RetrieveUpdateDestroyAPIView):
-    queryset = Mensalidade.objects.select_related('aluno').prefetch_related('transacoes_c6')
     serializer_class = MensalidadeSerializer
+    permission_classes = [PodeConsultarMensalidade]
+
+    def get_queryset(self):
+        queryset = Mensalidade.objects.select_related('aluno').prefetch_related('transacoes_c6')
+        return _restringir_mensalidades_ao_usuario(queryset, self.request.user)
 
 # Despesas API
 class DespesaListCreateView(ListCreateAPIView):
     serializer_class = DespesaSerializer
     pagination_class = MensalidadePagination
+    permission_classes = [IsGerente]
 
     def get_queryset(self):
         queryset = Despesa.objects.all()
@@ -223,11 +242,13 @@ class DespesaListCreateView(ListCreateAPIView):
 class DespesaRetrieveUpdateDestroyView(RetrieveUpdateDestroyAPIView):
     queryset = Despesa.objects.all()
     serializer_class = DespesaSerializer
+    permission_classes = [IsGerente]
 
 # Salários API
 class SalarioListCreateView(ListCreateAPIView):
     serializer_class = SalarioSerializer
     pagination_class = MensalidadePagination
+    permission_classes = [IsGerente]
 
     def get_queryset(self):
         mes_param = self.request.query_params.get('mes')
@@ -254,10 +275,11 @@ class SalarioListCreateView(ListCreateAPIView):
 class SalarioRetrieveUpdateDestroyView(RetrieveUpdateDestroyAPIView):
     queryset = Salario.objects.select_related('professor')
     serializer_class = SalarioSerializer
+    permission_classes = [IsGerente]
 
 class PagarSalarioAPIView(APIView):
     """API para realizar o pagamento de salários. Aceita POST com salario_id. Alternativa: PATCH /salarios/{id}/ com status='pago'."""
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsGerente]
 
     def post(self, request):
         try:
@@ -946,13 +968,14 @@ class C6BankCheckPaymentStatusAPIView(APIView):
         return response
 
 
-class C6BankTransactionListAPIView(ListCreateAPIView):
+class C6BankTransactionListAPIView(ListAPIView):
     """
-    Lista transações do C6 Bank
+    Lista transações do C6 Bank. Somente gerente, e somente leitura:
+    a cobrança nasce nos fluxos de PIX, boleto e cartão.
     URL: /api/financeiro/c6/transactions/
     """
     serializer_class = TransacaoC6BankSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsGerente]
     
     def get_queryset(self):
         queryset = TransacaoC6Bank.objects.all()
@@ -973,14 +996,14 @@ class C6BankTransactionListAPIView(ListCreateAPIView):
         return queryset.order_by('-data_criacao')
 
 
-class C6BankTransactionDetailAPIView(RetrieveUpdateDestroyAPIView):
+class C6BankTransactionDetailAPIView(RetrieveAPIView):
     """
-    Detalhes de uma transação específica do C6 Bank
+    Detalhes de uma transação específica do C6 Bank. Somente gerente.
     URL: /api/financeiro/c6/transactions/{id}/
     """
     queryset = TransacaoC6Bank.objects.all()
     serializer_class = TransacaoC6BankSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsGerente]
 
 
 class CriarPagamentoBancarioAPIView(APIView):

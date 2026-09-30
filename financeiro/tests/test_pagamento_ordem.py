@@ -91,7 +91,8 @@ class PagamentoOrdemAtrasadaPendenteTests(TestCase):
         resp = self._post_pix(self.pendente.id, txid="txid-depois")
         self.assertIn(resp.status_code, (200, 201), resp.data)
 
-    def test_realizar_pagamento_da_pendente_tambem_e_bloqueado(self):
-        resp = self.client.post(f"/api/alunos/realizar-pagamento/{self.pendente.id}/")
-        self.assertEqual(resp.status_code, 400, resp.data)
-        self.assertEqual(resp.data.get("codigo"), "pagar_atrasada_primeiro")
+    def test_realizar_pagamento_nao_quita_mensalidade(self):
+        resp = self.client.post(f"/api/alunos/realizar-pagamento/{self.atrasada.id}/")
+        self.assertEqual(resp.status_code, 403, resp.data)
+        self.atrasada.refresh_from_db()
+        self.assertNotEqual(self.atrasada.status, "pago")
