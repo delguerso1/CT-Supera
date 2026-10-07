@@ -1,3 +1,10 @@
+"""Sincroniza slots Wellhub do mês corrente.
+
+Agendar no cron (dia 1, 03:10 — mesmo relógio das outras rotinas do servidor):
+
+    10 3 1 * * /root/ct-supera/scripts/sincronizar_wellhub_slots.sh
+"""
+
 from django.core.management.base import BaseCommand
 
 from wellhub.client import WellhubClient

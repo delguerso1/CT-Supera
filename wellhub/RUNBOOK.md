@@ -43,10 +43,10 @@ python manage.py configurar_wellhub_praia --skip-api
    - Habilitar eventos de **booking** e **check-in** no portal
    - Enviar Bearer token das APIs CT Supera (processo Wellhub)
 
-## Operação diária
+## Operação
 
-- **Cron (03:00):** `sincronizar_wellhub_slots` — recria/atualiza slots do mês (seg/qua/sex útil)
-- **Manual (gerente):** botão “Sincronizar slots Wellhub” no painel web/app
+- **Cron (dia 1, 03:10, relógio do servidor):** `sincronizar_wellhub_slots` — cria/atualiza os slots do mês que começa (seg/qua/sex útil). Instalado no deploy; log em `logs/sincronizar_wellhub_slots.log`.
+- **Manual (gerente):** botão “Sincronizar slots Wellhub” no painel web/app (mesmo comando, se precisar antecipar ou repetir)
 - **Cadastros:** menu **Wellhub** → listar/editar `CadastroWellhub`
 
 ## Comandos úteis
@@ -81,7 +81,8 @@ python manage.py test wellhub
 | Slots com `sync_error` | Ver logs; conferir `WELLHUB_API_KEY`, `product_id`, class_id |
 | Webhook 403 | Conferir `WELLHUB_WEBHOOK_SECRET` e body bruto (HMAC-SHA1) |
 | Reserva rejeitada “janela” | `opens_at` / `closes_at` do slot; re-sync (`opens_at` = 1º dia do mês) |
-| `total_booked` dessincronizado | `POST /api/wellhub/sync/slots/` ou cron |
+| `total_booked` dessincronizado | `POST /api/wellhub/sync/slots/` ou `python manage.py sincronizar_wellhub_slots` |
+| Slots do mês novo ausentes no dia 1 | Conferir `logs/sincronizar_wellhub_slots.log` e se o cron `10 3 1 * *` está no servidor |
 
 ## Reprocessar evento webhook
 
