@@ -218,6 +218,14 @@ const styles = {
     width: 'min(92vw, 720px)',
     maxWidth: '720px',
   },
+  modalContentExAluno: {
+    width: 'min(94vw, 960px)',
+    maxWidth: '960px',
+  },
+  formDuasColunas: {
+    gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+    columnGap: '1.5rem',
+  },
   turmasPickerBox: {
     border: '1px solid #ddd',
     borderRadius: '8px',
@@ -302,6 +310,7 @@ function CadastroUsuario({ onUserChange }) {
   const [diasSemana, setDiasSemana] = useState([]);
   const [filtroCtSelecionado, setFiltroCtSelecionado] = useState('');
   const [filtroBuscaNomeAluno, setFiltroBuscaNomeAluno] = useState('');
+  const [filtroBuscaNomeExAluno, setFiltroBuscaNomeExAluno] = useState('');
   const [filtroTurmaSelecionada, setFiltroTurmaSelecionada] = useState('');
   const [filtroOrigemPrecadastro, setFiltroOrigemPrecadastro] = useState('');
   const [filtroStatusPrecadastro, setFiltroStatusPrecadastro] = useState('');
@@ -1473,13 +1482,13 @@ function CadastroUsuario({ onUserChange }) {
 
   // Lista da aba Alunos: filtro por CT, busca por nome e ordem alfabética (A–Z)
   const getFilteredUsers = () => {
-    if (activeTab !== 'alunos') {
+    if (activeTab !== 'alunos' && activeTab !== 'exalunos') {
       return users;
     }
 
     let list = [...users];
 
-    if (filtroCtSelecionado) {
+    if (activeTab === 'alunos' && filtroCtSelecionado) {
       const filtroId = parseInt(filtroCtSelecionado, 10);
       if (!isNaN(filtroId)) {
         list = list.filter(user => {
@@ -1497,7 +1506,7 @@ function CadastroUsuario({ onUserChange }) {
       }
     }
 
-    const q = filtroBuscaNomeAluno.trim().toLowerCase();
+    const q = (activeTab === 'exalunos' ? filtroBuscaNomeExAluno : filtroBuscaNomeAluno).trim().toLowerCase();
     if (q) {
       list = list.filter(user => {
         const nome = `${user.first_name || ''} ${user.last_name || ''}`.trim().toLowerCase();
@@ -1517,18 +1526,18 @@ function CadastroUsuario({ onUserChange }) {
   // Usuários a exibir (com paginação na aba alunos)
   const getUsersToDisplay = () => {
     const filtered = getFilteredUsers();
-    if (activeTab !== 'alunos') return filtered;
+    if (activeTab !== 'alunos' && activeTab !== 'exalunos') return filtered;
     const start = (paginaAlunos - 1) * USUARIOS_POR_PAGINA;
     return filtered.slice(start, start + USUARIOS_POR_PAGINA);
   };
 
-  const totalAlunosFiltrados = activeTab === 'alunos' ? getFilteredUsers().length : 0;
+  const totalAlunosFiltrados = (activeTab === 'alunos' || activeTab === 'exalunos') ? getFilteredUsers().length : 0;
   const totalPaginasAlunos = Math.ceil(totalAlunosFiltrados / USUARIOS_POR_PAGINA) || 1;
 
   // Resetar página ao mudar filtros ou aba
   useEffect(() => {
     setPaginaAlunos(1);
-  }, [activeTab, filtroCtSelecionado, filtroTurmaSelecionada, filtroBuscaNomeAluno]);
+  }, [activeTab, filtroCtSelecionado, filtroTurmaSelecionada, filtroBuscaNomeAluno, filtroBuscaNomeExAluno]);
 
   useEffect(() => {
     nameTooltipTriggerRef.current = null;
@@ -1693,6 +1702,23 @@ function CadastroUsuario({ onUserChange }) {
 
       {activeTab === 'exalunos' && (
         <div style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+          <label style={{ fontWeight: '500', color: '#333', whiteSpace: 'nowrap' }} htmlFor="busca_nome_exaluno">
+            Buscar por nome:
+          </label>
+          <input
+            id="busca_nome_exaluno"
+            type="search"
+            placeholder="Nome ou sobrenome"
+            value={filtroBuscaNomeExAluno}
+            onChange={e => setFiltroBuscaNomeExAluno(e.target.value)}
+            style={{
+              ...styles.input,
+              minWidth: '200px',
+              maxWidth: '320px',
+              flex: '1 1 200px',
+            }}
+            autoComplete="off"
+          />
           <label style={{ fontWeight: '500', color: '#333' }}>
             Status:
           </label>
@@ -1708,9 +1734,9 @@ function CadastroUsuario({ onUserChange }) {
             <option value="cancelado">Cancelados</option>
             <option value="todos">Todos</option>
           </select>
-          {filtroStatusPrecadastro && (
+          {(filtroStatusPrecadastro || filtroBuscaNomeExAluno.trim()) && (
             <button
-              onClick={() => setFiltroStatusPrecadastro('')}
+              onClick={() => { setFiltroStatusPrecadastro(''); setFiltroBuscaNomeExAluno(''); }}
               style={{
                 ...styles.actionButton,
                 backgroundColor: '#757575',
@@ -2158,10 +2184,10 @@ function CadastroUsuario({ onUserChange }) {
         </div>
       )}
 
-      {activeTab === 'alunos' && totalAlunosFiltrados > USUARIOS_POR_PAGINA && (
+      {(activeTab === 'alunos' || activeTab === 'exalunos') && totalAlunosFiltrados > USUARIOS_POR_PAGINA && (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '1rem', padding: '0.5rem 0', flexWrap: 'wrap', gap: '0.5rem' }}>
           <span style={{ color: '#666', fontSize: '0.9rem' }}>
-            Mostrando {((paginaAlunos - 1) * USUARIOS_POR_PAGINA) + 1} - {Math.min(paginaAlunos * USUARIOS_POR_PAGINA, totalAlunosFiltrados)} de {totalAlunosFiltrados} alunos
+            Mostrando {((paginaAlunos - 1) * USUARIOS_POR_PAGINA) + 1} - {Math.min(paginaAlunos * USUARIOS_POR_PAGINA, totalAlunosFiltrados)} de {totalAlunosFiltrados} {activeTab === 'exalunos' ? 'ex-alunos' : 'alunos'}
           </span>
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
             <button
@@ -2206,6 +2232,7 @@ function CadastroUsuario({ onUserChange }) {
             style={{
               ...styles.modalContent,
               ...(editingUser && activeTab === 'alunos' ? styles.modalContentWide : {}),
+              ...(activeTab === 'exalunos' ? styles.modalContentExAluno : {}),
             }}
           >
             <h2 style={styles.title}>
@@ -2222,7 +2249,10 @@ function CadastroUsuario({ onUserChange }) {
                     : `Novo ${singularEntidadePorTab(activeTab)}`}
             </h2>
 
-            <form style={styles.form} onSubmit={handleSubmit}>
+            <form
+              style={{ ...styles.form, ...(activeTab === 'exalunos' ? styles.formDuasColunas : {}) }}
+              onSubmit={handleSubmit}
+            >
               <div style={styles.formGroup}>
                 <label style={styles.label} htmlFor="first_name">
                   Nome
@@ -2657,7 +2687,7 @@ function CadastroUsuario({ onUserChange }) {
                 </>
               )}
 
-              <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem', flexWrap: 'wrap', gridColumn: '1 / -1' }}>
                 {editingUser && activeTab === 'alunos' && (
                   editingUser.contrato_suspenso ? (
                     <button
@@ -2824,7 +2854,7 @@ function CadastroUsuario({ onUserChange }) {
                       style={styles.input}
                       min="0"
                       step="0.01"
-                      placeholder="Ex: 90.00"
+                      placeholder="Ex: 60.00"
                     />
                   </div>
                   <div style={styles.formGroup}>
