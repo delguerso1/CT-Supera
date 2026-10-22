@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from rest_framework.fields import empty
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 from usuarios.models import Usuario, PreCadastro
 from turmas.models import DiaSemana, Turma
@@ -519,6 +520,14 @@ class PreCadastroSerializer(serializers.ModelSerializer):
 
     turma = serializers.PrimaryKeyRelatedField(queryset=Turma.objects.filter(ativo=True), required=False, allow_null=True)
     origem_display = serializers.SerializerMethodField()
+
+    def get_fields(self):
+        fields = super().get_fields()
+        # Na edição, mantém válida a turma já vinculada mesmo que tenha sido desativada.
+        turma_atual_id = getattr(self.instance, 'turma_id', None) if isinstance(self.instance, PreCadastro) else None
+        if turma_atual_id:
+            fields['turma'].queryset = Turma.objects.filter(Q(ativo=True) | Q(pk=turma_atual_id))
+        return fields
     data_nascimento = serializers.DateField(
         format=DATA_API_FMT,
         input_formats=DATE_INPUT_FORMATS,
@@ -607,10 +616,18 @@ class PreCadastroSerializer(serializers.ModelSerializer):
         if self.instance:
             data_nascimento = data_nascimento or (self.instance.data_nascimento if self.instance else None)
         if email and str(email).strip().lower() != 'pendente':
+            # Ex-aluno mantém o cadastro de aluno antigo (mesmo CPF/e-mail): é a mesma pessoa, não duplicidade.
+            usuario_mesma_pessoa = None
+            if self.instance and self.instance.origem == 'ex_aluno':
+                usuario_mesma_pessoa = self.instance.usuario
+                if usuario_mesma_pessoa is None and self.instance.cpf:
+                    usuario_mesma_pessoa = Usuario.objects.filter(
+                        tipo='aluno', cpf=self.instance.cpf
+                    ).first()
             validar_email_aluno_cadastro(
                 email,
                 data_nascimento,
-                instance_usuario=None,
+                instance_usuario=usuario_mesma_pessoa,
                 instance_precadastro=self.instance,
             )
 
