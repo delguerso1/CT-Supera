@@ -68,7 +68,7 @@ Preparação: Sugerimos o uso de protetor solar, roupas leves, óculos de prote�
 Duração: O tempo de treino é de, aproximadamente, 1 (uma) hora por sessão.
 Vigência Mensal: Você está contratando um serviço mensal. Ele se inicia no primeiro dia de cada mês e termina no último dia do mês.
 Alunos Novos (Proporcionalidade): Do dia 20 em diante de cada mês, caso seja um(a) aluno(a) novo(a), será cobrada normalmente a matrícula, porém a mensalidade daquele respectivo mês será proporcional aos dias restantes.
-Matrícula e Uniforme: No primeiro ato, é paga uma matrícula no valor de R$90,00 e a respectiva mensalidade. O valor da matrícula já inclui o fornecimento de 01 (uma) camisa de treino do CT SUPERA.
+Matrícula e Uniforme: No primeiro ato, é paga uma matrícula no valor de R$60,00 e a respectiva mensalidade. O valor da matrícula já inclui o fornecimento de 01 (uma) camisa de treino do CT SUPERA.
 Observação: Nos meses subsequentes, paga-se somente a mensalidade. Se o(a) aluno(a) se ausentar por 2 (dois) meses sem pagamento, ao retornar, será cobrada nova taxa de matrícula.
 Pagamentos: O(A) aluno(a) deverá informar a melhor data para pagamento (dias 01, 05 ou 10). Caso ocorra atraso no pagamento da mensalidade, será cobrado multa de 2% da mensalidade mais 1% de mora por mês. Evite atrasos.
 Condições Climáticas: Como o exercício é ao ar livre, poderá haver cancelamento em caso de chuva forte, raios ou condições adversas. O aviso será dado com antecedência mínima de 20 minutos.
