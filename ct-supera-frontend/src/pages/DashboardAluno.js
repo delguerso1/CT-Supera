@@ -834,26 +834,31 @@ function DashboardAluno({ user }) {
     };
     try {
       const updateResponse = await api.put(`usuarios/${aluno.id}/`, parqPayload);
-      console.log('[DEBUG] Resposta do PUT usuarios (PAR-Q):', updateResponse.data);
-      setSuccess('Questionário PAR-Q atualizado com sucesso!');
-      const resp = await api.get('alunos/painel-aluno/');
-      setAluno(resp.data.usuario);
-      updateStoredUser(resp.data.usuario);
-      setActiveSection('dashboard');
-      setSearchParams({}, { replace: true });
+      const salvo = updateResponse.data || {};
+      const parqConcluido = salvo.parq_completed === true || salvo.parq_completed === 'true';
+      const usuarioAtualizado = { ...aluno, ...parqPayload, ...salvo };
+      setAluno(usuarioAtualizado);
+      updateStoredUser(usuarioAtualizado);
       setForm(prev => ({
         ...prev,
-        parq_question_1: resp.data.usuario.parq_question_1 || false,
-        parq_question_2: resp.data.usuario.parq_question_2 || false,
-        parq_question_3: resp.data.usuario.parq_question_3 || false,
-        parq_question_4: resp.data.usuario.parq_question_4 || false,
-        parq_question_5: resp.data.usuario.parq_question_5 || false,
-        parq_question_6: resp.data.usuario.parq_question_6 || false,
-        parq_question_7: resp.data.usuario.parq_question_7 || false,
-        parq_question_8: resp.data.usuario.parq_question_8 || false,
-        parq_question_9: resp.data.usuario.parq_question_9 || false,
-        parq_question_10: resp.data.usuario.parq_question_10 || false,
+        parq_question_1: usuarioAtualizado.parq_question_1 || false,
+        parq_question_2: usuarioAtualizado.parq_question_2 || false,
+        parq_question_3: usuarioAtualizado.parq_question_3 || false,
+        parq_question_4: usuarioAtualizado.parq_question_4 || false,
+        parq_question_5: usuarioAtualizado.parq_question_5 || false,
+        parq_question_6: usuarioAtualizado.parq_question_6 || false,
+        parq_question_7: usuarioAtualizado.parq_question_7 || false,
+        parq_question_8: usuarioAtualizado.parq_question_8 || false,
+        parq_question_9: usuarioAtualizado.parq_question_9 || false,
+        parq_question_10: usuarioAtualizado.parq_question_10 || false,
       }));
+      if (!parqConcluido) {
+        setErro('O questionário foi enviado, mas ainda consta como pendente. Tente novamente.');
+        return;
+      }
+      setSuccess('Questionário PAR-Q atualizado com sucesso!');
+      setActiveSection('dashboard');
+      setSearchParams({}, { replace: true });
     } catch (err) {
       const errorMessage = err.response?.data?.parq_question_1 || err.response?.data?.detail || 'Erro ao atualizar PAR-Q.';
       setErro(Array.isArray(errorMessage) ? errorMessage[0] : errorMessage);

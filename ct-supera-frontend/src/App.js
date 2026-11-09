@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useParams } from 'react-router-dom';
 import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
@@ -24,30 +24,37 @@ function RedirectTurmasCentro() {
   return <Navigate to={`/dashboard/gerente?section=centros&centro=${centroId}`} replace />;
 }
 
-// Componente para proteger rotas que requerem autenticação
+function readStoredUser() {
+  const storedUser = localStorage.getItem('user');
+  if (!storedUser) return null;
+  try {
+    return JSON.parse(storedUser);
+  } catch (error) {
+    console.error('Erro ao parsear usuário do localStorage:', error);
+    localStorage.removeItem('user');
+    localStorage.removeItem('token');
+    return null;
+  }
+}
+
+// Componente para proteger rotas que requerem autenticação.
+// O usuário é relido do localStorage quando a rota muda ou quando o painel
+// atualiza o cadastro (aceite do contrato / PAR-Q). Sem isso, o aluno fica
+// preso na tela do questionário até fazer login de novo.
 function ProtectedRoute({ children, requiredType, allowContractAccess = false }) {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
   const location = useLocation();
+  const [authVersion, setAuthVersion] = useState(0);
 
   useEffect(() => {
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-      try {
-        const parsedUser = JSON.parse(storedUser);
-        setUser(parsedUser);
-      } catch (error) {
-        console.error('Erro ao parsear usuário do localStorage:', error);
-        localStorage.removeItem('user');
-        localStorage.removeItem('token');
-      }
-    }
-    setLoading(false);
+    const syncUser = () => setAuthVersion((version) => version + 1);
+    window.addEventListener('storage', syncUser);
+    return () => window.removeEventListener('storage', syncUser);
   }, []);
 
-  if (loading) {
-    return <div>Carregando...</div>;
-  }
+  const user = useMemo(
+    () => readStoredUser(),
+    [authVersion, location.pathname, location.search, location.key]
+  );
 
   if (!user) {
     return <Navigate to="/login" replace />;
