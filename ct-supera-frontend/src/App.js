@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useParams } from 'react-router-dom';
 import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
@@ -51,10 +51,8 @@ function ProtectedRoute({ children, requiredType, allowContractAccess = false })
     return () => window.removeEventListener('storage', syncUser);
   }, []);
 
-  const user = useMemo(
-    () => readStoredUser(),
-    [authVersion, location.pathname, location.search, location.key]
-  );
+  const sessionStamp = `${authVersion}:${location.pathname}:${location.search}:${location.key}`;
+  const user = sessionStamp ? readStoredUser() : null;
 
   if (!user) {
     return <Navigate to="/login" replace />;
