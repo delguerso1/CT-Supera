@@ -1,4 +1,5 @@
 from django.urls import path
+from .relatorio_centros import RelatorioPorCentroAPIView
 from .views import (
     MensalidadeListCreateView, MensalidadeRetrieveUpdateDestroyView,
     BaixarMensalidadeAPIView, AumentoMensalidadeGlobalAPIView,
@@ -46,6 +47,11 @@ urlpatterns = [
         'relatorio/ex-alunos-pendencias/',
         RelatorioExAlunosPendenciasAPIView.as_view(),
         name='relatorio_ex_alunos_pendencias',
+    ),
+    path(
+        'relatorio/por-centro/',
+        RelatorioPorCentroAPIView.as_view(),
+        name='relatorio_por_centro',
     ),
 
     # Pagamentos PIX - Rotas alternativas para compatibilidade com frontend

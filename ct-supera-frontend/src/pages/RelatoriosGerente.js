@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import api from '../services/api';
 import { downloadPdfRelatorioAlunos, downloadPdfRelatorioFinanceiro, downloadPdfRelatorioWellhub, downloadPdfRelatorioExAlunosPendencias } from '../utils/relatoriosPdf';
+import RelatorioPorCentro from './RelatorioPorCentro';
 import { formatApiDateDisplay, formatApiDateTimeDisplay } from '../utils/dateApi';
 
 const NOMES_MESES = [
@@ -710,6 +711,8 @@ function RelatoriosGerente({ user }) {
           </>
         )}
       </section>
+
+      <RelatorioPorCentro mes={mes} ano={ano} />
 
       <section style={{ marginBottom: 32 }}>
         <h3 style={{ color: '#1F6C86', marginTop: 0, marginBottom: 8, fontSize: '1.15rem' }}>
