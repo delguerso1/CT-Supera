@@ -14,14 +14,14 @@
     <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, user-scalable=yes, viewport-fit=cover" />
 
-    <title>CT Supera | Vôlei de Praia, Esporte, Exercício e Saúde</title>
+    <title>CT Supera | CT de Vôlei de Praia em Itaipuaçu</title>
     <meta
       name="description"
-      content="CT Supera: centro de treinamento de vôlei de praia. Treinos, exercício físico, saúde e bem-estar na praia. Agende sua aula experimental."
+      content="O CT Supera é o centro de treinamento de vôlei de praia em Itaipuaçu, Maricá (RJ). Agende uma aula experimental."
     />
     <meta
       name="keywords"
-      content="vôlei de praia, volei de praia, esporte, praia, exercício físico, saúde, bem-estar, condicionamento físico, aula experimental, CT Supera, treinamento esportivo, atividades ao ar livre, Itaipuaçu, Maricá"
+      content="CT Supera, ct volei, ct de vôlei, centro de treinamento, vôlei de praia, volei de praia, aula experimental, Itaipuaçu, Maricá"
     />
     <meta name="author" content="CT Supera" />
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
@@ -32,20 +32,20 @@
     <meta property="og:locale" content="pt_BR" />
     <meta property="og:site_name" content="CT Supera" />
     <meta property="og:url" content="https://ctsupera.com.br/" />
-    <meta property="og:title" content="CT Supera | Vôlei de Praia, Esporte e Saúde" />
+    <meta property="og:title" content="CT Supera | CT de Vôlei de Praia em Itaipuaçu" />
     <meta
       property="og:description"
-      content="Centro de treinamento de vôlei de praia. Esporte, exercício físico, saúde e bem-estar. Agende sua aula experimental."
+      content="O CT Supera é o centro de treinamento de vôlei de praia em Itaipuaçu, Maricá (RJ). Agende uma aula experimental."
     />
     <meta property="og:image" content="https://ctsupera.com.br/hero-volei-praia.png" />
     <meta property="og:image:alt" content="Atletas praticando vôlei de praia no CT Supera" />
 
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="CT Supera | Vôlei de Praia, Esporte e Saúde" />
+    <meta name="twitter:title" content="CT Supera | CT de Vôlei de Praia em Itaipuaçu" />
     <meta
       name="twitter:description"
-      content="Centro de treinamento de vôlei de praia. Esporte, exercício físico, saúde e bem-estar. Agende sua aula experimental."
+      content="O CT Supera é o centro de treinamento de vôlei de praia em Itaipuaçu, Maricá (RJ). Agende uma aula experimental."
     />
     <meta name="twitter:image" content="https://ctsupera.com.br/hero-volei-praia.png" />
 
@@ -59,18 +59,76 @@
     <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
     <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
 
+    <!-- Canonical, title e description das rotas públicas antes do React.
+         Manter os textos iguais a src/seo/routes.json. -->
+    <script>
+      (function () {
+        var SITE = "https://ctsupera.com.br";
+        var pages = {
+          "/": {
+            title: "CT Supera | CT de Vôlei de Praia em Itaipuaçu",
+            description: "O CT Supera é o centro de treinamento de vôlei de praia em Itaipuaçu, Maricá (RJ). Agende uma aula experimental."
+          },
+          "/agendamento": {
+            title: "Agendamento de aula experimental | CT Supera",
+            description: "Agende sua aula experimental no CT Supera, centro de treinamento de vôlei de praia em Itaipuaçu. Escolha o centro, a turma e a data da aula."
+          },
+          "/supera-news": {
+            title: "Supera News | Notícias de Esporte e Vôlei de Praia",
+            description: "Notícias do CT Supera sobre vôlei de praia, esporte, treinos, saúde e comunidade esportiva."
+          },
+          "/galeria": {
+            title: "Galeria | Vôlei de Praia, Treinos e Vida ao Ar Livre | CT Supera",
+            description: "Fotos de treinos de vôlei de praia, exercício físico e momentos na praia no CT Supera."
+          },
+          "/trabalhe-conosco": {
+            title: "Trabalhe Conosco | Educação Física e Vôlei de Praia | CT Supera",
+            description: "Trabalhe no CT Supera com vôlei de praia, educação física, esporte e saúde. Envie seu currículo."
+          }
+        };
+        var path = window.location.pathname || "/";
+        if (path.length > 1 && path.charAt(path.length - 1) === "/") path = path.slice(0, -1);
+        var page = pages[path];
+        if (!page) return;
+        var url = path === "/" ? SITE + "/" : SITE + path;
+        document.title = page.title;
+        function meta(attr, key, content) {
+          var el = document.head.querySelector("meta[" + attr + "=\"" + key + "\"]");
+          if (!el) {
+            el = document.createElement("meta");
+            el.setAttribute(attr, key);
+            document.head.appendChild(el);
+          }
+          el.setAttribute("content", content);
+        }
+        var canonical = document.head.querySelector("link[rel=\"canonical\"]");
+        if (!canonical) {
+          canonical = document.createElement("link");
+          canonical.setAttribute("rel", "canonical");
+          document.head.appendChild(canonical);
+        }
+        canonical.setAttribute("href", url);
+        meta("name", "description", page.description);
+        meta("property", "og:url", url);
+        meta("property", "og:title", page.title);
+        meta("property", "og:description", page.description);
+        meta("name", "twitter:title", page.title);
+        meta("name", "twitter:description", page.description);
+      })();
+    </script>
+
     <!-- Dados estruturados (Schema.org) -->
     <script type="application/ld+json">
       {
         "@context": "https://schema.org",
-        "@type": "SportsActivityLocation",
+        "@type": ["SportsActivityLocation", "LocalBusiness"],
         "@id": "https://ctsupera.com.br/#organization",
         "name": "CT Supera",
         "alternateName": "Centro de Treinamento Supera",
         "url": "https://ctsupera.com.br/",
         "logo": "https://ctsupera.com.br/logo-supera-principal.png",
         "image": "https://ctsupera.com.br/hero-volei-praia.png",
-        "description": "Centro de treinamento dedicado ao vôlei de praia, exercício físico, saúde e bem-estar. Formação de atletas e aulas experimentais na praia.",
+        "description": "Centro de treinamento de vôlei de praia em Itaipuaçu, Maricá (RJ). Aulas experimentais e formação de atletas.",
         "telephone": "+55-21-96483-5368",
         "email": "administracao@ctsupera.com.br",
         "address": {
@@ -85,7 +143,7 @@
           { "@type": "AdministrativeArea", "name": "Rio de Janeiro" }
         ],
         "sport": ["Beach Volleyball", "Vôlei de praia"],
-        "sameAs": [],
+        "sameAs": ["https://www.instagram.com/ctsupera"],
         "offers": {
           "@type": "Offer",
           "name": "Aula experimental de vôlei de praia",
@@ -100,7 +158,7 @@
         "@type": "WebSite",
         "name": "CT Supera",
         "url": "https://ctsupera.com.br/",
-        "description": "Vôlei de praia, esporte, exercício físico e saúde no CT Supera.",
+        "description": "Centro de treinamento de vôlei de praia em Itaipuaçu, Maricá. CT Supera.",
         "inLanguage": "pt-BR",
         "publisher": { "@id": "https://ctsupera.com.br/#organization" }
       }
@@ -109,10 +167,10 @@
   <body>
     <noscript>
       <main>
-        <h1>CT Supera — Vôlei de praia, esporte, exercício físico e saúde</h1>
+        <h1>CT Supera — centro de treinamento de vôlei de praia em Itaipuaçu</h1>
         <p>
-          O CT Supera é um centro de treinamento de vôlei de praia focado em esporte,
-          exercício físico, saúde e bem-estar. Agende uma aula experimental em
+          O CT Supera é um centro de treinamento de vôlei de praia em
+          Itaipuaçu, Maricá (RJ). Agende uma aula experimental em
           <a href="https://ctsupera.com.br/agendamento">ctsupera.com.br/agendamento</a>.
         </p>
       </main>
