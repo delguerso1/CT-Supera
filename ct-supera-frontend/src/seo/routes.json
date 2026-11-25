@@ -1,0 +1,35 @@
+{
+  "siteUrl": "https://ctsupera.com.br",
+  "pages": [
+    {
+      "path": "/",
+      "title": "CT Supera | CT de Vôlei e Futevôlei em Itaipuaçu",
+      "description": "O CT Supera é o centro de treinamento de vôlei de praia e futevôlei em Itaipuaçu, Maricá (RJ). Agende uma aula experimental.",
+      "keywords": "CT Supera, ct volei, ct de vôlei, centro de treinamento, vôlei de praia, volei de praia, futevôlei, futevolei, aula experimental, Itaipuaçu, Maricá"
+    },
+    {
+      "path": "/agendamento",
+      "title": "Agendamento de aula experimental | CT Supera",
+      "description": "Agende sua aula experimental no CT Supera, centro de treinamento de vôlei de praia em Itaipuaçu. Escolha o centro, a turma e a data da aula.",
+      "keywords": "agendamento aula experimental, agendar aula, CT Supera, vôlei de praia, centro de treinamento, Itaipuaçu"
+    },
+    {
+      "path": "/supera-news",
+      "title": "Supera News | Notícias de Esporte e Vôlei de Praia",
+      "description": "Notícias do CT Supera sobre vôlei de praia, esporte, treinos, saúde e comunidade esportiva.",
+      "keywords": "notícias vôlei de praia, esporte, CT Supera, supera news"
+    },
+    {
+      "path": "/galeria",
+      "title": "Galeria | Vôlei de Praia, Treinos e Vida ao Ar Livre | CT Supera",
+      "description": "Fotos de treinos de vôlei de praia, exercício físico e momentos na praia no CT Supera.",
+      "keywords": "galeria vôlei de praia, treinos na praia, esporte, CT Supera"
+    },
+    {
+      "path": "/trabalhe-conosco",
+      "title": "Trabalhe Conosco | Educação Física e Vôlei de Praia | CT Supera",
+      "description": "Trabalhe no CT Supera com vôlei de praia, educação física, esporte e saúde. Envie seu currículo.",
+      "keywords": "vagas educação física, professor vôlei de praia, trabalhar esporte, CT Supera"
+    }
+  ]
+}

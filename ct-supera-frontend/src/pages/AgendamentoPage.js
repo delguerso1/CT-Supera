@@ -512,6 +512,9 @@ function AgendamentoPage() {
       <Seo {...PAGE_META.agendamento} />
       <div style={styles.container}>
         <h1 style={styles.title}>Agende sua Aula Experimental de Vôlei de Praia</h1>
+        <p style={{ ...styles.hint, marginBottom: '16px', fontSize: '0.95rem' }}>
+          Agendamento de aula experimental no CT Supera. Escolha o centro de treinamento, a turma e a data da aula.
+        </p>
         {error && <div style={styles.error}>{error}</div>}
         {success && <div style={styles.success}>{success}</div>}
         <form onSubmit={handleSubmit} style={styles.form}>
