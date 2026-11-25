@@ -59,8 +59,7 @@ function HomePage() {
             CT Supera — centro de treinamento de vôlei
           </h1>
           <p className="home-hero__subtitle">
-            Vôlei de praia e futevôlei em Itaipuaçu, Maricá. Treino, exercício físico e bem-estar
-            na praia.
+            Vôlei de praia em Itaipuaçu, Maricá. Treino, exercício físico e bem-estar na praia.
           </p>
           <Link to="/agendamento" className="home-cta agendamento-button">
             Agendar aula experimental
@@ -84,8 +83,7 @@ function HomePage() {
           <div className="home-prose content">
             <p>
               O CT Supera é um centro de treinamento em Itaipuaçu, Maricá, dedicado ao
-              desenvolvimento de atletas de todas as idades, com foco no vôlei de praia e no
-              futevôlei.
+              desenvolvimento de atletas de todas as idades, com foco no vôlei de praia.
             </p>
             <p>
               Nossa missão é transformar vidas por meio do esporte, promovendo saúde, bem-estar,
